@@ -260,7 +260,7 @@ const Onboarding: React.FC = () => {
       if (!uniquenessCheck.isValid) {
         setErrors(prev => ({ 
           ...prev, 
-          deviceId: uniquenessCheck.error 
+          deviceId: uniquenessCheck.error || 'Device validation failed'
         }))
         
         // Show detailed alert if device exists
@@ -617,7 +617,7 @@ Please use a different device UUID or contact support if this is your device.`
                 if (!uniquenessCheck.isValid) {
                   setErrors(prev => ({ 
                     ...prev, 
-                    deviceId: uniquenessCheck.error 
+                    deviceId: uniquenessCheck.error || 'Device validation failed'
                   }))
                 } else {
                   // Clear error if UUID is valid and unique
@@ -865,7 +865,7 @@ Please use a different device UUID or contact support if this is your device.`
             <div className="bg-white rounded-2xl shadow-lg p-6 sticky top-8">
               <h3 className="text-lg font-semibold text-gray-900 mb-6">Setup Progress</h3>
               <div className="space-y-4">
-                {steps.map((stepInfo, index) => (
+                {steps.map((stepInfo) => (
                   <div key={stepInfo.id} className="flex items-center space-x-4">
                     <div className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center text-lg font-medium transition-all duration-200 ${
                       stepInfo.id < step

@@ -29,7 +29,6 @@ const EntertainerOnboarding: React.FC = () => {
       const response = await apiService.register({
         firstName: formData.firstName,
         lastName: formData.lastName,
-        stageName: formData.stageName,
         email: formData.email,
         password: formData.password
       })

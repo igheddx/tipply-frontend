@@ -4,7 +4,7 @@ import { Elements, CardElement, useStripe, useElements } from '@stripe/react-str
 import { toast } from 'sonner'
 
 // Initialize Stripe
-const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || 'pk_test_placeholder')
+const stripePromise = loadStripe((import.meta as any).env.VITE_STRIPE_PUBLISHABLE_KEY || 'pk_test_placeholder')
 
 interface PaymentSetupModalProps {
   isOpen: boolean
@@ -60,7 +60,6 @@ function PaymentForm({
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [paymentRequest, setPaymentRequest] = useState<any>(null)
-  const [prButtonReady, setPrButtonReady] = useState(false)
 
   useEffect(() => {
     if (stripe) {
@@ -202,7 +201,7 @@ function PaymentForm({
           <div className="mb-2">
             <button
               onClick={() => paymentRequest.show()}
-              disabled={!prButtonReady || loading}
+              disabled={!paymentRequest.canMakePayment()?.applePay || loading}
               className="w-full bg-black text-white py-3 px-4 rounded-lg hover:bg-gray-800 transition-colors disabled:opacity-50"
             >
               {paymentRequest.canMakePayment()?.applePay ? 'Pay with Apple Pay' : 'Pay with Google Pay'}

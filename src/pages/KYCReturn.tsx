@@ -1,11 +1,10 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import apiService from '../services/api'
 
 const KYCReturn: React.FC = () => {
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
-  const [isLoggingIn, setIsLoggingIn] = useState(false)
 
   useEffect(() => {
     // Debug: Log all search parameters
@@ -52,7 +51,6 @@ const KYCReturn: React.FC = () => {
   }, [searchParams])
 
   const handleAutoLogin = async () => {
-    setIsLoggingIn(true)
     try {
       // Get stored onboarding credentials
       const email = sessionStorage.getItem('onboarding_email')
@@ -100,8 +98,6 @@ const KYCReturn: React.FC = () => {
       console.error('Auto-login error:', err)
       // Still redirect to dashboard even on error
       navigate('/dashboard')
-    } finally {
-      setIsLoggingIn(false)
     }
   }
 
