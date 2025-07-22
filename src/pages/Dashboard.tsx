@@ -20,6 +20,7 @@ interface DashboardStats {
 interface DashboardMetrics {
   totalEarnings: number
   pendingPayouts: number
+  pendingTips: number
   todaysTips: number
   thisWeekTips: number
   thisWeekTipsCount: number
@@ -604,7 +605,7 @@ const Dashboard: React.FC = () => {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Stats Overview */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-6 mb-8">
           {/* Pending Payouts - Special Standout Card */}
           <div className="bg-gradient-to-br from-blue-50 to-indigo-100 border border-blue-200 rounded-xl shadow-sm p-6 transform hover:scale-105 transition-all duration-200">
             <div className="flex items-center">
@@ -621,6 +622,26 @@ const Dashboard: React.FC = () => {
                   {metrics ? formatCurrency(metrics.pendingPayouts) : '$0.00'}
                 </p>
                 <p className="text-xs text-blue-600 mt-1">Awaiting payout cycle</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Pending Tips Card */}
+          <div className="bg-white rounded-xl shadow-sm p-6">
+            <div className="flex items-center">
+              <div className="flex-shrink-0">
+                <div className="w-8 h-8 bg-orange-100 rounded-lg flex items-center justify-center">
+                  <svg className="w-5 h-5 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+              </div>
+              <div className="ml-4">
+                <p className="text-sm font-medium text-gray-600">Pending Tips</p>
+                <p className="text-2xl font-bold text-gray-900">
+                  {metrics ? formatCurrency(metrics.pendingTips) : '$0.00'}
+                </p>
+                <p className="text-sm text-gray-500">Awaiting processing</p>
               </div>
             </div>
           </div>
@@ -1116,7 +1137,7 @@ const Dashboard: React.FC = () => {
                       </svg>
                     </div>
                     <h3 className="text-lg font-medium text-gray-900 mb-2">No tips today</h3>
-                    <p className="text-gray-500">Tips from today will appear here once you start receiving them</p>
+                    <p className="text-gray-500">Tips from today (both pending and processed) will appear here once you start receiving them</p>
                   </div>
                 )}
               </div>
