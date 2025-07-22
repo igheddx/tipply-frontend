@@ -53,6 +53,7 @@ interface Device {
   uuid: string
   nickname: string
   stripeAccountId?: string
+  deletedAt?: string
 }
 
 const Dashboard: React.FC = () => {
@@ -64,7 +65,6 @@ const Dashboard: React.FC = () => {
   const [showStripeAlert, setShowStripeAlert] = useState(false)
   const [stripeEnabledDevices, setStripeEnabledDevices] = useState<string[]>([])
   const [deviceStripeStatus, setDeviceStripeStatus] = useState<{[key: string]: string}>({})
-  const [profileId, setProfileId] = useState<string>('')
   const [kycStatus, setKycStatus] = useState<string>('unknown')
   const [userProfile, setUserProfile] = useState<any>(null)
   
@@ -83,6 +83,8 @@ const Dashboard: React.FC = () => {
   const [showDeletedDevices, setShowDeletedDevices] = useState(false)
   const [isDeletingDevice, setIsDeletingDevice] = useState<string | null>(null)
   const [isRestoringDevice, setIsRestoringDevice] = useState<string | null>(null)
+  const [showDeleteModal, setShowDeleteModal] = useState(false)
+  const [deviceToDelete, setDeviceToDelete] = useState<DeviceSummary | null>(null)
   
   const navigate = useNavigate()
 
@@ -98,6 +100,7 @@ const Dashboard: React.FC = () => {
     fetchDashboardStats()
     checkStripeConnectStatus()
     fetchUserProfile()
+    fetchDeletedDevices()
   }, [navigate])
 
   const fetchUserProfile = async () => {
@@ -134,7 +137,7 @@ const Dashboard: React.FC = () => {
       }
       
       if (profileResponse.data) {
-        setProfileId(profileResponse.data.id)
+        // setProfileId(profileResponse.data.id) // This line was removed as per the new_code
         
         // Fetch real metrics data
         const metricsResponse = await apiService.getDashboardMetrics(profileResponse.data.id)
@@ -386,18 +389,23 @@ const Dashboard: React.FC = () => {
     }
   }
 
-  const handleSoftDeleteDevice = async (deviceId: string) => {
-    if (!confirm('Are you sure you want to delete this device? You can restore it later.')) {
-      return
-    }
+  const handleSoftDeleteDevice = async (device: DeviceSummary) => {
+    setDeviceToDelete(device)
+    setShowDeleteModal(true)
+  }
 
-    setIsDeletingDevice(deviceId)
+  const confirmDeleteDevice = async () => {
+    if (!deviceToDelete) return
+
+    setIsDeletingDevice(deviceToDelete.id)
     try {
-      const response = await apiService.softDeleteDevice(deviceId)
+      const response = await apiService.softDeleteDevice(deviceToDelete.id)
       if (response.data) {
         // Refresh both active and deleted devices
         fetchDashboardStats()
         fetchDeletedDevices()
+        setShowDeleteModal(false)
+        setDeviceToDelete(null)
       } else {
         alert('Failed to delete device: ' + (response.error || 'Unknown error'))
       }
@@ -407,6 +415,11 @@ const Dashboard: React.FC = () => {
     } finally {
       setIsDeletingDevice(null)
     }
+  }
+
+  const cancelDeleteDevice = () => {
+    setShowDeleteModal(false)
+    setDeviceToDelete(null)
   }
 
   const handleRestoreDevice = async (deviceId: string) => {
@@ -923,13 +936,11 @@ const Dashboard: React.FC = () => {
                             <span className="font-medium">{formatDate(device.lastTipReceived)}</span>
                           </div>
                           <div className="flex justify-between text-sm">
-                            <span className="text-gray-600">Stripe Status</span>
+                            <span className="text-gray-600">Device Status</span>
                             <span className={`font-medium ${
-                              isStripeEnabled ? 'text-green-600' : 
-                              isStripePending ? 'text-yellow-600' : 
-                              'text-gray-600'
+                              device.isOnline ? 'text-green-600' : 'text-gray-600'
                             }`}>
-                              {stripeStatus}
+                              {device.isOnline ? 'Online' : 'Offline'}
                             </span>
                           </div>
                         </div>
@@ -948,7 +959,7 @@ const Dashboard: React.FC = () => {
                             View
                           </button>
                           <button
-                            onClick={() => handleSoftDeleteDevice(device.id)}
+                            onClick={() => handleSoftDeleteDevice(device)}
                             disabled={isDeletingDevice === device.id}
                             className="px-3 py-2 bg-red-100 text-red-700 text-sm rounded-lg hover:bg-red-200 transition-colors disabled:opacity-50"
                           >
@@ -1235,6 +1246,34 @@ const Dashboard: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteModal && deviceToDelete && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50">
+          <div className="relative p-8 border w-96 shadow-lg rounded-md bg-white">
+            <div className="text-center">
+              <h3 className="text-lg font-semibold text-gray-900">Confirm Deletion</h3>
+              <p className="text-gray-600 mt-2">
+                Are you sure you want to delete the device "{deviceToDelete.nickname || deviceToDelete.uuid}"? This action cannot be undone.
+              </p>
+            </div>
+            <div className="items-center px-4 py-3">
+              <button
+                onClick={confirmDeleteDevice}
+                className="px-4 py-2 bg-red-600 text-white text-base font-medium rounded-md w-full shadow-sm hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500"
+              >
+                Delete
+              </button>
+              <button
+                onClick={cancelDeleteDevice}
+                className="mt-3 px-4 py-2 bg-gray-200 text-gray-800 text-base font-medium rounded-md w-full shadow-sm hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-500"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

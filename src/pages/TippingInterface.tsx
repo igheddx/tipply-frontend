@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useSpring, animated } from '@react-spring/web'
 import { useDrag } from '@use-gesture/react'
@@ -80,9 +80,7 @@ const TippingInterface: React.FC = () => {
         
         // Check if device has Stripe Connect account
         if (!data.stripeAccountId) {
-          toast.error('Device needs Stripe Connect account setup')
-          // Redirect to entertainer onboarding
-          window.location.href = `/onboard`
+          toast.error('This device is not set up for receiving tips yet')
           return
         }
       } else {
@@ -145,7 +143,7 @@ const TippingInterface: React.FC = () => {
   }
 
   // Gesture handling with react-spring
-  const [springs, api] = useSpring(() => ({
+  const [springs] = useSpring(() => ({
     x: 0,
     y: 0,
     scale: 1,
@@ -159,7 +157,6 @@ const TippingInterface: React.FC = () => {
     velocity: [vx, vy],
     cancel,
     canceled,
-    movement: [mx, my],
     distance,
     active,
     last
@@ -323,9 +320,9 @@ const TippingInterface: React.FC = () => {
             zIndex: 5
           }}
           className="relative w-full h-full touch-manipulation"
-          onTouchStart={(e) => console.log('Touch start detected')}
-          onTouchMove={(e) => console.log('Touch move detected')}
-          onTouchEnd={(e) => console.log('Touch end detected')}
+          onTouchStart={() => console.log('Touch start detected')}
+          onTouchMove={() => console.log('Touch move detected')}
+          onTouchEnd={() => console.log('Touch end detected')}
         >
           <AnimatePresence>
             <motion.div
