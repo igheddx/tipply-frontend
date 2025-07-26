@@ -41,6 +41,9 @@ class ApiService {
     }
 
     try {
+      console.log(`Making API request to: ${url}`)
+      console.log(`Request config:`, { method: config.method, headers: config.headers })
+      
       const response = await fetch(url, config)
       
       if (response.status === 401) {
@@ -102,6 +105,8 @@ class ApiService {
       return { data }
     } catch (error) {
       console.error('API request failed:', error)
+      console.error('Request URL was:', url)
+      console.error('Request config was:', config)
       return { error: error instanceof Error ? error.message : 'Unknown error occurred' }
     }
   }
