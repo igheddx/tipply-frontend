@@ -16,7 +16,9 @@ jobs:
       - name: Install dependencies
         run: |
           npm install
-          npm run build
+          npm run build:production
+        env:
+          VITE_API_URL: https://uhxejjh8s1.execute-api.us-east-1.amazonaws.com/dev
 
       - name: Sync to S3
         uses: jakejarvis/s3-sync-action@master

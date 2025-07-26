@@ -1,4 +1,19 @@
-const API_BASE_URL = (import.meta as any).env?.VITE_API_URL || 'http://localhost:5000'
+// Get API base URL from environment variable with fallback
+const getApiBaseUrl = () => {
+  // Check for VITE_API_URL environment variable
+  const envUrl = (import.meta as any).env?.VITE_API_URL;
+  
+  if (envUrl) {
+    console.log('Using API URL from environment:', envUrl);
+    return envUrl;
+  }
+  
+  // Fallback for local development
+  console.log('Using default API URL for local development');
+  return 'http://localhost:5000';
+};
+
+const API_BASE_URL = getApiBaseUrl();
 
 interface ApiResponse<T> {
   data?: T
