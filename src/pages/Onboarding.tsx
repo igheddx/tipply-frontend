@@ -333,8 +333,14 @@ Please use a different device UUID or contact support if this is your device.`
         throw new Error(result.error)
       }
 
-      // Redirect to Stripe onboarding - don't set loading to false
-      // as we're leaving the page
+      // Check if we got the new async response format
+      if (result.data?.status === 'processing') {
+        // Poll for status until we get the onboarding URL
+        await pollForOnboardingUrl()
+        return
+      }
+
+      // Handle legacy immediate response format
       if (result.data?.onboardingUrl) {
         window.location.href = result.data.onboardingUrl
         return // Exit early, don't set loading to false
@@ -345,6 +351,52 @@ Please use a different device UUID or contact support if this is your device.`
       console.error('Failed to start KYC process:', err)
       setIsLoading(false) // Only set loading to false on error
     }
+  }
+
+  const pollForOnboardingUrl = async () => {
+    const maxAttempts = 30 // 30 seconds max
+    const pollInterval = 1000 // 1 second
+    
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        console.log(`Polling for onboarding URL, attempt ${attempt}/${maxAttempts}`)
+        
+        const statusResult = await apiService.getConnectAccountStatus(formData.deviceId)
+        
+        if (statusResult.error) {
+          console.error('Error polling status:', statusResult.error)
+          continue
+        }
+        
+        const status = statusResult.data
+        console.log('Status response:', status)
+        
+        // Check if we have an onboarding URL
+        if (status?.onboardingUrl) {
+          console.log('Onboarding URL received, redirecting to Stripe')
+          window.location.href = status.onboardingUrl
+          return
+        }
+        
+        // Check if there was an error
+        if (status?.error) {
+          throw new Error(status.error)
+        }
+        
+        // Wait before next poll
+        await new Promise(resolve => setTimeout(resolve, pollInterval))
+        
+      } catch (error) {
+        console.error(`Error during polling attempt ${attempt}:`, error)
+        if (attempt === maxAttempts) {
+          throw new Error('Timeout waiting for Stripe account creation. Please try again.')
+        }
+        await new Promise(resolve => setTimeout(resolve, pollInterval))
+      }
+    }
+    
+    // If we get here, we've timed out
+    throw new Error('Timeout waiting for Stripe account creation. Please try again.')
   }
 
   const handleSubmit = async () => {
