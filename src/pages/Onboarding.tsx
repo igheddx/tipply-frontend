@@ -361,7 +361,7 @@ Please use a different device UUID or contact support if this is your device.`
   }
 
   const pollForOnboardingUrl = async () => {
-    const maxAttempts = 30 // 30 seconds max
+    const maxAttempts = 60 // 60 seconds max (increased from 30)
     const pollInterval = 1000 // 1 second
     
     console.log(`Starting polling for device: ${formData.deviceId}`)
@@ -376,6 +376,8 @@ Please use a different device UUID or contact support if this is your device.`
         
         if (statusResult.error) {
           console.error('Error polling status:', statusResult.error)
+          // If we get an error, wait a bit longer before retrying
+          await new Promise(resolve => setTimeout(resolve, pollInterval * 2))
           continue
         }
         
@@ -397,6 +399,11 @@ Please use a different device UUID or contact support if this is your device.`
         // Check if still processing
         if (status?.status === 'processing') {
           console.log('Still processing, waiting...')
+          
+          // After 30 seconds of processing, show a more informative message
+          if (attempt === 30) {
+            console.warn('Stripe account creation is taking longer than expected. This may be due to high load or network issues.')
+          }
         }
         
         // Wait before next poll
@@ -405,14 +412,14 @@ Please use a different device UUID or contact support if this is your device.`
       } catch (error) {
         console.error(`Error during polling attempt ${attempt}:`, error)
         if (attempt === maxAttempts) {
-          throw new Error('Timeout waiting for Stripe account creation. Please try again.')
+          throw new Error('Timeout waiting for Stripe account creation. The process may have failed. Please try again or contact support.')
         }
         await new Promise(resolve => setTimeout(resolve, pollInterval))
       }
     }
     
     // If we get here, we've timed out
-    throw new Error('Timeout waiting for Stripe account creation. Please try again.')
+    throw new Error('Timeout waiting for Stripe account creation. The process may have failed. Please try again or contact support.')
   }
 
   const handleSubmit = async () => {
