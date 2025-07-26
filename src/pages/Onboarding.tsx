@@ -322,6 +322,8 @@ Please use a different device UUID or contact support if this is your device.`
       sessionStorage.setItem('onboarding_email', formData.email)
       sessionStorage.setItem('onboarding_password', formData.password)
 
+      console.log('Starting KYC process with device ID:', formData.deviceId)
+
       const result = await apiService.createConnectAccount({
         deviceUuid: formData.deviceId,
         firstName: formData.firstName,
@@ -329,12 +331,15 @@ Please use a different device UUID or contact support if this is your device.`
         email: formData.email
       })
 
+      console.log('CreateConnectAccount response:', result)
+
       if (result.error) {
         throw new Error(result.error)
       }
 
       // Check if we got the new async response format
       if (result.data?.status === 'processing') {
+        console.log('Received processing status, starting polling...')
         // Poll for status until we get the onboarding URL
         await pollForOnboardingUrl()
         return
@@ -342,9 +347,11 @@ Please use a different device UUID or contact support if this is your device.`
 
       // Handle legacy immediate response format
       if (result.data?.onboardingUrl) {
+        console.log('Received immediate onboarding URL, redirecting...')
         window.location.href = result.data.onboardingUrl
         return // Exit early, don't set loading to false
       } else {
+        console.error('Unexpected response format:', result.data)
         throw new Error('No onboarding URL received from Stripe')
       }
     } catch (err) {
@@ -357,11 +364,15 @@ Please use a different device UUID or contact support if this is your device.`
     const maxAttempts = 30 // 30 seconds max
     const pollInterval = 1000 // 1 second
     
+    console.log(`Starting polling for device: ${formData.deviceId}`)
+    
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       try {
         console.log(`Polling for onboarding URL, attempt ${attempt}/${maxAttempts}`)
         
         const statusResult = await apiService.getConnectAccountStatus(formData.deviceId)
+        
+        console.log(`Status response for attempt ${attempt}:`, statusResult)
         
         if (statusResult.error) {
           console.error('Error polling status:', statusResult.error)
@@ -369,7 +380,7 @@ Please use a different device UUID or contact support if this is your device.`
         }
         
         const status = statusResult.data
-        console.log('Status response:', status)
+        console.log('Status data:', status)
         
         // Check if we have an onboarding URL
         if (status?.onboardingUrl) {
@@ -381,6 +392,11 @@ Please use a different device UUID or contact support if this is your device.`
         // Check if there was an error
         if (status?.error) {
           throw new Error(status.error)
+        }
+        
+        // Check if still processing
+        if (status?.status === 'processing') {
+          console.log('Still processing, waiting...')
         }
         
         // Wait before next poll
