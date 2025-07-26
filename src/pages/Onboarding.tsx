@@ -361,7 +361,7 @@ Please use a different device UUID or contact support if this is your device.`
   }
 
   const pollForOnboardingUrl = async () => {
-    const maxAttempts = 60 // 60 seconds max (increased from 30)
+    const maxAttempts = 180 // 3 minutes max (increased for Stripe Connect account creation)
     const pollInterval = 1000 // 1 second
     
     console.log(`Starting polling for device: ${formData.deviceId}`)
@@ -404,6 +404,16 @@ Please use a different device UUID or contact support if this is your device.`
           if (attempt === 30) {
             console.warn('Stripe account creation is taking longer than expected. This may be due to high load or network issues.')
           }
+          
+          // After 60 seconds, show that this is normal for Stripe Connect
+          if (attempt === 60) {
+            console.log('Stripe Connect account creation typically takes 1-3 minutes. Please be patient...')
+          }
+          
+          // After 120 seconds, show final warning
+          if (attempt === 120) {
+            console.warn('Stripe Connect account creation is taking longer than usual. This may indicate an issue.')
+          }
         }
         
         // Wait before next poll
@@ -412,14 +422,14 @@ Please use a different device UUID or contact support if this is your device.`
       } catch (error) {
         console.error(`Error during polling attempt ${attempt}:`, error)
         if (attempt === maxAttempts) {
-          throw new Error('Timeout waiting for Stripe account creation. The process may have failed. Please try again or contact support.')
+          throw new Error('Stripe Connect account creation is taking longer than expected (3 minutes). The process may still be running in the background. Please check your dashboard or try again.')
         }
         await new Promise(resolve => setTimeout(resolve, pollInterval))
       }
     }
     
     // If we get here, we've timed out
-    throw new Error('Timeout waiting for Stripe account creation. The process may have failed. Please try again or contact support.')
+    throw new Error('Stripe Connect account creation is taking longer than expected (3 minutes). The process may still be running in the background. Please check your dashboard or try again.')
   }
 
   const handleSubmit = async () => {
