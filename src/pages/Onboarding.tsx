@@ -356,6 +356,21 @@ Please use a different device UUID or contact support if this is your device.`
       }
     } catch (err) {
       console.error('Failed to start KYC process:', err)
+      
+      // Check if this is a retryable error
+      const errorMessage = err instanceof Error ? err.message : String(err)
+      if (errorMessage.includes('timeout') || errorMessage.includes('network') || errorMessage.includes('creation_error')) {
+        // Show retry option
+        if (window.confirm('The KYC process encountered an issue. Would you like to try again?')) {
+          setIsLoading(false)
+          // Wait a moment before retrying
+          setTimeout(() => {
+            startKYC()
+          }, 2000)
+          return
+        }
+      }
+      
       setIsLoading(false) // Only set loading to false on error
     }
   }
@@ -396,6 +411,19 @@ Please use a different device UUID or contact support if this is your device.`
           throw new Error(status.error)
         }
         
+        // Check for specific error states
+        if (status?.status === 'timeout_error') {
+          throw new Error('Stripe Connect account creation timed out. Please try again.')
+        }
+        
+        if (status?.status === 'network_error') {
+          throw new Error('Network error during Stripe Connect account creation. Please try again.')
+        }
+        
+        if (status?.status === 'creation_error') {
+          throw new Error('Error during Stripe Connect account creation. Please try again.')
+        }
+        
         // Check if still processing
         if (status?.status === 'processing') {
           console.log('Still processing, waiting...')
@@ -421,6 +449,19 @@ Please use a different device UUID or contact support if this is your device.`
         
       } catch (error) {
         console.error(`Error during polling attempt ${attempt}:`, error)
+        
+        // Check if this is a retryable error
+        const errorMessage = error instanceof Error ? error.message : String(error)
+        if (errorMessage.includes('timeout') || errorMessage.includes('network') || errorMessage.includes('creation_error')) {
+          // For retryable errors, try a few more times before giving up
+          if (attempt >= maxAttempts - 10) {
+            throw new Error(`Stripe Connect account creation failed: ${errorMessage}`)
+          }
+          // Wait longer before retrying for these errors
+          await new Promise(resolve => setTimeout(resolve, pollInterval * 3))
+          continue
+        }
+        
         if (attempt === maxAttempts) {
           throw new Error('Stripe Connect account creation is taking longer than expected (3 minutes). The process may still be running in the background. Please check your dashboard or try again.')
         }
