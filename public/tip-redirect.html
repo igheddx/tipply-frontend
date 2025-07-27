@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Redirecting to Tipping Interface</title>
+    <script>
+        // Extract device ID from URL path
+        const path = window.location.pathname;
+        const deviceId = path.split('/').pop();
+        
+        // Redirect to the correct route
+        if (deviceId) {
+            window.location.href = `/?route=tip&deviceId=${deviceId}`;
+        } else {
+            window.location.href = '/';
+        }
+    </script>
+</head>
+<body>
+    <p>Redirecting to tipping interface...</p>
+</body>
+</html> 

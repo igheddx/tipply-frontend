@@ -33,6 +33,7 @@ const TippingInterface: React.FC = () => {
   const [userId, setUserId] = useState<string>('')
   const [checkingPaymentMethods, setCheckingPaymentMethods] = useState(true)
   const [showCelebration, setShowCelebration] = useState(false)
+  const [isFullscreen, setIsFullscreen] = useState(false)
   
   const currencyRef = useRef<HTMLDivElement>(null)
 
@@ -50,6 +51,29 @@ const TippingInterface: React.FC = () => {
       localStorage.setItem('tipply_user_id', newUserId)
       setUserId(newUserId)
     }
+  }, [])
+
+  // Auto-enter fullscreen on mobile
+  useEffect(() => {
+    const enterFullscreen = async () => {
+      if (typeof window !== 'undefined' && window.innerWidth <= 768) {
+        try {
+          if (document.documentElement.requestFullscreen) {
+            await document.documentElement.requestFullscreen()
+            setIsFullscreen(true)
+          } else if ((document.documentElement as any).webkitRequestFullscreen) {
+            await (document.documentElement as any).webkitRequestFullscreen()
+            setIsFullscreen(true)
+          }
+        } catch (error) {
+          console.log('Fullscreen not supported or denied')
+        }
+      }
+    }
+
+    // Small delay to ensure page is loaded
+    const timer = setTimeout(enterFullscreen, 2000)
+    return () => clearTimeout(timer)
   }, [])
 
   // Fetch device info and check payment methods
@@ -281,7 +305,7 @@ const TippingInterface: React.FC = () => {
   }
 
   return (
-    <div className="relative w-full h-screen overflow-hidden bg-gradient-to-br from-green-50 to-blue-50">
+    <div className={`relative w-full h-screen overflow-hidden bg-gradient-to-br from-green-50 to-blue-50 ${isFullscreen ? 'fullscreen' : ''}`}>
       {/* Header */}
       <div className="absolute top-0 left-0 right-0 z-10 p-4 bg-white/30 backdrop-blur-sm">
         <div className="text-center">
