@@ -7,7 +7,20 @@ const Login: React.FC = () => {
   const [password, setPassword] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
+  const [showKycSuccess, setShowKycSuccess] = useState(false)
   const navigate = useNavigate()
+
+  // Check for KYC completion on component mount
+  React.useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search)
+    const kycCompleted = urlParams.get('kyc_completed')
+    
+    if (kycCompleted === 'true') {
+      setShowKycSuccess(true)
+      // Clear the URL parameter
+      window.history.replaceState({}, document.title, window.location.pathname)
+    }
+  }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -57,6 +70,28 @@ const Login: React.FC = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full">
+        {/* KYC Success Message */}
+        {showKycSuccess && (
+          <div className="mb-8 bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-2xl p-6">
+            <div className="text-center">
+              <div className="mx-auto w-16 h-16 bg-gradient-to-r from-green-500 to-emerald-500 rounded-full flex items-center justify-center mb-4">
+                <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+              </div>
+              <h3 className="text-xl font-bold text-green-800 mb-2">
+                🎉 Congratulations!
+              </h3>
+              <p className="text-green-700 mb-3">
+                You've successfully completed your KYC verification with Stripe!
+              </p>
+              <p className="text-green-600 text-sm">
+                Please sign in below to access your dashboard and start accepting tips.
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* Logo and Header */}
         <div className="text-center mb-8">
           <div className="mx-auto w-16 h-16 bg-gradient-to-r from-primary-600 to-primary-700 rounded-2xl flex items-center justify-center mb-4">
