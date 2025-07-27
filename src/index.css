@@ -39,6 +39,47 @@
       font-size: 16px !important;
     }
   }
+  
+  /* Desktop warning overlay */
+  .desktop-warning {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 10000;
+    color: white;
+    text-align: center;
+    padding: 2rem;
+  }
+  
+  .desktop-warning h1 {
+    font-size: 2rem;
+    font-weight: bold;
+    margin-bottom: 1rem;
+  }
+  
+  .desktop-warning p {
+    font-size: 1.2rem;
+    opacity: 0.9;
+    max-width: 400px;
+  }
+  
+  /* Portrait orientation lock */
+  @media screen and (orientation: landscape) and (max-width: 768px) {
+    body {
+      transform: rotate(90deg);
+      transform-origin: center center;
+      width: 100vh;
+      height: 100vw;
+      overflow: hidden;
+    }
+  }
 }
 
 @layer components {
