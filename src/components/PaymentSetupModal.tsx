@@ -87,7 +87,7 @@ function PaymentForm({
           setError(null)
           
           // Get setup intent from backend
-          const res = await fetch('/api/stripe/setup-intent', {
+          const res = await fetch(`${(import.meta as any).env?.VITE_API_URL || 'http://localhost:5000'}/api/stripe/setup-intent`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ deviceUuid, userId })
@@ -141,7 +141,7 @@ function PaymentForm({
     
     try {
       // Get setup intent from backend
-      const res = await fetch('/api/stripe/setup-intent', {
+      const res = await fetch(`${(import.meta as any).env?.VITE_API_URL || 'http://localhost:5000'}/api/stripe/setup-intent`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ deviceUuid, userId })
