@@ -283,6 +283,13 @@ class ApiService {
     }, true) // Use API key for onboarding
   }
 
+  // Check if device UUID exists in DetectedDevices table with status "new"
+  async checkDetectedDevice(uuid: string): Promise<ApiResponse<any>> {
+    return this.request(`/api/devices/check-detected-device/${uuid}`, {
+      method: 'GET',
+    }, true) // Use API key for onboarding
+  }
+
   // Tip endpoints
   async submitTip(tipData: {
     deviceId: string

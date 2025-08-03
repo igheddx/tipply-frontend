@@ -21,6 +21,8 @@ const Onboarding: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false)
   const [step, setStep] = useState(1)
   const [apiKeyGenerated, setApiKeyGenerated] = useState(false)
+  const [isValidatingDevice, setIsValidatingDevice] = useState(false)
+  const [deviceValidationComplete, setDeviceValidationComplete] = useState(false)
   const navigate = useNavigate()
 
   // Generate API key on component mount
@@ -81,6 +83,12 @@ const Onboarding: React.FC = () => {
       [name]: value
     }))
     setErrors(prev => ({ ...prev, [name]: '' }))
+    
+    // Reset device validation state when device ID changes
+    if (name === 'deviceId') {
+      setDeviceValidationComplete(false)
+      setIsValidatingDevice(false)
+    }
   }
 
   const validatePassword = () => {
@@ -148,6 +156,49 @@ const Onboarding: React.FC = () => {
     }
   }
 
+  const validateDetectedDevice = async () => {
+    const deviceId = formData.deviceId.trim()
+    
+    if (!deviceId) {
+      return { isValid: false, error: 'Device ID is required' }
+    }
+    
+    setIsValidatingDevice(true)
+    setDeviceValidationComplete(false)
+    
+    try {
+      const result = await apiService.checkDetectedDevice(deviceId)
+      
+      if (result.error) {
+        const errorMessage = result.error || 'Failed to validate device UUID'
+        setErrors(prev => ({ ...prev, deviceId: errorMessage }))
+        setDeviceValidationComplete(true)
+        setIsValidatingDevice(false)
+        return { isValid: false, error: errorMessage }
+      }
+      
+      if (!result.data?.exists) {
+        const errorMessage = result.data?.message || 'Device UUID could not be located, please check again'
+        setErrors(prev => ({ ...prev, deviceId: errorMessage }))
+        setDeviceValidationComplete(true)
+        setIsValidatingDevice(false)
+        return { isValid: false, error: errorMessage }
+      }
+      
+      // Clear any existing errors
+      setErrors(prev => ({ ...prev, deviceId: '' }))
+      setDeviceValidationComplete(true)
+      setIsValidatingDevice(false)
+      return { isValid: true, error: null }
+    } catch (err) {
+      const errorMessage = 'Failed to validate device UUID'
+      setErrors(prev => ({ ...prev, deviceId: errorMessage }))
+      setDeviceValidationComplete(true)
+      setIsValidatingDevice(false)
+      return { isValid: false, error: errorMessage }
+    }
+  }
+
   const validateStep1 = () => {
     const newErrors: {[key: string]: string} = {}
     
@@ -189,12 +240,18 @@ const Onboarding: React.FC = () => {
         setStep(step + 1)
       } else if (step === 3) {
         // Register device using the created profile
-        const deviceIdError = validateDeviceId()
-        if (deviceIdError) {
-          setErrors(prev => ({ ...prev, deviceId: deviceIdError }))
-          return
+        if (!deviceValidationComplete || !!errors.deviceId) {
+          // Re-validate if not already validated
+          if (formData.deviceId.trim()) {
+            const validation = await validateDetectedDevice()
+            if (!validation.isValid) {
+              return
+            }
+          } else {
+            setErrors(prev => ({ ...prev, deviceId: 'Device ID is required' }))
+            return
+          }
         }
-        setErrors(prev => ({ ...prev, deviceId: '' }))
         await registerDevice()
         setStep(step + 1)
       } else if (step === 4) {
@@ -726,36 +783,34 @@ Please use a different device UUID or contact support if this is your device.`
           <label htmlFor="deviceId" className="block text-sm font-semibold text-gray-700">
             Device ID *
           </label>
-          <input
-            type="text"
-            id="deviceId"
-            name="deviceId"
-            required
-            className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all duration-200 ${
-              errors.deviceId ? 'border-red-500 focus:ring-red-200' : 'border-gray-300'
-            }`}
-            placeholder="f47ac10b-58cc-4372-a567-0e02b2c3d47f"
-            value={formData.deviceId}
-            onChange={handleInputChange}
-            onBlur={async () => {
-              if (formData.deviceId.trim()) {
-                const uniquenessCheck = await validateDeviceIdUniqueness()
-                if (!uniquenessCheck.isValid) {
-                  setErrors(prev => ({ 
-                    ...prev, 
-                    deviceId: uniquenessCheck.error || 'Device validation failed'
-                  }))
-                } else {
-                  // Clear error if UUID is valid and unique
-                  setErrors(prev => ({ 
-                    ...prev, 
-                    deviceId: '' 
-                  }))
+          <div className="relative">
+            <input
+              type="text"
+              id="deviceId"
+              name="deviceId"
+              required
+              className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all duration-200 ${
+                errors.deviceId ? 'border-red-500 focus:ring-red-200' : 'border-gray-300'
+              }`}
+              placeholder="f47ac10b-58cc-4372-a567-0e02b2c3d47f"
+              value={formData.deviceId}
+              onChange={handleInputChange}
+              onBlur={async () => {
+                if (formData.deviceId.trim()) {
+                  await validateDetectedDevice()
                 }
-              }
-            }}
-          />
+              }}
+            />
+            {isValidatingDevice && (
+              <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-primary-600"></div>
+              </div>
+            )}
+          </div>
           {errors.deviceId && <p className="text-red-500 text-xs mt-1">{errors.deviceId}</p>}
+          {deviceValidationComplete && !errors.deviceId && formData.deviceId.trim() && (
+            <p className="text-green-500 text-xs mt-1">✓ Device UUID validated successfully</p>
+          )}
           <p className="text-sm text-gray-500">
             Enter the UUID from your Tipply device (36 characters, format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx)
           </p>
@@ -1069,7 +1124,7 @@ Please use a different device UUID or contact support if this is your device.`
                 <button
                   type="button"
                   onClick={handleNext}
-                  disabled={isLoading}
+                  disabled={isLoading || (step === 3 && (isValidatingDevice || !deviceValidationComplete || !!errors.deviceId))}
                   className="px-8 py-3 bg-gradient-to-r from-primary-600 to-primary-700 text-white font-medium rounded-lg hover:from-primary-700 hover:to-primary-800 focus:ring-4 focus:ring-primary-200 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {isLoading ? (
