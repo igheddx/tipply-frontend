@@ -366,20 +366,26 @@ const TippingInterface: React.FC = () => {
           onTouchEnd={() => console.log('Touch end detected')}
         >
           <AnimatePresence>
-            <motion.div
-              key={currentAmount}
-              initial={{ scale: 0.8, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.8, opacity: 0 }}
-              transition={{ duration: 0.3 }}
-              className="relative w-full h-full"
-            >
+                          <motion.div
+                key={currentAmount}
+                initial={{ scale: 0.8, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.8, opacity: 0 }}
+                transition={{ duration: 0.3 }}
+                className="relative w-full h-full"
+              >
               {/* Main Currency Image with Exit Animation */}
               <motion.img
                 key={`${currentAmount}-${flyingCurrency ? 'flying' : 'static'}`}
                 src={getCurrencyImage(currentAmount)}
                 alt={`$${currentAmount} bill`}
-                className="w-full h-full object-cover"
+                className="w-full h-full object-cover min-w-full min-h-full"
+                style={{ 
+                  width: '100vw', 
+                  height: '100vh',
+                  objectFit: 'cover',
+                  objectPosition: 'center'
+                }}
                 draggable={false}
                 initial={{ 
                   y: 0,
@@ -405,7 +411,13 @@ const TippingInterface: React.FC = () => {
                 <motion.img
                   src={getCurrencyImage(currentAmount)}
                   alt={`$${currentAmount} bill`}
-                  className="absolute inset-0 w-full h-full object-cover"
+                  className="absolute inset-0 w-full h-full object-cover min-w-full min-h-full"
+                  style={{ 
+                    width: '100vw', 
+                    height: '100vh',
+                    objectFit: 'cover',
+                    objectPosition: 'center'
+                  }}
                   draggable={false}
                   initial={{ 
                     y: 2000,
