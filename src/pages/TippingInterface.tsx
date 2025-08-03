@@ -185,7 +185,7 @@ const TippingInterface: React.FC = () => {
     config: { mass: 1, tension: 300, friction: 30 }
   }))
 
-  const bind = useDrag(({ 
+  const bind = useDrag(async ({ 
     offset: [ox, oy],
     direction: [xDir, yDir],
     velocity: [vx, vy],
@@ -201,7 +201,7 @@ const TippingInterface: React.FC = () => {
 
     // Enable audio on first interaction
     if (!audioEnabled) {
-      enableAudio()
+      await enableAudio()
     }
 
     // Horizontal swipe - change denomination (simplified)
@@ -244,13 +244,26 @@ const TippingInterface: React.FC = () => {
     setFlyingCurrency(true)
     
     // Play cash register sound
-    if (audioRef.current && audioEnabled) {
+    if (audioRef.current) {
       try {
         audioRef.current.currentTime = 0
+        audioRef.current.volume = 1
         await audioRef.current.play()
         console.log('Cash register sound played successfully')
       } catch (error) {
         console.log('Audio play failed:', error)
+        // Try to enable audio if it failed
+        if (!audioEnabled) {
+          await enableAudio()
+          // Try playing again
+          try {
+            audioRef.current.currentTime = 0
+            await audioRef.current.play()
+            console.log('Cash register sound played on retry')
+          } catch (retryError) {
+            console.log('Audio retry failed:', retryError)
+          }
+        }
       }
     }
     
