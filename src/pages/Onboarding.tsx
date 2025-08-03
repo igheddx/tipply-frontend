@@ -101,26 +101,7 @@ const Onboarding: React.FC = () => {
     return null
   }
 
-  const validateDeviceId = () => {
-    const deviceId = formData.deviceId.trim()
-    
-    if (!deviceId) {
-      return 'Device ID is required'
-    }
-    
-    // Check UUID format
-    const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-    if (!uuidPattern.test(deviceId)) {
-      return 'Please enter a valid UUID format (e.g., f47ac10b-58cc-4372-a567-0e02b2c3d47f)'
-    }
-    
-    // Check length
-    if (deviceId.length !== 36) {
-      return 'UUID must be exactly 36 characters long'
-    }
-    
-    return null
-  }
+
 
   const validateDeviceIdUniqueness = async () => {
     const deviceId = formData.deviceId.trim()
