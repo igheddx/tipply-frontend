@@ -34,6 +34,7 @@ const TippingInterface: React.FC = () => {
   const [checkingPaymentMethods, setCheckingPaymentMethods] = useState(true)
   const [showCelebration, setShowCelebration] = useState(false)
   const [isMobile, setIsMobile] = useState(true)
+  const [isAnimating, setIsAnimating] = useState(false)
   
   const currencyRef = useRef<HTMLDivElement>(null)
   const audioRef = useRef<HTMLAudioElement>(null)
@@ -197,7 +198,9 @@ const TippingInterface: React.FC = () => {
     // Vertical swipe up - submit tip (simplified)
     if (yDir < 0 && Math.abs(oy) > 80) {
       console.log('Swipe up detected - submitting tip')
-      handleSwipeUp()
+      if (!isAnimating) {
+        handleSwipeUp()
+      }
       cancel()
     }
   }, {
@@ -213,6 +216,7 @@ const TippingInterface: React.FC = () => {
       return
     }
 
+    setIsAnimating(true)
     setFlyingCurrency(true)
     
     // Play cash register sound
@@ -256,10 +260,11 @@ const TippingInterface: React.FC = () => {
       toast.error('Error recording tip')
     }
 
-    // Reset flying animation after delay
+    // Reset flying animation after delay (1 second faster)
     setTimeout(() => {
       setFlyingCurrency(false)
-    }, 2000)
+      setIsAnimating(false)
+    }, 1000)
   }
 
   const getLightEffect = (amount: number): string => {
