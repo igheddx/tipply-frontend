@@ -318,7 +318,15 @@ const TippingInterface: React.FC = () => {
   }
 
   return (
-    <div className="relative w-full h-screen overflow-hidden bg-gradient-to-br from-green-50 to-blue-50 fullscreen">
+    <div className="relative w-full h-screen overflow-hidden bg-gradient-to-br from-green-50 to-blue-50 fullscreen" style={{
+      width: '100vw',
+      height: '100vh',
+      minHeight: '-webkit-fill-available',
+      paddingTop: 'env(safe-area-inset-top)',
+      paddingBottom: 'env(safe-area-inset-bottom)',
+      paddingLeft: 'env(safe-area-inset-left)',
+      paddingRight: 'env(safe-area-inset-right)'
+    }}>
       {/* Audio element for cash register sound */}
       <audio ref={audioRef} preload="auto">
         <source src="/sound/cashRegisterSound.mp3" type="audio/mpeg" />
@@ -345,7 +353,14 @@ const TippingInterface: React.FC = () => {
       />
 
       {/* Currency Display */}
-      <div className="absolute inset-0 w-full h-full">
+      <div className="absolute inset-0 w-full h-full" style={{
+        width: '100%',
+        height: '100%',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0
+      }}>
         <animated.div
           ref={currencyRef}
           {...bind()}

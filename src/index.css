@@ -11,6 +11,14 @@
     margin: 0;
     padding: 0;
     background-color: #f8fafc;
+    height: 100vh;
+    height: -webkit-fill-available;
+    overflow: hidden;
+  }
+  
+  html {
+    height: 100vh;
+    height: -webkit-fill-available;
   }
   
   /* Fullscreen styles for mobile */
@@ -29,8 +37,21 @@
     left: 0 !important;
     width: 100vw !important;
     height: 100vh !important;
+    min-height: -webkit-fill-available !important;
     z-index: 9999 !important;
     background: #000 !important;
+    padding-top: env(safe-area-inset-top) !important;
+    padding-bottom: env(safe-area-inset-bottom) !important;
+    padding-left: env(safe-area-inset-left) !important;
+    padding-right: env(safe-area-inset-right) !important;
+  }
+  
+  /* Mobile fullscreen improvements */
+  @supports (-webkit-touch-callout: none) {
+    .fullscreen {
+      height: -webkit-fill-available !important;
+      min-height: -webkit-fill-available !important;
+    }
   }
   
   /* Prevent zoom on mobile */
