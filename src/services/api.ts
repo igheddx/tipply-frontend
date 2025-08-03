@@ -50,6 +50,8 @@ class ApiService {
     try {
       console.log(`Making API request to: ${url}`)
       console.log(`Request config:`, { method: config.method, headers: config.headers })
+      console.log(`Current hostname: ${window.location.hostname}`)
+      console.log(`API_BASE_URL: ${API_BASE_URL}`)
       
       const response = await fetch(url, config)
       
@@ -305,10 +307,13 @@ class ApiService {
     effect: string
     duration: number
   }): Promise<ApiResponse<any>> {
-    return this.request('/api/tips', {
+    console.log('Submitting tip with data:', tipData)
+    const response = await this.request('/api/tips', {
       method: 'POST',
       body: JSON.stringify(tipData),
     })
+    console.log('Tip submission response:', response)
+    return response
   }
 
   // Dashboard metrics endpoints

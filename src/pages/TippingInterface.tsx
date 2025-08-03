@@ -39,6 +39,7 @@ const TippingInterface: React.FC = () => {
   
   const currencyRef = useRef<HTMLDivElement>(null)
   const audioRef = useRef<HTMLAudioElement>(null)
+  const audioContextRef = useRef<AudioContext | null>(null)
 
   // Currency denominations in order
   const denominations = [1, 5, 10, 20, 50, 100]
@@ -70,19 +71,32 @@ const TippingInterface: React.FC = () => {
 
   // Enable audio on first user interaction
   const enableAudio = async () => {
-    if (!audioEnabled && audioRef.current) {
-      try {
+    try {
+      // Create audio context if it doesn't exist
+      if (!audioContextRef.current) {
+        audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)()
+      }
+      
+      // Resume audio context if suspended
+      if (audioContextRef.current.state === 'suspended') {
+        await audioContextRef.current.resume()
+      }
+      
+      if (audioRef.current) {
         // Try to play a silent audio to enable audio context
         audioRef.current.volume = 0
-        await audioRef.current.play()
+        const playPromise = audioRef.current.play()
+        if (playPromise !== undefined) {
+          await playPromise
+        }
         audioRef.current.pause()
         audioRef.current.currentTime = 0
         audioRef.current.volume = 1
         setAudioEnabled(true)
         console.log('Audio enabled successfully')
-      } catch (error) {
-        console.log('Audio enable failed:', error)
       }
+    } catch (error) {
+      console.log('Audio enable failed:', error)
     }
   }
 
@@ -243,13 +257,24 @@ const TippingInterface: React.FC = () => {
     setIsAnimating(true)
     setFlyingCurrency(true)
     
-    // Play cash register sound
+    // Play cash register sound with improved reliability
     if (audioRef.current) {
       try {
+        // Ensure audio context is active
+        if (audioContextRef.current && audioContextRef.current.state === 'suspended') {
+          await audioContextRef.current.resume()
+        }
+        
         audioRef.current.currentTime = 0
         audioRef.current.volume = 1
-        await audioRef.current.play()
-        console.log('Cash register sound played successfully')
+        audioRef.current.playbackRate = 1
+        
+        // Create a promise to handle the play operation
+        const playPromise = audioRef.current.play()
+        if (playPromise !== undefined) {
+          await playPromise
+          console.log('Cash register sound played successfully')
+        }
       } catch (error) {
         console.log('Audio play failed:', error)
         // Try to enable audio if it failed
@@ -258,8 +283,11 @@ const TippingInterface: React.FC = () => {
           // Try playing again
           try {
             audioRef.current.currentTime = 0
-            await audioRef.current.play()
-            console.log('Cash register sound played on retry')
+            const retryPromise = audioRef.current.play()
+            if (retryPromise !== undefined) {
+              await retryPromise
+              console.log('Cash register sound played on retry')
+            }
           } catch (retryError) {
             console.log('Audio retry failed:', retryError)
           }
