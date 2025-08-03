@@ -35,6 +35,7 @@ const TippingInterface: React.FC = () => {
   const [showCelebration, setShowCelebration] = useState(false)
   const [isMobile, setIsMobile] = useState(true)
   const [isAnimating, setIsAnimating] = useState(false)
+  const [audioEnabled, setAudioEnabled] = useState(false)
   
   const currencyRef = useRef<HTMLDivElement>(null)
   const audioRef = useRef<HTMLAudioElement>(null)
@@ -66,6 +67,24 @@ const TippingInterface: React.FC = () => {
       setUserId(newUserId)
     }
   }, [])
+
+  // Enable audio on first user interaction
+  const enableAudio = async () => {
+    if (!audioEnabled && audioRef.current) {
+      try {
+        // Try to play a silent audio to enable audio context
+        audioRef.current.volume = 0
+        await audioRef.current.play()
+        audioRef.current.pause()
+        audioRef.current.currentTime = 0
+        audioRef.current.volume = 1
+        setAudioEnabled(true)
+        console.log('Audio enabled successfully')
+      } catch (error) {
+        console.log('Audio enable failed:', error)
+      }
+    }
+  }
 
   // Fetch device info and check payment methods
   useEffect(() => {
@@ -180,6 +199,11 @@ const TippingInterface: React.FC = () => {
     
     if (canceled || !last) return
 
+    // Enable audio on first interaction
+    if (!audioEnabled) {
+      enableAudio()
+    }
+
     // Horizontal swipe - change denomination (simplified)
     if (Math.abs(ox) > 80) {
       console.log('Horizontal swipe detected:', xDir > 0 ? 'right' : 'left')
@@ -220,11 +244,14 @@ const TippingInterface: React.FC = () => {
     setFlyingCurrency(true)
     
     // Play cash register sound
-    if (audioRef.current) {
-      audioRef.current.currentTime = 0
-      audioRef.current.play().catch(error => {
+    if (audioRef.current && audioEnabled) {
+      try {
+        audioRef.current.currentTime = 0
+        await audioRef.current.play()
+        console.log('Cash register sound played successfully')
+      } catch (error) {
         console.log('Audio play failed:', error)
-      })
+      }
     }
     
     // Increment total immediately for better UX
