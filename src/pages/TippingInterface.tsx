@@ -299,6 +299,21 @@ const TippingInterface: React.FC = () => {
     setTotalTipped(prev => prev + currentAmount)
 
     try {
+      // Log the MQTT payload that would be sent to the device
+      const mqttPayload = {
+        target_uuid: deviceInfo.uuid,
+        action: "flash",
+        duration: 1,
+        sound: true,
+        intensity: "medium",
+        amount: currentAmount
+      }
+      console.log('=== MQTT PAYLOAD FOR DEVICE ===')
+      console.log('Device UUID:', deviceInfo.uuid)
+      console.log('MQTT Topic: tipply/presence/tipplyDevices')
+      console.log('MQTT Payload:', JSON.stringify(mqttPayload, null, 2))
+      console.log('=== END MQTT PAYLOAD ===')
+
       // Store tip in backend (no immediate payment processing)
       const response = await apiService.submitTip({
         deviceId: deviceInfo.uuid, // Backend expects deviceId as Guid
