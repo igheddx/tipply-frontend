@@ -114,6 +114,36 @@ const TippingInterface: React.FC = () => {
     }
   }, [deviceInfo, userId])
 
+  // Check AWS IoT connection status
+  useEffect(() => {
+    const checkAwsIotStatus = async () => {
+      try {
+        console.log('=== CHECKING AWS IoT CONNECTION STATUS ===')
+        const response = await apiService.getAwsIotStatus()
+        if (response.data) {
+          console.log('AWS IoT Status:', response.data)
+          if (response.data.isConnected) {
+            console.log('✅ AWS IoT MQTT service is CONNECTED and ready to send messages to devices')
+          } else {
+            console.log('❌ AWS IoT MQTT service is NOT CONNECTED - messages will not be sent to devices')
+          }
+        } else {
+          console.log('❌ Failed to check AWS IoT status:', response.error)
+        }
+        console.log('=== END AWS IoT STATUS CHECK ===')
+      } catch (error) {
+        console.log('❌ Error checking AWS IoT status:', error)
+      }
+    }
+
+    // Check status when component mounts
+    checkAwsIotStatus()
+
+    // Check status every 30 seconds
+    const interval = setInterval(checkAwsIotStatus, 30000)
+    return () => clearInterval(interval)
+  }, [])
+
   const fetchDeviceInfo = async () => {
     try {
       setLoading(true)
@@ -299,6 +329,18 @@ const TippingInterface: React.FC = () => {
     setTotalTipped(prev => prev + currentAmount)
 
     try {
+      // Check AWS IoT status before submitting tip
+      console.log('=== CHECKING AWS IoT STATUS BEFORE TIP SUBMISSION ===')
+      const awsIotStatus = await apiService.getAwsIotStatus()
+      if (awsIotStatus.data) {
+        if (awsIotStatus.data.isConnected) {
+          console.log('✅ AWS IoT is CONNECTED - tip will be sent to device')
+        } else {
+          console.log('❌ AWS IoT is NOT CONNECTED - tip will NOT be sent to device')
+        }
+      }
+      console.log('=== END AWS IoT STATUS CHECK ===')
+
       // Log the MQTT payload that would be sent to the device
       const mqttPayload = {
         target_uuid: deviceInfo.uuid,

@@ -324,6 +324,10 @@ class ApiService {
   async getRecentTips(profileId: string): Promise<ApiResponse<any>> {
     return this.request(`/api/tips/recent-tips/${profileId}`)
   }
+
+  async getAwsIotStatus(): Promise<ApiResponse<any>> {
+    return this.request('/api/tips/aws-iot-status')
+  }
 }
 
 export const apiService = new ApiService()
