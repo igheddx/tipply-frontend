@@ -134,13 +134,17 @@ const TippingInterface: React.FC = () => {
           console.log('❌ Full error response:', response)
         }
         console.log('=== END AWS IoT STATUS CHECK ===')
-      } catch (error) {
+      } catch (error: unknown) {
         console.log('❌ Error checking AWS IoT status:', error)
-        console.log('❌ Error details:', {
-          message: error.message,
-          stack: error.stack,
-          name: error.name
-        })
+        if (error instanceof Error) {
+          console.log('❌ Error details:', {
+            message: error.message,
+            stack: error.stack,
+            name: error.name
+          })
+        } else {
+          console.log('❌ Unknown error type:', error)
+        }
       }
     }
 
