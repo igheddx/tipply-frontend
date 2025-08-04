@@ -121,18 +121,26 @@ const TippingInterface: React.FC = () => {
         console.log('=== CHECKING AWS IoT CONNECTION STATUS ===')
         const response = await apiService.getAwsIotStatus()
         if (response.data) {
-          console.log('AWS IoT Status:', response.data)
+          console.log('Full AWS IoT Status Response:', response.data)
           if (response.data.isConnected) {
             console.log('✅ AWS IoT MQTT service is CONNECTED and ready to send messages to devices')
           } else {
             console.log('❌ AWS IoT MQTT service is NOT CONNECTED - messages will not be sent to devices')
+            console.log('❌ Connection Error Details:', response.data.message || 'No error message provided')
+            console.log('❌ Timestamp:', response.data.timestamp || 'No timestamp')
           }
         } else {
           console.log('❌ Failed to check AWS IoT status:', response.error)
+          console.log('❌ Full error response:', response)
         }
         console.log('=== END AWS IoT STATUS CHECK ===')
       } catch (error) {
         console.log('❌ Error checking AWS IoT status:', error)
+        console.log('❌ Error details:', {
+          message: error.message,
+          stack: error.stack,
+          name: error.name
+        })
       }
     }
 
@@ -333,11 +341,17 @@ const TippingInterface: React.FC = () => {
       console.log('=== CHECKING AWS IoT STATUS BEFORE TIP SUBMISSION ===')
       const awsIotStatus = await apiService.getAwsIotStatus()
       if (awsIotStatus.data) {
+        console.log('Full AWS IoT Status Response:', awsIotStatus.data)
         if (awsIotStatus.data.isConnected) {
           console.log('✅ AWS IoT is CONNECTED - tip will be sent to device')
         } else {
           console.log('❌ AWS IoT is NOT CONNECTED - tip will NOT be sent to device')
+          console.log('❌ Connection Error Details:', awsIotStatus.data.message || 'No error message provided')
+          console.log('❌ Timestamp:', awsIotStatus.data.timestamp || 'No timestamp')
         }
+      } else {
+        console.log('❌ Failed to get AWS IoT status:', awsIotStatus.error)
+        console.log('❌ Full error response:', awsIotStatus)
       }
       console.log('=== END AWS IoT STATUS CHECK ===')
 
