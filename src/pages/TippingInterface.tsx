@@ -121,13 +121,18 @@ const TippingInterface: React.FC = () => {
         console.log('=== CHECKING AWS IoT CONNECTION STATUS ===')
         const response = await apiService.getAwsIotStatus()
         if (response.data) {
-          console.log('Full AWS IoT Status Response:', response.data)
+          console.log('Full AWS IoT Status Response:', JSON.stringify(response.data, null, 2))
           if (response.data.isConnected) {
             console.log('✅ AWS IoT MQTT service is CONNECTED and ready to send messages to devices')
           } else {
             console.log('❌ AWS IoT MQTT service is NOT CONNECTED - messages will not be sent to devices')
             console.log('❌ Connection Error Details:', response.data.message || 'No error message provided')
             console.log('❌ Timestamp:', response.data.timestamp || 'No timestamp')
+            console.log('❌ Certificate Files Exist:', response.data.certFilesExist)
+            console.log('❌ Certificate Path:', response.data.certPath)
+            console.log('❌ Certificate Exists:', response.data.certificateExists)
+            console.log('❌ Private Key Exists:', response.data.privateKeyExists)
+            console.log('❌ Root CA Exists:', response.data.rootCaExists)
           }
         } else {
           console.log('❌ Failed to check AWS IoT status:', response.error)
@@ -345,13 +350,18 @@ const TippingInterface: React.FC = () => {
       console.log('=== CHECKING AWS IoT STATUS BEFORE TIP SUBMISSION ===')
       const awsIotStatus = await apiService.getAwsIotStatus()
       if (awsIotStatus.data) {
-        console.log('Full AWS IoT Status Response:', awsIotStatus.data)
+        console.log('Full AWS IoT Status Response:', JSON.stringify(awsIotStatus.data, null, 2))
         if (awsIotStatus.data.isConnected) {
           console.log('✅ AWS IoT is CONNECTED - tip will be sent to device')
         } else {
           console.log('❌ AWS IoT is NOT CONNECTED - tip will NOT be sent to device')
           console.log('❌ Connection Error Details:', awsIotStatus.data.message || 'No error message provided')
           console.log('❌ Timestamp:', awsIotStatus.data.timestamp || 'No timestamp')
+          console.log('❌ Certificate Files Exist:', awsIotStatus.data.certFilesExist)
+          console.log('❌ Certificate Path:', awsIotStatus.data.certPath)
+          console.log('❌ Certificate Exists:', awsIotStatus.data.certificateExists)
+          console.log('❌ Private Key Exists:', awsIotStatus.data.privateKeyExists)
+          console.log('❌ Root CA Exists:', awsIotStatus.data.rootCaExists)
         }
       } else {
         console.log('❌ Failed to get AWS IoT status:', awsIotStatus.error)
