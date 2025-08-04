@@ -137,9 +137,12 @@ const TippingInterface: React.FC = () => {
             console.log('❌ Timestamp:', response.data.timestamp || 'No timestamp')
             console.log('❌ Certificate Files Exist:', response.data.certFilesExist)
             console.log('❌ Certificate Path:', response.data.certPath)
-            console.log('❌ Certificate Exists:', response.data.certificateExists)
-            console.log('❌ Private Key Exists:', response.data.privateKeyExists)
-            console.log('❌ Root CA Exists:', response.data.rootCaExists)
+                      console.log('❌ Certificate Exists:', response.data.certificateExists)
+          console.log('❌ Private Key Exists:', response.data.privateKeyExists)
+          console.log('❌ Root CA Exists:', response.data.rootCaExists)
+          if (response.data.connectionError) {
+            console.log('❌ AWS IoT Connection Error:', response.data.connectionError)
+          }
           }
         } else {
           console.log('❌ Failed to check AWS IoT status:', response.error)
@@ -376,6 +379,9 @@ const TippingInterface: React.FC = () => {
           console.log('❌ Certificate Exists:', awsIotStatus.data.certificateExists)
           console.log('❌ Private Key Exists:', awsIotStatus.data.privateKeyExists)
           console.log('❌ Root CA Exists:', awsIotStatus.data.rootCaExists)
+          if (awsIotStatus.data.connectionError) {
+            console.log('❌ AWS IoT Connection Error:', awsIotStatus.data.connectionError)
+          }
         }
       } else {
         console.log('❌ Failed to get AWS IoT status:', awsIotStatus.error)
