@@ -122,6 +122,13 @@ const TippingInterface: React.FC = () => {
         const response = await apiService.getAwsIotStatus()
         if (response.data) {
           console.log('Full AWS IoT Status Response:', JSON.stringify(response.data, null, 2))
+          console.log('=== CERTIFICATE DETAILS ===')
+          console.log('Cert Files Exist:', response.data.certFilesExist)
+          console.log('Cert Path:', response.data.certPath)
+          console.log('Certificate Exists:', response.data.certificateExists)
+          console.log('Private Key Exists:', response.data.privateKeyExists)
+          console.log('Root CA Exists:', response.data.rootCaExists)
+          console.log('=== END CERTIFICATE DETAILS ===')
           if (response.data.isConnected) {
             console.log('✅ AWS IoT MQTT service is CONNECTED and ready to send messages to devices')
           } else {
@@ -351,6 +358,13 @@ const TippingInterface: React.FC = () => {
       const awsIotStatus = await apiService.getAwsIotStatus()
       if (awsIotStatus.data) {
         console.log('Full AWS IoT Status Response:', JSON.stringify(awsIotStatus.data, null, 2))
+        console.log('=== CERTIFICATE DETAILS ===')
+        console.log('Cert Files Exist:', awsIotStatus.data.certFilesExist)
+        console.log('Cert Path:', awsIotStatus.data.certPath)
+        console.log('Certificate Exists:', awsIotStatus.data.certificateExists)
+        console.log('Private Key Exists:', awsIotStatus.data.privateKeyExists)
+        console.log('Root CA Exists:', awsIotStatus.data.rootCaExists)
+        console.log('=== END CERTIFICATE DETAILS ===')
         if (awsIotStatus.data.isConnected) {
           console.log('✅ AWS IoT is CONNECTED - tip will be sent to device')
         } else {
