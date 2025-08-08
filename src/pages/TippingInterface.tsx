@@ -247,6 +247,29 @@ const TippingInterface: React.FC = () => {
     toast.success('Payment method setup complete!')
   }
 
+  const testAwsIotConnection = async () => {
+    try {
+      console.log('=== MANUAL AWS IoT CONNECTION TEST ===')
+      const response = await fetch('https://uhxejjh8s1.execute-api.us-east-1.amazonaws.com/dev/api/tips/test-mqtt-connect', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      })
+      const result = await response.json()
+      console.log('Manual test result:', result)
+      
+      if (result.success && result.connected) {
+        toast.success('AWS IoT is connected and working!')
+        console.log('✅ AWS IoT connection test successful!')
+      } else {
+        toast.error('AWS IoT connection failed: ' + (result.message || 'Unknown error'))
+        console.log('❌ AWS IoT connection test failed:', result)
+      }
+    } catch (error) {
+      console.error('Manual test error:', error)
+      toast.error('Test failed: ' + (error instanceof Error ? error.message : 'Unknown error'))
+    }
+  }
+
   // Gesture handling with react-spring
   const [springs] = useSpring(() => ({
     x: 0,
@@ -358,6 +381,32 @@ const TippingInterface: React.FC = () => {
     try {
       // Check AWS IoT status in background (non-blocking)
       console.log('=== CHECKING AWS IoT STATUS (NON-BLOCKING) ===')
+      
+      // First, try the manual connection test
+      fetch('https://uhxejjh8s1.execute-api.us-east-1.amazonaws.com/dev/api/tips/test-mqtt-connect', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      })
+      .then(r => r.json())
+      .then(testResult => {
+        console.log('=== MANUAL MQTT CONNECTION TEST RESULT ===')
+        console.log('Test Result:', JSON.stringify(testResult, null, 2))
+        if (testResult.success && testResult.connected) {
+          console.log('✅ MANUAL TEST: AWS IoT is CONNECTED and working!')
+        } else {
+          console.log('❌ MANUAL TEST: AWS IoT connection failed:', testResult.message)
+          if (testResult.error) {
+            console.log('❌ Error details:', testResult.error)
+            console.log('❌ Error type:', testResult.errorType)
+          }
+        }
+        console.log('=== END MANUAL MQTT CONNECTION TEST ===')
+      })
+      .catch(testError => {
+        console.log('❌ Manual MQTT test failed:', testError)
+      })
+      
+      // Then check the regular status
       apiService.getAwsIotStatus().then(awsIotStatus => {
         if (awsIotStatus.data) {
           console.log('Full AWS IoT Status Response:', JSON.stringify(awsIotStatus.data, null, 2))
@@ -516,6 +565,13 @@ const TippingInterface: React.FC = () => {
           <p className="text-sm text-gray-800 font-medium drop-shadow-lg">
             Swipe to change amount • Swipe up to tip
           </p>
+          {/* Debug button for testing AWS IoT */}
+          <button
+            onClick={testAwsIotConnection}
+            className="mt-2 px-3 py-1 bg-blue-500 text-white text-xs rounded-full hover:bg-blue-600 transition-colors"
+          >
+            Test AWS IoT
+          </button>
         </div>
       </div>
 
