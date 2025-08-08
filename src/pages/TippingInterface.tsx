@@ -565,13 +565,13 @@ const TippingInterface: React.FC = () => {
           <p className="text-sm text-gray-800 font-medium drop-shadow-lg">
             Swipe to change amount • Swipe up to tip
           </p>
-          {/* Debug button for testing AWS IoT */}
-          <button
+          {/* Debug button for testing AWS IoT - Hidden for production but available for troubleshooting */}
+          {/* <button
             onClick={testAwsIotConnection}
             className="mt-2 px-3 py-1 bg-blue-500 text-white text-xs rounded-full hover:bg-blue-600 transition-colors"
           >
             Test AWS IoT
-          </button>
+          </button> */}
         </div>
       </div>
 
