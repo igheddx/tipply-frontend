@@ -247,7 +247,8 @@ const TippingInterface: React.FC = () => {
     toast.success('Payment method setup complete!')
   }
 
-  const testAwsIotConnection = async () => {
+  // AWS IoT connection test function - commented out for production but available for troubleshooting
+  /* const testAwsIotConnection = async () => {
     try {
       console.log('=== MANUAL AWS IoT CONNECTION TEST ===')
       const response = await fetch('https://uhxejjh8s1.execute-api.us-east-1.amazonaws.com/dev/api/tips/test-mqtt-connect', {
@@ -268,7 +269,7 @@ const TippingInterface: React.FC = () => {
       console.error('Manual test error:', error)
       toast.error('Test failed: ' + (error instanceof Error ? error.message : 'Unknown error'))
     }
-  }
+  } */
 
   // Gesture handling with react-spring
   const [springs] = useSpring(() => ({
