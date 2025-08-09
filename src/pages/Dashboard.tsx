@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import apiService from '../services/api'
+import SongManagement from '../components/SongManagement'
 
 interface DashboardStats {
   totalDevices: number
@@ -780,6 +781,16 @@ const Dashboard: React.FC = () => {
                   >
                     Recent Tips
                   </button>
+                  <button
+                    onClick={() => setActiveTab('songs')}
+                    className={`py-4 px-1 border-b-2 font-medium text-sm ${
+                      activeTab === 'songs'
+                        ? 'border-primary-500 text-primary-600'
+                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    }`}
+                  >
+                    Song Requests
+                  </button>
                 </>
               ) : (
                 <div className="flex items-center justify-between w-full">
@@ -1262,6 +1273,12 @@ const Dashboard: React.FC = () => {
                     </div>
                   </div>
                 )}
+              </div>
+            )}
+
+            {activeTab === 'songs' && (
+              <div className="space-y-6">
+                <SongManagement profileId={userProfile?.id} />
               </div>
             )}
           </div>

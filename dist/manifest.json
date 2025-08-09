@@ -1,0 +1,27 @@
+{
+  "name": "Tipply - Smart Tipping",
+  "short_name": "Tipply",
+  "description": "Digital tipping platform for entertainers",
+  "start_url": "/",
+  "display": "fullscreen",
+  "background_color": "#000000",
+  "theme_color": "#000000",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/images/1dollar.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/images/5dollars.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["entertainment", "finance"],
+  "lang": "en",
+  "dir": "ltr"
+} 

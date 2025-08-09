@@ -46,6 +46,17 @@ const TippingInterface: React.FC = () => {
   const denominations = [1, 5, 10, 20, 50, 100]
   const currentIndex = denominations.indexOf(currentAmount)
 
+  // Manage body overflow for tipping interface
+  useEffect(() => {
+    // Prevent scrolling on the tipping interface
+    document.body.style.overflow = 'hidden'
+    
+    return () => {
+      // Restore scrolling when component unmounts
+      document.body.style.overflow = 'auto'
+    }
+  }, [])
+
   // Check if device is mobile
   useEffect(() => {
     const checkMobile = () => {
