@@ -6,6 +6,7 @@ import { useDrag } from '@use-gesture/react'
 import { toast } from 'sonner'
 import PaymentSetupModal from '../components/PaymentSetupModal'
 import apiService from '../services/api'
+import { getApiBaseUrl } from '../utils/config'
 
 interface DeviceInfo {
   id: string
@@ -177,7 +178,7 @@ const TippingInterface: React.FC = () => {
       console.log('Fetching device info for device ID:', deviceId)
       
       // Fetch actual device information from the backend
-      const response = await fetch(`${(import.meta as any).env?.VITE_API_URL || 'http://localhost:5000'}/api/devices/${deviceId}`)
+      const response = await fetch(`${getApiBaseUrl()}/api/devices/${deviceId}`)
       if (response.ok) {
         const data = await response.json()
         console.log('Device info received:', data)
@@ -207,7 +208,7 @@ const TippingInterface: React.FC = () => {
       setCheckingPaymentMethods(true)
       console.log('Checking payment methods for user:', userId)
       
-      const response = await fetch(`${(import.meta as any).env?.VITE_API_URL || 'http://localhost:5000'}/api/stripe/check-payment-methods`, {
+      const response = await fetch(`${getApiBaseUrl()}/api/stripe/check-payment-methods`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

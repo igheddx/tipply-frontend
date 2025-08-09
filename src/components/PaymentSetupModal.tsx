@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { loadStripe } from '@stripe/stripe-js'
 import { Elements, CardElement, useStripe, useElements } from '@stripe/react-stripe-js'
 import { toast } from 'sonner'
+import { getApiBaseUrl } from '../utils/config'
 
 // Initialize Stripe
 const stripePromise = loadStripe((import.meta as any).env.VITE_STRIPE_PUBLISHABLE_KEY || 'pk_test_placeholder')
@@ -87,7 +88,7 @@ function PaymentForm({
           setError(null)
           
           // Get setup intent from backend
-          const res = await fetch(`${(import.meta as any).env?.VITE_API_URL || 'http://localhost:5000'}/api/stripe/setup-intent`, {
+          const res = await fetch(`${getApiBaseUrl()}/api/stripe/setup-intent`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ deviceUuid, userId })
@@ -141,7 +142,7 @@ function PaymentForm({
     
     try {
       // Get setup intent from backend
-      const res = await fetch(`${(import.meta as any).env?.VITE_API_URL || 'http://localhost:5000'}/api/stripe/setup-intent`, {
+                const res = await fetch(`${getApiBaseUrl()}/api/stripe/setup-intent`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ deviceUuid, userId })

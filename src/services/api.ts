@@ -1,26 +1,4 @@
-// Get API base URL from environment variable with fallback
-const getApiBaseUrl = () => {
-  // Check for VITE_API_URL environment variable
-  const envUrl = (import.meta as any).env?.VITE_API_URL;
-  
-  if (envUrl) {
-    console.log('Using API URL from environment:', envUrl);
-    return envUrl;
-  }
-  
-  // Check if we're on the deployed S3 site
-  const hostname = window.location.hostname;
-  if (hostname.includes('tipply-s3-dashboard.s3-website-us-east-1.amazonaws.com')) {
-    console.log('Detected deployed environment, using AWS API Gateway URL');
-    return 'https://uhxejjh8s1.execute-api.us-east-1.amazonaws.com/dev';
-  }
-  
-  // Fallback for local development
-  console.log('Using default API URL for local development');
-  return 'http://localhost:5000';
-};
-
-const API_BASE_URL = getApiBaseUrl();
+import { API_BASE_URL } from '../utils/config';
 
 interface ApiResponse<T> {
   data?: T
