@@ -8,9 +8,9 @@ export const getApiBaseUrl = () => {
     return envUrl;
   }
   
-  // Check if we're on the deployed site (formal domain or S3)
+  // Check if we're on the deployed site
   const hostname = window.location.hostname;
-  if (hostname.includes('test.tipply.live') || hostname.includes('tipply-s3-dashboard.s3-website-us-east-1.amazonaws.com')) {
+  if (hostname.includes('test.tipply.live')) {
     console.log('Detected deployed environment, using AWS API Gateway URL');
     return 'https://uhxejjh8s1.execute-api.us-east-1.amazonaws.com/dev';
   }

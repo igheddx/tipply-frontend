@@ -126,7 +126,7 @@ const ManageDevices: React.FC = () => {
                       Download QR Code
                     </button>
                     <button
-                      onClick={() => window.open(`${window.location.origin}/tip/${device.id}`, '_blank')}
+                      onClick={() => window.open(`https://test.tipply.live/tip/${device.id}`, '_blank')}
                       className="btn-primary w-full"
                     >
                       View Tipping Page
