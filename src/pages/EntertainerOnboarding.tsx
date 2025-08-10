@@ -49,6 +49,14 @@ const EntertainerOnboarding: React.FC = () => {
     <div className="min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8 bg-gray-50">
       <div className="max-w-md w-full space-y-8">
         <div>
+          <div className="mx-auto w-32 h-32 overflow-visible rounded-2xl mb-4">
+            <img 
+              src="/images/tipply_logo.png" 
+              alt="Tipply Logo" 
+              className="w-full h-full object-contain"
+              style={{ transform: 'scale(1.25)', objectPosition: 'center' }}
+            />
+          </div>
           <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
             Create Your Account
           </h2>

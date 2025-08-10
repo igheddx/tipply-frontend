@@ -94,8 +94,13 @@ const Login: React.FC = () => {
 
         {/* Logo and Header */}
         <div className="text-center mb-8">
-          <div className="mx-auto w-16 h-16 bg-gradient-to-r from-primary-600 to-primary-700 rounded-2xl flex items-center justify-center mb-4">
-            <span className="text-2xl font-bold text-white">T</span>
+          <div className="mx-auto w-32 h-32 overflow-visible rounded-2xl mb-4">
+            <img 
+              src="/images/tipply_logo.png" 
+              alt="Tipply Logo" 
+              className="w-full h-full object-contain"
+              style={{ transform: 'scale(1.25)', objectPosition: 'center' }}
+            />
           </div>
           <h2 className="text-3xl font-bold text-gray-900 mb-2">
             Welcome back

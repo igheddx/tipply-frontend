@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 
 const DeviceRegistration: React.FC = () => {
   const [deviceName, setDeviceName] = useState('')
+  const [allowSongRequests, setAllowSongRequests] = useState<boolean | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
@@ -11,6 +12,13 @@ const DeviceRegistration: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    
+    // Validation for required song request selection
+    if (allowSongRequests === null) {
+      setError('Please select whether you want to enable song requests from your audience.')
+      return
+    }
+    
     setIsLoading(true)
     setError('')
     setSuccess('')
@@ -23,6 +31,7 @@ const DeviceRegistration: React.FC = () => {
         },
         body: JSON.stringify({
           name: deviceName,
+          isAllowSongRequest: allowSongRequests,
         }),
       })
 
@@ -66,6 +75,37 @@ const DeviceRegistration: React.FC = () => {
               value={deviceName}
               onChange={(e) => setDeviceName(e.target.value)}
             />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-3">
+              Would you like to enable song requests from your audience? *
+            </label>
+            <p className="text-sm text-gray-500 mb-4">
+              If you select "Yes", you'll be able to create a song catalog for your audience to choose from once you're logged in. This allows your audience to request specific songs when they tip you.
+            </p>
+            <div className="space-y-2">
+              <label className="flex items-center cursor-pointer">
+                <input
+                  type="radio"
+                  name="allowSongRequests"
+                  checked={allowSongRequests === true}
+                  onChange={() => setAllowSongRequests(true)}
+                  className="mr-3 h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300"
+                />
+                <span className="text-sm text-gray-700">Yes, enable song requests</span>
+              </label>
+              <label className="flex items-center cursor-pointer">
+                <input
+                  type="radio"
+                  name="allowSongRequests"
+                  checked={allowSongRequests === false}
+                  onChange={() => setAllowSongRequests(false)}
+                  className="mr-3 h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300"
+                />
+                <span className="text-sm text-gray-700">No, disable song requests</span>
+              </label>
+            </div>
           </div>
 
           {error && (

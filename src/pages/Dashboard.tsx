@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import apiService from '../services/api'
 import SongManagement from '../components/SongManagement'
+import SongRequestMonitor from '../components/SongRequestMonitor'
+import { API_BASE_URL } from '../utils/config'
 
 interface DashboardStats {
   totalDevices: number
@@ -40,6 +42,7 @@ interface DeviceSummary {
   totalTipsCount: number
   lastTipReceived: string
   qrCodeUrl: string
+  isAllowSongRequest: boolean
 }
 
 interface TipSummary {
@@ -74,10 +77,13 @@ const Dashboard: React.FC = () => {
   const [showAddDeviceForm, setShowAddDeviceForm] = useState(false)
   const [addDeviceForm, setAddDeviceForm] = useState({
     deviceUuid: '',
-    nickname: ''
+    nickname: '',
+    isAllowSongRequest: null as boolean | null
   })
   const [addDeviceErrors, setAddDeviceErrors] = useState<{[key: string]: string}>({})
   const [isAddingDevice, setIsAddingDevice] = useState(false)
+  const [isValidatingAddDevice, setIsValidatingAddDevice] = useState(false)
+  const [addDeviceValidationComplete, setAddDeviceValidationComplete] = useState(false)
   const [showStripeSetup, setShowStripeSetup] = useState(false)
   
   // Soft Delete States
@@ -87,6 +93,18 @@ const Dashboard: React.FC = () => {
   const [isRestoringDevice, setIsRestoringDevice] = useState<string | null>(null)
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [deviceToDelete, setDeviceToDelete] = useState<DeviceSummary | null>(null)
+  
+  // Song Request Toggle States
+  const [updatingSongRequest, setUpdatingSongRequest] = useState<string | null>(null)
+  
+  // Song Request Monitoring States
+  const [showMonitorFullscreen, setShowMonitorFullscreen] = useState(false)
+  const [songRequests, setSongRequests] = useState<any[]>([])
+  
+  // Song Catalog Alert States
+  const [showSongCatalogAlert, setShowSongCatalogAlert] = useState(false)
+  const [songCatalogCount, setSongCatalogCount] = useState(0)
+  const [hasDevicesWithSongRequests, setHasDevicesWithSongRequests] = useState(false)
   
   const navigate = useNavigate()
 
@@ -103,7 +121,15 @@ const Dashboard: React.FC = () => {
     checkStripeConnectStatus()
     fetchUserProfile()
     fetchDeletedDevices()
+    checkSongCatalogAlert()
   }, [navigate])
+
+  // Load song requests when monitor tab is active
+  useEffect(() => {
+    if (activeTab === 'monitor' && userProfile?.id) {
+      loadSongRequests()
+    }
+  }, [activeTab, userProfile?.id])
 
   const fetchUserProfile = async () => {
     try {
@@ -113,6 +139,74 @@ const Dashboard: React.FC = () => {
       }
     } catch (error) {
       console.error('Error fetching user profile:', error)
+    }
+  }
+
+  const checkSongCatalogAlert = async () => {
+    try {
+      console.log('🎵 [DEBUG] Starting song catalog alert check...')
+      
+      // Check if user has devices with song requests enabled
+      const response = await apiService.getDashboardStats()
+      console.log('🎵 [DEBUG] Dashboard stats response:', response)
+      console.log('🎵 [DEBUG] Response data:', response.data)
+      console.log('🎵 [DEBUG] Response error:', response.error)
+      
+      if (response.data && response.data.devices) {
+        const devicesWithSongRequests = response.data.devices.filter((device: DeviceSummary) => device.isAllowSongRequest)
+        console.log('🎵 [DEBUG] All devices:', response.data.devices)
+        console.log('🎵 [DEBUG] Devices with song requests enabled:', devicesWithSongRequests)
+        
+        setHasDevicesWithSongRequests(devicesWithSongRequests.length > 0)
+        
+        if (devicesWithSongRequests.length > 0) {
+          // Get profile ID to check song catalog count
+          const profileResponse = await apiService.getProfile()
+          if (profileResponse.data) {
+            const profileId = profileResponse.data.id
+            console.log('🎵 [DEBUG] Profile ID:', profileId)
+            
+            // Check song catalog count
+            const catalogResponse = await fetch(`${API_BASE_URL}/api/songcatalog/my-songs/${profileId}`)
+            console.log('🎵 [DEBUG] Catalog response status:', catalogResponse.status)
+            
+            if (catalogResponse.ok) {
+              const catalogData = await catalogResponse.json()
+              const count = catalogData.length || 0
+              console.log('🎵 [DEBUG] Song catalog count:', count)
+              setSongCatalogCount(count)
+              
+              // Show alert if catalog is empty (always check on login regardless of dismissal)
+              // If catalog count is now > 0, remove the dismissal flag so alert can show again if count goes back to 0
+              if (count > 0) {
+                console.log('🎵 [DEBUG] Catalog has songs, hiding alert')
+                localStorage.removeItem(`songCatalogAlertDismissed_${profileId}`)
+                setShowSongCatalogAlert(false)
+              } else {
+                // Show alert if catalog is empty and wasn't dismissed
+                const alertDismissed = localStorage.getItem(`songCatalogAlertDismissed_${profileId}`)
+                console.log('🎵 [DEBUG] Alert dismissed flag:', alertDismissed)
+                
+                if (!alertDismissed) {
+                  console.log('🎵 [DEBUG] Showing song catalog alert!')
+                  setShowSongCatalogAlert(true)
+                } else {
+                  console.log('🎵 [DEBUG] Alert was previously dismissed')
+                }
+              }
+            } else {
+              console.log('🎵 [DEBUG] Failed to fetch catalog:', catalogResponse.status)
+            }
+          }
+        } else {
+          console.log('🎵 [DEBUG] No devices with song requests enabled')
+        }
+      } else {
+        console.log('🎵 [DEBUG] No response data or devices found')
+      }
+    } catch (error) {
+      console.error('🎵 [ERROR] Error checking song catalog alert:', error)
+      console.error('🎵 [ERROR] Error stack:', (error as Error)?.stack)
     }
   }
 
@@ -207,9 +301,11 @@ const Dashboard: React.FC = () => {
               
               // Check verification status directly - try both cases
               const verificationStatus = status.VerificationStatus || status.verificationStatus || 'unknown'
+              console.log('🏆 [DEBUG] KYC Status for device', device.uuid, ':', verificationStatus)
               
               if (verificationStatus.toLowerCase() === 'verified') {
                 stripeEnabledDevicesList.push(device.uuid)
+                console.log('🏆 [DEBUG] Setting KYC status to verified')
                 if (kycStatus !== 'verified') {
                   setKycStatus('verified')
                 }
@@ -219,10 +315,12 @@ const Dashboard: React.FC = () => {
                 verificationStatus.toLowerCase() === 'incomplete' ||
                 verificationStatus.toLowerCase() === 'requires_verification'
               ) {
+                console.log('🏆 [DEBUG] Setting KYC status to pending')
                 if (kycStatus !== 'verified') {
                   setKycStatus('pending')
                 }
               } else {
+                console.log('🏆 [DEBUG] Setting KYC status to not_verified')
                 if (kycStatus !== 'verified' && kycStatus !== 'pending') {
                   setKycStatus('not_verified')
                 }
@@ -237,6 +335,10 @@ const Dashboard: React.FC = () => {
         }
       }
 
+      console.log('🏆 [DEBUG] Final KYC status:', kycStatus)
+      console.log('🏆 [DEBUG] Stripe enabled devices:', stripeEnabledDevicesList)
+      console.log('🏆 [DEBUG] Device status map:', deviceStatusMap)
+      
       setStripeEnabledDevices(stripeEnabledDevicesList)
       setDeviceStripeStatus(deviceStatusMap)
     } catch (error) {
@@ -246,6 +348,20 @@ const Dashboard: React.FC = () => {
 
   const dismissStripeAlert = () => {
     setShowStripeAlert(false)
+  }
+
+  const dismissSongCatalogAlert = async () => {
+    try {
+      const profileResponse = await apiService.getProfile()
+      if (profileResponse.data) {
+        const profileId = profileResponse.data.id
+        localStorage.setItem(`songCatalogAlertDismissed_${profileId}`, 'true')
+        setShowSongCatalogAlert(false)
+      }
+    } catch (error) {
+      console.error('Error dismissing song catalog alert:', error)
+      setShowSongCatalogAlert(false)
+    }
   }
 
   // Add Device Functions
@@ -258,8 +374,10 @@ const Dashboard: React.FC = () => {
     setShowAddDeviceForm(false)
     setShowStripeSetup(false)
     setActiveTab('overview')
-    setAddDeviceForm({ deviceUuid: '', nickname: '' })
+    setAddDeviceForm({ deviceUuid: '', nickname: '', isAllowSongRequest: null })
     setAddDeviceErrors({})
+    setAddDeviceValidationComplete(false)
+    setIsValidatingAddDevice(false)
   }
 
   const handleAddDeviceInputChange = (field: string, value: string) => {
@@ -267,6 +385,12 @@ const Dashboard: React.FC = () => {
     // Clear error when user starts typing
     if (addDeviceErrors[field]) {
       setAddDeviceErrors(prev => ({ ...prev, [field]: '' }))
+    }
+    
+    // Reset device validation state when device UUID changes
+    if (field === 'deviceUuid') {
+      setAddDeviceValidationComplete(false)
+      setIsValidatingAddDevice(false)
     }
   }
 
@@ -283,8 +407,55 @@ const Dashboard: React.FC = () => {
       errors.nickname = 'Device nickname is required'
     }
     
+    if (addDeviceForm.isAllowSongRequest === null) {
+      errors.isAllowSongRequest = 'Please select whether you want to enable song requests from your audience.'
+    }
+    
     setAddDeviceErrors(errors)
     return Object.keys(errors).length === 0
+  }
+
+  const validateAddDeviceDetectedDevice = async () => {
+    const deviceId = addDeviceForm.deviceUuid.trim()
+    
+    if (!deviceId) {
+      return { isValid: false, error: 'Device ID is required' }
+    }
+    
+    setIsValidatingAddDevice(true)
+    setAddDeviceValidationComplete(false)
+    
+    try {
+      const result = await apiService.checkDetectedDevice(deviceId)
+      
+      if (result.error) {
+        const errorMessage = result.error || 'Failed to validate device UUID'
+        setAddDeviceErrors(prev => ({ ...prev, deviceUuid: errorMessage }))
+        setAddDeviceValidationComplete(true)
+        setIsValidatingAddDevice(false)
+        return { isValid: false, error: errorMessage }
+      }
+      
+      if (!result.data?.exists) {
+        const errorMessage = result.data?.message || 'Device UUID could not be located, please check again'
+        setAddDeviceErrors(prev => ({ ...prev, deviceUuid: errorMessage }))
+        setAddDeviceValidationComplete(true)
+        setIsValidatingAddDevice(false)
+        return { isValid: false, error: errorMessage }
+      }
+      
+      // Clear any existing errors
+      setAddDeviceErrors(prev => ({ ...prev, deviceUuid: '' }))
+      setAddDeviceValidationComplete(true)
+      setIsValidatingAddDevice(false)
+      return { isValid: true, error: null }
+    } catch (err) {
+      const errorMessage = 'Failed to validate device UUID'
+      setAddDeviceErrors(prev => ({ ...prev, deviceUuid: errorMessage }))
+      setAddDeviceValidationComplete(true)
+      setIsValidatingAddDevice(false)
+      return { isValid: false, error: errorMessage }
+    }
   }
 
   const checkUserStripeStatus = async () => {
@@ -307,6 +478,20 @@ const Dashboard: React.FC = () => {
   const handleAddDeviceSubmit = async () => {
     if (!validateAddDeviceForm()) {
       return
+    }
+
+    // Validate device exists in DetectedDevices table
+    if (!addDeviceValidationComplete || !!addDeviceErrors.deviceUuid) {
+      // Re-validate if not already validated
+      if (addDeviceForm.deviceUuid.trim()) {
+        const validation = await validateAddDeviceDetectedDevice()
+        if (!validation.isValid) {
+          return
+        }
+      } else {
+        setAddDeviceErrors(prev => ({ ...prev, deviceUuid: 'Device ID is required' }))
+        return
+      }
     }
 
     setIsAddingDevice(true)
@@ -341,7 +526,8 @@ const Dashboard: React.FC = () => {
     try {
       const response = await apiService.addDevice({
         deviceUuid: addDeviceForm.deviceUuid,
-        nickname: addDeviceForm.nickname
+        nickname: addDeviceForm.nickname,
+        isAllowSongRequest: addDeviceForm.isAllowSongRequest || false
       })
       
       if (response.error) {
@@ -353,8 +539,10 @@ const Dashboard: React.FC = () => {
       await checkStripeConnectStatus()
       setShowAddDeviceForm(false)
       setActiveTab('devices')
-      setAddDeviceForm({ deviceUuid: '', nickname: '' })
+      setAddDeviceForm({ deviceUuid: '', nickname: '', isAllowSongRequest: null })
       setAddDeviceErrors({})
+      setAddDeviceValidationComplete(false)
+      setIsValidatingAddDevice(false)
       
     } catch (error) {
       console.error('Error adding device:', error)
@@ -450,6 +638,51 @@ const Dashboard: React.FC = () => {
     }
   }
 
+  const toggleSongRequestSetting = async (device: DeviceSummary) => {
+    setUpdatingSongRequest(device.id)
+    try {
+      const newSetting = !device.isAllowSongRequest
+      
+      const response = await apiService.updateSongRequestSetting(device.id, newSetting)
+
+      if (response.data) {
+        // Update the device in the stats state
+        setStats(prevStats => {
+          if (!prevStats) return prevStats
+          return {
+            ...prevStats,
+            devices: prevStats.devices.map(d => 
+              d.id === device.id 
+                ? { ...d, isAllowSongRequest: newSetting }
+                : d
+            )
+          }
+        })
+      } else {
+        alert('Failed to update song request setting: ' + (response.error || 'Unknown error'))
+      }
+    } catch (error) {
+      console.error('Error updating song request setting:', error)
+      alert('Error updating song request setting')
+    } finally {
+      setUpdatingSongRequest(null)
+    }
+  }
+
+  const loadSongRequests = async () => {
+    if (!userProfile?.id) return
+    
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/SongCatalog/monitor/${userProfile.id}`)
+      if (response.ok) {
+        const data = await response.json()
+        setSongRequests(data.songRequests || [])
+      }
+    } catch (error) {
+      console.error('Error loading song requests:', error)
+    }
+  }
+
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
@@ -539,48 +772,55 @@ const Dashboard: React.FC = () => {
         </div>
       )}
 
+
+
       {/* Header */}
-      <div className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-6">
-            <div className="flex items-center space-x-4">
-              <div>
-                <h1 className="text-3xl font-bold text-gray-900">Tipply</h1>
-                <p className="text-gray-600">
-                  Welcome back, {userProfile?.firstName || userProfile?.stageName || 'Performer'}! Here's your tipping overview
-                </p>
-              </div>
-              {/* KYC Status Icon */}
-              <div className="flex items-center space-x-4">
-                {kycStatus === 'verified' && (
-                  <div className="flex items-center space-x-2 bg-green-50 border border-green-200 rounded-lg px-3 py-2">
-                    <svg className="w-5 h-5 text-green-600" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                    </svg>
-                    <span className="text-sm font-medium text-green-800">KYC Verified</span>
-                  </div>
-                )}
-                {kycStatus === 'pending' && (
-                  <div className="flex items-center space-x-2 bg-yellow-50 border border-yellow-200 rounded-lg px-3 py-2">
-                    <svg className="w-5 h-5 text-yellow-600" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                    </svg>
-                    <span className="text-sm font-medium text-yellow-800">KYC Pending</span>
-                  </div>
-                )}
-                
-                {/* Stripe Account Status */}
-                {stripeEnabledDevices.length > 0 && (
-                  <div className="flex items-center space-x-2 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2">
-                    <svg className="w-5 h-5 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                    </svg>
-                    <span className="text-sm font-medium text-blue-800">Stripe Verified</span>
-                  </div>
-                )}
+              <div className="bg-white shadow-sm border-b">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="flex justify-between items-center py-1">
+            {/* Left side - Logo */}
+            <div className="flex items-center">
+                            <div className="relative w-24 h-24 overflow-visible rounded-lg">
+                <img
+                  src="/images/tipply_logo.png"
+                  alt="Tipply Logo"
+                  className="w-full h-full object-contain"
+                  style={{ transform: 'scale(1.2)', objectPosition: 'center' }}
+                />
               </div>
             </div>
-            <div className="flex items-center space-x-3">
+
+            {/* Right side - Status badges and actions */}
+            <div className="flex items-center space-x-4">
+              {/* KYC Status Icon */}
+              {kycStatus === 'verified' && (
+                <div className="flex items-center space-x-2 bg-green-50 border border-green-200 rounded-lg px-3 py-2">
+                  <svg className="w-5 h-5 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                  </svg>
+                  <span className="text-sm font-medium text-green-800">KYC Verified</span>
+                </div>
+              )}
+              {kycStatus === 'pending' && (
+                <div className="flex items-center space-x-2 bg-yellow-50 border border-yellow-200 rounded-lg px-3 py-2">
+                  <svg className="w-5 h-5 text-yellow-600" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                  </svg>
+                  <span className="text-sm font-medium text-yellow-800">KYC Pending</span>
+                </div>
+              )}
+              
+              {/* Stripe Account Status */}
+              {stripeEnabledDevices.length > 0 && (
+                <div className="flex items-center space-x-2 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2">
+                  <svg className="w-5 h-5 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                  </svg>
+                  <span className="text-sm font-medium text-blue-800">Stripe Verified</span>
+                </div>
+              )}
+
+              {/* Profile and Logout buttons */}
               <button
                 onClick={() => navigate('/profile')}
                 className="p-2 text-gray-500 hover:text-gray-700 transition-colors"
@@ -605,126 +845,181 @@ const Dashboard: React.FC = () => {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Welcome Message - Moved outside header */}
+        <div className="mb-8">
+          <h2 className="text-3xl font-bold text-gray-900 mb-2">
+            Welcome back, {userProfile?.firstName || userProfile?.stageName || 'Performer'}! 👋
+          </h2>
+          <p className="text-gray-600">
+            Here's how you're connecting with your audience and building meaningful social connections today.
+          </p>
+        </div>
+
+        {/* Song Catalog Alert */}
+        {showSongCatalogAlert && hasDevicesWithSongRequests && songCatalogCount === 0 && (
+          <div className="mb-6">
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 shadow-sm">
+              <div className="flex items-start">
+                <div className="flex-shrink-0">
+                  <svg className="h-5 w-5 text-blue-400" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                  </svg>
+                </div>
+                <div className="ml-3 flex-1">
+                  <h3 className="text-sm font-medium text-blue-800">
+                    Add Songs to Your Catalog 🎵
+                  </h3>
+                  <div className="mt-2 text-sm text-blue-700">
+                    <p>
+                      You've enabled song requests for your devices! Get started by adding songs to your catalog so your audience can request their favorites when they tip.
+                    </p>
+                    <button
+                      onClick={() => {
+                        setActiveTab('songs')
+                        // Scroll to top after tab change
+                        window.scrollTo({ top: 0, behavior: 'smooth' })
+                      }}
+                      className="mt-2 text-blue-800 hover:text-blue-900 font-medium underline"
+                    >
+                      Add songs now →
+                    </button>
+                  </div>
+                </div>
+                <div className="ml-auto pl-3">
+                  <button
+                    onClick={dismissSongCatalogAlert}
+                    className="inline-flex text-blue-400 hover:text-blue-600 focus:outline-none focus:text-blue-600"
+                  >
+                    <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Stats Overview */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-6 mb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 mb-8">
           {/* Pending Payouts - Special Standout Card */}
-          <div className="bg-gradient-to-br from-blue-50 to-indigo-100 border border-blue-200 rounded-xl shadow-sm p-6 transform hover:scale-105 transition-all duration-200">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
+          <div className="bg-gradient-to-br from-blue-50 to-indigo-100 border border-blue-200 rounded-xl shadow-sm p-4 transform hover:scale-105 transition-all duration-200">
+            <div className="flex flex-col items-center text-center">
+              <div className="flex-shrink-0 mb-3">
                 <div className="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center">
                   <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
                   </svg>
                 </div>
               </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-blue-700">Pending Balance</p>
-                <p className="text-2xl font-bold text-blue-900">
+              <div>
+                <p className="text-xs font-medium text-blue-700 mb-1">Pending Balance</p>
+                <p className="text-lg font-bold text-blue-900 mb-1">
                   {metrics ? formatCurrency(metrics.pendingPayouts) : '$0.00'}
                 </p>
-                <p className="text-xs text-blue-600 mt-1">Awaiting payout cycle</p>
+                <p className="text-xs text-blue-600">Awaiting payout</p>
               </div>
             </div>
           </div>
 
           {/* Pending Tips Card */}
-          <div className="bg-white rounded-xl shadow-sm p-6">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
+          <div className="bg-white rounded-xl shadow-sm p-4">
+            <div className="flex flex-col items-center text-center">
+              <div className="flex-shrink-0 mb-3">
                 <div className="w-8 h-8 bg-orange-100 rounded-lg flex items-center justify-center">
                   <svg className="w-5 h-5 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
                 </div>
               </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Pending Tips</p>
-                <p className="text-2xl font-bold text-gray-900">
+              <div>
+                <p className="text-xs font-medium text-gray-600 mb-1">Pending Tips</p>
+                <p className="text-lg font-bold text-gray-900 mb-1">
                   {metrics ? formatCurrency(metrics.pendingTips) : '$0.00'}
                 </p>
-                <p className="text-sm text-gray-500">Awaiting processing</p>
+                <p className="text-xs text-gray-500">Awaiting processing</p>
               </div>
             </div>
           </div>
 
-          <div className="bg-white rounded-xl shadow-sm p-6">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
+          <div className="bg-white rounded-xl shadow-sm p-4">
+            <div className="flex flex-col items-center text-center">
+              <div className="flex-shrink-0 mb-3">
                 <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
                   <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
                   </svg>
                 </div>
               </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Total Earnings</p>
-                <p className="text-2xl font-bold text-gray-900">
+              <div>
+                <p className="text-xs font-medium text-gray-600 mb-1">Total Earnings</p>
+                <p className="text-lg font-bold text-gray-900">
                   {metrics ? formatCurrency(metrics.totalEarnings) : formatCurrency(stats.totalTipsReceived)}
                 </p>
               </div>
             </div>
           </div>
 
-          <div className="bg-white rounded-xl shadow-sm p-6">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
+          <div className="bg-white rounded-xl shadow-sm p-4">
+            <div className="flex flex-col items-center text-center">
+              <div className="flex-shrink-0 mb-3">
                 <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
                   <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                   </svg>
                 </div>
               </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Today's Tips</p>
-                <p className="text-2xl font-bold text-gray-900">
+              <div>
+                <p className="text-xs font-medium text-gray-600 mb-1">Today's Tips</p>
+                <p className="text-lg font-bold text-gray-900 mb-1">
                   {metrics ? formatCurrency(metrics.todaysTips) : formatCurrency(stats.todayTipsReceived)}
                 </p>
-                <p className="text-sm text-gray-500">
+                <p className="text-xs text-gray-500">
                   {metrics ? `${Math.round(metrics.todaysTips)} tips` : `${stats.todayTipsCount} tips`}
                 </p>
               </div>
             </div>
           </div>
 
-          <div className="bg-white rounded-xl shadow-sm p-6">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
+          <div className="bg-white rounded-xl shadow-sm p-4">
+            <div className="flex flex-col items-center text-center">
+              <div className="flex-shrink-0 mb-3">
                 <div className="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center">
                   <svg className="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
                   </svg>
                 </div>
               </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Active Devices</p>
-                <p className="text-2xl font-bold text-gray-900">{stats.activeDevices}</p>
-                <p className="text-sm text-gray-500">of {stats.totalDevices} total</p>
+              <div>
+                <p className="text-xs font-medium text-gray-600 mb-1">Active Devices</p>
+                <p className="text-lg font-bold text-gray-900 mb-1">{stats.activeDevices}</p>
+                <p className="text-xs text-gray-500">of {stats.totalDevices} total</p>
               </div>
             </div>
           </div>
 
-          <div className="bg-white rounded-xl shadow-sm p-6">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
+          <div className="bg-white rounded-xl shadow-sm p-4">
+            <div className="flex flex-col items-center text-center">
+              <div className="flex-shrink-0 mb-3">
                 <div className="w-8 h-8 bg-yellow-100 rounded-lg flex items-center justify-center">
                   <svg className="w-5 h-5 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
                   </svg>
                 </div>
               </div>
-              <div className="ml-4">
-                <div className="flex items-center space-x-2">
-                  <p className="text-sm font-medium text-gray-600">This Month</p>
+              <div>
+                <div className="flex items-center justify-center space-x-2 mb-1">
+                  <p className="text-xs font-medium text-gray-600">This Month</p>
                   {metrics && metrics.trendPercentage > 0 && (
                     <div className={`flex items-center space-x-1 ${
                       metrics.trendDirection === 'up' ? 'text-green-600' : 'text-red-600'
                     }`}>
                       {metrics.trendDirection === 'up' ? (
-                        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                        <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
                           <path fillRule="evenodd" d="M3.293 9.707a1 1 0 010-1.414l6-6a1 1 0 011.414 0l6 6a1 1 0 01-1.414 1.414L11 5.414V17a1 1 0 11-2 0V5.414L4.707 9.707a1 1 0 01-1.414 0z" clipRule="evenodd" />
                         </svg>
                       ) : (
-                        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                        <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
                           <path fillRule="evenodd" d="M16.707 10.293a1 1 0 010 1.414l-6 6a1 1 0 01-1.414 0l-6-6a1 1 0 111.414-1.414L9 14.586V3a1 1 0 012 0v11.586l4.293-4.293a1 1 0 011.414 0z" clipRule="evenodd" />
                         </svg>
                       )}
@@ -734,10 +1029,10 @@ const Dashboard: React.FC = () => {
                     </div>
                   )}
                 </div>
-                <p className="text-2xl font-bold text-gray-900">
+                <p className="text-lg font-bold text-gray-900 mb-1">
                   {metrics ? formatCurrency(metrics.thisMonthTips) : formatCurrency(stats.thisMonthTipsReceived)}
                 </p>
-                <p className="text-sm text-gray-500">
+                <p className="text-xs text-gray-500">
                   {metrics ? `${Math.round(metrics.thisMonthTips)} tips` : `${stats.thisMonthTipsCount} tips`}
                 </p>
               </div>
@@ -790,6 +1085,16 @@ const Dashboard: React.FC = () => {
                     }`}
                   >
                     Song Requests
+                  </button>
+                  <button
+                    onClick={() => setActiveTab('monitor')}
+                    className={`py-4 px-1 border-b-2 font-medium text-sm ${
+                      activeTab === 'monitor'
+                        ? 'border-primary-500 text-primary-600'
+                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    }`}
+                  >
+                    Monitor Song Requests
                   </button>
                 </>
               ) : (
@@ -977,25 +1282,43 @@ const Dashboard: React.FC = () => {
                           </div>
                         </div>
 
-                        <div className="flex space-x-2">
+                        <div className="space-y-2">
+                          <div className="flex space-x-2">
+                            <button
+                              onClick={() => downloadQRCode(device.id, device.nickname)}
+                              className="flex-1 px-3 py-2 bg-primary-600 text-white text-sm rounded-lg hover:bg-primary-700 transition-colors"
+                            >
+                              Download QR
+                            </button>
+                            <button
+                              onClick={() => window.open(device.qrCodeUrl, '_blank')}
+                              className="px-3 py-2 bg-gray-200 text-gray-700 text-sm rounded-lg hover:bg-gray-300 transition-colors"
+                            >
+                              View
+                            </button>
+                            <button
+                              onClick={() => handleSoftDeleteDevice(device)}
+                              disabled={isDeletingDevice === device.id}
+                              className="px-3 py-2 bg-red-100 text-red-700 text-sm rounded-lg hover:bg-red-200 transition-colors disabled:opacity-50"
+                            >
+                              {isDeletingDevice === device.id ? 'Deleting...' : 'Delete'}
+                            </button>
+                          </div>
                           <button
-                            onClick={() => downloadQRCode(device.id, device.nickname)}
-                            className="flex-1 px-3 py-2 bg-primary-600 text-white text-sm rounded-lg hover:bg-primary-700 transition-colors"
+                            onClick={() => toggleSongRequestSetting(device)}
+                            disabled={updatingSongRequest === device.id}
+                            className={`w-full px-3 py-2 text-sm rounded-lg transition-colors disabled:opacity-50 ${
+                              device.isAllowSongRequest
+                                ? 'bg-orange-100 text-orange-700 hover:bg-orange-200'
+                                : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
+                            }`}
                           >
-                            Download QR
-                          </button>
-                          <button
-                            onClick={() => window.open(device.qrCodeUrl, '_blank')}
-                            className="px-3 py-2 bg-gray-200 text-gray-700 text-sm rounded-lg hover:bg-gray-300 transition-colors"
-                          >
-                            View
-                          </button>
-                          <button
-                            onClick={() => handleSoftDeleteDevice(device)}
-                            disabled={isDeletingDevice === device.id}
-                            className="px-3 py-2 bg-red-100 text-red-700 text-sm rounded-lg hover:bg-red-200 transition-colors disabled:opacity-50"
-                          >
-                            {isDeletingDevice === device.id ? 'Deleting...' : 'Delete'}
+                            {updatingSongRequest === device.id
+                              ? 'Updating...'
+                              : device.isAllowSongRequest
+                              ? 'Disable Song Request'
+                              : 'Enable Song Request'
+                            }
                           </button>
                         </div>
                       </div>
@@ -1170,18 +1493,33 @@ const Dashboard: React.FC = () => {
                           <label htmlFor="deviceUuid" className="block text-sm font-medium text-gray-700 mb-2">
                             Device UUID *
                           </label>
-                          <input
-                            type="text"
-                            id="deviceUuid"
-                            value={addDeviceForm.deviceUuid}
-                            onChange={(e) => handleAddDeviceInputChange('deviceUuid', e.target.value)}
-                            className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all duration-200 ${
-                              addDeviceErrors.deviceUuid ? 'border-red-500 focus:ring-red-200' : 'border-gray-300'
-                            }`}
-                            placeholder="e.g., f47ac10b-58cc-4372-a567-0e02b2c3d47f"
-                          />
+                          <div className="relative">
+                            <input
+                              type="text"
+                              id="deviceUuid"
+                              value={addDeviceForm.deviceUuid}
+                              onChange={(e) => handleAddDeviceInputChange('deviceUuid', e.target.value)}
+                              onBlur={async () => {
+                                if (addDeviceForm.deviceUuid.trim()) {
+                                  await validateAddDeviceDetectedDevice()
+                                }
+                              }}
+                              className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all duration-200 ${
+                                addDeviceErrors.deviceUuid ? 'border-red-500 focus:ring-red-200' : 'border-gray-300'
+                              }`}
+                              placeholder="e.g., f47ac10b-58cc-4372-a567-0e02b2c3d47f"
+                            />
+                            {isValidatingAddDevice && (
+                              <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-primary-600"></div>
+                              </div>
+                            )}
+                          </div>
                           {addDeviceErrors.deviceUuid && (
                             <p className="text-red-500 text-sm mt-1">{addDeviceErrors.deviceUuid}</p>
+                          )}
+                          {addDeviceValidationComplete && !addDeviceErrors.deviceUuid && addDeviceForm.deviceUuid.trim() && (
+                            <p className="text-green-500 text-sm mt-1">✓ Device UUID validated successfully</p>
                           )}
                           <p className="text-sm text-gray-500 mt-1">
                             Enter the 36-character UUID from your Tipply device
@@ -1208,6 +1546,46 @@ const Dashboard: React.FC = () => {
                           <p className="text-sm text-gray-500 mt-1">
                             Give your device a friendly name for easy identification
                           </p>
+                        </div>
+                        
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-3">
+                            Would you like to enable song requests from your audience? *
+                          </label>
+                          <p className="text-sm text-gray-500 mb-4">
+                            If you select "Yes", you'll be able to create a song catalog for your audience to choose from. This allows your audience to request specific songs when they tip you.
+                          </p>
+                          <div className="space-y-3">
+                            <label className="flex items-center cursor-pointer p-4 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
+                              <input
+                                type="radio"
+                                name="addDeviceIsAllowSongRequest"
+                                checked={addDeviceForm.isAllowSongRequest === true}
+                                onChange={() => setAddDeviceForm(prev => ({ ...prev, isAllowSongRequest: true }))}
+                                className="mr-4 h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300"
+                              />
+                              <div>
+                                <span className="text-sm font-medium text-gray-700">Yes, enable song requests</span>
+                                <p className="text-xs text-gray-500 mt-1">Your audience can request songs when they tip</p>
+                              </div>
+                            </label>
+                            <label className="flex items-center cursor-pointer p-4 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
+                              <input
+                                type="radio"
+                                name="addDeviceIsAllowSongRequest"
+                                checked={addDeviceForm.isAllowSongRequest === false}
+                                onChange={() => setAddDeviceForm(prev => ({ ...prev, isAllowSongRequest: false }))}
+                                className="mr-4 h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300"
+                              />
+                              <div>
+                                <span className="text-sm font-medium text-gray-700">No, disable song requests</span>
+                                <p className="text-xs text-gray-500 mt-1">Standard tipping without song requests</p>
+                              </div>
+                            </label>
+                          </div>
+                          {addDeviceErrors.isAllowSongRequest && (
+                            <p className="text-red-500 text-sm mt-1">{addDeviceErrors.isAllowSongRequest}</p>
+                          )}
                         </div>
 
                         {addDeviceErrors.submit && (
@@ -1281,6 +1659,78 @@ const Dashboard: React.FC = () => {
                 <SongManagement profileId={userProfile?.id} />
               </div>
             )}
+
+            {activeTab === 'monitor' && (
+              <div className="space-y-6">
+                <div className="bg-white rounded-lg shadow p-6">
+                  <div className="flex items-center justify-between mb-6">
+                    <h2 className="text-xl font-semibold text-gray-900">Monitor Song Requests</h2>
+                    <button
+                      onClick={() => setShowMonitorFullscreen(true)}
+                      className="bg-gradient-to-r from-purple-600 to-blue-600 text-white px-6 py-2 rounded-lg hover:from-purple-700 hover:to-blue-700 transition-all duration-200 font-medium flex items-center space-x-2"
+                    >
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                      </svg>
+                      <span>Actively Monitor Request</span>
+                    </button>
+                  </div>
+                  
+                  <div className="space-y-4">
+                    {songRequests.length === 0 ? (
+                      <div className="text-center py-8">
+                        <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                          <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
+                          </svg>
+                        </div>
+                        <h3 className="text-lg font-medium text-gray-800 mb-2">No song requests today</h3>
+                        <p className="text-gray-600">Song requests will appear here when participants make them through the tip interface</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        {songRequests.map((request) => (
+                          <div
+                            key={request.songId}
+                            className={`border rounded-lg p-4 ${
+                              request.status === 'completed' 
+                                ? 'bg-green-50 border-green-200' 
+                                : request.status === 'performing'
+                                ? 'bg-blue-50 border-blue-200'
+                                : 'bg-white border-gray-200'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between">
+                              <div className="flex-1">
+                                <h4 className="font-semibold text-gray-900">{request.songTitle}</h4>
+                                <p className="text-gray-600 text-sm">by {request.artist}</p>
+                                <div className="flex items-center space-x-4 mt-2 text-sm text-gray-500">
+                                  <span className="font-medium text-green-600">${request.totalTipAmount.toFixed(2)}</span>
+                                  <span>{request.requestCount} request{request.requestCount > 1 ? 's' : ''}</span>
+                                  <span>{new Date(request.firstRequestTime).toLocaleTimeString()}</span>
+                                </div>
+                              </div>
+                              <div className="flex items-center space-x-2">
+                                <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                                  request.status === 'completed' 
+                                    ? 'bg-green-100 text-green-800' 
+                                    : request.status === 'performing'
+                                    ? 'bg-blue-100 text-blue-800'
+                                    : 'bg-yellow-100 text-yellow-800'
+                                }`}>
+                                  {request.status === 'completed' ? 'Completed' : 
+                                   request.status === 'performing' ? 'Performing' : 'Pending'}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -1312,6 +1762,13 @@ const Dashboard: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Full-Screen Song Request Monitor */}
+      <SongRequestMonitor
+        profileId={userProfile?.id || ''}
+        isVisible={showMonitorFullscreen}
+        onClose={() => setShowMonitorFullscreen(false)}
+      />
     </div>
   )
 }

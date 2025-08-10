@@ -14,7 +14,8 @@ const Onboarding: React.FC = () => {
     password: '',
     confirmPassword: '',
     deviceId: '',
-    deviceNickname: ''
+    deviceNickname: '',
+    isAllowSongRequest: null as boolean | null
   })
 
   const [errors, setErrors] = useState<{[key: string]: string}>({})
@@ -233,6 +234,17 @@ const Onboarding: React.FC = () => {
             return
           }
         }
+        
+        // Validate song request selection
+        if (formData.isAllowSongRequest === null) {
+          setErrors(prev => ({ 
+            ...prev, 
+            isAllowSongRequest: 'Please select whether you want to enable song requests from your audience.' 
+          }))
+          return
+        }
+        setErrors(prev => ({ ...prev, isAllowSongRequest: '' }))
+        
         await registerDevice()
         setStep(step + 1)
       } else if (step === 4) {
@@ -326,7 +338,8 @@ Please use a different device UUID or contact support if this is your device.`
         lastName: formData.lastName,
         email: formData.email,
         phone: formData.phone,
-        nickname: formData.deviceNickname
+        nickname: formData.deviceNickname,
+        isAllowSongRequest: formData.isAllowSongRequest || false
       })
 
       if (result.error) {
@@ -795,18 +808,6 @@ Please use a different device UUID or contact support if this is your device.`
           <p className="text-sm text-gray-500">
             Enter the UUID from your Tipply device (36 characters, format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx)
           </p>
-          {/* Debug info - remove this in production */}
-          {formData.deviceId && (
-            <div className="mt-2 p-2 bg-gray-100 rounded text-xs">
-              <p><strong>Debug Info:</strong></p>
-              <p>Length: {formData.deviceId.length} characters</p>
-              <p>UUID: {formData.deviceId}</p>
-              <p>Expected format: 8-4-4-4-12 characters with hyphens</p>
-              {formData.deviceId.length !== 36 && (
-                <p className="text-red-600">⚠️ Your UUID has {formData.deviceId.length} characters, expected 36</p>
-              )}
-            </div>
-          )}
         </div>
         
         <div className="space-y-2">
@@ -824,6 +825,44 @@ Please use a different device UUID or contact support if this is your device.`
           />
           {errors.deviceNickname && <p className="text-red-500 text-xs mt-1">{errors.deviceNickname}</p>}
           <p className="text-sm text-gray-500">A friendly name to help you identify this device</p>
+        </div>
+        
+        <div className="space-y-3">
+          <label className="block text-sm font-semibold text-gray-700">
+            Would you like to enable song requests from your audience? *
+          </label>
+          <p className="text-sm text-gray-500 mb-4">
+            If you select "Yes", you'll be able to create a song catalog for your audience to choose from once you're logged in. This allows your audience to request specific songs when they tip you.
+          </p>
+          <div className="space-y-3">
+            <label className="flex items-center cursor-pointer p-4 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
+              <input
+                type="radio"
+                name="isAllowSongRequest"
+                checked={formData.isAllowSongRequest === true}
+                onChange={() => setFormData(prev => ({ ...prev, isAllowSongRequest: true }))}
+                className="mr-4 h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300"
+              />
+              <div>
+                <span className="text-sm font-medium text-gray-700">Yes, enable song requests</span>
+                <p className="text-xs text-gray-500 mt-1">Your audience can request songs when they tip</p>
+              </div>
+            </label>
+            <label className="flex items-center cursor-pointer p-4 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
+              <input
+                type="radio"
+                name="isAllowSongRequest"
+                checked={formData.isAllowSongRequest === false}
+                onChange={() => setFormData(prev => ({ ...prev, isAllowSongRequest: false }))}
+                className="mr-4 h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300"
+              />
+              <div>
+                <span className="text-sm font-medium text-gray-700">No, disable song requests</span>
+                <p className="text-xs text-gray-500 mt-1">Standard tipping without song requests</p>
+              </div>
+            </label>
+          </div>
+          {errors.isAllowSongRequest && <p className="text-red-500 text-xs mt-1">{errors.isAllowSongRequest}</p>}
         </div>
       </div>
     </div>
@@ -1013,6 +1052,14 @@ Please use a different device UUID or contact support if this is your device.`
       <div className="max-w-4xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
         {/* Header */}
         <div className="text-center mb-12">
+          <div className="mx-auto w-36 h-36 overflow-visible rounded-2xl mb-6">
+            <img 
+              src="/images/tipply_logo.png" 
+              alt="Tipply Logo" 
+              className="w-full h-full object-contain"
+              style={{ transform: 'scale(1.25)', objectPosition: 'center' }}
+            />
+          </div>
           <h1 className="text-4xl font-bold text-gray-900 mb-4">
             Welcome to Tipply
           </h1>

@@ -5,6 +5,7 @@ import { useSpring, animated } from '@react-spring/web'
 import { useDrag } from '@use-gesture/react'
 import { toast } from 'sonner'
 import PaymentSetupModal from '../components/PaymentSetupModal'
+import SongCatalogSearch from '../components/SongCatalogSearch'
 import apiService from '../services/api'
 import { getApiBaseUrl } from '../utils/config'
 
@@ -15,6 +16,7 @@ interface DeviceInfo {
   ownerLastName: string
   ownerId: string
   stripeAccountId?: string
+  isAllowSongRequest?: boolean
 }
 
 interface PaymentMethodsCheckResult {
@@ -37,6 +39,10 @@ const TippingInterface: React.FC = () => {
   const [isMobile, setIsMobile] = useState(true)
   const [isAnimating, setIsAnimating] = useState(false)
   const [audioEnabled, setAudioEnabled] = useState(false)
+  
+  // Song request state
+  const [showSongSearch, setShowSongSearch] = useState(false)
+  const [selectedSong, setSelectedSong] = useState<{id: string, title: string, artist: string, requestorName?: string, note?: string} | null>(null)
   
   const currencyRef = useRef<HTMLDivElement>(null)
   const audioRef = useRef<HTMLAudioElement>(null)
@@ -69,16 +75,36 @@ const TippingInterface: React.FC = () => {
     return () => window.removeEventListener('resize', checkMobile)
   }, [])
 
-  // Generate or retrieve user ID from localStorage
+  // Generate or retrieve user ID from localStorage and get proper UUID from backend
   useEffect(() => {
-    const storedUserId = localStorage.getItem('tipply_user_id')
-    if (storedUserId) {
-      setUserId(storedUserId)
-    } else {
-      const newUserId = `user_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`
-      localStorage.setItem('tipply_user_id', newUserId)
-      setUserId(newUserId)
+    const initializeUser = async () => {
+      // First get or create the temporary ID
+      let tempUserId = localStorage.getItem('tipply_user_id')
+      if (!tempUserId) {
+        tempUserId = `user_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`
+        localStorage.setItem('tipply_user_id', tempUserId)
+      }
+
+      try {
+        // Get the proper User UUID from the backend
+        const response = await fetch(`${getApiBaseUrl()}/api/songcatalog/user/${tempUserId}`)
+        if (response.ok) {
+          const userData = await response.json()
+          setUserId(userData.userId)
+          console.log('User initialized:', { tempId: tempUserId, userId: userData.userId })
+        } else {
+          console.error('Failed to get user UUID from backend')
+          // Fallback to temp ID (will cause errors but better than nothing)
+          setUserId(tempUserId)
+        }
+      } catch (error) {
+        console.error('Error initializing user:', error)
+        // Fallback to temp ID
+        setUserId(tempUserId)
+      }
     }
+
+    initializeUser()
   }, [])
 
   // Enable audio on first user interaction
@@ -257,6 +283,12 @@ const TippingInterface: React.FC = () => {
     setIsPaymentSetup(true)
     setShowPaymentModal(false)
     toast.success('Payment method setup complete!')
+  }
+
+  const handleSongSelect = (song: {id: string, title: string, artist: string, requestorName?: string, note?: string}) => {
+    setSelectedSong(song)
+    setShowSongSearch(false)
+    toast.success(`Song "${song.title}" selected! Now choose your tip amount and swipe up.`)
   }
 
   // AWS IoT connection test function - commented out for production but available for troubleshooting
@@ -480,7 +512,41 @@ const TippingInterface: React.FC = () => {
 
       if (response.data) {
         console.log('Tip stored successfully:', response.data)
-        toast.success(`$${currentAmount} tip recorded!`)
+        
+        // If a song was selected, create the song request entry
+        if (selectedSong) {
+          try {
+            const songRequestResponse = await fetch(`${getApiBaseUrl()}/api/songcatalog/request`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({
+                deviceUuid: deviceInfo?.uuid,
+                songId: selectedSong.id,
+                participantId: userId,
+                tipAmount: currentAmount,
+                requestorName: selectedSong.requestorName,
+                note: selectedSong.note
+              })
+            })
+
+            if (songRequestResponse.ok) {
+              console.log('Song request created successfully')
+              toast.success(`$${currentAmount} tip recorded with song "${selectedSong.title}"!`)
+            } else {
+              console.error('Failed to create song request')
+              toast.success(`$${currentAmount} tip recorded!`)
+              toast.error('Song request failed to save')
+            }
+          } catch (error) {
+            console.error('Error creating song request:', error)
+            toast.success(`$${currentAmount} tip recorded!`)
+            toast.error('Song request failed to save')
+          }
+        } else {
+          toast.success(`$${currentAmount} tip recorded!`)
+        }
         
         // Add celebration effect
         setShowCelebration(true)
@@ -572,6 +638,17 @@ const TippingInterface: React.FC = () => {
       {/* Header */}
       <div className="absolute top-0 left-0 right-0 z-10 p-4 bg-white/30 backdrop-blur-sm">
         <div className="text-center">
+          {selectedSong && (
+            <motion.div
+              initial={{ opacity: 0, y: -20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="mb-2 bg-purple-600/90 backdrop-blur-sm rounded-lg px-3 py-1 mx-auto inline-block"
+            >
+              <span className="text-white text-sm font-medium">
+                🎵 {selectedSong.title} by {selectedSong.artist}
+              </span>
+            </motion.div>
+          )}
           <h1 className="text-xl font-bold mb-1 text-white drop-shadow-lg">
             💝 Tip {deviceInfo.ownerFirstName} {deviceInfo.ownerLastName}
           </h1>
@@ -712,6 +789,26 @@ const TippingInterface: React.FC = () => {
         </div>
       </div>
 
+      {/* Song Request Button - Only show if device allows song requests */}
+      {deviceInfo?.isAllowSongRequest && !showSongSearch && (
+        <motion.div
+          initial={{ opacity: 0, x: 20 }}
+          animate={{ opacity: 1, x: 0 }}
+          className="absolute top-20 left-4 z-10"
+        >
+          <motion.button
+            whileTap={{ scale: 0.95 }}
+            onClick={() => setShowSongSearch(true)}
+            className="bg-gradient-to-r from-purple-600 to-blue-600 text-white px-3 py-2 rounded-lg shadow-lg backdrop-blur-sm text-sm flex items-center space-x-1.5 hover:from-purple-700 hover:to-blue-700 transition-all duration-200"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
+            </svg>
+            <span>🎵 Request song</span>
+          </motion.button>
+        </motion.div>
+      )}
+
       {/* Total Tipped Indicator - Always Show */}
       <div className="absolute top-20 right-4 z-10">
         <motion.div 
@@ -784,6 +881,15 @@ const TippingInterface: React.FC = () => {
           <span className="text-white text-xs">↑</span>
         </div>
       </div>
+
+      {/* Song Catalog Search Component */}
+      <SongCatalogSearch
+        deviceUuid={deviceInfo?.uuid || ''}
+        userTempId={userId}
+        onSongSelect={handleSongSelect}
+        onBackToTip={() => setShowSongSearch(false)}
+        isVisible={showSongSearch}
+      />
     </div>
   )
 }

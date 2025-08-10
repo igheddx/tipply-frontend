@@ -47,6 +47,7 @@ const SongManagement: React.FC<SongManagementProps> = ({ profileId }) => {
   const [searchResults, setSearchResults] = useState<ExternalSong[]>([])
   const [myCatalog, setMyCatalog] = useState<Song[]>([])
   const [catalogSearch, setCatalogSearch] = useState('')
+  const [catalogCount, setCatalogCount] = useState<number>(0)
   
   // Pagination
   const [searchPage, setSearchPage] = useState(1)
@@ -74,6 +75,27 @@ const SongManagement: React.FC<SongManagementProps> = ({ profileId }) => {
 
   const limit = 20
 
+  // Refresh catalog count only (lightweight)
+  const refreshCatalogCount = async () => {
+    try {
+      const token = localStorage.getItem('token')
+      const response = await fetch(`${API_BASE_URL}/api/songcatalog/my-songs/${profileId}?page=1&limit=1`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      })
+
+      if (response.ok) {
+        const totalCount = parseInt(response.headers.get('X-Total-Count') || '0')
+        setCatalogTotalCount(totalCount)
+        setCatalogCount(totalCount)
+      }
+    } catch (error) {
+      console.error('Error refreshing catalog count:', error)
+    }
+  }
+
   // Load user's catalog
   const loadMyCatalog = async (page = 1, search = '') => {
     setIsLoadingCatalog(true)
@@ -95,7 +117,9 @@ const SongManagement: React.FC<SongManagementProps> = ({ profileId }) => {
       if (response.ok) {
         const songs = await response.json()
         setMyCatalog(songs)
-        setCatalogTotalCount(parseInt(response.headers.get('X-Total-Count') || '0'))
+        const totalCount = parseInt(response.headers.get('X-Total-Count') || '0')
+        setCatalogTotalCount(totalCount)
+        setCatalogCount(totalCount)
       } else {
         showNotification('error', 'Failed to load your song catalog')
       }
@@ -112,6 +136,12 @@ const SongManagement: React.FC<SongManagementProps> = ({ profileId }) => {
     if (!query.trim()) return
     
     setIsSearching(true)
+    // Clear previous results when starting a new search (page 1)
+    if (page === 1) {
+      setSearchResults([])
+      setSearchTotalCount(0)
+      setSelectedSongs(new Set()) // Clear any previous selections
+    }
     try {
       const token = localStorage.getItem('token')
       const response = await fetch(`${API_BASE_URL}/api/songcatalog/search`, {
@@ -172,9 +202,11 @@ const SongManagement: React.FC<SongManagementProps> = ({ profileId }) => {
             ? { ...s, isInCatalog: true }
             : s
         ))
-        // Reload catalog if we're viewing it
+        // Reload catalog if we're viewing it, otherwise just refresh the count
         if (activeView === 'catalog') {
           loadMyCatalog(catalogPage, catalogSearch)
+        } else {
+          refreshCatalogCount()
         }
       } else {
         const error = await response.json()
@@ -257,6 +289,8 @@ const SongManagement: React.FC<SongManagementProps> = ({ profileId }) => {
         // Clear selections and refresh
         setSelectedSongs(new Set())
         searchSongs(searchQuery, searchPage)
+        // Refresh catalog count
+        refreshCatalogCount()
       } else {
         showNotification('error', 'Failed to add songs')
       }
@@ -336,8 +370,18 @@ const SongManagement: React.FC<SongManagementProps> = ({ profileId }) => {
   useEffect(() => {
     if (activeView === 'catalog') {
       loadMyCatalog()
+    } else {
+      // If not on catalog view, at least get the count for the tab
+      refreshCatalogCount()
     }
   }, [activeView, profileId])
+
+  // Load catalog count on initial mount regardless of active view
+  useEffect(() => {
+    if (profileId) {
+      refreshCatalogCount()
+    }
+  }, [profileId])
 
   // Toggle song selection for bulk operations
   const toggleSongSelection = (songKey: string) => {
@@ -413,7 +457,7 @@ const SongManagement: React.FC<SongManagementProps> = ({ profileId }) => {
                   : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
               }`}
             >
-              My Catalog ({myCatalog.length})
+              My Catalog ({catalogCount})
             </button>
           </nav>
         </div>

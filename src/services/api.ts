@@ -115,7 +115,7 @@ class ApiService {
   }
 
   // Device endpoints
-  async addDevice(deviceData: { deviceUuid: string; nickname?: string }): Promise<ApiResponse<any>> {
+  async addDevice(deviceData: { deviceUuid: string; nickname?: string; isAllowSongRequest?: boolean }): Promise<ApiResponse<any>> {
     return this.request('/api/devices/add', {
       method: 'POST',
       body: JSON.stringify(deviceData),
@@ -249,6 +249,7 @@ class ApiService {
     email: string
     phone?: string
     nickname?: string
+    isAllowSongRequest?: boolean
   }): Promise<ApiResponse<any>> {
     return this.request('/api/devices/register', {
       method: 'POST',
@@ -305,6 +306,13 @@ class ApiService {
 
   async getAwsIotStatus(): Promise<ApiResponse<any>> {
     return this.request('/api/tips/aws-iot-status')
+  }
+
+  async updateSongRequestSetting(deviceId: string, isAllowSongRequest: boolean): Promise<ApiResponse<any>> {
+    return this.request(`/api/devices/${deviceId}/song-request`, {
+      method: 'PUT',
+      body: JSON.stringify({ isAllowSongRequest })
+    })
   }
 }
 
