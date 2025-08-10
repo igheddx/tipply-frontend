@@ -766,7 +766,10 @@ const TippingInterface: React.FC = () => {
   }
 
   return (
-    <div className="tipping-interface-fullscreen relative w-full h-screen overflow-hidden bg-gradient-to-br from-green-50 to-blue-50" style={{
+    <div 
+      data-route="tipping"
+      className="tipping-interface-fullscreen relative w-full h-screen overflow-hidden bg-gradient-to-br from-green-50 to-blue-50" 
+      style={{
       width: '100vw',
       height: '100vh',
       minHeight: '-webkit-fill-available',

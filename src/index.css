@@ -13,15 +13,11 @@
     background-color: #f8fafc;
     height: 100vh;
     height: -webkit-fill-available;
-    overflow: hidden;
   }
   
   html {
     height: 100vh;
     height: -webkit-fill-available;
-    margin: 0;
-    padding: 0;
-    overflow: hidden;
   }
   
   /* Fullscreen styles for mobile */
@@ -71,17 +67,10 @@
     }
   }
   
-  /* Fix for mobile fullscreen white space */
+  /* Fix for mobile fullscreen white space - ONLY for tipping interface */
   @media screen and (max-width: 768px) {
-    html, body {
-      margin: 0 !important;
-      padding: 0 !important;
-      overflow: hidden !important;
-      height: 100% !important;
-      width: 100% !important;
-    }
-    
-    #root {
+    /* Only apply fullscreen restrictions to the tipping interface route */
+    #root[data-route="tipping"] {
       height: 100% !important;
       width: 100% !important;
       margin: 0 !important;
@@ -89,8 +78,7 @@
       overflow: hidden !important;
     }
     
-    /* Ensure the tipping interface route takes full screen */
-    #root > div {
+    #root[data-route="tipping"] > div {
       height: 100% !important;
       width: 100% !important;
       margin: 0 !important;
