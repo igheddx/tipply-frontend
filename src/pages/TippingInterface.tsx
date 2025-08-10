@@ -24,6 +24,13 @@ interface PaymentMethodsCheckResult {
   paymentMethodType?: string
 }
 
+// Extended HTMLElement interface for vendor-prefixed fullscreen methods
+interface ExtendedHTMLElement extends HTMLElement {
+  webkitRequestFullscreen?: () => Promise<void>
+  msRequestFullscreen?: () => Promise<void>
+  mozRequestFullScreen?: () => Promise<void>
+}
+
 const TippingInterface: React.FC = () => {
   const { deviceId } = useParams<{ deviceId: string }>()
   const [currentAmount, setCurrentAmount] = useState<number>(1)
@@ -39,6 +46,7 @@ const TippingInterface: React.FC = () => {
   const [isMobile, setIsMobile] = useState(true)
   const [isAnimating, setIsAnimating] = useState(false)
   const [audioEnabled, setAudioEnabled] = useState(false)
+  const [isFullscreen, setIsFullscreen] = useState(false)
   
   // Song request state
   const [showSongSearch, setShowSongSearch] = useState(false)
@@ -59,18 +67,29 @@ const TippingInterface: React.FC = () => {
     
     // Try to enter fullscreen mode on mobile
     const enterFullscreen = async () => {
-      if (document.documentElement.requestFullscreen) {
-        try {
-          await document.documentElement.requestFullscreen()
-        } catch (error) {
-          console.log('Fullscreen not supported or denied:', error)
+      // Try multiple fullscreen methods for better compatibility
+      try {
+        const docElement = document.documentElement as ExtendedHTMLElement
+        if (docElement.requestFullscreen) {
+          await docElement.requestFullscreen()
+        } else if (docElement.webkitRequestFullscreen) {
+          await docElement.webkitRequestFullscreen()
+        } else if (docElement.msRequestFullscreen) {
+          await docElement.msRequestFullscreen()
+        } else if (docElement.mozRequestFullScreen) {
+          await docElement.mozRequestFullScreen()
         }
+      } catch (error) {
+        console.log('Fullscreen not supported or denied:', error)
       }
     }
     
-    // Enter fullscreen on mobile devices
+    // Enter fullscreen immediately on mobile devices
     if (isMobile) {
-      enterFullscreen()
+      // Small delay to ensure the page is fully loaded
+      setTimeout(() => {
+        enterFullscreen()
+      }, 100)
     }
     
     return () => {
@@ -94,6 +113,25 @@ const TippingInterface: React.FC = () => {
     checkMobile()
     window.addEventListener('resize', checkMobile)
     return () => window.removeEventListener('resize', checkMobile)
+  }, [])
+  
+  // Monitor fullscreen changes
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement)
+    }
+    
+    document.addEventListener('fullscreenchange', handleFullscreenChange)
+    document.addEventListener('webkitfullscreenchange', handleFullscreenChange)
+    document.addEventListener('mozfullscreenchange', handleFullscreenChange)
+    document.addEventListener('MSFullscreenChange', handleFullscreenChange)
+    
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFullscreenChange)
+      document.removeEventListener('webkitfullscreenchange', handleFullscreenChange)
+      document.removeEventListener('mozfullscreenchange', handleFullscreenChange)
+      document.removeEventListener('MSFullscreenChange', handleFullscreenChange)
+    }
   }, [])
 
   // Generate or retrieve user ID from localStorage and get proper UUID from backend
@@ -675,6 +713,7 @@ const TippingInterface: React.FC = () => {
           )}
           <h1 className="text-xl font-bold mb-1 text-white drop-shadow-lg">
             💝 Tip {deviceInfo.ownerFirstName} {deviceInfo.ownerLastName}
+            {isFullscreen && <span className="ml-2 text-green-400">📱 Fullscreen</span>}
           </h1>
           <p className="text-sm text-gray-800 font-medium drop-shadow-lg">
             Swipe to change amount • Swipe up to tip
@@ -693,7 +732,7 @@ const TippingInterface: React.FC = () => {
             }}
             className="mt-2 px-3 py-1 bg-black/20 backdrop-blur-sm text-white text-xs rounded-full hover:bg-black/30 transition-colors"
           >
-            {document.fullscreenElement ? 'Exit Fullscreen' : 'Enter Fullscreen'}
+            {document.fullscreenElement ? '🖥️ Exit Fullscreen' : '📱 Enter Fullscreen'}
           </button>
           {/* Debug button for testing AWS IoT - Hidden for production but available for troubleshooting */}
           {/* <button
