@@ -52,16 +52,37 @@ const TippingInterface: React.FC = () => {
   const denominations = [1, 5, 10, 20, 50, 100]
   const currentIndex = denominations.indexOf(currentAmount)
 
-  // Manage body overflow for tipping interface
+  // Manage body overflow for tipping interface and fullscreen
   useEffect(() => {
     // Prevent scrolling on the tipping interface
     document.body.style.overflow = 'hidden'
     
+    // Try to enter fullscreen mode on mobile
+    const enterFullscreen = async () => {
+      if (document.documentElement.requestFullscreen) {
+        try {
+          await document.documentElement.requestFullscreen()
+        } catch (error) {
+          console.log('Fullscreen not supported or denied:', error)
+        }
+      }
+    }
+    
+    // Enter fullscreen on mobile devices
+    if (isMobile) {
+      enterFullscreen()
+    }
+    
     return () => {
       // Restore scrolling when component unmounts
       document.body.style.overflow = 'auto'
+      
+      // Exit fullscreen when component unmounts
+      if (document.fullscreenElement) {
+        document.exitFullscreen()
+      }
     }
-  }, [])
+  }, [isMobile])
 
   // Check if device is mobile
   useEffect(() => {
@@ -622,14 +643,17 @@ const TippingInterface: React.FC = () => {
   }
 
   return (
-    <div className="relative w-full h-screen overflow-hidden bg-gradient-to-br from-green-50 to-blue-50 fullscreen" style={{
+    <div className="tipping-interface-fullscreen relative w-full h-screen overflow-hidden bg-gradient-to-br from-green-50 to-blue-50" style={{
       width: '100vw',
       height: '100vh',
       minHeight: '-webkit-fill-available',
-      paddingTop: 'env(safe-area-inset-top)',
-      paddingBottom: 'env(safe-area-inset-bottom)',
-      paddingLeft: 'env(safe-area-inset-left)',
-      paddingRight: 'env(safe-area-inset-right)'
+      margin: 0,
+      padding: 0,
+      position: 'fixed',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0
     }}>
       {/* Audio element for cash register sound */}
       <audio ref={audioRef} preload="auto">
@@ -655,6 +679,22 @@ const TippingInterface: React.FC = () => {
           <p className="text-sm text-gray-800 font-medium drop-shadow-lg">
             Swipe to change amount • Swipe up to tip
           </p>
+          <button
+            onClick={async () => {
+              if (document.fullscreenElement) {
+                await document.exitFullscreen()
+              } else {
+                try {
+                  await document.documentElement.requestFullscreen()
+                } catch (error) {
+                  console.log('Fullscreen not supported:', error)
+                }
+              }
+            }}
+            className="mt-2 px-3 py-1 bg-black/20 backdrop-blur-sm text-white text-xs rounded-full hover:bg-black/30 transition-colors"
+          >
+            {document.fullscreenElement ? 'Exit Fullscreen' : 'Enter Fullscreen'}
+          </button>
           {/* Debug button for testing AWS IoT - Hidden for production but available for troubleshooting */}
           {/* <button
             onClick={testAwsIotConnection}
@@ -676,12 +716,15 @@ const TippingInterface: React.FC = () => {
 
       {/* Currency Display */}
       <div className="absolute inset-0 w-full h-full" style={{
-        width: '100%',
-        height: '100%',
+        width: '100vw',
+        height: '100vh',
+        minHeight: '-webkit-fill-available',
         top: 0,
         left: 0,
         right: 0,
-        bottom: 0
+        bottom: 0,
+        margin: 0,
+        padding: 0
       }}>
         <animated.div
           ref={currencyRef}
@@ -720,8 +763,16 @@ const TippingInterface: React.FC = () => {
                 style={{ 
                   width: '100vw', 
                   height: '100vh',
+                  minHeight: '-webkit-fill-available',
                   objectFit: 'cover',
-                  objectPosition: 'center'
+                  objectPosition: 'center',
+                  margin: 0,
+                  padding: 0,
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  bottom: 0
                 }}
                 draggable={false}
                 initial={{ 
@@ -752,8 +803,16 @@ const TippingInterface: React.FC = () => {
                   style={{ 
                     width: '100vw', 
                     height: '100vh',
+                    minHeight: '-webkit-fill-available',
                     objectFit: 'cover',
-                    objectPosition: 'center'
+                    objectPosition: 'center',
+                    margin: 0,
+                    padding: 0,
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0
                   }}
                   draggable={false}
                   initial={{ 
