@@ -113,6 +113,24 @@
       margin: 0 !important;
       padding: 0 !important;
     }
+    
+    /* Hide Safari/Chrome address bars in fullscreen */
+    .tipping-interface-fullscreen:fullscreen,
+    .tipping-interface-fullscreen:-webkit-full-screen,
+    .tipping-interface-fullscreen:-moz-full-screen {
+      width: 100vw !important;
+      height: 100vh !important;
+      min-height: -webkit-fill-available !important;
+    }
+    
+    /* Additional fullscreen optimizations for mobile browsers */
+    .tipping-interface-fullscreen:fullscreen *,
+    .tipping-interface-fullscreen:-webkit-full-screen *,
+    .tipping-interface-fullscreen:-moz-full-screen * {
+      -webkit-user-select: none !important;
+      -webkit-touch-callout: none !important;
+      -webkit-tap-highlight-color: transparent !important;
+    }
   }
   
   /* Mobile fullscreen improvements */
@@ -121,6 +139,21 @@
       height: -webkit-fill-available !important;
       min-height: -webkit-fill-available !important;
     }
+    
+    .tipping-interface-fullscreen {
+      height: -webkit-fill-available !important;
+      min-height: -webkit-fill-available !important;
+    }
+  }
+  
+  /* Ensure swipe gestures work in fullscreen mode */
+  .tipping-interface-fullscreen {
+    touch-action: pan-x pan-y !important;
+    -webkit-overflow-scrolling: touch !important;
+  }
+  
+  .tipping-interface-fullscreen * {
+    touch-action: pan-x pan-y !important;
   }
   
   /* Prevent zoom on mobile */

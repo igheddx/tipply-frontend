@@ -49,6 +49,7 @@ const TippingInterface: React.FC = () => {
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [showInstallPrompt, setShowInstallPrompt] = useState(false)
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null)
+  const [hasEnteredFullscreen, setHasEnteredFullscreen] = useState(false)
   
   // Song request state
   const [showSongSearch, setShowSongSearch] = useState(false)
@@ -62,48 +63,16 @@ const TippingInterface: React.FC = () => {
   const denominations = [1, 5, 10, 20, 50, 100]
   const currentIndex = denominations.indexOf(currentAmount)
 
-  // Manage body overflow for tipping interface and fullscreen
+  // Manage body overflow for tipping interface
   useEffect(() => {
     // Prevent scrolling on the tipping interface
     document.body.style.overflow = 'hidden'
     
-    // Try to enter fullscreen mode on mobile
-    const enterFullscreen = async () => {
-      // Try multiple fullscreen methods for better compatibility
-      try {
-        const docElement = document.documentElement as ExtendedHTMLElement
-        if (docElement.requestFullscreen) {
-          await docElement.requestFullscreen()
-        } else if (docElement.webkitRequestFullscreen) {
-          await docElement.webkitRequestFullscreen()
-        } else if (docElement.msRequestFullscreen) {
-          await docElement.msRequestFullscreen()
-        } else if (docElement.mozRequestFullScreen) {
-          await docElement.mozRequestFullScreen()
-        }
-      } catch (error) {
-        console.log('Fullscreen not supported or denied:', error)
-      }
-    }
-    
-    // Enter fullscreen immediately on mobile devices
-    if (isMobile) {
-      // Small delay to ensure the page is fully loaded
-      setTimeout(() => {
-        enterFullscreen()
-      }, 100)
-    }
-    
     return () => {
       // Restore scrolling when component unmounts
       document.body.style.overflow = 'auto'
-      
-      // Exit fullscreen when component unmounts
-      if (document.fullscreenElement) {
-        document.exitFullscreen()
-      }
     }
-  }, [isMobile])
+  }, [])
 
   // Check if device is mobile
   useEffect(() => {
@@ -135,6 +104,39 @@ const TippingInterface: React.FC = () => {
       document.removeEventListener('MSFullscreenChange', handleFullscreenChange)
     }
   }, [])
+  
+  // Gesture-triggered fullscreen logic
+  useEffect(() => {
+    if (!hasEnteredFullscreen && isMobile) {
+      const handleFirstSwipe = async () => {
+        if (!hasEnteredFullscreen) {
+          try {
+            const elem = document.documentElement as ExtendedHTMLElement
+            if (elem.requestFullscreen) {
+              await elem.requestFullscreen()
+            } else if (elem.webkitRequestFullscreen) {
+              await elem.webkitRequestFullscreen()
+            } else if (elem.msRequestFullscreen) {
+              await elem.msRequestFullscreen()
+            } else if (elem.mozRequestFullScreen) {
+              await elem.mozRequestFullScreen()
+            }
+            setHasEnteredFullscreen(true)
+            console.log('Fullscreen activated by first gesture')
+          } catch (error) {
+            console.log('Fullscreen not supported or denied:', error)
+          }
+        }
+      }
+      
+      // Listen for first touch/swipe gesture
+      document.addEventListener('touchstart', handleFirstSwipe, { once: true })
+      
+      return () => {
+        document.removeEventListener('touchstart', handleFirstSwipe)
+      }
+    }
+  }, [hasEnteredFullscreen, isMobile])
   
   // PWA Installation logic
   useEffect(() => {
@@ -834,22 +836,7 @@ const TippingInterface: React.FC = () => {
           <p className="text-sm text-gray-800 font-medium drop-shadow-lg">
             Swipe to change amount • Swipe up to tip
           </p>
-          <button
-            onClick={async () => {
-              if (document.fullscreenElement) {
-                await document.exitFullscreen()
-              } else {
-                try {
-                  await document.documentElement.requestFullscreen()
-                } catch (error) {
-                  console.log('Fullscreen not supported:', error)
-                }
-              }
-            }}
-            className="mt-2 px-3 py-1 bg-black/20 backdrop-blur-sm text-white text-xs rounded-full hover:bg-black/30 transition-colors"
-          >
-            {document.fullscreenElement ? '🖥️ Exit Fullscreen' : '📱 Enter Fullscreen'}
-          </button>
+
           {/* Debug button for testing AWS IoT - Hidden for production but available for troubleshooting */}
           {/* <button
             onClick={testAwsIotConnection}
