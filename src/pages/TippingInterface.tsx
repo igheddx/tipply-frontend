@@ -113,7 +113,7 @@ const TippingInterface: React.FC = () => {
     }
   }, [])
   
-  // Function to activate fullscreen - can be called from any gesture
+  // Function to activate fullscreen - only call this once per session
   const activateFullscreen = async () => {
     if (hasEnteredFullscreen) {
       console.log('Already in fullscreen mode')
@@ -122,18 +122,19 @@ const TippingInterface: React.FC = () => {
     
     try {
       const elem = document.documentElement as ExtendedHTMLElement
-      console.log('Attempting to activate fullscreen...')
+      console.log('Attempting to activate fullscreen for mobile...')
       
-      if (elem.requestFullscreen) {
-        await elem.requestFullscreen()
-      } else if (elem.webkitRequestFullscreen) {
+      if (elem.webkitRequestFullscreen) {
+        // Safari/iOS prefers webkitRequestFullscreen
         await elem.webkitRequestFullscreen()
+      } else if (elem.requestFullscreen) {
+        await elem.requestFullscreen()
       } else if (elem.msRequestFullscreen) {
         await elem.msRequestFullscreen()
       } else if (elem.mozRequestFullScreen) {
         await elem.mozRequestFullScreen()
       } else {
-        console.log('Fullscreen API not supported')
+        console.log('Fullscreen API not supported on this device')
       }
     } catch (error) {
       console.log('Fullscreen activation failed:', error)
@@ -144,10 +145,10 @@ const TippingInterface: React.FC = () => {
   // Function to exit fullscreen
   const exitFullscreen = async () => {
     try {
-      if (document.exitFullscreen) {
-        await document.exitFullscreen()
-      } else if ((document as any).webkitExitFullscreen) {
+      if ((document as any).webkitExitFullscreen) {
         await (document as any).webkitExitFullscreen()
+      } else if (document.exitFullscreen) {
+        await document.exitFullscreen()
       } else if ((document as any).msExitFullscreen) {
         await (document as any).msExitFullscreen()
       } else if ((document as any).mozCancelFullScreen) {
@@ -158,12 +159,13 @@ const TippingInterface: React.FC = () => {
     }
   }
   
-  // Gesture-triggered fullscreen logic - trigger on any swipe gesture
+  // Simple fullscreen activation on first swipe - only for mobile
   useEffect(() => {
-    if (!isMobile) return
+    if (!isMobile || hasEnteredFullscreen) return
     
     let touchStartY = 0
     let touchStartX = 0
+    let hasAttemptedFullscreen = false
     
     const handleTouchStart = (e: TouchEvent) => {
       touchStartY = e.touches[0].clientY
@@ -171,15 +173,18 @@ const TippingInterface: React.FC = () => {
     }
     
     const handleTouchEnd = async (e: TouchEvent) => {
+      if (hasAttemptedFullscreen) return // Only try once
+      
       const touchEndY = e.changedTouches[0].clientY
       const touchEndX = e.changedTouches[0].clientX
       
       const deltaY = touchStartY - touchEndY
       const deltaX = touchStartX - touchEndX
       
-      // Trigger fullscreen on any intentional swipe (not taps)
-      if (Math.abs(deltaY) > 80 || Math.abs(deltaX) > 80) {
-        console.log('Swipe gesture detected, attempting fullscreen activation')
+      // Only trigger fullscreen on significant swipe (not taps)
+      if (Math.abs(deltaY) > 100 || Math.abs(deltaX) > 100) {
+        hasAttemptedFullscreen = true
+        console.log('First significant swipe detected, activating fullscreen...')
         await activateFullscreen()
       }
     }
@@ -893,8 +898,16 @@ const TippingInterface: React.FC = () => {
                 </button>
               </div>
             ) : (
-              <div className="bg-gray-600/90 backdrop-blur-sm rounded-lg px-3 py-1">
+              <div className="bg-gray-600/90 backdrop-blur-sm rounded-lg px-3 py-1 inline-flex items-center gap-2">
                 <span className="text-white text-sm font-medium">📱 Swipe to enter fullscreen</span>
+                {isMobile && (
+                  <button
+                    onClick={activateFullscreen}
+                    className="text-white/80 hover:text-white text-xs px-2 py-1 rounded border border-white/30 hover:bg-white/20 transition-colors"
+                  >
+                    Tap to Enter
+                  </button>
+                )}
               </div>
             )}
           </motion.div>
@@ -992,27 +1005,6 @@ const TippingInterface: React.FC = () => {
             WebkitTapHighlightColor: 'transparent' // Remove tap highlight
           }}
           className="relative w-full h-full touch-manipulation"
-          onTouchStart={(e) => {
-            console.log('Touch start detected')
-            // Fallback touch handling for fullscreen mode
-            if (document.fullscreenElement || (document as any).webkitFullscreenElement) {
-              e.preventDefault()
-            }
-          }}
-          onTouchMove={(e) => {
-            console.log('Touch move detected')
-            // Fallback touch handling for fullscreen mode
-            if (document.fullscreenElement || (document as any).webkitFullscreenElement) {
-              e.preventDefault()
-            }
-          }}
-          onTouchEnd={(e) => {
-            console.log('Touch end detected')
-            // Fallback touch handling for fullscreen mode
-            if (document.fullscreenElement || (document as any).webkitFullscreenElement) {
-              e.preventDefault()
-            }
-          }}
         >
           <AnimatePresence>
                           <motion.div
