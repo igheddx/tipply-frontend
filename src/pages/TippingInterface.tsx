@@ -327,6 +327,19 @@ const TippingInterface: React.FC = () => {
     }
   } */
 
+  // Simple touch event handler as backup
+  const handleTouchStart = (e: React.TouchEvent) => {
+    console.log('Touch start detected', e.touches.length, 'touches')
+  }
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    console.log('Touch move detected', e.touches.length, 'touches')
+  }
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    console.log('Touch end detected', e.changedTouches.length, 'touches')
+  }
+
   // Gesture handling with react-spring
   const [springs] = useSpring(() => ({
     x: 0,
@@ -344,9 +357,10 @@ const TippingInterface: React.FC = () => {
     canceled,
     distance,
     active,
-    last
+    last,
+    event
   }) => {
-    console.log('Gesture detected:', { ox, oy, xDir, yDir, velocity: [vx, vy], distance, active, last })
+    console.log('Gesture detected:', { ox, oy, xDir, yDir, velocity: [vx, vy], distance, active, last, event })
     
     if (canceled || !last) return
 
@@ -393,7 +407,11 @@ const TippingInterface: React.FC = () => {
     preventDefault: false, // Keep false for better fullscreen compatibility
     from: () => [0, 0],
     rubberband: true, // Keep rubberband effect for better feel
-    bounds: { left: -150, right: 150, top: -150, bottom: 150 } // Reduced bounds for better control
+    bounds: { left: -150, right: 150, top: -150, bottom: 150 }, // Reduced bounds for better control
+    // Add debugging options
+    onDragStart: (state: any) => console.log('Drag started:', state),
+    onDrag: (state: any) => console.log('Dragging:', state),
+    onDragEnd: (state: any) => console.log('Drag ended:', state)
   })
 
   const handleSwipeUp = async () => {
@@ -688,6 +706,42 @@ const TippingInterface: React.FC = () => {
             </motion.div>
           )}
 
+          {/* Test buttons for debugging swipe functionality */}
+          <div className="mt-4 flex gap-2 justify-center">
+            <button
+              onClick={() => {
+                const prevIndex = currentIndex === 0 ? denominations.length - 1 : currentIndex - 1
+                setCurrentAmount(denominations[prevIndex])
+                console.log('Test: Amount changed to:', denominations[prevIndex])
+              }}
+              className="px-3 py-1 bg-blue-500 text-white text-xs rounded-full hover:bg-blue-600 transition-colors"
+            >
+              Test Left
+            </button>
+            <button
+              onClick={() => {
+                const nextIndex = (currentIndex + 1) % denominations.length
+                setCurrentAmount(denominations[nextIndex])
+                console.log('Test: Amount changed to:', denominations[nextIndex])
+              }}
+              className="px-3 py-1 bg-green-500 text-white text-xs rounded-full hover:bg-green-600 transition-colors"
+            >
+              Test Right
+            </button>
+            <button
+              onClick={() => {
+                if (!isAnimating && !checkingPaymentMethods && isPaymentSetup) {
+                  handleSwipeUp()
+                } else {
+                  console.log('Cannot test swipe up:', { isAnimating, checkingPaymentMethods, isPaymentSetup })
+                }
+              }}
+              className="px-3 py-1 bg-purple-500 text-white text-xs rounded-full hover:bg-purple-600 transition-colors"
+            >
+              Test Up
+            </button>
+          </div>
+
           {/* Debug button for testing AWS IoT - Hidden for production but available for troubleshooting */}
           {/* <button
             onClick={testAwsIotConnection}
@@ -722,6 +776,9 @@ const TippingInterface: React.FC = () => {
         <animated.div
           ref={currencyRef}
           {...bind()}
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
           style={{
             ...springs,
             width: '100%',
