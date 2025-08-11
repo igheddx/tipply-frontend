@@ -92,6 +92,11 @@ const TippingInterface: React.FC = () => {
           (document as any).mozFullScreenElement || 
           (document as any).msFullscreenElement) {
         setHasEnteredFullscreen(true)
+        console.log('✅ Fullscreen entered successfully')
+      } else {
+        // Fullscreen was exited
+        setHasEnteredFullscreen(false)
+        console.log('❌ Fullscreen exited')
       }
     }
     
@@ -108,57 +113,86 @@ const TippingInterface: React.FC = () => {
     }
   }, [])
   
-  // Gesture-triggered fullscreen logic - only trigger on specific gestures
+  // Function to activate fullscreen - can be called from any gesture
+  const activateFullscreen = async () => {
+    if (hasEnteredFullscreen) {
+      console.log('Already in fullscreen mode')
+      return
+    }
+    
+    try {
+      const elem = document.documentElement as ExtendedHTMLElement
+      console.log('Attempting to activate fullscreen...')
+      
+      if (elem.requestFullscreen) {
+        await elem.requestFullscreen()
+      } else if (elem.webkitRequestFullscreen) {
+        await elem.webkitRequestFullscreen()
+      } else if (elem.msRequestFullscreen) {
+        await elem.msRequestFullscreen()
+      } else if (elem.mozRequestFullScreen) {
+        await elem.mozRequestFullScreen()
+      } else {
+        console.log('Fullscreen API not supported')
+      }
+    } catch (error) {
+      console.log('Fullscreen activation failed:', error)
+      // Don't set hasEnteredFullscreen to false here, let the fullscreen change event handle it
+    }
+  }
+
+  // Function to exit fullscreen
+  const exitFullscreen = async () => {
+    try {
+      if (document.exitFullscreen) {
+        await document.exitFullscreen()
+      } else if ((document as any).webkitExitFullscreen) {
+        await (document as any).webkitExitFullscreen()
+      } else if ((document as any).msExitFullscreen) {
+        await (document as any).msExitFullscreen()
+      } else if ((document as any).mozCancelFullScreen) {
+        await (document as any).mozCancelFullScreen()
+      }
+    } catch (error) {
+      console.log('Exit fullscreen failed:', error)
+    }
+  }
+  
+  // Gesture-triggered fullscreen logic - trigger on any swipe gesture
   useEffect(() => {
-    if (!hasEnteredFullscreen && isMobile) {
-      let touchStartY = 0
-      let touchStartX = 0
+    if (!isMobile) return
+    
+    let touchStartY = 0
+    let touchStartX = 0
+    
+    const handleTouchStart = (e: TouchEvent) => {
+      touchStartY = e.touches[0].clientY
+      touchStartX = e.touches[0].clientX
+    }
+    
+    const handleTouchEnd = async (e: TouchEvent) => {
+      const touchEndY = e.changedTouches[0].clientY
+      const touchEndX = e.changedTouches[0].clientX
       
-      const handleTouchStart = (e: TouchEvent) => {
-        touchStartY = e.touches[0].clientY
-        touchStartX = e.touches[0].clientX
-      }
+      const deltaY = touchStartY - touchEndY
+      const deltaX = touchStartX - touchEndX
       
-      const handleTouchEnd = async (e: TouchEvent) => {
-        if (hasEnteredFullscreen) return
-        
-        const touchEndY = e.changedTouches[0].clientY
-        const touchEndX = e.changedTouches[0].clientX
-        
-        const deltaY = touchStartY - touchEndY
-        const deltaX = touchStartX - touchEndX
-        
-        // Only trigger fullscreen on intentional swipes (not taps)
-        if (Math.abs(deltaY) > 100 || Math.abs(deltaX) > 100) {
-          try {
-            const elem = document.documentElement as ExtendedHTMLElement
-            if (elem.requestFullscreen) {
-              await elem.requestFullscreen()
-            } else if (elem.webkitRequestFullscreen) {
-              await elem.webkitRequestFullscreen()
-            } else if (elem.msRequestFullscreen) {
-              await elem.msRequestFullscreen()
-            } else if (elem.mozRequestFullScreen) {
-              await elem.mozRequestFullScreen()
-            }
-            setHasEnteredFullscreen(true)
-            console.log('Fullscreen activated by intentional swipe gesture')
-          } catch (error) {
-            console.log('Fullscreen not supported or denied:', error)
-          }
-        }
-      }
-      
-      // Listen for touch events
-      document.addEventListener('touchstart', handleTouchStart, { passive: true })
-      document.addEventListener('touchend', handleTouchEnd, { passive: true })
-      
-      return () => {
-        document.removeEventListener('touchstart', handleTouchStart)
-        document.removeEventListener('touchend', handleTouchEnd)
+      // Trigger fullscreen on any intentional swipe (not taps)
+      if (Math.abs(deltaY) > 80 || Math.abs(deltaX) > 80) {
+        console.log('Swipe gesture detected, attempting fullscreen activation')
+        await activateFullscreen()
       }
     }
-  }, [hasEnteredFullscreen, isMobile])
+    
+    // Listen for touch events
+    document.addEventListener('touchstart', handleTouchStart, { passive: true })
+    document.addEventListener('touchend', handleTouchEnd, { passive: true })
+    
+    return () => {
+      document.removeEventListener('touchstart', handleTouchStart)
+      document.removeEventListener('touchend', handleTouchEnd)
+    }
+  }, [isMobile, hasEnteredFullscreen])
 
   // Manual touch gesture handler as backup for fullscreen mode
   useEffect(() => {
@@ -218,8 +252,9 @@ const TippingInterface: React.FC = () => {
     }
     
     // Add manual touch handlers to the document for fullscreen compatibility
-    document.addEventListener('touchstart', handleManualTouchStart, { passive: false })
-    document.addEventListener('touchend', handleManualTouchEnd, { passive: false })
+    // Use passive: true for better performance and to avoid conflicts
+    document.addEventListener('touchstart', handleManualTouchStart, { passive: true })
+    document.addEventListener('touchend', handleManualTouchEnd, { passive: true })
     
     return () => {
       document.removeEventListener('touchstart', handleManualTouchStart)
@@ -841,6 +876,28 @@ const TippingInterface: React.FC = () => {
             💝 Tip {deviceInfo.ownerFirstName} {deviceInfo.ownerLastName}
           </h1>
           
+          {/* Fullscreen Status Indicator */}
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-2 flex items-center justify-center gap-2"
+          >
+            {hasEnteredFullscreen ? (
+              <div className="bg-green-600/90 backdrop-blur-sm rounded-lg px-3 py-1 inline-flex items-center gap-2">
+                <span className="text-white text-sm font-medium">🖥️ Fullscreen Active</span>
+                <button
+                  onClick={exitFullscreen}
+                  className="text-white/80 hover:text-white text-xs px-2 py-1 rounded border border-white/30 hover:bg-white/20 transition-colors"
+                >
+                  Exit
+                </button>
+              </div>
+            ) : (
+              <div className="bg-gray-600/90 backdrop-blur-sm rounded-lg px-3 py-1">
+                <span className="text-white text-sm font-medium">📱 Swipe to enter fullscreen</span>
+              </div>
+            )}
+          </motion.div>
 
           <p className="text-sm text-gray-800 font-medium drop-shadow-lg">
             Swipe to change amount • Swipe up to tip
