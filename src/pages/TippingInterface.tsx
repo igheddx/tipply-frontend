@@ -203,7 +203,14 @@ const TippingInterface: React.FC = () => {
         // Vertical swipe up - submit tip
         if (deltaY > 0 && Math.abs(deltaY) > 80) {
           console.log('Manual swipe up detected - submitting tip')
-          if (!isAnimating) {
+          if (!isAnimating && !checkingPaymentMethods) {
+            // Check if payment method is set up before allowing tip submission
+            if (!isPaymentSetup) {
+              console.log('No payment method setup, showing payment modal')
+              setShowPaymentModal(true)
+              toast.info('Please set up a payment method first')
+              return
+            }
             handleSwipeUp()
           }
         }
@@ -218,7 +225,7 @@ const TippingInterface: React.FC = () => {
       document.removeEventListener('touchstart', handleManualTouchStart)
       document.removeEventListener('touchend', handleManualTouchEnd)
     }
-  }, [currentIndex, isAnimating])
+  }, [currentIndex, isAnimating, checkingPaymentMethods, isPaymentSetup])
   
 
   
@@ -300,6 +307,14 @@ const TippingInterface: React.FC = () => {
       checkPaymentMethods()
     }
   }, [deviceInfo, userId])
+
+  // Initial payment method check when component mounts
+  useEffect(() => {
+    // If we have both device info and user ID, check payment methods immediately
+    if (deviceInfo && userId && !checkingPaymentMethods) {
+      checkPaymentMethods()
+    }
+  }, []) // Empty dependency array to run only once on mount
 
   // Check AWS IoT connection status
   useEffect(() => {
@@ -410,18 +425,22 @@ const TippingInterface: React.FC = () => {
         if (data.hasPaymentMethods) {
           console.log('User has payment methods, no setup needed')
           setIsPaymentSetup(true)
+          setShowPaymentModal(false)
         } else {
-          console.log('No payment methods found, showing setup modal')
+          console.log('No payment methods found, showing setup modal immediately')
+          setIsPaymentSetup(false)
           setShowPaymentModal(true)
         }
       } else {
         console.error('Failed to check payment methods')
         // Fallback to showing payment setup modal
+        setIsPaymentSetup(false)
         setShowPaymentModal(true)
       }
     } catch (error) {
       console.error('Error checking payment methods:', error)
       // Fallback to showing payment setup modal
+      setIsPaymentSetup(false)
       setShowPaymentModal(true)
     } finally {
       setCheckingPaymentMethods(false)
@@ -525,8 +544,20 @@ const TippingInterface: React.FC = () => {
   })
 
   const handleSwipeUp = async () => {
-    if (!deviceInfo || !isPaymentSetup) {
-      toast.error('Please set up payment method first')
+    if (!deviceInfo) {
+      toast.error('Device information not loaded yet')
+      return
+    }
+
+    if (checkingPaymentMethods) {
+      toast.info('Please wait while we check your payment methods...')
+      return
+    }
+
+    if (!isPaymentSetup) {
+      console.log('No payment method setup, showing payment modal')
+      setShowPaymentModal(true)
+      toast.info('Please set up a payment method first')
       return
     }
 
@@ -814,6 +845,47 @@ const TippingInterface: React.FC = () => {
           <p className="text-sm text-gray-800 font-medium drop-shadow-lg">
             Swipe to change amount • Swipe up to tip
           </p>
+
+          {/* Payment Method Check Status */}
+          {checkingPaymentMethods && (
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="mt-2 bg-blue-600/90 backdrop-blur-sm rounded-lg px-3 py-1 mx-auto inline-block"
+            >
+              <span className="text-white text-sm font-medium">
+                🔄 Checking payment methods...
+              </span>
+            </motion.div>
+          )}
+
+          {/* Payment Setup Required Indicator */}
+          {!checkingPaymentMethods && !isPaymentSetup && (
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="mt-2 bg-orange-600/90 backdrop-blur-sm rounded-lg px-3 py-1 mx-auto inline-block"
+            >
+              <span className="text-white text-sm font-medium">
+                💳 Payment method required
+              </span>
+            </motion.div>
+          )}
+
+          {/* Payment Setup Instructions */}
+          {!checkingPaymentMethods && !isPaymentSetup && (
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.2 }}
+              className="mt-2 bg-white/90 backdrop-blur-sm rounded-lg px-3 py-2 mx-auto inline-block max-w-xs cursor-pointer hover:bg-white/95 transition-colors"
+              onClick={() => setShowPaymentModal(true)}
+            >
+              <p className="text-gray-800 text-xs text-center leading-relaxed">
+                Tap here to set up your payment method and start tipping!
+              </p>
+            </motion.div>
+          )}
 
           {/* Debug button for testing AWS IoT - Hidden for production but available for troubleshooting */}
           {/* <button
