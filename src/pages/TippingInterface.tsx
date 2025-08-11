@@ -330,6 +330,18 @@ const TippingInterface: React.FC = () => {
   // Simple touch event handler as backup
   const handleTouchStart = (e: React.TouchEvent) => {
     console.log('Touch start detected', e.touches.length, 'touches')
+    // Store touch start position for manual gesture detection
+    if (e.touches.length === 1) {
+      const touch = e.touches[0]
+      const startX = touch.clientX
+      const startY = touch.clientY
+      console.log('Touch start position:', { startX, startY })
+      // Store in a ref or state for comparison
+      if (currencyRef.current) {
+        (currencyRef.current as any).touchStartX = startX
+        ;(currencyRef.current as any).touchStartY = startY
+      }
+    }
   }
 
   const handleTouchMove = (e: React.TouchEvent) => {
@@ -338,6 +350,46 @@ const TippingInterface: React.FC = () => {
 
   const handleTouchEnd = (e: React.TouchEvent) => {
     console.log('Touch end detected', e.changedTouches.length, 'touches')
+    
+    // Manual gesture detection
+    if (e.changedTouches.length === 1 && currencyRef.current) {
+      const touch = e.changedTouches[0]
+      const endX = touch.clientX
+      const endY = touch.clientY
+      const startX = (currencyRef.current as any).touchStartX
+      const startY = (currencyRef.current as any).touchStartY
+      
+      if (startX !== undefined && startY !== undefined) {
+        const deltaX = endX - startX
+        const deltaY = endY - startY
+        const minSwipeDistance = 60
+        
+        console.log('Touch gesture analysis:', { startX, startY, endX, endY, deltaX, deltaY })
+        
+        // Horizontal swipe detection
+        if (Math.abs(deltaX) > minSwipeDistance && Math.abs(deltaX) > Math.abs(deltaY)) {
+          if (deltaX > 0) {
+            console.log('Manual swipe right detected')
+            const nextIndex = (currentIndex + 1) % denominations.length
+            setCurrentAmount(denominations[nextIndex])
+          } else {
+            console.log('Manual swipe left detected')
+            const prevIndex = currentIndex === 0 ? denominations.length - 1 : currentIndex - 1
+            setCurrentAmount(denominations[prevIndex])
+          }
+        }
+        
+        // Vertical swipe up detection
+        if (deltaY < -minSwipeDistance && Math.abs(deltaY) > Math.abs(deltaX)) {
+          console.log('Manual swipe up detected')
+          if (!isAnimating && !checkingPaymentMethods && isPaymentSetup) {
+            handleSwipeUp()
+          } else {
+            console.log('Cannot process swipe up:', { isAnimating, checkingPaymentMethods, isPaymentSetup })
+          }
+        }
+      }
+    }
   }
 
   // Gesture handling with react-spring
