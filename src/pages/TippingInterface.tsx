@@ -47,8 +47,6 @@ const TippingInterface: React.FC = () => {
   const [isAnimating, setIsAnimating] = useState(false)
   const [audioEnabled, setAudioEnabled] = useState(false)
   const [isFullscreen, setIsFullscreen] = useState(false)
-  const [showInstallPrompt, setShowInstallPrompt] = useState(false)
-  const [deferredPrompt, setDeferredPrompt] = useState<any>(null)
   const [hasEnteredFullscreen, setHasEnteredFullscreen] = useState(false)
   
   // Song request state
@@ -105,11 +103,28 @@ const TippingInterface: React.FC = () => {
     }
   }, [])
   
-  // Gesture-triggered fullscreen logic
+  // Gesture-triggered fullscreen logic - only trigger on specific gestures
   useEffect(() => {
     if (!hasEnteredFullscreen && isMobile) {
-      const handleFirstSwipe = async () => {
-        if (!hasEnteredFullscreen) {
+      let touchStartY = 0
+      let touchStartX = 0
+      
+      const handleTouchStart = (e: TouchEvent) => {
+        touchStartY = e.touches[0].clientY
+        touchStartX = e.touches[0].clientX
+      }
+      
+      const handleTouchEnd = async (e: TouchEvent) => {
+        if (hasEnteredFullscreen) return
+        
+        const touchEndY = e.changedTouches[0].clientY
+        const touchEndX = e.changedTouches[0].clientX
+        
+        const deltaY = touchStartY - touchEndY
+        const deltaX = touchStartX - touchEndX
+        
+        // Only trigger fullscreen on intentional swipes (not taps)
+        if (Math.abs(deltaY) > 100 || Math.abs(deltaX) > 100) {
           try {
             const elem = document.documentElement as ExtendedHTMLElement
             if (elem.requestFullscreen) {
@@ -122,104 +137,27 @@ const TippingInterface: React.FC = () => {
               await elem.mozRequestFullScreen()
             }
             setHasEnteredFullscreen(true)
-            console.log('Fullscreen activated by first gesture')
+            console.log('Fullscreen activated by intentional swipe gesture')
           } catch (error) {
             console.log('Fullscreen not supported or denied:', error)
           }
         }
       }
       
-      // Listen for first touch/swipe gesture
-      document.addEventListener('touchstart', handleFirstSwipe, { once: true })
+      // Listen for touch events
+      document.addEventListener('touchstart', handleTouchStart, { passive: true })
+      document.addEventListener('touchend', handleTouchEnd, { passive: true })
       
       return () => {
-        document.removeEventListener('touchstart', handleFirstSwipe)
+        document.removeEventListener('touchstart', handleTouchStart)
+        document.removeEventListener('touchend', handleTouchEnd)
       }
     }
   }, [hasEnteredFullscreen, isMobile])
   
-  // PWA Installation logic
-  useEffect(() => {
-    // Check if PWA is already installed
-    const isPWAInstalled = () => {
-      return window.matchMedia('(display-mode: standalone)').matches ||
-             (window.navigator as any).standalone === true
-    }
-    
-    // Handle beforeinstallprompt event
-    const handleBeforeInstallPrompt = (e: Event) => {
-      e.preventDefault()
-      setDeferredPrompt(e)
-      
-      // Show install prompt if not already installed
-      if (!isPWAInstalled()) {
-        setShowInstallPrompt(true)
-        
-        // Auto-hide after 5 seconds
-        setTimeout(() => {
-          setShowInstallPrompt(false)
-        }, 5000)
-      }
-    }
-    
-    // Handle appinstalled event
-    const handleAppInstalled = () => {
-      setShowInstallPrompt(false)
-      setDeferredPrompt(null)
-      console.log('PWA was installed successfully!')
-    }
-    
-    // Add event listeners
-    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt)
-    window.addEventListener('appinstalled', handleAppInstalled)
-    
-    // Check if already installed
-    if (isPWAInstalled()) {
-      console.log('PWA is already installed')
-    } else {
-      // Attempt automatic installation after a delay
-      attemptAutoInstall()
-    }
-    
-    return () => {
-      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt)
-      window.removeEventListener('appinstalled', handleAppInstalled)
-    }
-  }, [])
+
   
-  // Auto-install PWA function
-  const installPWA = async () => {
-    if (deferredPrompt) {
-      try {
-        await deferredPrompt.prompt()
-        const { outcome } = await deferredPrompt.userChoice
-        if (outcome === 'accepted') {
-          console.log('User accepted PWA installation')
-        } else {
-          console.log('User declined PWA installation')
-        }
-        setDeferredPrompt(null)
-        setShowInstallPrompt(false)
-      } catch (error) {
-        console.error('Error installing PWA:', error)
-      }
-    }
-  }
-  
-  // Attempt automatic PWA installation
-  const attemptAutoInstall = async () => {
-    // Wait a bit for the page to fully load
-    setTimeout(async () => {
-      if (deferredPrompt && !showInstallPrompt) {
-        try {
-          console.log('Attempting automatic PWA installation...')
-          await installPWA()
-        } catch (error) {
-          console.log('Auto-install failed, showing manual prompt:', error)
-        }
-      }
-    }, 2000) // Wait 2 seconds after page load
-  }
+
 
   // Generate or retrieve user ID from localStorage and get proper UUID from backend
   useEffect(() => {
@@ -803,36 +741,9 @@ const TippingInterface: React.FC = () => {
           )}
           <h1 className="text-xl font-bold mb-1 text-white drop-shadow-lg">
             💝 Tip {deviceInfo.ownerFirstName} {deviceInfo.ownerLastName}
-            {isFullscreen && <span className="ml-2 text-green-400">📱 Fullscreen</span>}
           </h1>
           
-          {/* PWA Install Prompt */}
-          {showInstallPrompt && (
-            <div className="mt-2 p-2 bg-blue-600/90 backdrop-blur-sm rounded-lg border border-blue-400/50">
-              <div className="flex items-center justify-between">
-                <div className="text-white text-sm">
-                  <span className="font-medium">📱 Install App</span>
-                  <p className="text-blue-100 text-xs mt-1">
-                    Get the best experience with our app
-                  </p>
-                </div>
-                <div className="flex gap-2">
-                  <button
-                    onClick={installPWA}
-                    className="px-3 py-1 bg-white text-blue-600 text-xs font-medium rounded-full hover:bg-blue-50 transition-colors"
-                  >
-                    Install
-                  </button>
-                  <button
-                    onClick={() => setShowInstallPrompt(false)}
-                    className="px-2 py-1 text-white/80 hover:text-white text-xs transition-colors"
-                  >
-                    ✕
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
+
           <p className="text-sm text-gray-800 font-medium drop-shadow-lg">
             Swipe to change amount • Swipe up to tip
           </p>
