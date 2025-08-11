@@ -46,7 +46,6 @@ const TippingInterface: React.FC = () => {
   const [isMobile, setIsMobile] = useState(true)
   const [isAnimating, setIsAnimating] = useState(false)
   const [audioEnabled, setAudioEnabled] = useState(false)
-  const [isFullscreen, setIsFullscreen] = useState(false)
   const [hasEnteredFullscreen, setHasEnteredFullscreen] = useState(false)
   
   // Song request state
@@ -87,7 +86,13 @@ const TippingInterface: React.FC = () => {
   // Monitor fullscreen changes
   useEffect(() => {
     const handleFullscreenChange = () => {
-      setIsFullscreen(!!document.fullscreenElement)
+      // Update hasEnteredFullscreen when fullscreen is entered
+      if (document.fullscreenElement || 
+          (document as any).webkitFullscreenElement || 
+          (document as any).mozFullScreenElement || 
+          (document as any).msFullscreenElement) {
+        setHasEnteredFullscreen(true)
+      }
     }
     
     document.addEventListener('fullscreenchange', handleFullscreenChange)
