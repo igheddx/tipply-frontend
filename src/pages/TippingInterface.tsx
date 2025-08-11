@@ -159,6 +159,66 @@ const TippingInterface: React.FC = () => {
       }
     }
   }, [hasEnteredFullscreen, isMobile])
+
+  // Manual touch gesture handler as backup for fullscreen mode
+  useEffect(() => {
+    let touchStartY = 0
+    let touchStartX = 0
+    let touchStartTime = 0
+    
+    const handleManualTouchStart = (e: TouchEvent) => {
+      touchStartY = e.touches[0].clientY
+      touchStartX = e.touches[0].clientX
+      touchStartTime = Date.now()
+    }
+    
+    const handleManualTouchEnd = (e: TouchEvent) => {
+      const touchEndY = e.changedTouches[0].clientY
+      const touchEndX = e.changedTouches[0].clientX
+      const touchEndTime = Date.now()
+      const touchDuration = touchEndTime - touchStartTime
+      
+      const deltaY = touchStartY - touchEndY
+      const deltaX = touchStartX - touchEndX
+      
+      // Only process if it's a quick swipe (less than 500ms) and significant movement
+      if (touchDuration < 500 && (Math.abs(deltaY) > 50 || Math.abs(deltaX) > 50)) {
+        console.log('Manual touch gesture detected:', { deltaX, deltaY, duration: touchDuration })
+        
+        // Horizontal swipe - change denomination
+        if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > 50) {
+          if (deltaX > 0) {
+            // Swipe left - decrease denomination
+            const prevIndex = currentIndex === 0 ? denominations.length - 1 : currentIndex - 1
+            setCurrentAmount(denominations[prevIndex])
+            console.log('Manual left swipe - amount changed to:', denominations[prevIndex])
+          } else {
+            // Swipe right - increase denomination
+            const nextIndex = (currentIndex + 1) % denominations.length
+            setCurrentAmount(denominations[nextIndex])
+            console.log('Manual right swipe - amount changed to:', denominations[nextIndex])
+          }
+        }
+        
+        // Vertical swipe up - submit tip
+        if (deltaY > 0 && Math.abs(deltaY) > 80) {
+          console.log('Manual swipe up detected - submitting tip')
+          if (!isAnimating) {
+            handleSwipeUp()
+          }
+        }
+      }
+    }
+    
+    // Add manual touch handlers to the document for fullscreen compatibility
+    document.addEventListener('touchstart', handleManualTouchStart, { passive: false })
+    document.addEventListener('touchend', handleManualTouchEnd, { passive: false })
+    
+    return () => {
+      document.removeEventListener('touchstart', handleManualTouchStart)
+      document.removeEventListener('touchend', handleManualTouchEnd)
+    }
+  }, [currentIndex, isAnimating])
   
 
   
@@ -458,8 +518,10 @@ const TippingInterface: React.FC = () => {
   }, {
     filterTaps: true,
     threshold: 5,
-    preventDefault: true,
-    from: () => [0, 0]
+    preventDefault: false, // Changed to false for better fullscreen compatibility
+    from: () => [0, 0],
+    rubberband: true, // Add rubberband effect for better feel
+    bounds: { left: -200, right: 200, top: -200, bottom: 200 } // Add bounds for better control
   })
 
   const handleSwipeUp = async () => {
@@ -794,14 +856,34 @@ const TippingInterface: React.FC = () => {
             cursor: 'grab',
             userSelect: 'none',
             WebkitUserSelect: 'none',
-            touchAction: 'none',
+            touchAction: 'manipulation', // Changed from 'none' to 'manipulation' for better fullscreen compatibility
             position: 'relative',
-            zIndex: 5
+            zIndex: 5,
+            WebkitTouchCallout: 'none', // Prevent callout on iOS
+            WebkitTapHighlightColor: 'transparent' // Remove tap highlight
           }}
           className="relative w-full h-full touch-manipulation"
-          onTouchStart={() => console.log('Touch start detected')}
-          onTouchMove={() => console.log('Touch move detected')}
-          onTouchEnd={() => console.log('Touch end detected')}
+          onTouchStart={(e) => {
+            console.log('Touch start detected')
+            // Fallback touch handling for fullscreen mode
+            if (document.fullscreenElement || (document as any).webkitFullscreenElement) {
+              e.preventDefault()
+            }
+          }}
+          onTouchMove={(e) => {
+            console.log('Touch move detected')
+            // Fallback touch handling for fullscreen mode
+            if (document.fullscreenElement || (document as any).webkitFullscreenElement) {
+              e.preventDefault()
+            }
+          }}
+          onTouchEnd={(e) => {
+            console.log('Touch end detected')
+            // Fallback touch handling for fullscreen mode
+            if (document.fullscreenElement || (document as any).webkitFullscreenElement) {
+              e.preventDefault()
+            }
+          }}
         >
           <AnimatePresence>
                           <motion.div
