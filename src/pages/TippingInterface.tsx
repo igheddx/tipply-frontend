@@ -199,78 +199,6 @@ const TippingInterface: React.FC = () => {
     }
   }, [isMobile, hasEnteredFullscreen])
 
-  // Manual touch gesture handler as backup for fullscreen mode
-  useEffect(() => {
-    let touchStartY = 0
-    let touchStartX = 0
-    let touchStartTime = 0
-    
-    const handleManualTouchStart = (e: TouchEvent) => {
-      touchStartY = e.touches[0].clientY
-      touchStartX = e.touches[0].clientX
-      touchStartTime = Date.now()
-    }
-    
-    const handleManualTouchEnd = (e: TouchEvent) => {
-      const touchEndY = e.changedTouches[0].clientY
-      const touchEndX = e.changedTouches[0].clientX
-      const touchEndTime = Date.now()
-      const touchDuration = touchEndTime - touchStartTime
-      
-      const deltaY = touchStartY - touchEndY
-      const deltaX = touchStartX - touchEndX
-      
-      // Only process if it's a quick swipe (less than 500ms) and significant movement
-      if (touchDuration < 500 && (Math.abs(deltaY) > 50 || Math.abs(deltaX) > 50)) {
-        console.log('Manual touch gesture detected:', { deltaX, deltaY, duration: touchDuration })
-        
-        // Horizontal swipe - change denomination
-        if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > 50) {
-          if (deltaX > 0) {
-            // Swipe left - decrease denomination
-            const prevIndex = currentIndex === 0 ? denominations.length - 1 : currentIndex - 1
-            setCurrentAmount(denominations[prevIndex])
-            console.log('Manual left swipe - amount changed to:', denominations[prevIndex])
-          } else {
-            // Swipe right - increase denomination
-            const nextIndex = (currentIndex + 1) % denominations.length
-            setCurrentAmount(denominations[nextIndex])
-            console.log('Manual right swipe - amount changed to:', denominations[nextIndex])
-          }
-        }
-        
-        // Vertical swipe up - submit tip
-        if (deltaY > 0 && Math.abs(deltaY) > 80) {
-          console.log('Manual swipe up detected - submitting tip')
-          if (!isAnimating && !checkingPaymentMethods) {
-            // Check if payment method is set up before allowing tip submission
-            if (!isPaymentSetup) {
-              console.log('No payment method setup, showing payment modal')
-              setShowPaymentModal(true)
-              toast.info('Please set up a payment method first')
-              return
-            }
-            handleSwipeUp()
-          }
-        }
-      }
-    }
-    
-    // Add manual touch handlers to the document for fullscreen compatibility
-    // Use passive: true for better performance and to avoid conflicts
-    document.addEventListener('touchstart', handleManualTouchStart, { passive: true })
-    document.addEventListener('touchend', handleManualTouchEnd, { passive: true })
-    
-    return () => {
-      document.removeEventListener('touchstart', handleManualTouchStart)
-      document.removeEventListener('touchend', handleManualTouchEnd)
-    }
-  }, [currentIndex, isAnimating, checkingPaymentMethods, isPaymentSetup])
-  
-
-  
-
-
   // Generate or retrieve user ID from localStorage and get proper UUID from backend
   useEffect(() => {
     const initializeUser = async () => {
@@ -551,36 +479,45 @@ const TippingInterface: React.FC = () => {
       await enableAudio()
     }
 
-    // Horizontal swipe - change denomination (simplified)
-    if (Math.abs(ox) > 80) {
+    // Horizontal swipe - change denomination (left/right)
+    if (Math.abs(ox) > 60) { // Reduced threshold for better mobile responsiveness
       console.log('Horizontal swipe detected:', xDir > 0 ? 'right' : 'left')
       if (xDir > 0) {
         // Swipe right - increase denomination
         const nextIndex = (currentIndex + 1) % denominations.length
         setCurrentAmount(denominations[nextIndex])
+        console.log('Swipe right - amount changed to:', denominations[nextIndex])
       } else {
         // Swipe left - decrease denomination
         const prevIndex = currentIndex === 0 ? denominations.length - 1 : currentIndex - 1
         setCurrentAmount(denominations[prevIndex])
+        console.log('Swipe left - amount changed to:', denominations[prevIndex])
       }
       cancel()
     }
     
-    // Vertical swipe up - submit tip (simplified)
-    if (yDir < 0 && Math.abs(oy) > 80) {
+    // Vertical swipe up - submit tip
+    if (yDir < 0 && Math.abs(oy) > 60) { // Reduced threshold for better mobile responsiveness
       console.log('Swipe up detected - submitting tip')
-      if (!isAnimating) {
+      if (!isAnimating && !checkingPaymentMethods) {
+        // Check if payment method is set up before allowing tip submission
+        if (!isPaymentSetup) {
+          console.log('No payment method setup, showing payment modal')
+          setShowPaymentModal(true)
+          toast.info('Please set up a payment method first')
+          return
+        }
         handleSwipeUp()
       }
       cancel()
     }
   }, {
     filterTaps: true,
-    threshold: 5,
-    preventDefault: false, // Changed to false for better fullscreen compatibility
+    threshold: 10, // Increased threshold to prevent accidental triggers
+    preventDefault: false, // Keep false for better fullscreen compatibility
     from: () => [0, 0],
-    rubberband: true, // Add rubberband effect for better feel
-    bounds: { left: -200, right: 200, top: -200, bottom: 200 } // Add bounds for better control
+    rubberband: true, // Keep rubberband effect for better feel
+    bounds: { left: -150, right: 150, top: -150, bottom: 150 } // Reduced bounds for better control
   })
 
   const handleSwipeUp = async () => {
