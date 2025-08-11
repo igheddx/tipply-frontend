@@ -538,13 +538,13 @@ const TippingInterface: React.FC = () => {
       return
     }
 
+    // IMMEDIATE FEEDBACK - Don't block the UI
     setIsAnimating(true)
     setFlyingCurrency(true)
     
-    // Play cash register sound with improved reliability
+    // Play cash register sound immediately
     if (audioRef.current) {
       try {
-        // Ensure audio context is active
         if (audioContextRef.current && audioContextRef.current.state === 'suspended') {
           await audioContextRef.current.resume()
         }
@@ -553,7 +553,6 @@ const TippingInterface: React.FC = () => {
         audioRef.current.volume = 1
         audioRef.current.playbackRate = 1
         
-        // Create a promise to handle the play operation
         const playPromise = audioRef.current.play()
         if (playPromise !== undefined) {
           await playPromise
@@ -561,10 +560,8 @@ const TippingInterface: React.FC = () => {
         }
       } catch (error) {
         console.log('Audio play failed:', error)
-        // Try to enable audio if it failed
         if (!audioEnabled) {
           await enableAudio()
-          // Try playing again
           try {
             audioRef.current.currentTime = 0
             const retryPromise = audioRef.current.play()
@@ -582,87 +579,11 @@ const TippingInterface: React.FC = () => {
     // Increment total immediately for better UX
     setTotalTipped(prev => prev + currentAmount)
 
+    // STORE TIP IMMEDIATELY - This is the core functionality
     try {
-      // Check AWS IoT status in background (non-blocking)
-      console.log('=== CHECKING AWS IoT STATUS (NON-BLOCKING) ===')
-      
-      // First, try the manual connection test
-      fetch('https://uhxejjh8s1.execute-api.us-east-1.amazonaws.com/dev/api/tips/test-mqtt-connect', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' }
-      })
-      .then(r => r.json())
-      .then(testResult => {
-        console.log('=== MANUAL MQTT CONNECTION TEST RESULT ===')
-        console.log('Test Result:', JSON.stringify(testResult, null, 2))
-        if (testResult.success && testResult.connected) {
-          console.log('✅ MANUAL TEST: AWS IoT is CONNECTED and working!')
-        } else {
-          console.log('❌ MANUAL TEST: AWS IoT connection failed:', testResult.message)
-          if (testResult.error) {
-            console.log('❌ Error details:', testResult.error)
-            console.log('❌ Error type:', testResult.errorType)
-          }
-        }
-        console.log('=== END MANUAL MQTT CONNECTION TEST ===')
-      })
-      .catch(testError => {
-        console.log('❌ Manual MQTT test failed:', testError)
-      })
-      
-      // Then check the regular status
-      apiService.getAwsIotStatus().then(awsIotStatus => {
-        if (awsIotStatus.data) {
-          console.log('Full AWS IoT Status Response:', JSON.stringify(awsIotStatus.data, null, 2))
-          console.log('=== CERTIFICATE DETAILS ===')
-          console.log('Cert Files Exist:', awsIotStatus.data.certFilesExist)
-          console.log('Cert Path:', awsIotStatus.data.certPath)
-          console.log('Certificate Exists:', awsIotStatus.data.certificateExists)
-          console.log('Private Key Exists:', awsIotStatus.data.privateKeyExists)
-          console.log('Root CA Exists:', awsIotStatus.data.rootCaExists)
-          console.log('=== END CERTIFICATE DETAILS ===')
-          if (awsIotStatus.data.isConnected) {
-            console.log('✅ AWS IoT is CONNECTED - tip will be sent to device')
-          } else {
-            console.log('❌ AWS IoT is NOT CONNECTED - tip will NOT be sent to device')
-            console.log('❌ Connection Error Details:', awsIotStatus.data.message || 'No error message provided')
-            console.log('❌ Timestamp:', awsIotStatus.data.timestamp || 'No timestamp')
-            console.log('❌ Certificate Files Exist:', awsIotStatus.data.certFilesExist)
-            console.log('❌ Certificate Path:', awsIotStatus.data.certPath)
-            console.log('❌ Certificate Exists:', awsIotStatus.data.certificateExists)
-            console.log('❌ Private Key Exists:', awsIotStatus.data.privateKeyExists)
-            console.log('❌ Root CA Exists:', awsIotStatus.data.rootCaExists)
-            if (awsIotStatus.data.connectionError) {
-              console.log('❌ AWS IoT Connection Error:', awsIotStatus.data.connectionError)
-            }
-          }
-        } else {
-          console.log('❌ Failed to get AWS IoT status:', awsIotStatus.error)
-          console.log('❌ Full error response:', awsIotStatus)
-        }
-        console.log('=== END AWS IoT STATUS CHECK ===')
-      }).catch(error => {
-        console.log('❌ AWS IoT status check failed:', error)
-      })
-
-      // Log the MQTT payload that would be sent to the device
-      const mqttPayload = {
-        target_uuid: deviceInfo.uuid,
-        action: "flash",
-        duration: 1,
-        sound: true,
-        intensity: "medium",
-        amount: currentAmount
-      }
-      console.log('=== MQTT PAYLOAD FOR DEVICE ===')
-      console.log('Device UUID:', deviceInfo.uuid)
-      console.log('MQTT Topic: tipply/presence/tipplyDevices')
-      console.log('MQTT Payload:', JSON.stringify(mqttPayload, null, 2))
-      console.log('=== END MQTT PAYLOAD ===')
-
-      // Store tip in backend (no immediate payment processing)
+      console.log('Submitting tip immediately...')
       const response = await apiService.submitTip({
-        deviceId: deviceInfo.uuid, // Backend expects deviceId as Guid
+        deviceId: deviceInfo.uuid,
         userId: userId,
         amount: currentAmount,
         effect: getLightEffect(currentAmount),
@@ -671,63 +592,89 @@ const TippingInterface: React.FC = () => {
 
       if (response.data) {
         console.log('Tip stored successfully:', response.data)
+        toast.success(`$${currentAmount} tip submitted!`)
         
-        // If a song was selected, create the song request entry
+        // If a song was selected, create the song request entry (non-blocking)
         if (selectedSong) {
-          try {
-            const songRequestResponse = await fetch(`${getApiBaseUrl()}/api/songcatalog/request`, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json'
-              },
-              body: JSON.stringify({
-                deviceUuid: deviceInfo?.uuid,
-                songId: selectedSong.id,
-                participantId: userId,
-                tipAmount: currentAmount,
-                requestorName: selectedSong.requestorName,
-                note: selectedSong.note
-              })
+          // Fire and forget - don't block the UI
+          fetch(`${getApiBaseUrl()}/api/songcatalog/request`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              deviceUuid: deviceInfo?.uuid,
+              songId: selectedSong.id,
+              participantId: userId,
+              tipAmount: currentAmount,
+              requestorName: selectedSong.requestorName,
+              note: selectedSong.note
             })
-
+          })
+          .then(songRequestResponse => {
             if (songRequestResponse.ok) {
               console.log('Song request created successfully')
-              toast.success(`$${currentAmount} tip recorded with song "${selectedSong.title}"!`)
             } else {
               console.error('Failed to create song request')
-              toast.success(`$${currentAmount} tip recorded!`)
-              toast.error('Song request failed to save')
             }
-          } catch (error) {
-            console.error('Error creating song request:', error)
-            toast.success(`$${currentAmount} tip recorded!`)
-            toast.error('Song request failed to save')
-          }
-        } else {
-          toast.success(`$${currentAmount} tip recorded!`)
+          })
+          .catch(error => {
+            console.error('Song request error:', error)
+          })
         }
-        
-        // Add celebration effect
-        setShowCelebration(true)
-        
-        // Reset celebration after animation completes
-        setTimeout(() => {
-          setShowCelebration(false)
-        }, 3000)
       } else {
         console.error('Failed to store tip:', response.error)
-        toast.error(response.error || 'Failed to record tip')
+        toast.error('Failed to submit tip. Please try again.')
       }
     } catch (error) {
-      console.error('Error storing tip:', error)
-      toast.error('Error recording tip')
+      console.error('Tip submission error:', error)
+      toast.error('Failed to submit tip. Please try again.')
     }
 
-    // Reset flying animation after delay (1 second faster)
+    // AWS IoT STATUS CHECKS - COMPLETELY NON-BLOCKING (fire and forget)
+    // These run in the background and don't affect the user experience
     setTimeout(() => {
-      setFlyingCurrency(false)
+      console.log('=== BACKGROUND AWS IoT STATUS CHECK ===')
+      
+      // Manual connection test (non-blocking)
+      fetch('https://uhxejjh8s1.execute-api.us-east-1.amazonaws.com/dev/api/tips/test-mqtt-connect', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      })
+      .then(r => r.json())
+      .then(testResult => {
+        console.log('Background MQTT test result:', testResult.success ? 'Connected' : 'Failed')
+      })
+      .catch(testError => {
+        console.log('Background MQTT test failed:', testError)
+      })
+      
+      // Regular status check (non-blocking)
+      apiService.getAwsIotStatus().then(awsIotStatus => {
+        if (awsIotStatus.data?.isConnected) {
+          console.log('✅ Background: AWS IoT is connected')
+        } else {
+          console.log('❌ Background: AWS IoT is not connected')
+        }
+      }).catch(error => {
+        console.log('Background AWS IoT status check failed:', error)
+      })
+
+      // Log MQTT payload (non-blocking)
+      const mqttPayload = {
+        target_uuid: deviceInfo.uuid,
+        action: "flash",
+        duration: 1,
+        sound: true,
+        intensity: "medium",
+        amount: currentAmount
+      }
+      console.log('Background MQTT payload:', mqttPayload)
+    }, 100) // Small delay to ensure tip submission completes first
+
+    // Reset animation state after a short delay
+    setTimeout(() => {
       setIsAnimating(false)
-    }, 1000)
+      setFlyingCurrency(false)
+    }, 2000)
   }
 
   const getLightEffect = (amount: number): string => {
