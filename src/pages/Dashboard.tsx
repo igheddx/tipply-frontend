@@ -76,7 +76,7 @@ const Dashboard: React.FC = () => {
   // Add Device Form States
   const [showAddDeviceForm, setShowAddDeviceForm] = useState(false)
   const [addDeviceForm, setAddDeviceForm] = useState({
-    deviceUuid: '',
+    serialNumber: '', // Changed from deviceUuid to serialNumber
     nickname: '',
     isAllowSongRequest: null as boolean | null
   })
@@ -374,7 +374,7 @@ const Dashboard: React.FC = () => {
     setShowAddDeviceForm(false)
     setShowStripeSetup(false)
     setActiveTab('overview')
-    setAddDeviceForm({ deviceUuid: '', nickname: '', isAllowSongRequest: null })
+    setAddDeviceForm({ serialNumber: '', nickname: '', isAllowSongRequest: null })
     setAddDeviceErrors({})
     setAddDeviceValidationComplete(false)
     setIsValidatingAddDevice(false)
@@ -388,7 +388,7 @@ const Dashboard: React.FC = () => {
     }
     
     // Reset device validation state when device UUID changes
-    if (field === 'deviceUuid') {
+    if (field === 'serialNumber') {
       setAddDeviceValidationComplete(false)
       setIsValidatingAddDevice(false)
     }
@@ -397,10 +397,8 @@ const Dashboard: React.FC = () => {
   const validateAddDeviceForm = () => {
     const errors: {[key: string]: string} = {}
     
-    if (!addDeviceForm.deviceUuid.trim()) {
-      errors.deviceUuid = 'Device UUID is required'
-    } else if (addDeviceForm.deviceUuid.length !== 36) {
-      errors.deviceUuid = 'Device UUID must be 36 characters'
+    if (!addDeviceForm.serialNumber.trim()) {
+      errors.serialNumber = 'Serial Number is required'
     }
     
     if (!addDeviceForm.nickname.trim()) {
@@ -408,7 +406,7 @@ const Dashboard: React.FC = () => {
     }
     
     if (addDeviceForm.isAllowSongRequest === null) {
-      errors.isAllowSongRequest = 'Please select whether you want to enable song requests from your audience.'
+      errors.isAllowSongRequest = 'Please select whether to enable song requests'
     }
     
     setAddDeviceErrors(errors)
@@ -416,42 +414,42 @@ const Dashboard: React.FC = () => {
   }
 
   const validateAddDeviceDetectedDevice = async () => {
-    const deviceId = addDeviceForm.deviceUuid.trim()
+    const serialNumber = addDeviceForm.serialNumber.trim()
     
-    if (!deviceId) {
-      return { isValid: false, error: 'Device ID is required' }
+    if (!serialNumber) {
+      return { isValid: false, error: 'Serial Number is required' }
     }
     
     setIsValidatingAddDevice(true)
     setAddDeviceValidationComplete(false)
     
     try {
-      const result = await apiService.checkDetectedDevice(deviceId)
+      const result = await apiService.checkDetectedDeviceBySerialNumber(serialNumber)
       
       if (result.error) {
-        const errorMessage = result.error || 'Failed to validate device UUID'
-        setAddDeviceErrors(prev => ({ ...prev, deviceUuid: errorMessage }))
+        const errorMessage = result.error || 'Failed to validate serial number'
+        setAddDeviceErrors(prev => ({ ...prev, serialNumber: errorMessage }))
         setAddDeviceValidationComplete(true)
         setIsValidatingAddDevice(false)
         return { isValid: false, error: errorMessage }
       }
       
       if (!result.data?.exists) {
-        const errorMessage = result.data?.message || 'Device UUID could not be located, please check again'
-        setAddDeviceErrors(prev => ({ ...prev, deviceUuid: errorMessage }))
+        const errorMessage = result.data?.message || 'Serial Number not found or device is not available for registration'
+        setAddDeviceErrors(prev => ({ ...prev, serialNumber: errorMessage }))
         setAddDeviceValidationComplete(true)
         setIsValidatingAddDevice(false)
         return { isValid: false, error: errorMessage }
       }
       
       // Clear any existing errors
-      setAddDeviceErrors(prev => ({ ...prev, deviceUuid: '' }))
+      setAddDeviceErrors(prev => ({ ...prev, serialNumber: '' }))
       setAddDeviceValidationComplete(true)
       setIsValidatingAddDevice(false)
       return { isValid: true, error: null }
     } catch (err) {
-      const errorMessage = 'Failed to validate device UUID'
-      setAddDeviceErrors(prev => ({ ...prev, deviceUuid: errorMessage }))
+      const errorMessage = 'Failed to validate serial number'
+      setAddDeviceErrors(prev => ({ ...prev, serialNumber: errorMessage }))
       setAddDeviceValidationComplete(true)
       setIsValidatingAddDevice(false)
       return { isValid: false, error: errorMessage }
@@ -481,15 +479,15 @@ const Dashboard: React.FC = () => {
     }
 
     // Validate device exists in DetectedDevices table
-    if (!addDeviceValidationComplete || !!addDeviceErrors.deviceUuid) {
+    if (!addDeviceValidationComplete || !!addDeviceErrors.serialNumber) {
       // Re-validate if not already validated
-      if (addDeviceForm.deviceUuid.trim()) {
+      if (addDeviceForm.serialNumber.trim()) {
         const validation = await validateAddDeviceDetectedDevice()
         if (!validation.isValid) {
           return
         }
       } else {
-        setAddDeviceErrors(prev => ({ ...prev, deviceUuid: 'Device ID is required' }))
+        setAddDeviceErrors(prev => ({ ...prev, serialNumber: 'Serial Number is required' }))
         return
       }
     }
@@ -525,7 +523,7 @@ const Dashboard: React.FC = () => {
   const addDeviceToUser = async () => {
     try {
       const response = await apiService.addDevice({
-        deviceUuid: addDeviceForm.deviceUuid,
+        serialNumber: addDeviceForm.serialNumber,
         nickname: addDeviceForm.nickname,
         isAllowSongRequest: addDeviceForm.isAllowSongRequest || false
       })
@@ -539,7 +537,7 @@ const Dashboard: React.FC = () => {
       await checkStripeConnectStatus()
       setShowAddDeviceForm(false)
       setActiveTab('devices')
-      setAddDeviceForm({ deviceUuid: '', nickname: '', isAllowSongRequest: null })
+      setAddDeviceForm({ serialNumber: '', nickname: '', isAllowSongRequest: null })
       setAddDeviceErrors({})
       setAddDeviceValidationComplete(false)
       setIsValidatingAddDevice(false)
@@ -1490,24 +1488,24 @@ const Dashboard: React.FC = () => {
 
                       <form onSubmit={(e) => { e.preventDefault(); handleAddDeviceSubmit(); }} className="space-y-6">
                         <div>
-                          <label htmlFor="deviceUuid" className="block text-sm font-medium text-gray-700 mb-2">
-                            Device UUID *
+                          <label htmlFor="serialNumber" className="block text-sm font-medium text-gray-700 mb-2">
+                            Serial Number *
                           </label>
                           <div className="relative">
                             <input
                               type="text"
-                              id="deviceUuid"
-                              value={addDeviceForm.deviceUuid}
-                              onChange={(e) => handleAddDeviceInputChange('deviceUuid', e.target.value)}
+                              id="serialNumber"
+                              value={addDeviceForm.serialNumber}
+                              onChange={(e) => handleAddDeviceInputChange('serialNumber', e.target.value)}
                               onBlur={async () => {
-                                if (addDeviceForm.deviceUuid.trim()) {
+                                if (addDeviceForm.serialNumber.trim()) {
                                   await validateAddDeviceDetectedDevice()
                                 }
                               }}
                               className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all duration-200 ${
-                                addDeviceErrors.deviceUuid ? 'border-red-500 focus:ring-red-200' : 'border-gray-300'
+                                addDeviceErrors.serialNumber ? 'border-red-500 focus:ring-red-200' : 'border-gray-300'
                               }`}
-                              placeholder="e.g., f47ac10b-58cc-4372-a567-0e02b2c3d47f"
+                              placeholder="e.g., TPY-5C07-K73"
                             />
                             {isValidatingAddDevice && (
                               <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
@@ -1515,14 +1513,14 @@ const Dashboard: React.FC = () => {
                               </div>
                             )}
                           </div>
-                          {addDeviceErrors.deviceUuid && (
-                            <p className="text-red-500 text-sm mt-1">{addDeviceErrors.deviceUuid}</p>
+                          {addDeviceErrors.serialNumber && (
+                            <p className="text-red-500 text-sm mt-1">{addDeviceErrors.serialNumber}</p>
                           )}
-                          {addDeviceValidationComplete && !addDeviceErrors.deviceUuid && addDeviceForm.deviceUuid.trim() && (
-                            <p className="text-green-500 text-sm mt-1">✓ Device UUID validated successfully</p>
+                          {addDeviceValidationComplete && !addDeviceErrors.serialNumber && addDeviceForm.serialNumber.trim() && (
+                            <p className="text-green-500 text-sm mt-1">✓ Serial Number validated successfully</p>
                           )}
                           <p className="text-sm text-gray-500 mt-1">
-                            Enter the 36-character UUID from your Tipply device
+                            Enter the serial number from your Tipply device (e.g., TPY-5C07-K73)
                           </p>
                         </div>
 

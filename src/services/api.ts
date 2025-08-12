@@ -115,7 +115,7 @@ class ApiService {
   }
 
   // Device endpoints
-  async addDevice(deviceData: { deviceUuid: string; nickname?: string; isAllowSongRequest?: boolean }): Promise<ApiResponse<any>> {
+  async addDevice(deviceData: { serialNumber: string; nickname?: string; isAllowSongRequest?: boolean }): Promise<ApiResponse<any>> {
     return this.request('/api/devices/add', {
       method: 'POST',
       body: JSON.stringify(deviceData),
@@ -170,7 +170,7 @@ class ApiService {
 
   // Stripe endpoints
   async createConnectAccount(data: {
-    deviceUuid: string
+    serialNumber: string // Changed from deviceUuid to serialNumber
     firstName: string
     lastName: string
     email: string
@@ -181,8 +181,8 @@ class ApiService {
     }, true) // Use API key for onboarding
   }
 
-  async getConnectAccountStatus(deviceUuid: string): Promise<ApiResponse<any>> {
-    return this.request(`/api/stripe/connect-account/${deviceUuid}/status`)
+  async getConnectAccountStatus(serialNumber: string): Promise<ApiResponse<any>> { // Changed from deviceUuid to serialNumber
+    return this.request(`/api/stripe/connect-account/${serialNumber}/status`)
   }
 
   // Auth endpoints
@@ -243,7 +243,7 @@ class ApiService {
 
   // Onboarding-specific endpoints (with API key)
   async registerDeviceOnboarding(deviceData: {
-    deviceUuid: string
+    serialNumber: string // Changed from deviceUuid to serialNumber
     firstName: string
     lastName: string
     email: string
@@ -274,6 +274,13 @@ class ApiService {
   // Check if device UUID exists in DetectedDevices table with status "new"
   async checkDetectedDevice(uuid: string): Promise<ApiResponse<any>> {
     return this.request(`/api/devices/check-detected-device/${uuid}`, {
+      method: 'GET',
+    }, true) // Use API key for onboarding
+  }
+
+  // Check if device SerialNumber exists in DetectedDevices table with status "new"
+  async checkDetectedDeviceBySerialNumber(serialNumber: string): Promise<ApiResponse<any>> {
+    return this.request(`/api/devices/check-detected-device-serial/${serialNumber}`, {
       method: 'GET',
     }, true) // Use API key for onboarding
   }

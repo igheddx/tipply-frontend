@@ -13,7 +13,7 @@ const Onboarding: React.FC = () => {
     stageName: '',
     password: '',
     confirmPassword: '',
-    deviceId: '',
+    serialNumber: '', // Changed from deviceId to serialNumber
     deviceNickname: '',
     isAllowSongRequest: null as boolean | null
   })
@@ -85,8 +85,8 @@ const Onboarding: React.FC = () => {
     }))
     setErrors(prev => ({ ...prev, [name]: '' }))
     
-    // Reset device validation state when device ID changes
-    if (name === 'deviceId') {
+    // Reset device validation state when serial number changes
+    if (name === 'serialNumber') {
       setDeviceValidationComplete(false)
       setIsValidatingDevice(false)
     }
@@ -104,15 +104,15 @@ const Onboarding: React.FC = () => {
 
 
 
-  const validateDeviceIdUniqueness = async () => {
-    const deviceId = formData.deviceId.trim()
+  const validateSerialNumberUniqueness = async () => {
+    const serialNumber = formData.serialNumber.trim()
     
-    if (!deviceId) {
-      return { isValid: false, error: 'Device ID is required' }
+    if (!serialNumber) {
+      return { isValid: false, error: 'Serial Number is required' }
     }
     
     try {
-      const result = await apiService.checkDeviceExists(deviceId)
+      const result = await apiService.checkDeviceExists(serialNumber)
       
       if (result.error) {
         return { isValid: false, error: result.error }
@@ -122,7 +122,7 @@ const Onboarding: React.FC = () => {
         const device = result.data.device
         return {
           isValid: false,
-          error: `Device UUID already exists`,
+          error: `Serial Number already exists`,
           details: {
             ownerName: device.ownerName,
             ownerEmail: device.ownerEmail,
@@ -134,47 +134,47 @@ const Onboarding: React.FC = () => {
       
       return { isValid: true, error: null }
     } catch (err) {
-      return { isValid: false, error: 'Failed to validate device UUID' }
+      return { isValid: false, error: 'Failed to validate serial number' }
     }
   }
 
   const validateDetectedDevice = async () => {
-    const deviceId = formData.deviceId.trim()
+    const serialNumber = formData.serialNumber.trim()
     
-    if (!deviceId) {
-      return { isValid: false, error: 'Device ID is required' }
+    if (!serialNumber) {
+      return { isValid: false, error: 'Serial Number is required' }
     }
     
     setIsValidatingDevice(true)
     setDeviceValidationComplete(false)
     
     try {
-      const result = await apiService.checkDetectedDevice(deviceId)
+      const result = await apiService.checkDetectedDeviceBySerialNumber(serialNumber)
       
       if (result.error) {
-        const errorMessage = result.error || 'Failed to validate device UUID'
-        setErrors(prev => ({ ...prev, deviceId: errorMessage }))
+        const errorMessage = result.error || 'Failed to validate serial number'
+        setErrors(prev => ({ ...prev, serialNumber: errorMessage }))
         setDeviceValidationComplete(true)
         setIsValidatingDevice(false)
         return { isValid: false, error: errorMessage }
       }
       
       if (!result.data?.exists) {
-        const errorMessage = result.data?.message || 'Device UUID could not be located, please check again'
-        setErrors(prev => ({ ...prev, deviceId: errorMessage }))
+        const errorMessage = result.data?.message || 'Serial Number not found or device is not available for registration'
+        setErrors(prev => ({ ...prev, serialNumber: errorMessage }))
         setDeviceValidationComplete(true)
         setIsValidatingDevice(false)
         return { isValid: false, error: errorMessage }
       }
       
       // Clear any existing errors
-      setErrors(prev => ({ ...prev, deviceId: '' }))
+      setErrors(prev => ({ ...prev, serialNumber: '' }))
       setDeviceValidationComplete(true)
       setIsValidatingDevice(false)
       return { isValid: true, error: null }
     } catch (err) {
-      const errorMessage = 'Failed to validate device UUID'
-      setErrors(prev => ({ ...prev, deviceId: errorMessage }))
+      const errorMessage = 'Failed to validate serial number'
+      setErrors(prev => ({ ...prev, serialNumber: errorMessage }))
       setDeviceValidationComplete(true)
       setIsValidatingDevice(false)
       return { isValid: false, error: errorMessage }
@@ -222,15 +222,15 @@ const Onboarding: React.FC = () => {
         setStep(step + 1)
       } else if (step === 3) {
         // Register device using the created profile
-        if (!deviceValidationComplete || !!errors.deviceId) {
+        if (!deviceValidationComplete || !!errors.serialNumber) {
           // Re-validate if not already validated
-          if (formData.deviceId.trim()) {
+          if (formData.serialNumber.trim()) {
             const validation = await validateDetectedDevice()
             if (!validation.isValid) {
               return
             }
           } else {
-            setErrors(prev => ({ ...prev, deviceId: 'Device ID is required' }))
+            setErrors(prev => ({ ...prev, serialNumber: 'Serial Number is required' }))
             return
           }
         }
@@ -306,25 +306,25 @@ const Onboarding: React.FC = () => {
     setIsLoading(true)
     try {
       // First validate UUID uniqueness
-      const uniquenessCheck = await validateDeviceIdUniqueness()
+      const uniquenessCheck = await validateSerialNumberUniqueness()
       if (!uniquenessCheck.isValid) {
         setErrors(prev => ({ 
           ...prev, 
-          deviceId: uniquenessCheck.error || 'Device validation failed'
+          serialNumber: uniquenessCheck.error || 'Device validation failed'
         }))
         
         // Show detailed alert if device exists
         if (uniquenessCheck.details) {
           const device = uniquenessCheck.details
-          const alertMessage = `⚠️ Device UUID Already Exists
+          const alertMessage = `⚠️ Serial Number Already Exists
 
-This device UUID is already registered to:
+This serial number is already registered to:
 • Owner: ${device.ownerName}
 • Email: ${device.ownerEmail}
 • Nickname: ${device.nickname || 'No nickname'}
 • Registered: ${new Date(device.createdAt).toLocaleDateString()}
 
-Please use a different device UUID or contact support if this is your device.`
+Please use a different serial number or contact support if this is your device.`
           
           alert(alertMessage)
         }
@@ -333,7 +333,7 @@ Please use a different device UUID or contact support if this is your device.`
       }
 
       const result = await apiService.registerDeviceOnboarding({
-        deviceUuid: formData.deviceId,
+        serialNumber: formData.serialNumber, // Changed from deviceUuid to serialNumber
         firstName: formData.firstName,
         lastName: formData.lastName,
         email: formData.email,
@@ -347,7 +347,7 @@ Please use a different device UUID or contact support if this is your device.`
         if (result.error.includes('already exists')) {
           setErrors(prev => ({ 
             ...prev, 
-            deviceId: 'This device is already registered. Please use a different device ID or contact support if this is your device.' 
+            serialNumber: 'This device is already registered. Please use a different serial number or contact support if this is your device.' 
           }))
           return
         }
@@ -359,7 +359,7 @@ Please use a different device UUID or contact support if this is your device.`
       console.error('Failed to register device:', err)
       setErrors(prev => ({ 
         ...prev, 
-        deviceId: err instanceof Error ? err.message : 'Failed to register device. Please try again.' 
+        serialNumber: err instanceof Error ? err.message : 'Failed to register device. Please try again.' 
       }))
     } finally {
       setIsLoading(false)
@@ -373,10 +373,10 @@ Please use a different device UUID or contact support if this is your device.`
       sessionStorage.setItem('onboarding_email', formData.email)
       sessionStorage.setItem('onboarding_password', formData.password)
 
-      console.log('Starting KYC process with device ID:', formData.deviceId)
+      console.log('Starting KYC process with serial number:', formData.serialNumber)
 
       const result = await apiService.createConnectAccount({
-        deviceUuid: formData.deviceId,
+        serialNumber: formData.serialNumber, // Changed from deviceUuid to serialNumber
         firstName: formData.firstName,
         lastName: formData.lastName,
         email: formData.email
@@ -430,13 +430,13 @@ Please use a different device UUID or contact support if this is your device.`
     const maxAttempts = 180 // 3 minutes max (increased for Stripe Connect account creation)
     const pollInterval = 1000 // 1 second
     
-    console.log(`Starting polling for device: ${formData.deviceId}`)
+    console.log(`Starting polling for device: ${formData.serialNumber}`)
     
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       try {
         console.log(`Polling for onboarding URL, attempt ${attempt}/${maxAttempts}`)
         
-        const statusResult = await apiService.getConnectAccountStatus(formData.deviceId)
+        const statusResult = await apiService.getConnectAccountStatus(formData.serialNumber)
         
         console.log(`Status response for attempt ${attempt}:`, statusResult)
         
@@ -774,23 +774,23 @@ Please use a different device UUID or contact support if this is your device.`
       
       <div className="space-y-6">
         <div className="space-y-2">
-          <label htmlFor="deviceId" className="block text-sm font-semibold text-gray-700">
-            Device ID *
+          <label htmlFor="serialNumber" className="block text-sm font-semibold text-gray-700">
+            Serial Number *
           </label>
           <div className="relative">
             <input
               type="text"
-              id="deviceId"
-              name="deviceId"
+              id="serialNumber"
+              name="serialNumber"
               required
               className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all duration-200 ${
-                errors.deviceId ? 'border-red-500 focus:ring-red-200' : 'border-gray-300'
+                errors.serialNumber ? 'border-red-500 focus:ring-red-200' : 'border-gray-300'
               }`}
-              placeholder="f47ac10b-58cc-4372-a567-0e02b2c3d47f"
-              value={formData.deviceId}
+              placeholder="12345678901234567890"
+              value={formData.serialNumber}
               onChange={handleInputChange}
               onBlur={async () => {
-                if (formData.deviceId.trim()) {
+                if (formData.serialNumber.trim()) {
                   await validateDetectedDevice()
                 }
               }}
@@ -801,12 +801,12 @@ Please use a different device UUID or contact support if this is your device.`
               </div>
             )}
           </div>
-          {errors.deviceId && <p className="text-red-500 text-xs mt-1">{errors.deviceId}</p>}
-          {deviceValidationComplete && !errors.deviceId && formData.deviceId.trim() && (
-            <p className="text-green-500 text-xs mt-1">✓ Device UUID validated successfully</p>
+          {errors.serialNumber && <p className="text-red-500 text-xs mt-1">{errors.serialNumber}</p>}
+          {deviceValidationComplete && !errors.serialNumber && formData.serialNumber.trim() && (
+            <p className="text-green-500 text-xs mt-1">✓ Serial Number validated successfully</p>
           )}
           <p className="text-sm text-gray-500">
-            Enter the UUID from your Tipply device (36 characters, format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx)
+            Enter the serial number from your Tipply device (16-20 characters)
           </p>
         </div>
         
@@ -1152,7 +1152,7 @@ Please use a different device UUID or contact support if this is your device.`
                 <button
                   type="button"
                   onClick={handleNext}
-                  disabled={isLoading || (step === 3 && (isValidatingDevice || !deviceValidationComplete || !!errors.deviceId))}
+                  disabled={isLoading || (step === 3 && (isValidatingDevice || !deviceValidationComplete || !!errors.serialNumber))}
                   className="px-8 py-3 bg-gradient-to-r from-primary-600 to-primary-700 text-white font-medium rounded-lg hover:from-primary-700 hover:to-primary-800 focus:ring-4 focus:ring-primary-200 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {isLoading ? (
