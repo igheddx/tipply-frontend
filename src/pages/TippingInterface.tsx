@@ -399,9 +399,9 @@ const TippingInterface: React.FC = () => {
     scale: 1,
     rotate: 0,
     config: { 
-      mass: 0.8, // Reduced mass for faster response
-      tension: 400, // Increased tension for snappier feel
-      friction: 25, // Reduced friction for smoother motion
+      mass: 0.6, // Further reduced mass for even faster response
+      tension: 500, // Increased tension for snappier feel
+      friction: 20, // Further reduced friction for smoother motion
       precision: 0.01 // Lower precision for better performance
     }
   }))
@@ -551,11 +551,11 @@ const TippingInterface: React.FC = () => {
       // For now, keeping it simple to avoid unused variable errors
     }, 100) // Small delay to ensure tip submission completes first
 
-    // Reset animation state after a short delay
+    // Reset animation state after a short delay - optimized for faster response
     setTimeout(() => {
       setIsAnimating(false)
       setFlyingCurrency(false)
-    }, 2000)
+    }, 1200) // Reduced from 2000ms to 1200ms for faster reset
   }
 
   const getLightEffect = (amount: number): string => {
@@ -828,7 +828,7 @@ const TippingInterface: React.FC = () => {
                   x: flyingCurrency ? Math.random() * 200 - 100 : 0
                 }}
                 transition={{ 
-                  duration: flyingCurrency ? 1.5 : 0.3,
+                  duration: flyingCurrency ? 0.8 : 0.3, // Reduced from 1.5s to 0.8s for faster flying
                   ease: flyingCurrency ? "easeInOut" : "easeOut"
                 }}
               />
@@ -867,9 +867,9 @@ const TippingInterface: React.FC = () => {
                     rotate: 0
                   }}
                   transition={{ 
-                    duration: 1.5,
+                    duration: 0.8, // Reduced from 1.5s to 0.8s for faster slide-in
                     ease: "easeOut",
-                    delay: 0.8
+                    delay: 0.4 // Reduced from 0.8s to 0.4s for faster response
                   }}
                 />
               )}
