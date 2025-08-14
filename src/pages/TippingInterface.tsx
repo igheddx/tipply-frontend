@@ -40,6 +40,11 @@ const TippingInterface: React.FC = () => {
   const [isAnimating, setIsAnimating] = useState(false)
   const [audioEnabled, setAudioEnabled] = useState(false)
   
+  // Enhanced animation states
+  const [isSlidingLeft, setIsSlidingLeft] = useState(false)
+  const [isSlidingRight, setIsSlidingRight] = useState(false)
+  const [slideDirection, setSlideDirection] = useState<'left' | 'right' | null>(null)
+  
   // Song request state
   const [showSongSearch, setShowSongSearch] = useState(false)
   const [selectedSong, setSelectedSong] = useState<{id: string, title: string, artist: string, requestorName?: string, note?: string} | null>(null)
@@ -420,16 +425,28 @@ const TippingInterface: React.FC = () => {
       enableAudio().catch(() => {}) // Fire and forget
     }
 
-    // Horizontal swipe - change denomination (left/right)
+    // Horizontal swipe - change denomination (left/right) with enhanced animation
     if (Math.abs(ox) > 60) { // Reduced threshold for better mobile responsiveness
       if (xDir > 0) {
         // Swipe right - increase denomination
         const nextIndex = (currentIndex + 1) % denominations.length
-        setCurrentAmount(denominations[nextIndex])
+        setSlideDirection('right')
+        setIsSlidingRight(true)
+        setTimeout(() => {
+          setCurrentAmount(denominations[nextIndex])
+          setIsSlidingRight(false)
+          setSlideDirection(null)
+        }, 300)
       } else {
         // Swipe left - decrease denomination
         const prevIndex = currentIndex === 0 ? denominations.length - 1 : currentIndex - 1
-        setCurrentAmount(denominations[prevIndex])
+        setSlideDirection('left')
+        setIsSlidingLeft(true)
+        setTimeout(() => {
+          setCurrentAmount(denominations[prevIndex])
+          setIsSlidingLeft(false)
+          setSlideDirection(null)
+        }, 300)
       }
       cancel()
     }
@@ -793,9 +810,9 @@ const TippingInterface: React.FC = () => {
                 transition={{ duration: 0.3 }}
                 className="relative w-full h-full"
               >
-              {/* Main Currency Image with Exit Animation */}
+              {/* Main Currency Image with Enhanced Animations */}
               <motion.img
-                key={`${currentAmount}-${flyingCurrency ? 'flying' : 'static'}`}
+                key={`${currentAmount}-${flyingCurrency ? 'flying' : 'static'}-${slideDirection || 'center'}`}
                 src={getCurrencyImage(currentAmount)}
                 alt={`$${currentAmount} bill`}
                 className="w-full h-full object-cover min-w-full min-h-full"
@@ -818,22 +835,117 @@ const TippingInterface: React.FC = () => {
                   y: 0,
                   scale: 1,
                   opacity: 1,
-                  rotate: 0
+                  rotate: 0,
+                  x: 0
                 }}
                 animate={{ 
-                  y: flyingCurrency ? -2000 : 0,
-                  scale: flyingCurrency ? 0.6 : 1,
+                  // Enhanced swipe-up: Single bill floats up and disperses into mist
+                  y: flyingCurrency ? -800 : 0,
+                  scale: flyingCurrency ? 0.1 : 1,
                   opacity: flyingCurrency ? 0 : 1,
-                  rotate: flyingCurrency ? 720 : 0,
-                  x: flyingCurrency ? Math.random() * 200 - 100 : 0
+                  rotate: flyingCurrency ? 45 : 0,
+                  x: flyingCurrency ? 0 : 0,
+                  
+                  // Enhanced swipe left/right: Currency stack sliding effect
+                  x: isSlidingLeft ? -1000 : isSlidingRight ? 1000 : 0,
+                  scale: isSlidingLeft || isSlidingRight ? 0.8 : 1,
+                  opacity: isSlidingLeft || isSlidingRight ? 0 : 1
                 }}
                 transition={{ 
-                  duration: flyingCurrency ? 0.8 : 0.3, // Reduced from 1.5s to 0.8s for faster flying
-                  ease: flyingCurrency ? "easeInOut" : "easeOut"
+                  // Swipe-up animation: Gentle float + mist dispersion
+                  duration: flyingCurrency ? 0.8 : 0.3,
+                  ease: flyingCurrency ? "easeInOut" : "easeOut",
+                  
+                  // Swipe left/right animation: Smooth sliding
+                  duration: isSlidingLeft || isSlidingRight ? 0.3 : 0.3
                 }}
               />
 
-              {/* New Currency Sliding In */}
+              {/* Enhanced Mist Dispersion Effect for Swipe-Up */}
+              {flyingCurrency && (
+                <motion.div
+                  className="absolute inset-0 pointer-events-none"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.8 }}
+                >
+                  {/* Mist particles - multiple small currency images for dispersion effect */}
+                  {[...Array(8)].map((_, i) => (
+                    <motion.img
+                      key={`mist-${i}`}
+                      src={getCurrencyImage(currentAmount)}
+                      alt="mist particle"
+                      className="absolute w-16 h-16 object-cover opacity-60"
+                      style={{
+                        left: `${20 + (i * 10)}%`,
+                        top: `${30 + (i * 5)}%`
+                      }}
+                      initial={{ 
+                        scale: 0.3,
+                        opacity: 0.8,
+                        y: 0,
+                        rotate: 0
+                      }}
+                      animate={{ 
+                        scale: 0.1,
+                        opacity: 0,
+                        y: -400 - (i * 50),
+                        rotate: 180 + (i * 45),
+                        x: (i % 2 === 0 ? 1 : -1) * (100 + i * 20)
+                      }}
+                      transition={{ 
+                        duration: 0.8,
+                        delay: i * 0.05,
+                        ease: "easeOut"
+                      }}
+                    />
+                  ))}
+                </motion.div>
+              )}
+
+              {/* New Currency Sliding In for Left/Right Swipes */}
+              {(isSlidingLeft || isSlidingRight) && (
+                <motion.img
+                  src={getCurrencyImage(currentAmount)}
+                  alt={`$${currentAmount} bill`}
+                  className="absolute inset-0 w-full h-full object-cover min-w-full min-h-full"
+                  style={{ 
+                    width: '100vw', 
+                    height: '100vh',
+                    minHeight: '-webkit-fill-available',
+                    objectFit: 'cover',
+                    objectPosition: 'center',
+                    margin: 0,
+                    padding: 0,
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0
+                  }}
+                  draggable={false}
+                  initial={{ 
+                    y: 0,
+                    scale: 0.8,
+                    opacity: 0,
+                    x: slideDirection === 'left' ? 1000 : -1000
+                  }}
+                  animate={{ 
+                    y: 0,
+                    scale: 1,
+                    opacity: 1,
+                    x: 0
+                  }}
+                  transition={{ 
+                    duration: 0.3,
+                    ease: "easeOut"
+                  }}
+                />
+              )}
+
+              {/* BACKUP: Original flying currency animation (commented out but preserved) */}
+              {/* 
               {flyingCurrency && (
                 <motion.img
                   src={getCurrencyImage(currentAmount)}
@@ -867,12 +979,13 @@ const TippingInterface: React.FC = () => {
                     rotate: 0
                   }}
                   transition={{ 
-                    duration: 0.8, // Reduced from 1.5s to 0.8s for faster slide-in
+                    duration: 0.8,
                     ease: "easeOut",
-                    delay: 0.4 // Reduced from 0.8s to 0.4s for faster response
+                    delay: 0.4
                   }}
                 />
               )}
+              */}
             </motion.div>
           </AnimatePresence>
         </animated.div>
