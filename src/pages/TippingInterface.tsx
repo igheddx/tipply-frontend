@@ -572,7 +572,7 @@ const TippingInterface: React.FC = () => {
     setTimeout(() => {
       setIsAnimating(false)
       setFlyingCurrency(false)
-    }, 1200) // Reduced from 2000ms to 1200ms for faster reset
+    }, 900) // Reduced from 1200ms to 900ms for even faster reset - eliminates white space delay
   }
 
   const getLightEffect = (amount: number): string => {
@@ -847,7 +847,7 @@ const TippingInterface: React.FC = () => {
                   x: isSlidingLeft ? -1000 : isSlidingRight ? 1000 : 0
                 }}
                 transition={{ 
-                  duration: flyingCurrency ? 0.8 : (isSlidingLeft || isSlidingRight ? 0.3 : 0.3),
+                  duration: flyingCurrency ? 0.6 : (isSlidingLeft || isSlidingRight ? 0.3 : 0.3), // Reduced from 0.8s to 0.6s for faster flying
                   ease: flyingCurrency ? "easeInOut" : "easeOut"
                 }}
               />
@@ -886,8 +886,8 @@ const TippingInterface: React.FC = () => {
                         x: (i % 2 === 0 ? 1 : -1) * (100 + i * 20)
                       }}
                       transition={{ 
-                        duration: 0.8,
-                        delay: i * 0.05,
+                        duration: 0.6, // Reduced from 0.8s to 0.6s for faster dispersion
+                        delay: i * 0.03, // Reduced delay between particles for tighter effect
                         ease: "easeOut"
                       }}
                     />
