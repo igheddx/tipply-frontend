@@ -841,23 +841,14 @@ const TippingInterface: React.FC = () => {
                 animate={{ 
                   // Enhanced swipe-up: Single bill floats up and disperses into mist
                   y: flyingCurrency ? -800 : 0,
-                  scale: flyingCurrency ? 0.1 : 1,
-                  opacity: flyingCurrency ? 0 : 1,
+                  scale: flyingCurrency ? 0.1 : (isSlidingLeft || isSlidingRight ? 0.8 : 1),
+                  opacity: flyingCurrency ? 0 : (isSlidingLeft || isSlidingRight ? 0 : 1),
                   rotate: flyingCurrency ? 45 : 0,
-                  x: flyingCurrency ? 0 : 0,
-                  
-                  // Enhanced swipe left/right: Currency stack sliding effect
-                  x: isSlidingLeft ? -1000 : isSlidingRight ? 1000 : 0,
-                  scale: isSlidingLeft || isSlidingRight ? 0.8 : 1,
-                  opacity: isSlidingLeft || isSlidingRight ? 0 : 1
+                  x: isSlidingLeft ? -1000 : isSlidingRight ? 1000 : 0
                 }}
                 transition={{ 
-                  // Swipe-up animation: Gentle float + mist dispersion
-                  duration: flyingCurrency ? 0.8 : 0.3,
-                  ease: flyingCurrency ? "easeInOut" : "easeOut",
-                  
-                  // Swipe left/right animation: Smooth sliding
-                  duration: isSlidingLeft || isSlidingRight ? 0.3 : 0.3
+                  duration: flyingCurrency ? 0.8 : (isSlidingLeft || isSlidingRight ? 0.3 : 0.3),
+                  ease: flyingCurrency ? "easeInOut" : "easeOut"
                 }}
               />
 
