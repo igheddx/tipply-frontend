@@ -17,7 +17,7 @@ export const getApiBaseUrl = () => {
   
   // Fallback for local development
   console.log('Using default API URL for local development');
-  return 'http://localhost:5000';
+  return 'http://localhost:5000'; // Temporarily force local backend for development
 };
 
 // Get the current API base URL

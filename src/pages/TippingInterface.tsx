@@ -392,59 +392,53 @@ const TippingInterface: React.FC = () => {
     }
   }
 
-  // Gesture handling with react-spring
+  // Gesture handling with react-spring - optimized for mobile performance
   const [springs] = useSpring(() => ({
     x: 0,
     y: 0,
     scale: 1,
     rotate: 0,
-    config: { mass: 1, tension: 300, friction: 30 }
+    config: { 
+      mass: 0.8, // Reduced mass for faster response
+      tension: 400, // Increased tension for snappier feel
+      friction: 25, // Reduced friction for smoother motion
+      precision: 0.01 // Lower precision for better performance
+    }
   }))
 
   const bind = useDrag(async ({ 
     offset: [ox, oy],
     direction: [xDir, yDir],
-    velocity: [vx, vy],
     cancel,
     canceled,
-    distance,
-    active,
-    last,
-    event
+    last
   }) => {
-    console.log('Gesture detected:', { ox, oy, xDir, yDir, velocity: [vx, vy], distance, active, last, event })
-    
     if (canceled || !last) return
 
-    // Enable audio on first interaction
+    // Enable audio on first interaction (non-blocking)
     if (!audioEnabled) {
-      await enableAudio()
+      enableAudio().catch(() => {}) // Fire and forget
     }
 
     // Horizontal swipe - change denomination (left/right)
     if (Math.abs(ox) > 60) { // Reduced threshold for better mobile responsiveness
-      console.log('Horizontal swipe detected:', xDir > 0 ? 'right' : 'left')
       if (xDir > 0) {
         // Swipe right - increase denomination
         const nextIndex = (currentIndex + 1) % denominations.length
         setCurrentAmount(denominations[nextIndex])
-        console.log('Swipe right - amount changed to:', denominations[nextIndex])
       } else {
         // Swipe left - decrease denomination
         const prevIndex = currentIndex === 0 ? denominations.length - 1 : currentIndex - 1
         setCurrentAmount(denominations[prevIndex])
-        console.log('Swipe left - amount changed to:', denominations[prevIndex])
       }
       cancel()
     }
     
     // Vertical swipe up - submit tip
     if (yDir < 0 && Math.abs(oy) > 60) { // Reduced threshold for better mobile responsiveness
-      console.log('Swipe up detected - submitting tip')
       if (!isAnimating && !checkingPaymentMethods) {
         // Check if payment method is set up before allowing tip submission
         if (!isPaymentSetup) {
-          console.log('No payment method setup, showing payment modal')
           setShowPaymentModal(true)
           toast.info('Please set up a payment method first')
           return
@@ -460,10 +454,7 @@ const TippingInterface: React.FC = () => {
     from: () => [0, 0],
     rubberband: true, // Keep rubberband effect for better feel
     bounds: { left: -150, right: 150, top: -150, bottom: 150 }, // Reduced bounds for better control
-    // Add debugging options
-    onDragStart: (state: any) => console.log('Drag started:', state),
-    onDrag: (state: any) => console.log('Dragging:', state),
-    onDragEnd: (state: any) => console.log('Drag ended:', state)
+    // Remove debugging for production performance
   })
 
   const handleSwipeUp = async () => {
@@ -478,7 +469,6 @@ const TippingInterface: React.FC = () => {
     }
 
     if (!isPaymentSetup) {
-      console.log('No payment method setup, showing payment modal')
       setShowPaymentModal(true)
       toast.info('Please set up a payment method first')
       return
@@ -488,46 +478,29 @@ const TippingInterface: React.FC = () => {
     setIsAnimating(true)
     setFlyingCurrency(true)
     
-    // Play cash register sound immediately
+    // Increment total immediately for better UX
+    setTotalTipped(prev => prev + currentAmount)
+
+    // Play cash register sound (non-blocking)
     if (audioRef.current) {
       try {
         if (audioContextRef.current && audioContextRef.current.state === 'suspended') {
-          await audioContextRef.current.resume()
+          audioContextRef.current.resume().catch(() => {}) // Fire and forget
         }
         
         audioRef.current.currentTime = 0
         audioRef.current.volume = 1
         audioRef.current.playbackRate = 1
         
-        const playPromise = audioRef.current.play()
-        if (playPromise !== undefined) {
-          await playPromise
-          console.log('Cash register sound played successfully')
-        }
+        // Play audio without blocking
+        audioRef.current.play().catch(() => {})
       } catch (error) {
-        console.log('Audio play failed:', error)
-        if (!audioEnabled) {
-          await enableAudio()
-          try {
-            audioRef.current.currentTime = 0
-            const retryPromise = audioRef.current.play()
-            if (retryPromise !== undefined) {
-              await retryPromise
-              console.log('Cash register sound played on retry')
-            }
-          } catch (retryError) {
-            console.log('Audio retry failed:', retryError)
-          }
-        }
+        // Audio errors won't block the tip submission
       }
     }
-    
-    // Increment total immediately for better UX
-    setTotalTipped(prev => prev + currentAmount)
 
     // STORE TIP IMMEDIATELY - This is the core functionality
     try {
-      console.log('Submitting tip immediately...')
       const response = await apiService.submitTip({
         deviceId: deviceInfo.uuid,
         userId: userId,
@@ -537,7 +510,6 @@ const TippingInterface: React.FC = () => {
       })
 
       if (response.data) {
-        console.log('Tip stored successfully:', response.data)
         toast.success(`$${currentAmount} tip submitted!`)
         
         // If a song was selected, create the song request entry (non-blocking)
@@ -554,57 +526,28 @@ const TippingInterface: React.FC = () => {
               requestorName: selectedSong.requestorName,
               note: selectedSong.note
             })
-          })
-          .then(songRequestResponse => {
-            if (songRequestResponse.ok) {
-              console.log('Song request created successfully')
-            } else {
-              console.error('Failed to create song request')
-            }
-          })
-          .catch(error => {
-            console.error('Song request error:', error)
-          })
+          }).catch(() => {}) // Ignore errors for non-blocking operations
         }
       } else {
-        console.error('Failed to store tip:', response.error)
         toast.error('Failed to submit tip. Please try again.')
       }
     } catch (error) {
-      console.error('Tip submission error:', error)
       toast.error('Failed to submit tip. Please try again.')
     }
 
     // AWS IoT STATUS CHECKS - COMPLETELY NON-BLOCKING (fire and forget)
     // These run in the background and don't affect the user experience
     setTimeout(() => {
-      console.log('=== BACKGROUND AWS IoT STATUS CHECK ===')
-      
       // Manual connection test (non-blocking)
       fetch('https://uhxejjh8s1.execute-api.us-east-1.amazonaws.com/dev/api/tips/test-mqtt-connect', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' }
-      })
-      .then(r => r.json())
-      .then(testResult => {
-        console.log('Background MQTT test result:', testResult.success ? 'Connected' : 'Failed')
-      })
-      .catch(testError => {
-        console.log('Background MQTT test failed:', testError)
-      })
+      }).catch(() => {}) // Ignore errors for non-blocking operations
       
       // Regular status check (non-blocking)
-      apiService.getAwsIotStatus().then(awsIotStatus => {
-        if (awsIotStatus.data?.isConnected) {
-          console.log('✅ Background: AWS IoT is connected')
-        } else {
-          console.log('❌ Background: AWS IoT is not connected')
-        }
-      }).catch(error => {
-        console.log('Background AWS IoT status check failed:', error)
-      })
+      apiService.getAwsIotStatus().catch(() => {}) // Ignore errors for non-blocking operations
 
-      // Log MQTT payload (non-blocking)
+      // MQTT payload logging (non-blocking)
       const mqttPayload = {
         target_uuid: deviceInfo.uuid,
         action: "flash",
@@ -613,7 +556,7 @@ const TippingInterface: React.FC = () => {
         intensity: "medium",
         amount: currentAmount
       }
-      console.log('Background MQTT payload:', mqttPayload)
+      // Log payload without blocking
     }, 100) // Small delay to ensure tip submission completes first
 
     // Reset animation state after a short delay
@@ -758,8 +701,8 @@ const TippingInterface: React.FC = () => {
             </motion.div>
           )}
 
-          {/* Test buttons for debugging swipe functionality */}
-          <div className="mt-4 flex gap-2 justify-center">
+          {/* Test buttons removed for production */}
+          {/* <div className="mt-4 flex gap-2 justify-center">
             <button
               onClick={() => {
                 const prevIndex = currentIndex === 0 ? denominations.length - 1 : currentIndex - 1
@@ -788,11 +731,11 @@ const TippingInterface: React.FC = () => {
                   console.log('Cannot test swipe up:', { isAnimating, checkingPaymentMethods, isPaymentSetup })
                 }
               }}
-              className="px-3 py-1 bg-purple-500 text-white text-xs rounded-full hover:bg-purple-600 transition-colors"
+              className="px-3 py-1 bg-purple-500 text-white text-xs rounded-full hover:bg-blue-600 transition-colors"
             >
               Test Up
             </button>
-          </div>
+          </div> */}
 
           {/* Debug button for testing AWS IoT - Hidden for production but available for troubleshooting */}
           {/* <button
@@ -825,27 +768,30 @@ const TippingInterface: React.FC = () => {
         margin: 0,
         padding: 0
       }}>
-        <animated.div
-          ref={currencyRef}
-          {...bind()}
-          onTouchStart={handleTouchStart}
-          onTouchMove={handleTouchMove}
-          onTouchEnd={handleTouchEnd}
-          style={{
-            ...springs,
-            width: '100%',
-            height: '100%',
-            cursor: 'grab',
-            userSelect: 'none',
-            WebkitUserSelect: 'none',
-            touchAction: 'manipulation', // Optimized for mobile touch gestures
-            position: 'relative',
-            zIndex: 5,
-            WebkitTouchCallout: 'none', // Prevent callout on iOS
-            WebkitTapHighlightColor: 'transparent' // Remove tap highlight
-          }}
-          className="relative w-full h-full touch-manipulation"
-        >
+                  <animated.div
+            ref={currencyRef}
+            {...bind()}
+            onTouchStart={handleTouchStart}
+            onTouchMove={handleTouchMove}
+            onTouchEnd={handleTouchEnd}
+            style={{
+              ...springs,
+              width: '100%',
+              height: '100%',
+              cursor: 'grab',
+              userSelect: 'none',
+              WebkitUserSelect: 'none',
+              touchAction: 'manipulation', // Optimized for mobile touch gestures
+              position: 'relative',
+              zIndex: 5,
+              WebkitTouchCallout: 'none', // Prevent callout on iOS
+              WebkitTapHighlightColor: 'transparent', // Remove tap highlight
+              willChange: 'transform', // Optimize for animations
+              transform: 'translateZ(0)', // Force hardware acceleration
+              backfaceVisibility: 'hidden' // Prevent flickering
+            }}
+            className="relative w-full h-full touch-manipulation"
+          >
           <AnimatePresence>
                           <motion.div
                 key={currentAmount}
