@@ -895,6 +895,47 @@ const TippingInterface: React.FC = () => {
                 </motion.div>
               )}
 
+              {/* New Currency Sliding In from Bottom for Swipe-Up */}
+              {flyingCurrency && (
+                <motion.img
+                  src={getCurrencyImage(currentAmount)}
+                  alt={`$${currentAmount} bill`}
+                  className="absolute inset-0 w-full h-full object-cover min-w-full min-h-full"
+                  style={{ 
+                    width: '100vw', 
+                    height: '100vh',
+                    minHeight: '-webkit-fill-available',
+                    objectFit: 'cover',
+                    objectPosition: 'center',
+                    margin: 0,
+                    padding: 0,
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0
+                  }}
+                  draggable={false}
+                  initial={{ 
+                    y: 1000, // Start from below the screen
+                    scale: 0.8,
+                    opacity: 0,
+                    rotate: 0
+                  }}
+                  animate={{ 
+                    y: 0, // Slide to center
+                    scale: 1,
+                    opacity: 1,
+                    rotate: 0
+                  }}
+                  transition={{ 
+                    duration: 0.4, // Smooth slide-in duration
+                    ease: "easeOut",
+                    delay: 0.6 // Start sliding in when mist dispersion is almost complete
+                  }}
+                />
+              )}
+
               {/* New Currency Sliding In for Left/Right Swipes */}
               {(isSlidingLeft || isSlidingRight) && (
                 <motion.img
