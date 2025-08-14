@@ -547,16 +547,8 @@ const TippingInterface: React.FC = () => {
       // Regular status check (non-blocking)
       apiService.getAwsIotStatus().catch(() => {}) // Ignore errors for non-blocking operations
 
-      // MQTT payload logging (non-blocking)
-      const mqttPayload = {
-        target_uuid: deviceInfo.uuid,
-        action: "flash",
-        duration: 1,
-        sound: true,
-        intensity: "medium",
-        amount: currentAmount
-      }
-      // Log payload without blocking
+      // MQTT payload could be sent here if needed in the future
+      // For now, keeping it simple to avoid unused variable errors
     }, 100) // Small delay to ensure tip submission completes first
 
     // Reset animation state after a short delay
