@@ -45,6 +45,9 @@ const TippingInterface: React.FC = () => {
   const [isSlidingRight, setIsSlidingRight] = useState(false)
   const [slideDirection, setSlideDirection] = useState<'left' | 'right' | null>(null)
   
+  // Separate state for when currency is ready for new swipes
+  const [isCurrencyReady, setIsCurrencyReady] = useState(true)
+  
   // Song request state
   const [showSongSearch, setShowSongSearch] = useState(false)
   const [selectedSong, setSelectedSong] = useState<{id: string, title: string, artist: string, requestorName?: string, note?: string} | null>(null)
@@ -386,11 +389,8 @@ const TippingInterface: React.FC = () => {
         
         // Vertical swipe up detection
         if (deltaY < -minSwipeDistance && Math.abs(deltaY) > Math.abs(deltaX)) {
-          console.log('Manual swipe up detected')
-          if (!isAnimating && !checkingPaymentMethods && isPaymentSetup) {
+          if (!isAnimating && !checkingPaymentMethods && isPaymentSetup && isCurrencyReady) {
             handleSwipeUp()
-          } else {
-            console.log('Cannot process swipe up:', { isAnimating, checkingPaymentMethods, isPaymentSetup })
           }
         }
       }
@@ -453,7 +453,7 @@ const TippingInterface: React.FC = () => {
     
     // Vertical swipe up - submit tip
     if (yDir < 0 && Math.abs(oy) > 60) { // Reduced threshold for better mobile responsiveness
-      if (!isAnimating && !checkingPaymentMethods) {
+      if (!isAnimating && !checkingPaymentMethods && isCurrencyReady) {
         // Check if payment method is set up before allowing tip submission
         if (!isPaymentSetup) {
           setShowPaymentModal(true)
@@ -494,6 +494,7 @@ const TippingInterface: React.FC = () => {
     // IMMEDIATE FEEDBACK - Don't block the UI
     setIsAnimating(true)
     setFlyingCurrency(true)
+    setIsCurrencyReady(false) // Currency is not ready for new swipes until animation completes
     
     // Increment total immediately for better UX
     setTotalTipped(prev => prev + currentAmount)
@@ -932,6 +933,10 @@ const TippingInterface: React.FC = () => {
                     duration: 0.4, // Smooth slide-in duration
                     ease: "easeOut",
                     delay: 0.6 // Start sliding in when mist dispersion is almost complete
+                  }}
+                  onAnimationComplete={() => {
+                    // Currency is ready for new swipes as soon as slide-in completes
+                    setIsCurrencyReady(true)
                   }}
                 />
               )}
