@@ -321,6 +321,44 @@ class ApiService {
       body: JSON.stringify({ isAllowSongRequest })
     })
   }
+
+  // Password reset endpoints (public - no API key required)
+  async forgotPassword(email: string): Promise<ApiResponse<any>> {
+    return this.request('/api/auth/forgot-password', {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+    }, false) // No API key required for password reset
+  }
+
+  async validateResetCode(email: string, code: string): Promise<ApiResponse<any>> {
+    return this.request('/api/auth/validate-reset-code', {
+      method: 'POST',
+      body: JSON.stringify({ email, code }),
+    }, false) // No API key required for password reset
+  }
+
+  // Onboarding email verification endpoint
+  async sendOnboardingVerification(email: string): Promise<ApiResponse<any>> {
+    return this.request('/api/auth/onboarding-verification', {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+    }, false) // No API key required for onboarding verification
+  }
+
+  // Onboarding code validation endpoint
+  async validateOnboardingCode(email: string, code: string): Promise<ApiResponse<any>> {
+    return this.request('/api/auth/validate-onboarding-code', {
+      method: 'POST',
+      body: JSON.stringify({ email, code }),
+    }, false) // No API key required for onboarding verification
+  }
+
+  async resetPassword(email: string, code: string, newPassword: string): Promise<ApiResponse<any>> {
+    return this.request('/api/auth/reset-password', {
+      method: 'POST',
+      body: JSON.stringify({ email, code, newPassword }),
+    }, false) // No API key required for password reset
+  }
 }
 
 export const apiService = new ApiService()

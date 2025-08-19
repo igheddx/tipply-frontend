@@ -24,6 +24,8 @@ const Onboarding: React.FC = () => {
   const [apiKeyGenerated, setApiKeyGenerated] = useState(false)
   const [isValidatingDevice, setIsValidatingDevice] = useState(false)
   const [deviceValidationComplete, setDeviceValidationComplete] = useState(false)
+  const [verificationCode, setVerificationCode] = useState('')
+  const [verificationSent, setVerificationSent] = useState(false)
   const navigate = useNavigate()
 
   // Generate API key on component mount
@@ -56,20 +58,27 @@ const Onboarding: React.FC = () => {
     },
     {
       id: 3,
+      title: 'Email Verification',
+      subtitle: 'Verify your email address',
+      icon: '📧',
+      description: 'Enter the verification code sent to your email'
+    },
+    {
+      id: 4,
       title: 'Device Setup',
       subtitle: 'Register your Tipply device',
       icon: '📱',
       description: 'Device ID and nickname'
     },
     {
-      id: 4,
+      id: 5,
       title: 'KYC Verification',
       subtitle: 'Identity verification with Stripe',
       icon: '🔐',
       description: 'Security & compliance'
     },
     {
-      id: 5,
+      id: 6,
       title: 'Complete Setup',
       subtitle: 'Finish onboarding',
       icon: '✅',
@@ -100,6 +109,54 @@ const Onboarding: React.FC = () => {
       return 'Passwords do not match'
     }
     return null
+  }
+
+  const sendVerificationCode = async () => {
+    if (!formData.email.trim()) {
+      setErrors(prev => ({ ...prev, email: 'Email is required to send verification code' }))
+      return false
+    }
+    
+    try {
+      setIsLoading(true)
+      const result = await apiService.sendOnboardingVerification(formData.email)
+      
+      if (result.error) {
+        setErrors(prev => ({ ...prev, email: result.error || 'Failed to send verification code' }))
+        return false
+      }
+      
+      setVerificationSent(true)
+      return true
+    } catch (err) {
+      setErrors(prev => ({ ...prev, email: 'Failed to send verification code. Please try again.' }))
+      return false
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const verifyEmail = async () => {
+    if (!verificationCode.trim()) {
+      setErrors(prev => ({ ...prev, verificationCode: 'Verification code is required' }))
+      return false
+    }
+    
+        try {
+      const result = await apiService.validateOnboardingCode(formData.email, verificationCode)
+      
+      if (result.error) {
+        setErrors(prev => ({ ...prev, verificationCode: result.error || 'Failed to verify code' }))
+        return false
+      }
+      
+      // Clear verification errors
+      setErrors(prev => ({ ...prev, verificationCode: '' }))
+      return true
+    } catch (err) {
+      setErrors(prev => ({ ...prev, verificationCode: 'Failed to verify code. Please try again.' }))
+      return false
+    }
   }
 
 
@@ -201,7 +258,7 @@ const Onboarding: React.FC = () => {
   }
 
   const handleNext = async () => {
-    if (step < 5) {
+    if (step < 6) {
       if (step === 1) {
         // Validate step 1
         if (!validateStep1()) {
@@ -221,6 +278,24 @@ const Onboarding: React.FC = () => {
         await createProfile()
         setStep(step + 1)
       } else if (step === 3) {
+        // Verify email before proceeding
+        if (!verificationSent) {
+          // First time on this step, send verification code
+          const sent = await sendVerificationCode()
+          if (!sent) {
+            return
+          }
+          return // Don't advance, wait for user to enter code
+        }
+        
+        // Verify the entered code
+        const verified = await verifyEmail()
+        if (!verified) {
+          return
+        }
+        
+        setStep(step + 1)
+      } else if (step === 4) {
         // Register device using the created profile
         if (!deviceValidationComplete || !!errors.serialNumber) {
           // Re-validate if not already validated
@@ -247,7 +322,7 @@ const Onboarding: React.FC = () => {
         
         await registerDevice()
         setStep(step + 1)
-      } else if (step === 4) {
+      } else if (step === 5) {
         // Start KYC process - this will redirect to Stripe
         await startKYC()
         // Don't advance step here - startKYC will redirect to Stripe
@@ -733,6 +808,91 @@ Please use a different serial number or contact support if this is your device.`
   const renderStep3 = () => (
     <div className="space-y-8">
       <div className="text-center">
+        <div className="text-6xl mb-4">📧</div>
+        <h3 className="text-2xl font-bold text-gray-900 mb-2">Verify Your Email</h3>
+        <p className="text-gray-600">We've sent a verification code to your email address</p>
+      </div>
+      
+      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-6">
+        <div className="flex items-start space-x-4">
+          <div className="flex-shrink-0">
+            <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+              <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 4.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+              </svg>
+            </div>
+          </div>
+          <div className="flex-1">
+            <h4 className="text-lg font-semibold text-blue-900 mb-2">
+              Check Your Email
+            </h4>
+            <p className="text-blue-700 mb-4">
+              We've sent a 6-digit verification code to <strong>{formData.email}</strong>. 
+              Please check your inbox and enter the code below.
+            </p>
+            <div className="space-y-3">
+              <div className="flex items-center space-x-3">
+                <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                <span className="text-blue-800">Check your email inbox (and spam folder)</span>
+              </div>
+              <div className="flex items-center space-x-3">
+                <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                <span className="text-blue-800">Enter the 6-digit code below</span>
+              </div>
+              <div className="flex items-center space-x-3">
+                <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                <span className="text-blue-800">Code expires in 5 minutes</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <div className="space-y-6">
+        <div className="space-y-2">
+          <label htmlFor="verificationCode" className="block text-sm font-semibold text-gray-700">
+            Verification Code *
+          </label>
+          <input
+            type="text"
+            id="verificationCode"
+            name="verificationCode"
+            required
+            maxLength={6}
+            className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all duration-200 text-center text-2xl font-mono tracking-widest ${
+              errors.verificationCode ? 'border-red-500 focus:ring-red-200' : 'border-gray-300'
+            }`}
+            placeholder="000000"
+            value={verificationCode}
+            onChange={(e) => {
+              setVerificationCode(e.target.value.replace(/\D/g, ''))
+              setErrors(prev => ({ ...prev, verificationCode: '' }))
+            }}
+          />
+          {errors.verificationCode && <p className="text-red-500 text-xs mt-1">{errors.verificationCode}</p>}
+          <p className="text-sm text-gray-500">Enter the 6-digit code from your email</p>
+        </div>
+        
+        <div className="flex items-center justify-between">
+          <button
+            type="button"
+            onClick={sendVerificationCode}
+            disabled={isLoading}
+            className="text-primary-600 hover:text-primary-700 font-medium transition-colors duration-200 disabled:opacity-50"
+          >
+            {isLoading ? 'Sending...' : 'Resend Code'}
+          </button>
+          <p className="text-sm text-gray-500">
+            Didn't receive the code? Check your spam folder
+          </p>
+        </div>
+      </div>
+    </div>
+  )
+
+  const renderStep4 = () => (
+    <div className="space-y-8">
+      <div className="text-center">
         <div className="text-6xl mb-4">📱</div>
         <h3 className="text-2xl font-bold text-gray-900 mb-2">Device Registration</h3>
         <p className="text-gray-600">Register your Tipply device to start accepting tips</p>
@@ -868,7 +1028,7 @@ Please use a different serial number or contact support if this is your device.`
     </div>
   )
 
-  const renderStep4 = () => (
+  const renderStep5 = () => (
     <div className="space-y-8">
       <div className="text-center">
         <div className="text-6xl mb-4">🔐</div>
@@ -947,7 +1107,7 @@ Please use a different serial number or contact support if this is your device.`
     </div>
   )
 
-  const renderStep5 = () => (
+  const renderStep6 = () => (
     <div className="space-y-8">
       <div className="text-center">
         <div className="text-6xl mb-4">✅</div>
@@ -1024,6 +1184,8 @@ Please use a different serial number or contact support if this is your device.`
         return renderStep4()
       case 5:
         return renderStep5()
+      case 6:
+        return renderStep6()
       default:
         return renderStep1()
     }
@@ -1105,12 +1267,12 @@ Please use a different serial number or contact support if this is your device.`
               <div className="mt-6">
                 <div className="flex justify-between text-xs text-gray-500 mb-2">
                   <span>Progress</span>
-                  <span>{Math.round((step / 5) * 100)}%</span>
+                  <span>{Math.round((step / 6) * 100)}%</span>
                 </div>
                 <div className="w-full bg-gray-200 rounded-full h-2">
                   <div 
                     className="bg-gradient-to-r from-primary-500 to-primary-600 h-2 rounded-full transition-all duration-500"
-                    style={{ width: `${(step / 5) * 100}%` }}
+                    style={{ width: `${(step / 6) * 100}%` }}
                   ></div>
                 </div>
               </div>
@@ -1162,7 +1324,7 @@ Please use a different serial number or contact support if this is your device.`
                     </div>
                   ) : step === 5 ? (
                     'Go to Dashboard'
-                  ) : step === 4 ? (
+                  ) : step === 5 ? (
                     'Start KYC Process'
                   ) : (
                     'Continue'

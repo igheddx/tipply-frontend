@@ -8,9 +8,10 @@ const Login: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
   const [showKycSuccess, setShowKycSuccess] = useState(false)
+  const [passwordResetMessage, setPasswordResetMessage] = useState('')
   const navigate = useNavigate()
 
-  // Check for KYC completion on component mount
+  // Check for KYC completion and password reset on component mount
   React.useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search)
     const kycCompleted = urlParams.get('kyc_completed')
@@ -19,6 +20,21 @@ const Login: React.FC = () => {
       setShowKycSuccess(true)
       // Clear the URL parameter
       window.history.replaceState({}, document.title, window.location.pathname)
+    }
+
+    // Check for password reset message from navigation state
+    const location = window.location as any
+    if (location.state?.message) {
+      setPasswordResetMessage(location.state.message)
+      // Clear the navigation state
+      window.history.replaceState({}, document.title, window.location.pathname)
+    }
+    
+    // Also check for message in sessionStorage as fallback
+    const storedMessage = sessionStorage.getItem('password_reset_message')
+    if (storedMessage) {
+      setPasswordResetMessage(storedMessage)
+      sessionStorage.removeItem('password_reset_message')
     }
   }, [])
 
@@ -92,6 +108,28 @@ const Login: React.FC = () => {
           </div>
         )}
 
+        {/* Password Reset Success Message */}
+        {passwordResetMessage && (
+          <div className="mb-8 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-2xl p-6">
+            <div className="text-center">
+              <div className="mx-auto w-16 h-16 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-full flex items-center justify-center mb-4">
+                <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+              </div>
+              <h3 className="text-xl font-bold text-blue-800 mb-2">
+                🔐 Password Reset Complete!
+              </h3>
+              <p className="text-blue-700 mb-3">
+                Your password has been successfully reset.
+              </p>
+              <p className="text-blue-600 text-sm">
+                Please sign in below with your new password.
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* Logo and Header */}
         <div className="text-center mb-8">
           <div className="mx-auto w-32 h-32 overflow-visible rounded-2xl mb-4">
@@ -159,6 +197,17 @@ const Login: React.FC = () => {
                   onChange={(e) => setPassword(e.target.value)}
                 />
               </div>
+            </div>
+
+            {/* Forgot Password Link */}
+            <div className="flex justify-end">
+              <button
+                type="button"
+                onClick={() => navigate('/forgot-password')}
+                className="text-sm text-primary-600 hover:text-primary-700 font-medium transition-colors duration-200"
+              >
+                Forgot your password?
+              </button>
             </div>
 
             {error && (
