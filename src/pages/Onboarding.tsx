@@ -112,23 +112,32 @@ const Onboarding: React.FC = () => {
   }
 
   const sendVerificationCode = async () => {
+    console.log('sendVerificationCode called with email:', formData.email)
+    
     if (!formData.email.trim()) {
+      console.log('sendVerificationCode: Email is empty')
       setErrors(prev => ({ ...prev, email: 'Email is required to send verification code' }))
       return false
     }
     
     try {
       setIsLoading(true)
+      console.log('sendVerificationCode: Calling API...')
       const result = await apiService.sendOnboardingVerification(formData.email)
+      console.log('sendVerificationCode: API result:', result)
       
       if (result.error) {
+        console.log('sendVerificationCode: API returned error:', result.error)
         setErrors(prev => ({ ...prev, email: result.error || 'Failed to send verification code' }))
         return false
       }
       
+      console.log('sendVerificationCode: Setting verificationSent to true')
       setVerificationSent(true)
+      console.log('sendVerificationCode: verificationSent is now:', true)
       return true
     } catch (err) {
+      console.log('sendVerificationCode: Exception occurred:', err)
       setErrors(prev => ({ ...prev, email: 'Failed to send verification code. Please try again.' }))
       return false
     } finally {
@@ -275,25 +284,38 @@ const Onboarding: React.FC = () => {
           return
         }
         setErrors(prev => ({ ...prev, password: '', confirmPassword: '' }))
+        
+        // Create profile and send verification code
         await createProfile()
+        
+        // Send verification code immediately after profile creation
+        console.log('Step 2: Profile created, sending verification code...')
+        const sent = await sendVerificationCode()
+        if (!sent) {
+          console.log('Step 2: Failed to send verification code')
+          return
+        }
+        console.log('Step 2: Verification code sent successfully, advancing to step 3')
         setStep(step + 1)
       } else if (step === 3) {
-        // Verify email before proceeding
-        if (!verificationSent) {
-          // First time on this step, send verification code
-          const sent = await sendVerificationCode()
-          if (!sent) {
-            return
-          }
-          return // Don't advance, wait for user to enter code
-        }
+        // Verify email code (verification code already sent in step 2)
+        console.log('Step 3: verificationSent =', verificationSent, 'verificationCode =', verificationCode)
         
-        // Verify the entered code
-        const verified = await verifyEmail()
-        if (!verified) {
+        if (!verificationCode.trim()) {
+          console.log('Step 3: No verification code entered')
+          setErrors(prev => ({ ...prev, verificationCode: 'Please enter the verification code sent to your email' }))
           return
         }
         
+        // Verify the entered code
+        console.log('Step 3: Verifying email code...')
+        const verified = await verifyEmail()
+        if (!verified) {
+          console.log('Step 3: Failed to verify email code')
+          return
+        }
+        
+        console.log('Step 3: Email verified successfully, advancing to next step')
         setStep(step + 1)
       } else if (step === 4) {
         // Register device using the created profile
@@ -1314,7 +1336,10 @@ Please use a different serial number or contact support if this is your device.`
                 <button
                   type="button"
                   onClick={handleNext}
-                  disabled={isLoading || (step === 3 && (isValidatingDevice || !deviceValidationComplete || !!errors.serialNumber))}
+                  disabled={isLoading || 
+                    (step === 3 && (!verificationCode.trim() || !!errors.verificationCode)) ||
+                    (step === 4 && (isValidatingDevice || !deviceValidationComplete || !!errors.serialNumber))
+                  }
                   className="px-8 py-3 bg-gradient-to-r from-primary-600 to-primary-700 text-white font-medium rounded-lg hover:from-primary-700 hover:to-primary-800 focus:ring-4 focus:ring-primary-200 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {isLoading ? (

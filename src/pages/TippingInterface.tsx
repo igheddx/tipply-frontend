@@ -683,33 +683,7 @@ const TippingInterface: React.FC = () => {
             </motion.div>
           )}
 
-          {/* Payment Setup Required Indicator */}
-          {!checkingPaymentMethods && !isPaymentSetup && (
-            <motion.div
-              initial={{ opacity: 0, y: -10 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="mt-2 bg-orange-600/90 backdrop-blur-sm rounded-lg px-3 py-1 mx-auto inline-block"
-            >
-              <span className="text-white text-sm font-medium">
-                💳 Payment method required
-              </span>
-            </motion.div>
-          )}
 
-          {/* Payment Setup Instructions */}
-          {!checkingPaymentMethods && !isPaymentSetup && (
-            <motion.div
-              initial={{ opacity: 0, y: -10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.2 }}
-              className="mt-2 bg-white/90 backdrop-blur-sm rounded-lg px-3 py-2 mx-auto inline-block max-w-xs cursor-pointer hover:bg-white/95 transition-colors"
-              onClick={() => setShowPaymentModal(true)}
-            >
-              <p className="text-gray-800 text-xs text-center leading-relaxed">
-                Tap here to set up your payment method and start tipping!
-              </p>
-            </motion.div>
-          )}
 
           {/* Test buttons removed for production */}
           {/* <div className="mt-4 flex gap-2 justify-center">

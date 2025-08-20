@@ -874,8 +874,13 @@ const Dashboard: React.FC = () => {
                     <button
                       onClick={() => {
                         setActiveTab('songs')
-                        // Scroll to top after tab change
-                        window.scrollTo({ top: 0, behavior: 'smooth' })
+                        // Scroll to songs section after tab change
+                        setTimeout(() => {
+                          const songsSection = document.getElementById('songs-section')
+                          if (songsSection) {
+                            songsSection.scrollIntoView({ behavior: 'smooth', block: 'start' })
+                          }
+                        }, 100) // Small delay to ensure tab change completes
                       }}
                       className="mt-2 text-blue-800 hover:text-blue-900 font-medium underline"
                     >
@@ -1653,7 +1658,7 @@ const Dashboard: React.FC = () => {
             )}
 
             {activeTab === 'songs' && (
-              <div className="space-y-6">
+              <div id="songs-section" className="space-y-6">
                 <SongManagement profileId={userProfile?.id} />
               </div>
             )}
