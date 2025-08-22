@@ -359,6 +359,29 @@ class ApiService {
       body: JSON.stringify({ email, code, newPassword }),
     }, false) // No API key required for password reset
   }
+
+  // Generic HTTP methods for admin endpoints
+  async get(endpoint: string): Promise<ApiResponse<any>> {
+    return this.request(endpoint, { method: 'GET' })
+  }
+
+  async post(endpoint: string, data?: any): Promise<ApiResponse<any>> {
+    return this.request(endpoint, {
+      method: 'POST',
+      body: data ? JSON.stringify(data) : undefined,
+    })
+  }
+
+  async put(endpoint: string, data?: any): Promise<ApiResponse<any>> {
+    return this.request(endpoint, {
+      method: 'PUT',
+      body: data ? JSON.stringify(data) : undefined,
+    })
+  }
+
+  async delete(endpoint: string): Promise<ApiResponse<any>> {
+    return this.request(endpoint, { method: 'DELETE' })
+  }
 }
 
 export const apiService = new ApiService()

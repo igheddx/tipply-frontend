@@ -3,6 +3,7 @@ import { Toaster } from 'sonner'
 import Login from './pages/Login'
 import ForgotPassword from './pages/ForgotPassword'
 import Dashboard from './pages/Dashboard'
+import AdminDashboard from './pages/AdminDashboard'
 import Profile from './pages/Profile'
 import DeviceRegistration from './pages/DeviceRegistration'
 import ManageDevices from './pages/ManageDevices'
@@ -12,6 +13,7 @@ import KYCReturn from './pages/KYCReturn'
 import StripeStatus from './pages/StripeStatus'
 import Onboarding from './pages/Onboarding'
 import NotFound from './pages/NotFound'
+import ProtectedRoute from './components/ProtectedRoute'
 
 function App() {
   return (
@@ -21,10 +23,11 @@ function App() {
         <Route path="/login" element={<Login />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/onboarding" element={<Onboarding />} />
-        <Route path="/dashboard" element={<Dashboard />} />
-        <Route path="/profile" element={<Profile />} />
-        <Route path="/add-device" element={<DeviceRegistration />} />
-        <Route path="/manage-devices" element={<ManageDevices />} />
+        <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+        <Route path="/admin" element={<ProtectedRoute requiredRole="root_admin"><AdminDashboard /></ProtectedRoute>} />
+        <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+        <Route path="/add-device" element={<ProtectedRoute><DeviceRegistration /></ProtectedRoute>} />
+        <Route path="/manage-devices" element={<ProtectedRoute><ManageDevices /></ProtectedRoute>} />
         <Route path="/tip/:deviceId" element={<TippingInterface />} />
         <Route path="/stripe-return" element={<StripeReturn />} />
         <Route path="/kyc-return" element={<KYCReturn />} />

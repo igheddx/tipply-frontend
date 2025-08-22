@@ -67,8 +67,12 @@ const Login: React.FC = () => {
           console.log('KYC result moved to localStorage for dashboard display')
         }
         
-        // Navigate to dashboard
-        navigate('/dashboard')
+        // Check if user is admin and redirect accordingly
+        if (result.data?.user?.role === 'root_admin') {
+          navigate('/admin')
+        } else {
+          navigate('/dashboard')
+        }
       } else {
         setError('Login failed. Please try again.')
       }
