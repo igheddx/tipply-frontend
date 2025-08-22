@@ -12,11 +12,13 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@ant-design/icons": "^6.0.0",
     "@react-spring/web": "^10.0.1",
     "@stripe/react-stripe-js": "^2.4.0",
     "@stripe/stripe-js": "^2.4.0",
     "@types/crypto-js": "^4.2.2",
     "@use-gesture/react": "^10.3.1",
+    "antd": "^5.27.1",
     "crypto-js": "^4.2.0",
     "framer-motion": "^12.23.6",
     "react": "^18.2.0",
