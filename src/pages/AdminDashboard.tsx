@@ -251,10 +251,22 @@ const AdminDashboard: React.FC = () => {
         {/* Header */}
         <div className="mb-8">
           <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900 mb-2">Admin Dashboard</h1>
-              <p className="text-gray-600">System overview and performer management</p>
+            {/* Left side - Logo and Title */}
+            <div className="flex items-center space-x-6">
+              <div className="relative w-24 h-24 overflow-visible rounded-lg">
+                <img
+                  src="/images/tipply_logo.png"
+                  alt="Tipply Logo"
+                  className="w-full h-full object-contain"
+                  style={{ transform: 'scale(1.2)', objectPosition: 'center' }}
+                />
+              </div>
+              <div>
+                <h1 className="text-3xl font-bold text-gray-900 mb-2">Admin Dashboard</h1>
+                <p className="text-gray-600">System overview and performer management</p>
+              </div>
             </div>
+            {/* Right side - Buttons */}
             <div className="flex items-center space-x-3">
               <Button 
                 icon={<ArrowLeftOutlined />}

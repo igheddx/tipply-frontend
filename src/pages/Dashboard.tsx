@@ -131,6 +131,12 @@ const Dashboard: React.FC = () => {
     }
   }, [activeTab, userProfile?.id])
 
+  // Debug logging for admin button visibility
+  useEffect(() => {
+    console.log('🔍 [DEBUG] userProfile:', userProfile)
+    console.log('🔍 [DEBUG] userProfile?.role:', userProfile?.role)
+  }, [userProfile])
+
   const fetchUserProfile = async () => {
     try {
       const response = await apiService.getProfile()
@@ -819,8 +825,6 @@ const Dashboard: React.FC = () => {
               )}
 
               {/* Admin Dashboard Button */}
-              {console.log('🔍 [DEBUG] userProfile:', userProfile)}
-              {console.log('🔍 [DEBUG] userProfile?.role:', userProfile?.role)}
               {userProfile?.role === 'root_admin' && (
                 <button
                   onClick={() => navigate('/admin')}
