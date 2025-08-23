@@ -819,6 +819,8 @@ const Dashboard: React.FC = () => {
               )}
 
               {/* Admin Dashboard Button */}
+              {console.log('🔍 [DEBUG] userProfile:', userProfile)}
+              {console.log('🔍 [DEBUG] userProfile?.role:', userProfile?.role)}
               {userProfile?.role === 'root_admin' && (
                 <button
                   onClick={() => navigate('/admin')}
