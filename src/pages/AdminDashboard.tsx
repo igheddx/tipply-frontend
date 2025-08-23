@@ -255,13 +255,26 @@ const AdminDashboard: React.FC = () => {
               <h1 className="text-3xl font-bold text-gray-900 mb-2">Admin Dashboard</h1>
               <p className="text-gray-600">System overview and performer management</p>
             </div>
-            <Button 
-              icon={<ArrowLeftOutlined />}
-              onClick={() => navigate('/dashboard')}
-              className="flex items-center"
-            >
-              Back to Dashboard
-            </Button>
+            <div className="flex items-center space-x-3">
+              <Button 
+                icon={<ArrowLeftOutlined />}
+                onClick={() => navigate('/dashboard')}
+                className="flex items-center"
+              >
+                Back to Dashboard
+              </Button>
+              <Button 
+                type="default"
+                onClick={() => {
+                  localStorage.removeItem('token');
+                  localStorage.removeItem('refreshToken');
+                  navigate('/login');
+                }}
+                className="flex items-center"
+              >
+                Logout
+              </Button>
+            </div>
           </div>
         </div>
 
