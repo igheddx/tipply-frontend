@@ -139,9 +139,14 @@ const AdminDashboard: React.FC = () => {
 
     try {
       setUpdatingFee(true);
-      await apiService.put(`/admin/performers/${selectedPerformer.id}/platform-fee`, {
+      console.log('🔧 [DEBUG] Updating platform fee for performer:', selectedPerformer.id);
+      console.log('🔧 [DEBUG] New fee percentage:', newFeePercentage);
+      
+      const response = await apiService.put(`/api/admin/performers/${selectedPerformer.id}/platform-fee`, {
         platformFeePercentage: newFeePercentage
       });
+      
+      console.log('🔧 [DEBUG] Update response:', response);
 
       message.success(`Platform fee updated to ${newFeePercentage}%`);
       setUpdateFeeModal(false);
@@ -149,7 +154,9 @@ const AdminDashboard: React.FC = () => {
       setNewFeePercentage(10);
       
       // Reload data to reflect changes
-      loadDashboardData();
+      console.log('🔧 [DEBUG] Reloading dashboard data...');
+      await loadDashboardData();
+      console.log('🔧 [DEBUG] Dashboard data reloaded');
     } catch (error) {
       console.error('Error updating platform fee:', error);
       message.error('Failed to update platform fee');
@@ -262,8 +269,8 @@ const AdminDashboard: React.FC = () => {
     <div className="min-h-screen bg-gray-50 p-6">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
-        <div className="bg-white shadow-sm border-b">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="bg-white shadow-sm border-b w-full">
+          <div className="w-full px-4 sm:px-6 lg:px-8">
             <div className="flex items-center justify-between py-4">
               {/* Left side - Logo */}
               <div className="flex items-center">
