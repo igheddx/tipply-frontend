@@ -266,61 +266,59 @@ const AdminDashboard: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
-      <div className="max-w-7xl mx-auto">
-        {/* Header */}
-        <div className="bg-white shadow-sm border-b w-full">
-          <div className="w-full px-4 sm:px-6 lg:px-8">
-            <div className="flex items-center justify-between py-4">
-              {/* Left side - Logo */}
-              <div className="flex items-center">
-                <div className="relative w-24 h-24 overflow-visible rounded-lg">
-                  <img
-                    src="/images/tipply_logo.png"
-                    alt="Tipply Logo"
-                    className="w-full h-full object-contain"
-                    style={{ transform: 'scale(1.2)', objectPosition: 'center' }}
-                  />
-                </div>
+    <div className="min-h-screen bg-gray-50">
+      {/* Header */}
+      <div className="bg-white shadow-sm border-b">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center py-1">
+            {/* Left side - Logo */}
+            <div className="flex items-center">
+              <div className="relative w-24 h-24 overflow-visible rounded-lg">
+                <img
+                  src="/images/tipply_logo.png"
+                  alt="Tipply Logo"
+                  className="w-full h-full object-contain"
+                  style={{ transform: 'scale(1.2)', objectPosition: 'center' }}
+                />
               </div>
+            </div>
 
-              {/* Right side - Buttons */}
-              <div className="flex items-center space-x-4">
-                <Button 
-                  icon={<ArrowLeftOutlined />}
-                  onClick={() => navigate('/dashboard')}
-                  className="flex items-center"
-                >
-                  Back to Dashboard
-                </Button>
-                <button
-                  onClick={() => {
-                    localStorage.removeItem('token');
-                    localStorage.removeItem('refreshToken');
-                    navigate('/login');
-                  }}
-                  className="p-2 text-gray-500 hover:text-gray-700 transition-colors"
-                  title="Logout"
-                >
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                  </svg>
-                </button>
-              </div>
+            {/* Right side - Buttons */}
+            <div className="flex items-center space-x-4">
+              <Button 
+                icon={<ArrowLeftOutlined />}
+                onClick={() => navigate('/dashboard')}
+                className="flex items-center"
+              >
+                Back to Dashboard
+              </Button>
+              <button
+                onClick={() => {
+                  localStorage.removeItem('token');
+                  localStorage.removeItem('refreshToken');
+                  navigate('/login');
+                }}
+                className="p-2 text-gray-500 hover:text-gray-700 transition-colors"
+                title="Logout"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                </svg>
+              </button>
             </div>
           </div>
         </div>
+      </div>
 
-        {/* Welcome Message - Below header */}
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="mb-8">
-            <h2 className="text-3xl font-bold text-gray-900 mb-2">
-              Admin Dashboard, Welcome {userProfile?.firstName || userProfile?.stageName || 'Admin'}! 👋
-            </h2>
-            <p className="text-gray-600">
-              System overview and performer management
-            </p>
-          </div>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Welcome Message */}
+        <div className="mb-8">
+          <h2 className="text-3xl font-bold text-gray-900 mb-2">
+            Admin Dashboard, Welcome {userProfile?.firstName || userProfile?.stageName || 'Admin'}! 👋
+          </h2>
+          <p className="text-gray-600">
+            System overview and performer management
+          </p>
         </div>
 
         {/* Stats Cards */}
