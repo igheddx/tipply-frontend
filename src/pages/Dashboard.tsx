@@ -472,7 +472,22 @@ const Dashboard: React.FC = () => {
       // Check KYC status
       const isKycVerified = kycStatus === 'verified'
       
-      return { hasStripeAccount: !!hasStripeAccount, isKycVerified }
+      // Also check if user has completed KYC from onboarding flow
+      const kycResult = localStorage.getItem('kyc_result')
+      let hasCompletedKyc = false
+      if (kycResult) {
+        try {
+          const parsed = JSON.parse(kycResult)
+          hasCompletedKyc = parsed.status === 'success'
+        } catch (e) {
+          console.log('Failed to parse KYC result from localStorage')
+        }
+      }
+      
+      // Allow device addition if user has completed KYC (either verified status or successful onboarding)
+      const canAddDevice = isKycVerified || hasCompletedKyc
+      
+      return { hasStripeAccount: !!hasStripeAccount, isKycVerified: canAddDevice }
     } catch (error) {
       console.error('Error checking Stripe status:', error)
       return { hasStripeAccount: false, isKycVerified: false }
@@ -509,7 +524,9 @@ const Dashboard: React.FC = () => {
       // Check user's Stripe/KYC status
       const { hasStripeAccount, isKycVerified } = await checkUserStripeStatus()
       
-      if (!hasStripeAccount || !isKycVerified) {
+      // For users who have completed KYC but don't have devices yet, allow device addition
+      // The device will get its own Stripe Connect account during the process
+      if (!isKycVerified) {
         // User needs to complete Stripe setup first
         setShowStripeSetup(true)
         return
