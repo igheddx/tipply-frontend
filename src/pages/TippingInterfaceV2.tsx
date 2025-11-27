@@ -22,7 +22,7 @@ interface PaymentMethodsCheckResult {
   paymentMethodType?: string
 }
 
-const TippingInterface: React.FC = () => {
+const TippingInterfaceV2: React.FC = () => {
   const { deviceId } = useParams<{ deviceId: string }>()
   const [totalTipped, setTotalTipped] = useState<number>(0)
   const [loading, setLoading] = useState(false)
@@ -32,10 +32,8 @@ const TippingInterface: React.FC = () => {
   const [userId, setUserId] = useState<string>('')
   const [checkingPaymentMethods, setCheckingPaymentMethods] = useState(true)
   const [showCelebration, setShowCelebration] = useState(false)
-  const [celebrationTier, setCelebrationTier] = useState<'basic' | 'enhanced' | 'premium' | 'epic'>('basic')
   const [audioEnabled, setAudioEnabled] = useState(false)
   const [clickedAmount, setClickedAmount] = useState<number | null>(null)
-  const [isMobile, setIsMobile] = useState(false)
   
   // Song request state
   const [showSongSearch, setShowSongSearch] = useState(false)
@@ -63,18 +61,6 @@ const TippingInterface: React.FC = () => {
     return () => {
       document.body.style.overflow = 'auto'
     }
-  }, [])
-
-  // Check if device is mobile
-  useEffect(() => {
-    const checkMobile = () => {
-      const mobile = window.innerWidth <= 768
-      setIsMobile(mobile)
-    }
-    
-    checkMobile()
-    window.addEventListener('resize', checkMobile)
-    return () => window.removeEventListener('resize', checkMobile)
   }, [])
 
   // Initialize user
@@ -181,51 +167,21 @@ const TippingInterface: React.FC = () => {
       return { hasPaymentMethods: false }
     }
 
-    // Check cached payment status first (valid for 5 minutes)
-    const cachedPaymentStatus = localStorage.getItem(`payment_status_${tempUserId}`)
-    const cachedTimestamp = localStorage.getItem(`payment_status_timestamp_${tempUserId}`)
-    
-    if (cachedPaymentStatus && cachedTimestamp) {
-      const now = Date.now()
-      const cacheAge = now - parseInt(cachedTimestamp)
-      const fiveMinutes = 5 * 60 * 1000
-      
-      if (cacheAge < fiveMinutes) {
-        const cached = JSON.parse(cachedPaymentStatus)
-        console.log('Using cached payment status:', cached)
-        return cached
-      }
-    }
-
     try {
       const response = await fetch(`${getApiBaseUrl()}/api/stripe/payment-methods/${tempUserId}`)
       const data = await response.json()
       
       if (response.ok && data.hasPaymentMethods) {
-        const result = {
+        return {
           hasPaymentMethods: true,
           paymentMethodType: data.paymentMethodType
         }
-        
-        // Cache the successful result
-        localStorage.setItem(`payment_status_${tempUserId}`, JSON.stringify(result))
-        localStorage.setItem(`payment_status_timestamp_${tempUserId}`, Date.now().toString())
-        
-        return result
       }
     } catch (error) {
       console.log('Payment method check failed:', error)
     }
     
     return { hasPaymentMethods: false }
-  }
-
-  const clearPaymentCache = () => {
-    const tempUserId = localStorage.getItem('tipply_user_id')
-    if (tempUserId) {
-      localStorage.removeItem(`payment_status_${tempUserId}`)
-      localStorage.removeItem(`payment_status_timestamp_${tempUserId}`)
-    }
   }
 
   const getLightEffect = (amount: number): string => {
@@ -235,25 +191,6 @@ const TippingInterface: React.FC = () => {
     if (amount >= 10) return 'blue'
     if (amount >= 5) return 'green'
     return 'white'
-  }
-
-  const getCelebrationTier = (amount: number): 'basic' | 'enhanced' | 'premium' | 'epic' => {
-    if (amount >= 100) return 'epic'
-    if (amount >= 50) return 'premium'
-    if (amount >= 20) return 'enhanced'
-    return 'basic'
-  }
-
-  const triggerCelebration = (amount: number) => {
-    const tier = getCelebrationTier(amount)
-    setCelebrationTier(tier)
-    setShowCelebration(true)
-    
-    // Reliable timer-based cleanup
-    const duration = tier === 'epic' ? 2500 : tier === 'premium' ? 2000 : tier === 'enhanced' ? 1500 : 1200
-    setTimeout(() => {
-      setShowCelebration(false)
-    }, duration + 200) // Add small buffer
   }
 
   const handleTipClick = async (amount: number) => {
@@ -279,7 +216,7 @@ const TippingInterface: React.FC = () => {
     setClickedAmount(amount)
     
     // Show confetti immediately
-    triggerCelebration(amount)
+    setShowCelebration(true)
     
     // Update total
     setTotalTipped(prev => prev + amount)
@@ -328,7 +265,7 @@ const TippingInterface: React.FC = () => {
   const processTipWithSong = async (amount: number) => {
     setLoading(true)
     setClickedAmount(amount)
-    triggerCelebration(amount)
+    setShowCelebration(true)
     setTotalTipped(prev => prev + amount)
 
     // Play sound
@@ -415,29 +352,12 @@ const TippingInterface: React.FC = () => {
         <PaymentSetupModal
           isOpen={showPaymentModal}
           onClose={() => setShowPaymentModal(false)}
-          onComplete={() => {
+          onSuccess={() => {
             setIsPaymentSetup(true)
             setShowPaymentModal(false)
             toast.success('Payment method added successfully!')
           }}
-          deviceUuid={deviceInfo?.uuid || ''}
-          userId={userId}
         />
-      </div>
-    )
-  }
-
-  // Show desktop warning if not on mobile
-  if (!isMobile) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 flex items-center justify-center p-6">
-        <div className="bg-white/10 backdrop-blur-md rounded-2xl p-8 text-center max-w-md mx-auto border border-white/20">
-          <div className="text-6xl mb-4">📱</div>
-          <h1 className="text-2xl font-bold text-white mb-4">Mobile Only</h1>
-          <p className="text-white/80 text-lg leading-relaxed">
-            This tipping interface is designed for mobile devices only. Please open this page on your smartphone or tablet for the best experience.
-          </p>
-        </div>
       </div>
     )
   }
@@ -505,7 +425,7 @@ const TippingInterface: React.FC = () => {
               disabled={loading}
               className={`
                 relative h-32 rounded-2xl bg-gradient-to-br ${cardColors[index]}
-                flex items-center justify-center font-black text-white text-5xl
+                flex items-center justify-center font-black text-white text-3xl
                 shadow-2xl border border-white/20 overflow-hidden
                 ${loading && clickedAmount === amount ? 'scale-95' : 'hover:scale-105'}
                 transition-all duration-200 disabled:opacity-50
@@ -568,160 +488,40 @@ const TippingInterface: React.FC = () => {
         </div>
       )}
 
-      {/* Tiered Confetti Animation */}
+      {/* Confetti Animation */}
       <AnimatePresence>
         {showCelebration && (
-          <>
-            {/* Screen Shake Effect for Epic Tier */}
-            {celebrationTier === 'epic' && (
+          <div className="absolute inset-0 pointer-events-none z-50">
+            {[...Array(12)].map((_, i) => (
               <motion.div
-                className="absolute inset-0 pointer-events-none z-40"
+                key={i}
+                className="absolute text-2xl"
+                initial={{
+                  x: Math.random() * window.innerWidth,
+                  y: window.innerHeight + 50,
+                  opacity: 1,
+                  scale: 0,
+                  rotate: 0
+                }}
                 animate={{
-                  x: [0, -4, 4, -4, 4, 0],
-                  y: [0, -2, 2, -2, 2, 0]
+                  y: -100,
+                  opacity: [1, 1, 0],
+                  scale: [0, 1.2, 0.8],
+                  rotate: [0, 180 + Math.random() * 180]
                 }}
                 transition={{
-                  duration: 0.8,
-                  times: [0, 0.2, 0.4, 0.6, 0.8, 1]
+                  duration: 1.2,
+                  delay: i * 0.05,
+                  ease: "easeOut"
                 }}
-              />
-            )}
-
-            {/* Confetti Particles */}
-            <div className="absolute inset-0 pointer-events-none z-50">
-              {(() => {
-                const getConfettiConfig = () => {
-                  switch (celebrationTier) {
-                    case 'epic':
-                      return {
-                        count: 40,
-                        duration: 2.5,
-                        emojis: ['🎉', '💰', '⭐', '🎵', '💝', '🔥', '💎', '👑', '🌟', '💫', '🎊', '🏆'],
-                        textSize: 'text-4xl',
-                        maxScale: 2.0,
-                        yTravel: -200
-                      }
-                    case 'premium':
-                      return {
-                        count: 30,
-                        duration: 2.0,
-                        emojis: ['🎉', '💰', '⭐', '🎵', '💝', '🔥', '💎', '🌟', '🎊'],
-                        textSize: 'text-3xl',
-                        maxScale: 1.6,
-                        yTravel: -150
-                      }
-                    case 'enhanced':
-                      return {
-                        count: 20,
-                        duration: 1.5,
-                        emojis: ['🎉', '💰', '⭐', '🎵', '💝', '🔥', '🌟'],
-                        textSize: 'text-3xl',
-                        maxScale: 1.4,
-                        yTravel: -120
-                      }
-                    default: // basic
-                      return {
-                        count: 12,
-                        duration: 1.2,
-                        emojis: ['🎉', '💰', '⭐', '🎵', '💝', '🔥'],
-                        textSize: 'text-2xl',
-                        maxScale: 1.2,
-                        yTravel: -100
-                      }
-                  }
-                }
-
-                const config = getConfettiConfig()
-
-                return [...Array(config.count)].map((_, i) => (
-                  <motion.div
-                    key={`${celebrationTier}-${i}`}
-                    className={`absolute ${config.textSize}`}
-                    initial={{
-                      x: Math.random() * window.innerWidth,
-                      y: window.innerHeight + 50,
-                      opacity: 1,
-                      scale: 0,
-                      rotate: 0
-                    }}
-                    animate={{
-                      y: config.yTravel,
-                      opacity: celebrationTier === 'epic' ? [1, 1, 1, 0] : [1, 1, 0],
-                      scale: [0, config.maxScale, config.maxScale * 0.8],
-                      rotate: [0, 360 + Math.random() * 360],
-                      x: Math.random() * window.innerWidth * 0.3 - window.innerWidth * 0.15
-                    }}
-                    transition={{
-                      duration: config.duration,
-                      delay: i * (celebrationTier === 'epic' ? 0.03 : 0.05),
-                      ease: "easeOut"
-                    }}
-
-                  >
-                    {config.emojis[i % config.emojis.length]}
-                  </motion.div>
-                ))
-              })()}
-
-              {/* Extra Burst Effect for Premium and Epic */}
-              {(celebrationTier === 'premium' || celebrationTier === 'epic') && (
-                [...Array(8)].map((_, i) => (
-                  <motion.div
-                    key={`burst-${i}`}
-                    className="absolute text-yellow-400 text-6xl font-bold"
-                    initial={{
-                      x: window.innerWidth / 2,
-                      y: window.innerHeight / 2,
-                      opacity: 1,
-                      scale: 0
-                    }}
-                    animate={{
-                      x: window.innerWidth / 2 + (Math.cos(i * 45 * Math.PI / 180) * 200),
-                      y: window.innerHeight / 2 + (Math.sin(i * 45 * Math.PI / 180) * 200),
-                      opacity: [1, 0.7, 0],
-                      scale: [0, celebrationTier === 'epic' ? 1.5 : 1.2, 0]
-                    }}
-                    transition={{
-                      duration: celebrationTier === 'epic' ? 1.5 : 1.2,
-                      delay: 0.2 + i * 0.05,
-                      ease: "easeOut"
-                    }}
-                  >
-                    ✨
-                  </motion.div>
-                ))
-              )}
-
-              {/* Epic Tier: Golden Shower Effect */}
-              {celebrationTier === 'epic' && (
-                [...Array(20)].map((_, i) => (
-                  <motion.div
-                    key={`gold-${i}`}
-                    className="absolute text-yellow-400 text-3xl"
-                    initial={{
-                      x: Math.random() * window.innerWidth,
-                      y: -50,
-                      opacity: 1,
-                      rotate: 0
-                    }}
-                    animate={{
-                      y: window.innerHeight + 100,
-                      opacity: [0, 1, 1, 0],
-                      rotate: 360 * 3,
-                      x: Math.random() * 100 - 50
-                    }}
-                    transition={{
-                      duration: 3,
-                      delay: 0.5 + i * 0.1,
-                      ease: "linear"
-                    }}
-                  >
-                    💰
-                  </motion.div>
-                ))
-              )}
-            </div>
-          </>
+                onAnimationComplete={() => {
+                  if (i === 11) setShowCelebration(false)
+                }}
+              >
+                {['🎉', '💰', '⭐', '🎵', '💝', '🔥'][i % 6]}
+              </motion.div>
+            ))}
+          </div>
         )}
       </AnimatePresence>
 
@@ -742,10 +542,9 @@ const TippingInterface: React.FC = () => {
             >
               <SongCatalogSearch
                 deviceUuid={deviceInfo?.uuid || ''}
-                userTempId={userId}
+                userId={userId}
                 onSongSelect={handleSongSelect}
-                onBackToTip={() => setShowSongSearch(false)}
-                isVisible={showSongSearch}
+                onClose={() => setShowSongSearch(false)}
               />
             </motion.div>
           </motion.div>
@@ -756,14 +555,11 @@ const TippingInterface: React.FC = () => {
       <PaymentSetupModal
         isOpen={showPaymentModal}
         onClose={() => setShowPaymentModal(false)}
-        onComplete={() => {
-          clearPaymentCache() // Clear cache so next check will be fresh
+        onSuccess={() => {
           setIsPaymentSetup(true)
           setShowPaymentModal(false)
           toast.success('Payment method added successfully!')
         }}
-        deviceUuid={deviceInfo?.uuid || ''}
-        userId={userId}
       />
 
       {/* Audio Element */}
@@ -776,4 +572,4 @@ const TippingInterface: React.FC = () => {
   )
 }
 
-export default TippingInterface
+export default TippingInterfaceV2

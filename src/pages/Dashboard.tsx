@@ -84,6 +84,8 @@ const Dashboard: React.FC = () => {
   const [isAddingDevice, setIsAddingDevice] = useState(false)
   const [isValidatingAddDevice, setIsValidatingAddDevice] = useState(false)
   const [addDeviceValidationComplete, setAddDeviceValidationComplete] = useState(false)
+  const [validatedDeviceUuid, setValidatedDeviceUuid] = useState<string>('')
+  const [validatedSerialNumber, setValidatedSerialNumber] = useState<string>('')
   const [showStripeSetup, setShowStripeSetup] = useState(false)
   
   // Soft Delete States
@@ -376,6 +378,90 @@ const Dashboard: React.FC = () => {
     setActiveTab('addDevice')
   }
 
+  const handleStripeConnect = async () => {
+    if (!userProfile) {
+      setAddDeviceErrors({ submit: 'User profile not found. Please refresh and try again.' })
+      return
+    }
+
+    if (!validatedDeviceUuid || !validatedSerialNumber) {
+      setAddDeviceErrors({ submit: 'Device UUID not found. Please validate the device serial number first.' })
+      return
+    }
+
+    console.log('🔍 [DEBUG] Using validated device UUID for Stripe Connect:', validatedDeviceUuid)
+    console.log('🔍 [DEBUG] Using validated serial number for Stripe Connect:', validatedSerialNumber)
+
+    setIsAddingDevice(true)
+    try {
+      console.log('Starting Stripe Connect setup for authenticated user:', userProfile.email)
+      console.log('Using validated device UUID:', validatedDeviceUuid)
+      console.log('Using validated serial number:', validatedSerialNumber)
+      
+      const token = localStorage.getItem('token')
+      console.log('Token exists:', !!token)
+      console.log('Token length:', token?.length || 0)
+      
+      // Decode token to check role and expiry
+      if (token) {
+        try {
+          const payload = JSON.parse(atob(token.split('.')[1]))
+          console.log('Token payload:', payload)
+          console.log('User role:', payload.role)
+          console.log('Token expires:', new Date(payload.exp * 1000))
+        } catch (e) {
+          console.error('Error decoding token:', e)
+        }
+      }
+      
+      // Use the UUID-based endpoint with JWT authentication
+      // The UUID comes from the device validation step
+      const result = await apiService.createConnectAccountForUser(validatedDeviceUuid, validatedSerialNumber)
+      
+      console.log('CreateConnectAccount response:', result)
+
+      if (result.error) {
+        throw new Error(result.error)
+      }
+
+      // Check if device already has Stripe Connect account (inherited)
+      if (result.data?.requiresOnboarding === false) {
+        console.log('Device already linked to existing Stripe account:', result.data.stripeAccountId)
+        console.log('Success:', result.data.message || 'Device successfully linked to existing Stripe account!')
+        
+        // Refresh the devices list to show the updated device
+        await fetchDashboardStats()
+        setActiveTab('devices')
+        return // Exit early - no onboarding needed
+      }
+
+      // Handle new Stripe account creation - requires onboarding
+      if (result.data?.onboardingUrl && result.data?.requiresOnboarding !== false) {
+        console.log('Redirecting to Stripe onboarding URL:', result.data.onboardingUrl)
+        window.location.href = result.data.onboardingUrl
+        return // Exit early since we're redirecting
+      } 
+      
+      // Check if we got an async processing response (fallback)
+      if (result.data?.status === 'processing') {
+        console.log('Received processing status, but we need serial number for polling...')
+        console.log('This case might need additional handling for UUID-based polling')
+        throw new Error('Async processing not yet supported for UUID-based requests')
+      }
+      
+      // If no clear response, this is an error
+      throw new Error('Unexpected response from Stripe Connect setup')
+
+    } catch (error) {
+      console.error('Error setting up Stripe Connect:', error)
+      setAddDeviceErrors({ submit: `Failed to setup Stripe Connect: ${error instanceof Error ? error.message : 'Unknown error'}` })
+    } finally {
+      setIsAddingDevice(false)
+    }
+  }
+
+
+
   const handleBackToDashboard = () => {
     setShowAddDeviceForm(false)
     setShowStripeSetup(false)
@@ -384,6 +470,8 @@ const Dashboard: React.FC = () => {
     setAddDeviceErrors({})
     setAddDeviceValidationComplete(false)
     setIsValidatingAddDevice(false)
+    setValidatedDeviceUuid('')
+    setValidatedSerialNumber('')
   }
 
   const handleAddDeviceInputChange = (field: string, value: string) => {
@@ -397,6 +485,8 @@ const Dashboard: React.FC = () => {
     if (field === 'serialNumber') {
       setAddDeviceValidationComplete(false)
       setIsValidatingAddDevice(false)
+      setValidatedDeviceUuid('')
+      setValidatedSerialNumber('')
     }
   }
 
@@ -445,14 +535,23 @@ const Dashboard: React.FC = () => {
         setAddDeviceErrors(prev => ({ ...prev, serialNumber: errorMessage }))
         setAddDeviceValidationComplete(true)
         setIsValidatingAddDevice(false)
+        setValidatedDeviceUuid('')
+        setValidatedSerialNumber('')
         return { isValid: false, error: errorMessage }
+      }
+      
+      // Store the validated device UUID and serial number
+      const deviceUuid = result.data?.detectedDevice?.uuid
+      if (deviceUuid) {
+        setValidatedDeviceUuid(deviceUuid)
+        setValidatedSerialNumber(serialNumber) // Store the serial number we used for validation
       }
       
       // Clear any existing errors
       setAddDeviceErrors(prev => ({ ...prev, serialNumber: '' }))
       setAddDeviceValidationComplete(true)
       setIsValidatingAddDevice(false)
-      return { isValid: true, error: null }
+      return { isValid: true, error: null, deviceUuid }
     } catch (err) {
       const errorMessage = 'Failed to validate serial number'
       setAddDeviceErrors(prev => ({ ...prev, serialNumber: errorMessage }))
@@ -464,12 +563,22 @@ const Dashboard: React.FC = () => {
 
   const checkUserStripeStatus = async () => {
     try {
-      // Check if user has any devices with Stripe accounts
-      const hasStripeAccount = stats?.devices.some(device => 
+      // Check if user has any devices with Stripe accounts directly from backend
+      const stripeCheckResponse = await apiService.checkUserStripeSetup()
+      let hasStripeAccountFromAPI = false
+      
+      if (stripeCheckResponse.data?.hasVerifiedStripeAccount) {
+        hasStripeAccountFromAPI = true
+      }
+      
+      // Also check UI state as fallback
+      const hasStripeAccountFromUI = stats?.devices.some(device => 
         deviceStripeStatus[device.uuid] === 'Enabled'
       ) || stripeEnabledDevices.length > 0
       
-      // Check KYC status
+      const hasStripeAccount = hasStripeAccountFromAPI || hasStripeAccountFromUI
+      
+      // Check KYC status from various sources
       const isKycVerified = kycStatus === 'verified'
       
       // Also check if user has completed KYC from onboarding flow
@@ -484,8 +593,21 @@ const Dashboard: React.FC = () => {
         }
       }
       
-      // Allow device addition if user has completed KYC (either verified status or successful onboarding)
-      const canAddDevice = isKycVerified || hasCompletedKyc
+      // IMPORTANT: If user already has Stripe devices, they can always add more devices
+      // The backend will handle device linking and Stripe inheritance automatically
+      const canAddDevice = hasStripeAccount || isKycVerified || hasCompletedKyc
+      
+      console.log('Stripe Status Check:', {
+        hasStripeAccountFromAPI,
+        hasStripeAccountFromUI,
+        hasStripeAccount,
+        isKycVerified,
+        hasCompletedKyc,
+        canAddDevice,
+        kycStatus,
+        stripeEnabledDevicesCount: stripeEnabledDevices.length,
+        stripeCheckResponse: stripeCheckResponse.data
+      })
       
       return { hasStripeAccount: !!hasStripeAccount, isKycVerified: canAddDevice }
     } catch (error) {
@@ -522,7 +644,7 @@ const Dashboard: React.FC = () => {
       await new Promise(resolve => setTimeout(resolve, 500))
       
       // Check user's Stripe/KYC status
-      const { hasStripeAccount, isKycVerified } = await checkUserStripeStatus()
+      const { isKycVerified } = await checkUserStripeStatus()
       
       // For users who have completed KYC but don't have devices yet, allow device addition
       // The device will get its own Stripe Connect account during the process
@@ -555,7 +677,20 @@ const Dashboard: React.FC = () => {
         throw new Error(response.error)
       }
       
-      // Success! Refresh dashboard and return to devices tab
+      // Check if Stripe setup is required
+      if (response.data?.requiresStripeSetup) {
+        // Device added but needs Stripe Connect setup
+        console.log('Device added, Stripe setup required:', response.data.stripeSetupMessage)
+        
+        // Show the existing Stripe setup flow
+        setShowStripeSetup(true)
+        return
+      }
+
+      // Success! Device added and ready (either inherited Stripe or no Stripe needed)
+      console.log('Device added successfully:', response.data.stripeSetupMessage || 'Device linked successfully')
+      
+      // Refresh dashboard and return to devices tab
       await fetchDashboardStats()
       await checkStripeConnectStatus()
       setShowAddDeviceForm(false)
@@ -1678,7 +1813,19 @@ const Dashboard: React.FC = () => {
                           <p className="text-yellow-700 mb-4">
                             Before adding a new device, you need to complete your Stripe Connect account setup and KYC verification.
                           </p>
+                          {addDeviceErrors.submit && (
+                            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+                              <p className="text-red-700 text-sm">{addDeviceErrors.submit}</p>
+                            </div>
+                          )}
                           <div className="flex space-x-4">
+                            <button
+                              onClick={handleStripeConnect}
+                              disabled={isAddingDevice}
+                              className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                              {isAddingDevice ? 'Setting up...' : 'Complete Stripe Setup'}
+                            </button>
                             <button
                               onClick={handleBackToDashboard}
                               className="px-4 py-2 bg-yellow-100 text-yellow-800 rounded-lg hover:bg-yellow-200 transition-colors"

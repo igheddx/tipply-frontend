@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Device } from '../types'
+import { FRONTEND_BASE_URL } from '../utils/config'
 
 const ManageDevices: React.FC = () => {
   const [devices, setDevices] = useState<Device[]>([])
@@ -126,7 +127,7 @@ const ManageDevices: React.FC = () => {
                       Download QR Code
                     </button>
                     <button
-                      onClick={() => window.open(`https://test.tipply.live/tip/${device.id}`, '_blank')}
+                      onClick={() => window.open(`${FRONTEND_BASE_URL}/tip/${device.id}`, '_blank')}
                       className="btn-primary w-full"
                     >
                       View Tipping Page

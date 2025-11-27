@@ -30,6 +30,9 @@ class ApiService {
       console.log(`Request config:`, { method: config.method, headers: config.headers })
       console.log(`Current hostname: ${window.location.hostname}`)
       console.log(`API_BASE_URL: ${API_BASE_URL}`)
+      console.log(`Token exists: ${!!token}`)
+      console.log(`UseApiKey: ${useApiKey}`)
+      console.log(`Authorization header: ${(config.headers as any)?.Authorization}`)
       
       const response = await fetch(url, config)
       
@@ -142,6 +145,10 @@ class ApiService {
     })
   }
 
+  async checkUserStripeSetup(): Promise<ApiResponse<any>> {
+    return this.request('/api/devices/check-stripe-setup')
+  }
+
   async getDevice(deviceId: string): Promise<ApiResponse<any>> {
     return this.request(`/api/devices/${deviceId}`)
   }
@@ -184,6 +191,24 @@ class ApiService {
   async getConnectAccountStatus(serialNumber: string): Promise<ApiResponse<any>> { // Changed from deviceUuid to serialNumber
     return this.request(`/api/stripe/connect-account/${serialNumber}/status`)
   }
+
+  async createConnectAccountForUser(deviceUuid: string, serialNumber: string): Promise<ApiResponse<any>> {
+    console.log('createConnectAccountForUser called with deviceUuid:', deviceUuid, 'serialNumber:', serialNumber)
+    
+    // Debug token state before making request
+    const token = localStorage.getItem('token')
+    console.log('Token available for createConnectAccountForUser:', !!token)
+    console.log('Token length:', token?.length || 0)
+    
+    const result = await this.request('/api/stripe/create-connect-account', {
+      method: 'POST',
+      body: JSON.stringify({ deviceUuid, serialNumber }),
+    })
+    console.log('createConnectAccountForUser result:', result)
+    return result
+  }
+
+
 
   // Auth endpoints
   async login(credentials: { email: string; password: string }): Promise<ApiResponse<any>> {
