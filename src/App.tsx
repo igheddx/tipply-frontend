@@ -12,6 +12,7 @@ import StripeReturn from './pages/StripeReturn'
 import KYCReturn from './pages/KYCReturn'
 import StripeStatus from './pages/StripeStatus'
 import Onboarding from './pages/Onboarding'
+import DeviceWifiSetup from './pages/DeviceWifiSetup'
 import NotFound from './pages/NotFound'
 import ProtectedRoute from './components/ProtectedRoute'
 
@@ -29,6 +30,7 @@ function App() {
         <Route path="/add-device" element={<ProtectedRoute><DeviceRegistration /></ProtectedRoute>} />
         <Route path="/manage-devices" element={<ProtectedRoute><ManageDevices /></ProtectedRoute>} />
         <Route path="/tip/:deviceId" element={<TippingInterface />} />
+        <Route path="/device-setup" element={<DeviceWifiSetup />} />
         <Route path="/stripe-return" element={<StripeReturn />} />
         <Route path="/kyc-return" element={<KYCReturn />} />
         <Route path="/stripe-status" element={<StripeStatus />} />
