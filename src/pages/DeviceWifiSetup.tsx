@@ -30,7 +30,16 @@ const DeviceWifiSetup = () => {
   // Check if Web Bluetooth is supported
   useEffect(() => {
     if (!(navigator as any).bluetooth) {
-      setError('Web Bluetooth is not supported in this browser. Please use Chrome, Edge, or Opera on desktop/Android.');
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+      const isAndroid = /Android/.test(navigator.userAgent);
+      
+      if (isIOS) {
+        setError('⚠️ Web Bluetooth is not supported on iOS devices. Please use an Android device with Chrome, Edge, or Opera browser.');
+      } else if (isAndroid) {
+        setError('Web Bluetooth is not supported in this browser. Please open this page in Chrome, Edge, or Opera on your Android device.');
+      } else {
+        setError('Web Bluetooth is not supported in this browser. Please use Chrome, Edge, or Opera.');
+      }
     }
   }, []);
 
@@ -39,6 +48,28 @@ const DeviceWifiSetup = () => {
     try {
       setScanning(true);
       setError('');
+      
+      // Check if Web Bluetooth is supported
+      if (!(navigator as any).bluetooth) {
+        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+        const isAndroid = /Android/.test(navigator.userAgent);
+        
+        if (isIOS) {
+          toast.error('Web Bluetooth is not supported on iOS. Please use an Android device with Chrome.', {
+            duration: 6000
+          });
+        } else if (isAndroid) {
+          toast.error('Please open this page in Chrome, Edge, or Opera browser.', {
+            duration: 5000
+          });
+        } else {
+          toast.error('Web Bluetooth is not supported. Please use Chrome, Edge, or Opera.', {
+            duration: 5000
+          });
+        }
+        setScanning(false);
+        return;
+      }
       
       const device = await (navigator as any).bluetooth.requestDevice({
         acceptAllDevices: true,
