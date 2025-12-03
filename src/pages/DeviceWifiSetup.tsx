@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Button, Input, Alert, Card, Steps, Modal, List } from 'antd';
 import { WifiOutlined, ScanOutlined, CheckCircleOutlined, LoadingOutlined, ApiOutlined, MobileOutlined, DesktopOutlined } from '@ant-design/icons';
 import { toast } from 'sonner';
+import { PWAInstallPrompt } from '../components/PWAInstallPrompt';
 
 interface BluetoothDevice {
   name: string;
@@ -645,6 +646,9 @@ const DeviceWifiSetup = () => {
           className="max-h-96 overflow-y-auto"
         />
       </Modal>
+
+      {/* PWA Install Prompt */}
+      <PWAInstallPrompt />
     </div>
   );
 };

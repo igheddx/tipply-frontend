@@ -122,17 +122,19 @@ When Web Bluetooth not supported:
 
 ### Android (Chrome/Edge/Opera)
 1. Visit `https://test.tipply.live/device-setup`
-2. Tap browser menu (⋮)
-3. Select "Install app" or "Add to Home Screen"
-4. App installs as standalone PWA
-5. Launch from home screen - runs fullscreen without browser UI
+2. Look for the blue "Install Tipply App" banner at the bottom
+3. Tap "Install Now" button
+4. OR tap browser menu (⋮) → "Install app" or "Add to Home Screen"
+5. App installs as standalone PWA
+6. Launch from home screen - runs fullscreen without browser UI
 
 ### iOS (Safari)
-1. Visit `https://test.tipply.live` in Safari
-2. Tap Share button (□↑)
-3. Select "Add to Home Screen"
-4. Tap "Add"
-5. **Note**: iOS Safari does NOT support Web Bluetooth, so device setup will not work on iOS
+1. Visit `https://test.tipply.live/device-setup` in Safari
+2. Look for the blue "Install Tipply App" banner at the bottom
+3. Tap "View Instructions" to see step-by-step guide
+4. OR manually: Tap Share button (□↑) → "Add to Home Screen" → "Add"
+5. Launch from home screen
+6. **⚠️ Important**: iOS Safari does NOT support Web Bluetooth, so device WiFi setup will not work on iOS. The app will install and run, but Bluetooth features require an Android device.
 
 ### Desktop (Chrome/Edge/Opera)
 1. Visit `https://test.tipply.live/device-setup`
