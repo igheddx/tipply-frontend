@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Button, Input, Alert, Card, Steps, Modal, List } from 'antd';
-import { WifiOutlined, ScanOutlined, CheckCircleOutlined, LoadingOutlined, ApiOutlined } from '@ant-design/icons';
+import { WifiOutlined, ScanOutlined, CheckCircleOutlined, LoadingOutlined, ApiOutlined, MobileOutlined, DesktopOutlined } from '@ant-design/icons';
 import { toast } from 'sonner';
 
 interface BluetoothDevice {
@@ -15,6 +15,17 @@ interface WifiNetwork {
   security: string;
 }
 
+interface EnvironmentInfo {
+  isPWA: boolean;
+  isIOS: boolean;
+  isAndroid: boolean;
+  isMobile: boolean;
+  isDesktop: boolean;
+  browser: string;
+  supportsWebBluetooth: boolean;
+  supportsNotifications: boolean;
+}
+
 const DeviceWifiSetup = () => {
   const [currentStep, setCurrentStep] = useState(0);
   const [scanning, setScanning] = useState(false);
@@ -26,22 +37,127 @@ const DeviceWifiSetup = () => {
   const [password, setPassword] = useState<string>('');
   const [connected, setConnected] = useState(false);
   const [error, setError] = useState<string>('');
+  const [environment, setEnvironment] = useState<EnvironmentInfo | null>(null);
+  const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>('default');
 
-  // Check if Web Bluetooth is supported
+  // Detect environment and capabilities
+  const detectEnvironment = (): EnvironmentInfo => {
+    const userAgent = navigator.userAgent;
+    const isIOS = /iPad|iPhone|iPod/.test(userAgent);
+    const isAndroid = /Android/.test(userAgent);
+    const isMobile = isIOS || isAndroid || /Mobile/.test(userAgent);
+    const isDesktop = !isMobile;
+    
+    // Check if running as PWA
+    const isPWA = window.matchMedia('(display-mode: standalone)').matches ||
+                  (window.navigator as any).standalone === true ||
+                  document.referrer.includes('android-app://');
+    
+    // Detect browser
+    let browser = 'Unknown';
+    if (userAgent.includes('Chrome')) browser = 'Chrome';
+    else if (userAgent.includes('Safari') && !userAgent.includes('Chrome')) browser = 'Safari';
+    else if (userAgent.includes('Firefox')) browser = 'Firefox';
+    else if (userAgent.includes('Edge')) browser = 'Edge';
+    else if (userAgent.includes('Opera')) browser = 'Opera';
+    
+    const supportsWebBluetooth = !!(navigator as any).bluetooth;
+    const supportsNotifications = 'Notification' in window;
+    
+    return {
+      isPWA,
+      isIOS,
+      isAndroid,
+      isMobile,
+      isDesktop,
+      browser,
+      supportsWebBluetooth,
+      supportsNotifications
+    };
+  };
+
+  // Initialize environment detection
   useEffect(() => {
-    if (!(navigator as any).bluetooth) {
-      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-      const isAndroid = /Android/.test(navigator.userAgent);
-      
-      if (isIOS) {
-        setError('⚠️ Web Bluetooth is not supported on iOS devices. Please use an Android device with Chrome, Edge, or Opera browser.');
-      } else if (isAndroid) {
-        setError('Web Bluetooth is not supported in this browser. Please open this page in Chrome, Edge, or Opera on your Android device.');
+    const env = detectEnvironment();
+    setEnvironment(env);
+    
+    // Check notification permission status
+    if (env.supportsNotifications) {
+      setNotificationPermission(Notification.permission);
+    }
+    
+    // Set appropriate error message based on environment
+    if (!env.supportsWebBluetooth) {
+      if (env.isIOS) {
+        setError('⚠️ Web Bluetooth is not supported on iOS. Please use an Android device with Chrome, Edge, or Opera, or install the Tipply PWA wrapper.');
+      } else if (env.isAndroid) {
+        setError(`Web Bluetooth is not supported in ${env.browser}. Please open this page in Chrome, Edge, or Opera on your Android device.`);
       } else {
         setError('Web Bluetooth is not supported in this browser. Please use Chrome, Edge, or Opera.');
       }
     }
   }, []);
+
+  // Request Bluetooth permission (triggered on "Find my device" button)
+  const requestBluetoothPermission = async (): Promise<boolean> => {
+    if (!(navigator as any).bluetooth) {
+      return false;
+    }
+    
+    try {
+      // Bluetooth permission is requested implicitly through requestDevice
+      // This is just a pre-check
+      return true;
+    } catch (err) {
+      console.error('Bluetooth permission check failed:', err);
+      return false;
+    }
+  };
+
+  // Request Notification permission (triggered after successful provisioning)
+  const requestNotificationPermission = async (): Promise<boolean> => {
+    if (!('Notification' in window)) {
+      console.log('Notifications not supported');
+      return false;
+    }
+    
+    if (Notification.permission === 'granted') {
+      return true;
+    }
+    
+    if (Notification.permission === 'denied') {
+      toast.info('Notifications are blocked. Enable them in browser settings to get setup alerts.');
+      return false;
+    }
+    
+    try {
+      const permission = await Notification.requestPermission();
+      setNotificationPermission(permission);
+      
+      if (permission === 'granted') {
+        toast.success('Notifications enabled! You\'ll be alerted when setup completes.');
+        return true;
+      } else {
+        return false;
+      }
+    } catch (err) {
+      console.error('Notification permission error:', err);
+      return false;
+    }
+  };
+
+  // Send notification
+  const sendNotification = (title: string, body: string, success: boolean = true) => {
+    if (Notification.permission === 'granted') {
+      new Notification(title, {
+        body,
+        icon: success ? '/images/5dollars.png' : '/images/1dollar.png',
+        badge: '/images/1dollar.png',
+        vibrate: success ? [200, 100, 200] : [100],
+        tag: 'tipply-setup'
+      });
+    }
+  };
 
   // Step 1: Scan for Bluetooth devices
   const scanForDevices = async () => {
@@ -49,17 +165,16 @@ const DeviceWifiSetup = () => {
       setScanning(true);
       setError('');
       
-      // Check if Web Bluetooth is supported
-      if (!(navigator as any).bluetooth) {
-        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-        const isAndroid = /Android/.test(navigator.userAgent);
-        
-        if (isIOS) {
-          toast.error('Web Bluetooth is not supported on iOS. Please use an Android device with Chrome.', {
+      // Request Bluetooth permission first
+      const hasBluetoothAccess = await requestBluetoothPermission();
+      
+      if (!hasBluetoothAccess || !(navigator as any).bluetooth) {
+        if (environment?.isIOS) {
+          toast.error('🚫 Provisioning requires desktop or Tipply PWA wrapper. iOS Safari does not support Web Bluetooth.', {
             duration: 6000
           });
-        } else if (isAndroid) {
-          toast.error('Please open this page in Chrome, Edge, or Opera browser.', {
+        } else if (environment?.isAndroid) {
+          toast.error(`Please open this page in Chrome, Edge, or Opera browser on Android.`, {
             duration: 5000
           });
         } else {
@@ -187,7 +302,17 @@ const DeviceWifiSetup = () => {
       if (status === 'CONNECTED') {
         setConnected(true);
         setCurrentStep(3);
-        toast.success('Tipply device connected to Wi-Fi!');
+        toast.success('✅ Tipply device connected to Wi-Fi!');
+        
+        // Request notification permission after successful provisioning
+        const notifGranted = await requestNotificationPermission();
+        if (notifGranted) {
+          sendNotification(
+            '✅ Setup Complete!', 
+            `Your Tipply device is now connected to ${selectedSsid}`,
+            true
+          );
+        }
       } else {
         throw new Error('Connection failed: ' + status);
       }
@@ -195,6 +320,15 @@ const DeviceWifiSetup = () => {
       console.error('Wi-Fi configuration error:', err);
       setError(`Failed to configure Wi-Fi: ${err.message}`);
       toast.error('Failed to configure Wi-Fi');
+      
+      // Send failure notification if permission granted
+      if (notificationPermission === 'granted') {
+        sendNotification(
+          '❌ Setup Failed',
+          'Tipply device could not connect to Wi-Fi. Please try again.',
+          false
+        );
+      }
     } finally {
       setConnecting(false);
     }
@@ -284,15 +418,40 @@ const DeviceWifiSetup = () => {
           />
         </Card>
 
+        {/* Environment Info Banner */}
+        {environment && (
+          <Card className="bg-gray-800 border-gray-700 mb-6">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                {environment.isMobile ? <MobileOutlined className="text-blue-400 text-xl" /> : <DesktopOutlined className="text-blue-400 text-xl" />}
+                <div>
+                  <p className="text-white font-medium">
+                    {environment.isPWA ? '📱 Running as PWA' : environment.isMobile ? '📱 Mobile Browser' : '💻 Desktop Browser'}
+                  </p>
+                  <p className="text-gray-400 text-sm">
+                    {environment.browser} • {environment.supportsWebBluetooth ? '✅ Bluetooth Ready' : '❌ No Bluetooth'} • {environment.supportsNotifications ? '🔔 Notifications Available' : '🔕 No Notifications'}
+                  </p>
+                </div>
+              </div>
+              {environment.isPWA && (
+                <span className="px-3 py-1 bg-blue-600 text-white rounded-full text-xs font-semibold">
+                  PWA Mode
+                </span>
+              )}
+            </div>
+          </Card>
+        )}
+
         {/* Error Alert */}
         {error && (
           <Alert
-            message="Error"
+            message="Setup Requirements"
             description={error}
-            type="error"
+            type="warning"
             closable
             onClose={() => setError('')}
             className="mb-6"
+            showIcon
           />
         )}
 
@@ -313,11 +472,16 @@ const DeviceWifiSetup = () => {
                 icon={scanning ? <LoadingOutlined /> : <ScanOutlined />}
                 onClick={scanForDevices}
                 loading={scanning}
-                disabled={!!error && error.includes('not supported')}
+                disabled={!environment?.supportsWebBluetooth}
                 className="bg-blue-600 hover:bg-blue-700 border-none px-8"
               >
-                {scanning ? 'Scanning...' : 'Scan for Devices'}
+                {scanning ? 'Scanning...' : 'Find My Device'}
               </Button>
+              {!environment?.supportsWebBluetooth && (
+                <p className="text-yellow-400 mt-4 text-sm">
+                  🚫 Provisioning requires desktop or Tipply PWA wrapper
+                </p>
+              )}
             </div>
           </Card>
         )}

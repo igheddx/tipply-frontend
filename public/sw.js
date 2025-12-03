@@ -1,7 +1,8 @@
-const CACHE_NAME = "tipply-v1";
+const CACHE_NAME = "tipply-v2";
 const urlsToCache = [
   "/",
   "/index.html",
+  "/device-setup",
   "/manifest.json",
   "/images/1dollar.png",
   "/images/5dollars.png",
@@ -12,16 +13,73 @@ const urlsToCache = [
   "/sound/cashRegisterSound.mp3",
 ];
 
+// Install event - cache core assets
 self.addEventListener("install", (event) => {
+  console.log('[SW] Installing service worker...');
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(urlsToCache))
+    caches.open(CACHE_NAME).then((cache) => {
+      console.log('[SW] Caching app shell');
+      return cache.addAll(urlsToCache);
+    }).then(() => {
+      console.log('[SW] Skip waiting');
+      return self.skipWaiting();
+    })
   );
 });
 
-self.addEventListener("fetch", (event) => {
-  event.respondWith(
-    caches.match(event.request).then((response) => {
-      return response || fetch(event.request);
+// Activate event - clean up old caches
+self.addEventListener("activate", (event) => {
+  console.log('[SW] Activating service worker...');
+  event.waitUntil(
+    caches.keys().then((cacheNames) => {
+      return Promise.all(
+        cacheNames.map((cacheName) => {
+          if (cacheName !== CACHE_NAME) {
+            console.log('[SW] Deleting old cache:', cacheName);
+            return caches.delete(cacheName);
+          }
+        })
+      );
+    }).then(() => {
+      console.log('[SW] Claiming clients');
+      return self.clients.claim();
     })
   );
+});
+
+// Fetch event - network first for device setup, cache first for assets
+self.addEventListener("fetch", (event) => {
+  const url = new URL(event.request.url);
+  
+  // Network first strategy for device setup page and API calls
+  if (url.pathname === '/device-setup' || url.pathname.startsWith('/api/')) {
+    event.respondWith(
+      fetch(event.request)
+        .then((response) => {
+          // Clone the response before caching
+          const responseToCache = response.clone();
+          caches.open(CACHE_NAME).then((cache) => {
+            cache.put(event.request, responseToCache);
+          });
+          return response;
+        })
+        .catch(() => {
+          return caches.match(event.request);
+        })
+    );
+  } 
+  // Cache first strategy for static assets
+  else {
+    event.respondWith(
+      caches.match(event.request).then((response) => {
+        return response || fetch(event.request).then((fetchResponse) => {
+          // Cache new requests
+          return caches.open(CACHE_NAME).then((cache) => {
+            cache.put(event.request, fetchResponse.clone());
+            return fetchResponse;
+          });
+        });
+      })
+    );
+  }
 });

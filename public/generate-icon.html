@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Generate PWA Icons</title>
+  <style>
+    body {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      background: linear-gradient(135deg, #1f2937 0%, #111827 100%);
+      margin: 0;
+      font-family: Arial, sans-serif;
+    }
+    .icon {
+      width: 512px;
+      height: 512px;
+      background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+      border-radius: 120px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+    }
+    .icon-text {
+      font-size: 180px;
+      font-weight: bold;
+      color: white;
+      margin: 0;
+      text-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    }
+    .icon-subtext {
+      font-size: 64px;
+      color: rgba(255,255,255,0.9);
+      margin: 10px 0 0 0;
+      font-weight: 600;
+    }
+    canvas {
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="icon" id="icon">
+    <p class="icon-text">T</p>
+    <p class="icon-subtext">Setup</p>
+  </div>
+  <canvas id="canvas192"></canvas>
+  <canvas id="canvas512"></canvas>
+  
+  <script>
+    // This HTML file can be opened in browser to generate icons
+    // Right-click the icon and "Save Image As" to create pwa-icon-512.png
+    // Then resize to create pwa-icon-192.png
+    console.log('PWA Icon Generator - Right-click the icon to save');
+  </script>
+</body>
+</html>
