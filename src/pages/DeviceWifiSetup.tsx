@@ -150,13 +150,19 @@ const DeviceWifiSetup = () => {
   // Send notification
   const sendNotification = (title: string, body: string, success: boolean = true) => {
     if (Notification.permission === 'granted') {
-      new Notification(title, {
+      const options: NotificationOptions & { vibrate?: number[] } = {
         body,
         icon: success ? '/images/5dollars.png' : '/images/1dollar.png',
         badge: '/images/1dollar.png',
-        vibrate: success ? [200, 100, 200] : [100],
         tag: 'tipply-setup'
-      });
+      };
+      
+      // Add vibrate if supported (type assertion needed for non-standard property)
+      if ('vibrate' in navigator) {
+        options.vibrate = success ? [200, 100, 200] : [100];
+      }
+      
+      new Notification(title, options);
     }
   };
 
