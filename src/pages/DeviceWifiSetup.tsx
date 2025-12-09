@@ -1,3 +1,21 @@
+/**
+ * Tipwave Device WiFi Setup Component
+ * 
+ * Bluetooth Specification:
+ * - Device Name: Tipwave-<serial_number> (e.g., Tipwave-TPW-5C07-3VQ)
+ * 
+ * Service and Characteristics:
+ * - Provisioning Service: 550e8400-e29b-41d4-a716-446655440000
+ * - SSID Characteristic:    550e8400-e29b-41d4-a716-446655440001 (Write-only)
+ * - Password Characteristic: 550e8400-e29b-41d4-a716-446655440002 (Write-only)
+ * - Status Characteristic:   550e8400-e29b-41d4-a716-446655440003 (Notify-only)
+ * 
+ * Status JSON Format:
+ * - {"state":"connecting"}
+ * - {"state":"success","ip":"192.168.x.x"}
+ * - {"state":"failure","error":"auth_failed|no_ssid|timeout|unknown"}
+ */
+
 import { useState, useEffect } from 'react';
 import { Button, Input, Alert, Card, Steps, Modal, List } from 'antd';
 import { WifiOutlined, ScanOutlined, CheckCircleOutlined, LoadingOutlined, ApiOutlined, MobileOutlined, DesktopOutlined } from '@ant-design/icons';
@@ -150,14 +168,14 @@ const DeviceWifiSetup = () => {
   // Send notification
   const sendNotification = (title: string, body: string, success: boolean = true) => {
     if (Notification.permission === 'granted') {
-      const options: NotificationOptions & { vibrate?: number[] } = {
+      const options: any = {
         body,
         icon: success ? '/images/5dollars.png' : '/images/1dollar.png',
         badge: '/images/1dollar.png',
         tag: 'tipply-setup'
       };
       
-      // Add vibrate if supported (type assertion needed for non-standard property)
+      // Add vibrate if supported (non-standard property)
       if ('vibrate' in navigator) {
         options.vibrate = success ? [200, 100, 200] : [100];
       }
@@ -194,9 +212,13 @@ const DeviceWifiSetup = () => {
       }
       
       const device = await (navigator as any).bluetooth.requestDevice({
-        acceptAllDevices: true,
+        filters: [
+          {
+            namePrefix: 'Tipwave-'
+          }
+        ],
         optionalServices: [
-          '00001234-0000-1000-8000-00805f9b34fb',
+          '550e8400-e29b-41d4-a716-446655440000', // Provisioning Service
           'battery_service',
           'device_information'
         ]
@@ -241,27 +263,14 @@ const DeviceWifiSetup = () => {
       const server = await targetDevice.device.gatt.connect();
       toast.success('Connected to device');
 
-      // Get the custom Tipply service
-      const service = await server.getPrimaryService('00001234-0000-1000-8000-00805f9b34fb');
+      // Get the Tipwave Provisioning Service
+      const service = await server.getPrimaryService('550e8400-e29b-41d4-a716-446655440000');
       
-      // Get the Wi-Fi scan characteristic
-      const wifiScanCharacteristic = await service.getCharacteristic('00001235-0000-1000-8000-00805f9b34fb');
-      
-      // Request Wi-Fi scan
-      await wifiScanCharacteristic.writeValue(new TextEncoder().encode('SCAN'));
-      
-      // Wait a bit for scan to complete
-      await new Promise(resolve => setTimeout(resolve, 3000));
-      
-      // Read the Wi-Fi networks
-      const networksData = await wifiScanCharacteristic.readValue();
-      const networksJson = new TextDecoder().decode(networksData);
-      const networks = JSON.parse(networksJson);
-      
-      setWifiNetworks(networks);
-      setShowWifiModal(true);
+      // Note: WiFi network scanning should be done by the device's OS
+      // User will manually enter SSID
+      // Move to manual SSID entry step
       setCurrentStep(2);
-      toast.success(`Found ${networks.length} Wi-Fi networks`);
+      toast.info('Enter your WiFi network name (SSID) and password');
     } catch (err: any) {
       console.error('Connection error:', err);
       setError(`Failed to connect: ${err.message}`);
@@ -280,7 +289,7 @@ const DeviceWifiSetup = () => {
   // Step 3: Send Wi-Fi credentials to device
   const configureWifi = async () => {
     if (!selectedDevice || !selectedSsid || !password) {
-      toast.error('Please enter Wi-Fi password');
+      toast.error('Please enter WiFi network name and password');
       return;
     }
 
@@ -289,55 +298,107 @@ const DeviceWifiSetup = () => {
       setError('');
 
       const server = await selectedDevice.device.gatt.connect();
-      const service = await server.getPrimaryService('00001234-0000-1000-8000-00805f9b34fb');
+      const service = await server.getPrimaryService('550e8400-e29b-41d4-a716-446655440000');
       
-      // Get the Wi-Fi config characteristic
-      const wifiConfigCharacteristic = await service.getCharacteristic('00001236-0000-1000-8000-00805f9b34fb');
+      // Get the SSID characteristic (write-only)
+      const ssidCharacteristic = await service.getCharacteristic('550e8400-e29b-41d4-a716-446655440001');
       
-      // Send credentials
-      const credentials = JSON.stringify({ ssid: selectedSsid, password });
-      await wifiConfigCharacteristic.writeValue(new TextEncoder().encode(credentials));
+      // Get the Password characteristic (write-only)
+      const passwordCharacteristic = await service.getCharacteristic('550e8400-e29b-41d4-a716-446655440002');
       
-      // Wait for connection confirmation
-      await new Promise(resolve => setTimeout(resolve, 5000));
+      // Get the Status characteristic (notify-only)
+      const statusCharacteristic = await service.getCharacteristic('550e8400-e29b-41d4-a716-446655440003');
       
-      // Read connection status
-      const statusCharacteristic = await service.getCharacteristic('00001237-0000-1000-8000-00805f9b34fb');
-      const statusData = await statusCharacteristic.readValue();
-      const status = new TextDecoder().decode(statusData);
+      // Write SSID
+      await ssidCharacteristic.writeValue(new TextEncoder().encode(selectedSsid));
+      toast.info('SSID sent to device');
       
-      if (status === 'CONNECTED') {
-        setConnected(true);
-        setCurrentStep(3);
-        toast.success('✅ Tipply device connected to Wi-Fi!');
+      // Write Password
+      await passwordCharacteristic.writeValue(new TextEncoder().encode(password));
+      toast.info('Password sent to device');
+      
+      // Enable notifications for status updates
+      await statusCharacteristic.startNotifications();
+      
+      // Listen for status updates
+      statusCharacteristic.addEventListener('characteristicvaluechanged', async (event: any) => {
+        const statusData = event.target.value;
+        const statusJson = new TextDecoder().decode(statusData);
         
-        // Request notification permission after successful provisioning
-        const notifGranted = await requestNotificationPermission();
-        if (notifGranted) {
-          sendNotification(
-            '✅ Setup Complete!', 
-            `Your Tipply device is now connected to ${selectedSsid}`,
-            true
-          );
+        try {
+          const status = JSON.parse(statusJson);
+          console.log('Status update:', status);
+          
+          if (status.state === 'connecting') {
+            toast.info('Device is connecting to WiFi...');
+          } else if (status.state === 'success') {
+            setConnected(true);
+            setCurrentStep(3);
+            const ipAddress = status.ip || 'network';
+            toast.success(`✅ Tipwave device connected to WiFi! IP: ${ipAddress}`);
+            
+            // Request notification permission after successful provisioning
+            const notifGranted = await requestNotificationPermission();
+            if (notifGranted) {
+              sendNotification(
+                '✅ Setup Complete!', 
+                `Your Tipwave device is now connected to ${selectedSsid} (IP: ${ipAddress})`,
+                true
+              );
+            }
+            
+            // Stop notifications
+            await statusCharacteristic.stopNotifications();
+            setConnecting(false);
+          } else if (status.state === 'failure') {
+            const errorMsg = getErrorMessage(status.error);
+            throw new Error(errorMsg);
+          }
+        } catch (parseErr) {
+          console.error('Failed to parse status JSON:', parseErr);
         }
-      } else {
-        throw new Error('Connection failed: ' + status);
-      }
+      });
+      
+      toast.info('Waiting for device to connect to WiFi...');
+      
+      // Set a timeout in case we don't get a response
+      setTimeout(() => {
+        if (connecting) {
+          setConnecting(false);
+          toast.error('Connection timeout. Please try again.');
+        }
+      }, 30000); // 30 second timeout
+      
     } catch (err: any) {
       console.error('Wi-Fi configuration error:', err);
       setError(`Failed to configure Wi-Fi: ${err.message}`);
-      toast.error('Failed to configure Wi-Fi');
+      toast.error(`Failed to configure Wi-Fi: ${err.message}`);
       
       // Send failure notification if permission granted
       if (notificationPermission === 'granted') {
         sendNotification(
           '❌ Setup Failed',
-          'Tipply device could not connect to Wi-Fi. Please try again.',
+          'Tipwave device could not connect to Wi-Fi. Please try again.',
           false
         );
       }
-    } finally {
+      
       setConnecting(false);
+    }
+  };
+  
+  // Helper function to get user-friendly error messages
+  const getErrorMessage = (errorCode: string): string => {
+    switch (errorCode) {
+      case 'auth_failed':
+        return 'Wrong WiFi password. Please check and try again.';
+      case 'no_ssid':
+        return 'WiFi network not found. Make sure the network name is correct.';
+      case 'timeout':
+        return 'Connection attempt timed out. Please try again.';
+      case 'unknown':
+      default:
+        return 'Connection failed. Please try again.';
     }
   };
 
@@ -355,7 +416,7 @@ const DeviceWifiSetup = () => {
     {
       title: 'Configure',
       icon: <WifiOutlined />,
-      description: 'Select Wi-Fi network'
+      description: 'Enter WiFi credentials'
     },
     {
       title: 'Complete',
@@ -370,10 +431,13 @@ const DeviceWifiSetup = () => {
         {/* Header */}
         <div className="text-center mb-8">
           <h1 className="text-4xl md:text-5xl font-bold text-white mb-3">
-            Tipply Device Setup
+            Tipwave Device Setup
           </h1>
           <p className="text-gray-300 text-lg">
-            Connect your Tipply device to Wi-Fi via Bluetooth
+            Connect your Tipwave device to WiFi via Bluetooth
+          </p>
+          <p className="text-gray-400 text-sm mt-2">
+            Looking for devices named: <span className="text-blue-400 font-mono">Tipwave-*</span>
           </p>
         </div>
 
@@ -468,10 +532,22 @@ const DeviceWifiSetup = () => {
             <div className="text-center py-8">
               <ApiOutlined className="text-6xl text-blue-500 mb-4" />
               <h2 className="text-2xl font-bold text-white mb-4">
-                Scan for Tipply Device
+                Scan for Tipwave Device
               </h2>
               <p className="text-gray-300 mb-6">
-                Make sure your Tipply device is powered on and in pairing mode
+                Make sure your Tipwave device is powered on and in pairing mode
+              </p>
+              <div className="bg-blue-900/30 border border-blue-700 rounded-lg p-4 mb-6 text-left max-w-md mx-auto">
+                <p className="text-blue-200 text-sm mb-2">
+                  <strong>Device Name Format:</strong>
+                </p>
+                <p className="text-blue-100 text-sm font-mono">
+                  Tipwave-&lt;serial_number&gt;
+                </p>
+                <p className="text-blue-200 text-xs mt-2">
+                  Example: Tipwave-TPW-5C07-3VQ
+                </p>
+              </div>
               </p>
               <Button
                 type="primary"
@@ -502,37 +578,36 @@ const DeviceWifiSetup = () => {
                 Connecting to Device
               </h2>
               <p className="text-gray-300 mb-6">
-                Scanning for available Wi-Fi networks...
+                Establishing Bluetooth connection...
               </p>
             </div>
           </Card>
         )}
 
-        {/* Step 2: Enter Wi-Fi Password */}
-        {currentStep === 2 && selectedSsid && (
+        {/* Step 2: Enter WiFi Credentials */}
+        {currentStep === 2 && (
           <Card className="bg-gray-800 border-gray-700">
             <div className="py-6">
               <h2 className="text-2xl font-bold text-white mb-4">
-                Enter Wi-Fi Password
+                Enter WiFi Credentials
               </h2>
               
               <div className="space-y-4 mb-6">
-                <div className="bg-gray-700 p-4 rounded-lg">
-                  <label className="block text-gray-300 text-sm mb-2">
-                    Selected Network
+                <div>
+                  <label className="block text-gray-300 font-semibold mb-2">
+                    WiFi Network Name (SSID)
                   </label>
-                  <div className="flex items-center justify-between">
-                    <p className="text-white font-semibold text-lg">
-                      {selectedSsid}
-                    </p>
-                    <Button
-                      type="link"
-                      onClick={() => setShowWifiModal(true)}
-                      className="text-blue-400"
-                    >
-                      Change
-                    </Button>
-                  </div>
+                  <Input
+                    size="large"
+                    placeholder="Enter your WiFi network name"
+                    value={selectedSsid}
+                    onChange={(e) => setSelectedSsid(e.target.value)}
+                    className="bg-gray-700 border-gray-600 text-white"
+                    style={{ backgroundColor: '#374151', color: 'white', borderColor: '#4B5563' }}
+                  />
+                  <p className="text-gray-400 text-xs mt-1">
+                    Enter the exact name of your WiFi network
+                  </p>
                 </div>
 
                 <div>
@@ -572,10 +647,10 @@ const DeviceWifiSetup = () => {
                   icon={connecting ? <LoadingOutlined /> : <CheckCircleOutlined />}
                   onClick={configureWifi}
                   loading={connecting}
-                  disabled={!password}
+                  disabled={!selectedSsid || !password}
                   className="flex-1 bg-green-600 hover:bg-green-700 border-none"
                 >
-                  {connecting ? 'Connecting...' : 'Connect to Wi-Fi'}
+                  {connecting ? 'Connecting...' : 'Connect to WiFi'}
                 </Button>
               </div>
             </div>
@@ -591,7 +666,7 @@ const DeviceWifiSetup = () => {
                 Setup Complete!
               </h2>
               <p className="text-gray-300 mb-6">
-                Your Tipply device is now connected to Wi-Fi
+                Your Tipwave device is now connected to WiFi
               </p>
               <div className="bg-gray-700 p-4 rounded-lg mb-6">
                 <p className="text-white font-semibold">
