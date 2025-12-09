@@ -324,26 +324,11 @@ const DeviceWifiSetup = () => {
       // Get the Tipwave Provisioning Service
       const service = await server.getPrimaryService('550e8400-e29b-41d4-a716-446655440000');
       
-      // Get the WiFi Scan characteristic
-      const wifiScanCharacteristic = await service.getCharacteristic('550e8400-e29b-41d4-a716-446655440004');
+      // TODO: WiFi scanning will be implemented later when firmware supports characteristic 550e8400-e29b-41d4-a716-446655440004
+      // For now, skip directly to manual SSID entry
       
-      toast.info('Scanning for WiFi networks...');
-      
-      // Read WiFi networks from device
-      const networksData = await wifiScanCharacteristic.readValue();
-      const networksJson = new TextDecoder().decode(networksData);
-      const networks = JSON.parse(networksJson);
-      
-      if (networks && networks.length > 0) {
-        setWifiNetworks(networks);
-        setShowWifiModal(true);
-        setCurrentStep(2);
-        toast.success(`Found ${networks.length} WiFi networks`);
-      } else {
-        // No networks found, allow manual entry
-        setCurrentStep(2);
-        toast.info('No networks found. Enter WiFi details manually.');
-      }
+      setCurrentStep(2);
+      toast.info('Enter your WiFi network credentials');
     } catch (err: any) {
       console.error('Connection error:', err);
       setError(`Failed to connect: ${err.message}`);
@@ -705,20 +690,9 @@ const DeviceWifiSetup = () => {
               
               <div className="space-y-4 mb-6">
                 <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <label className="block text-gray-300 font-semibold">
-                      WiFi Network Name (SSID)
-                    </label>
-                    {wifiNetworks.length > 0 && (
-                      <Button
-                        type="link"
-                        onClick={() => setShowWifiModal(true)}
-                        className="text-blue-400 text-sm"
-                      >
-                        Choose from list
-                      </Button>
-                    )}
-                  </div>
+                  <label className="block text-gray-300 font-semibold mb-2">
+                    WiFi Network Name (SSID)
+                  </label>
                   <Input
                     size="large"
                     placeholder="Enter your WiFi network name"
@@ -726,17 +700,11 @@ const DeviceWifiSetup = () => {
                     onChange={(e) => setSelectedSsid(e.target.value)}
                     className="bg-gray-700 border-gray-600 text-white"
                     style={{ backgroundColor: '#374151', color: 'white', borderColor: '#4B5563' }}
+                    autoFocus
                   />
-                  {wifiNetworks.length === 0 && (
-                    <p className="text-gray-400 text-xs mt-1">
-                      Enter the exact name of your WiFi network
-                    </p>
-                  )}
-                  {wifiNetworks.length > 0 && !selectedSsid && (
-                    <p className="text-blue-400 text-xs mt-1">
-                      💡 Tip: Click "Choose from list" to select from {wifiNetworks.length} available networks
-                    </p>
-                  )}
+                  <p className="text-gray-400 text-xs mt-1">
+                    Enter the exact name of your WiFi network (case-sensitive)
+                  </p>
                 </div>
 
                 <div>
