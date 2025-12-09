@@ -297,23 +297,10 @@ const DeviceWifiSetup = () => {
         await new Promise(resolve => setTimeout(resolve, 1500));
         
         toast.success('Connected to device (Demo)');
-        toast.info('Scanning for WiFi networks...');
         
-        await new Promise(resolve => setTimeout(resolve, 2000));
-        
-        // Mock WiFi networks
-        const mockNetworks = [
-          { ssid: 'Home-WiFi-5G', rssi: -45, security: 'WPA2' },
-          { ssid: 'Office-Network', rssi: -52, security: 'WPA2' },
-          { ssid: 'Guest-WiFi', rssi: -67, security: 'WPA2' },
-          { ssid: 'Tipwave-Setup', rssi: -38, security: 'Open' },
-          { ssid: 'Neighbor-WiFi', rssi: -78, security: 'WPA2' }
-        ];
-        
-        setWifiNetworks(mockNetworks);
-        setShowWifiModal(true);
+        // Skip WiFi scanning in demo mode - go straight to manual entry
         setCurrentStep(2);
-        toast.success(`Found ${mockNetworks.length} WiFi networks (Demo)`);
+        toast.info('Enter your WiFi credentials (Demo)');
         setConnecting(false);
         return;
       }
