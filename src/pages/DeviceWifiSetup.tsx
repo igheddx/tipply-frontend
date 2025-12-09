@@ -518,7 +518,7 @@ const DeviceWifiSetup = () => {
           <p className="text-gray-400 text-sm mt-2">
             Looking for devices named: <span className="text-blue-400 font-mono">Tipwave-*</span>
           </p>
-          {!demoMode && (
+          {!demoMode && import.meta.env.DEV && (
             <p className="text-yellow-400 text-xs mt-2">
               💡 No hardware? Hold <kbd className="bg-gray-700 px-2 py-1 rounded">Shift</kbd> while clicking "Find My Device" to test demo mode
             </p>
