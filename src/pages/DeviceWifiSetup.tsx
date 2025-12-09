@@ -645,39 +645,44 @@ const DeviceWifiSetup = () => {
                   {scanning ? 'Scanning...' : 'Find My Device'}
                 </Button>
                 
-                <div className="text-gray-400 text-sm">or</div>
-                
-                <Button
-                  type="default"
-                  size="large"
-                  onClick={async () => {
-                    // Activate demo mode directly
-                    setScanning(true);
-                    setDemoMode(true);
-                    toast.info('Demo mode activated - simulating Tipwave device');
+                {/* Demo Mode Button - Only visible in development */}
+                {import.meta.env.DEV && (
+                  <>
+                    <div className="text-gray-400 text-sm">or</div>
                     
-                    await new Promise(resolve => setTimeout(resolve, 500));
-                    
-                    // Simulate device selection
-                    const demoDevice: BluetoothDevice = {
-                      name: 'Tipwave-TPW-DEMO-001',
-                      id: 'demo-device-001',
-                      device: null
-                    };
-                    
-                    setSelectedDevice(demoDevice);
-                    toast.success(`Selected: ${demoDevice.name} (Demo)`);
-                    
-                    // Simulate connection with delay
-                    setTimeout(() => {
-                      connectToDevice(demoDevice);
-                      setScanning(false);
-                    }, 1000);
-                  }}
-                  className="bg-yellow-600 hover:bg-yellow-700 text-white border-none px-8"
-                >
-                  🧪 Test Demo Mode
-                </Button>
+                    <Button
+                      type="default"
+                      size="large"
+                      onClick={async () => {
+                        // Activate demo mode directly
+                        setScanning(true);
+                        setDemoMode(true);
+                        toast.info('Demo mode activated - simulating Tipwave device');
+                        
+                        await new Promise(resolve => setTimeout(resolve, 500));
+                        
+                        // Simulate device selection
+                        const demoDevice: BluetoothDevice = {
+                          name: 'Tipwave-TPW-DEMO-001',
+                          id: 'demo-device-001',
+                          device: null
+                        };
+                        
+                        setSelectedDevice(demoDevice);
+                        toast.success(`Selected: ${demoDevice.name} (Demo)`);
+                        
+                        // Simulate connection with delay
+                        setTimeout(() => {
+                          connectToDevice(demoDevice);
+                          setScanning(false);
+                        }, 1000);
+                      }}
+                      className="bg-yellow-600 hover:bg-yellow-700 text-white border-none px-8"
+                    >
+                      🧪 Test Demo Mode
+                    </Button>
+                  </>
+                )}
               </div>
               
               {!environment?.supportsWebBluetooth && (
