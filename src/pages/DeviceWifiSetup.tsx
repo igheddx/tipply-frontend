@@ -62,6 +62,7 @@ const DeviceWifiSetup = () => {
   const [error, setError] = useState<string>('');
   const [environment, setEnvironment] = useState<EnvironmentInfo | null>(null);
   const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>('default');
+  const [demoMode, setDemoMode] = useState(false);
 
   // Detect environment and capabilities
   const detectEnvironment = (): EnvironmentInfo => {
@@ -215,6 +216,31 @@ const DeviceWifiSetup = () => {
         return;
       }
       
+      // Check for demo mode (hold Shift key while clicking)
+      if ((window.event as any)?.shiftKey) {
+        setDemoMode(true);
+        toast.info('Demo mode activated - simulating Tipwave device');
+        
+        // Simulate device selection
+        const demoDevice: BluetoothDevice = {
+          name: 'Tipwave-TPW-DEMO-001',
+          id: 'demo-device-001',
+          device: null
+        };
+        
+        setSelectedDevice(demoDevice);
+        toast.success(`Selected: ${demoDevice.name} (Demo)`);
+        
+        // Simulate connection with delay
+        setTimeout(() => {
+          connectToDevice(demoDevice);
+        }, 1000);
+        
+        return;
+      }
+      
+      toast.info('Opening Bluetooth device picker...');
+      
       const device = await (navigator as any).bluetooth.requestDevice({
         filters: [
           {
@@ -244,7 +270,8 @@ const DeviceWifiSetup = () => {
     } catch (err: any) {
       console.error('Bluetooth scan error:', err);
       if (err.message.includes('User cancelled') || err.name === 'NotFoundError') {
-        toast.error('Device selection cancelled');
+        toast.error('Device selection cancelled. No Tipwave devices found nearby.');
+        toast.info('💡 Hold Shift key while clicking "Find My Device" to test in demo mode');
       } else {
         setError(`Failed to scan for devices: ${err.message}`);
         toast.error('Failed to scan for devices');
@@ -263,6 +290,33 @@ const DeviceWifiSetup = () => {
       setConnecting(true);
       setError('');
       setCurrentStep(1);
+
+      // Demo mode simulation
+      if (demoMode || !targetDevice.device) {
+        toast.info('Demo mode: Simulating device connection...');
+        await new Promise(resolve => setTimeout(resolve, 1500));
+        
+        toast.success('Connected to device (Demo)');
+        toast.info('Scanning for WiFi networks...');
+        
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        
+        // Mock WiFi networks
+        const mockNetworks = [
+          { ssid: 'Home-WiFi-5G', rssi: -45, security: 'WPA2' },
+          { ssid: 'Office-Network', rssi: -52, security: 'WPA2' },
+          { ssid: 'Guest-WiFi', rssi: -67, security: 'WPA2' },
+          { ssid: 'Tipwave-Setup', rssi: -38, security: 'Open' },
+          { ssid: 'Neighbor-WiFi', rssi: -78, security: 'WPA2' }
+        ];
+        
+        setWifiNetworks(mockNetworks);
+        setShowWifiModal(true);
+        setCurrentStep(2);
+        toast.success(`Found ${mockNetworks.length} WiFi networks (Demo)`);
+        setConnecting(false);
+        return;
+      }
 
       const server = await targetDevice.device.gatt.connect();
       toast.success('Connected to device');
@@ -315,6 +369,33 @@ const DeviceWifiSetup = () => {
     try {
       setConnecting(true);
       setError('');
+
+      // Demo mode simulation
+      if (demoMode || !selectedDevice.device) {
+        toast.info('Demo mode: Sending credentials to device...');
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        toast.info('Device is connecting to WiFi...');
+        await new Promise(resolve => setTimeout(resolve, 3000));
+        
+        // Simulate success
+        setConnected(true);
+        setCurrentStep(3);
+        const mockIp = '192.168.1.157';
+        toast.success(`✅ Tipwave device connected to WiFi! IP: ${mockIp} (Demo)`);
+        
+        const notifGranted = await requestNotificationPermission();
+        if (notifGranted) {
+          sendNotification(
+            '✅ Setup Complete!', 
+            `Your Tipwave device is now connected to ${selectedSsid} (Demo Mode)`,
+            true
+          );
+        }
+        
+        setConnecting(false);
+        return;
+      }
 
       const server = await selectedDevice.device.gatt.connect();
       const service = await server.getPrimaryService('550e8400-e29b-41d4-a716-446655440000');
@@ -449,15 +530,27 @@ const DeviceWifiSetup = () => {
       <div className="max-w-4xl mx-auto">
         {/* Header */}
         <div className="text-center mb-8">
-          <h1 className="text-4xl md:text-5xl font-bold text-white mb-3">
-            Tipwave Device Setup
-          </h1>
+          <div className="flex items-center justify-center gap-3 mb-3">
+            <h1 className="text-4xl md:text-5xl font-bold text-white">
+              Tipwave Device Setup
+            </h1>
+            {demoMode && (
+              <span className="px-3 py-1 bg-yellow-600 text-white rounded-full text-xs font-semibold">
+                DEMO MODE
+              </span>
+            )}
+          </div>
           <p className="text-gray-300 text-lg">
             Connect your Tipwave device to WiFi via Bluetooth
           </p>
           <p className="text-gray-400 text-sm mt-2">
             Looking for devices named: <span className="text-blue-400 font-mono">Tipwave-*</span>
           </p>
+          {!demoMode && (
+            <p className="text-yellow-400 text-xs mt-2">
+              💡 No hardware? Hold <kbd className="bg-gray-700 px-2 py-1 rounded">Shift</kbd> while clicking "Find My Device" to test demo mode
+            </p>
+          )}
         </div>
 
         {/* Progress Steps */}
