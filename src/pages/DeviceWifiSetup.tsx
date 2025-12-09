@@ -308,8 +308,8 @@ const DeviceWifiSetup = () => {
       const server = await targetDevice.device.gatt.connect();
       toast.success('Connected to device');
 
-      // Get the Tipwave Provisioning Service
-      const service = await server.getPrimaryService('550e8400-e29b-41d4-a716-446655440000');
+      // Get the Tipwave Provisioning Service (will be used in configureWifi)
+      await server.getPrimaryService('550e8400-e29b-41d4-a716-446655440000');
       
       // TODO: WiFi scanning will be implemented later when firmware supports characteristic 550e8400-e29b-41d4-a716-446655440004
       // For now, skip directly to manual SSID entry
