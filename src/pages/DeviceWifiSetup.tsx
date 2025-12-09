@@ -216,8 +216,8 @@ const DeviceWifiSetup = () => {
         return;
       }
       
-      // Check for demo mode (hold Shift key while clicking)
-      if ((window.event as any)?.shiftKey) {
+      // Check for demo mode (hold Shift key while clicking) - Only in development
+      if (import.meta.env.DEV && (window.event as any)?.shiftKey) {
         setDemoMode(true);
         toast.info('Demo mode activated - simulating Tipwave device');
         
@@ -271,7 +271,9 @@ const DeviceWifiSetup = () => {
       console.error('Bluetooth scan error:', err);
       if (err.message.includes('User cancelled') || err.name === 'NotFoundError') {
         toast.error('Device selection cancelled. No Tipwave devices found nearby.');
-        toast.info('💡 Hold Shift key while clicking "Find My Device" to test in demo mode');
+        if (import.meta.env.DEV) {
+          toast.info('💡 Hold Shift key while clicking "Find My Device" to test in demo mode');
+        }
       } else {
         setError(`Failed to scan for devices: ${err.message}`);
         toast.error('Failed to scan for devices');
@@ -291,8 +293,8 @@ const DeviceWifiSetup = () => {
       setError('');
       setCurrentStep(1);
 
-      // Demo mode simulation
-      if (demoMode || !targetDevice.device) {
+      // Demo mode simulation - Only in development
+      if (import.meta.env.DEV && (demoMode || !targetDevice.device)) {
         toast.info('Demo mode: Simulating device connection...');
         await new Promise(resolve => setTimeout(resolve, 1500));
         
@@ -342,8 +344,8 @@ const DeviceWifiSetup = () => {
       setConnecting(true);
       setError('');
 
-      // Demo mode simulation
-      if (demoMode || !selectedDevice.device) {
+      // Demo mode simulation - Only in development
+      if (import.meta.env.DEV && (demoMode || !selectedDevice.device)) {
         toast.info('Demo mode: Sending credentials to device...');
         await new Promise(resolve => setTimeout(resolve, 1000));
         
@@ -506,7 +508,7 @@ const DeviceWifiSetup = () => {
             <h1 className="text-4xl md:text-5xl font-bold text-white">
               Tipwave Device Setup
             </h1>
-            {demoMode && (
+            {import.meta.env.DEV && demoMode && (
               <span className="px-3 py-1 bg-yellow-600 text-white rounded-full text-xs font-semibold">
                 DEMO MODE
               </span>
