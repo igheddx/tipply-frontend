@@ -6,9 +6,13 @@
  * 
  * Service and Characteristics:
  * - Provisioning Service: 550e8400-e29b-41d4-a716-446655440000
+ * - WiFi Scan Characteristic: 550e8400-e29b-41d4-a716-446655440004 (Read/Notify)
  * - SSID Characteristic:    550e8400-e29b-41d4-a716-446655440001 (Write-only)
  * - Password Characteristic: 550e8400-e29b-41d4-a716-446655440002 (Write-only)
  * - Status Characteristic:   550e8400-e29b-41d4-a716-446655440003 (Notify-only)
+ * 
+ * WiFi Scan JSON Format:
+ * - [{"ssid":"Network1","rssi":-45,"security":"WPA2"},{"ssid":"Network2","rssi":-67,"security":"Open"}]
  * 
  * Status JSON Format:
  * - {"state":"connecting"}
@@ -266,11 +270,26 @@ const DeviceWifiSetup = () => {
       // Get the Tipwave Provisioning Service
       const service = await server.getPrimaryService('550e8400-e29b-41d4-a716-446655440000');
       
-      // Note: WiFi network scanning should be done by the device's OS
-      // User will manually enter SSID
-      // Move to manual SSID entry step
-      setCurrentStep(2);
-      toast.info('Enter your WiFi network name (SSID) and password');
+      // Get the WiFi Scan characteristic
+      const wifiScanCharacteristic = await service.getCharacteristic('550e8400-e29b-41d4-a716-446655440004');
+      
+      toast.info('Scanning for WiFi networks...');
+      
+      // Read WiFi networks from device
+      const networksData = await wifiScanCharacteristic.readValue();
+      const networksJson = new TextDecoder().decode(networksData);
+      const networks = JSON.parse(networksJson);
+      
+      if (networks && networks.length > 0) {
+        setWifiNetworks(networks);
+        setShowWifiModal(true);
+        setCurrentStep(2);
+        toast.success(`Found ${networks.length} WiFi networks`);
+      } else {
+        // No networks found, allow manual entry
+        setCurrentStep(2);
+        toast.info('No networks found. Enter WiFi details manually.');
+      }
     } catch (err: any) {
       console.error('Connection error:', err);
       setError(`Failed to connect: ${err.message}`);
@@ -548,7 +567,6 @@ const DeviceWifiSetup = () => {
                   Example: Tipwave-TPW-5C07-3VQ
                 </p>
               </div>
-              </p>
               <Button
                 type="primary"
                 size="large"
@@ -594,9 +612,20 @@ const DeviceWifiSetup = () => {
               
               <div className="space-y-4 mb-6">
                 <div>
-                  <label className="block text-gray-300 font-semibold mb-2">
-                    WiFi Network Name (SSID)
-                  </label>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="block text-gray-300 font-semibold">
+                      WiFi Network Name (SSID)
+                    </label>
+                    {wifiNetworks.length > 0 && (
+                      <Button
+                        type="link"
+                        onClick={() => setShowWifiModal(true)}
+                        className="text-blue-400 text-sm"
+                      >
+                        Choose from list
+                      </Button>
+                    )}
+                  </div>
                   <Input
                     size="large"
                     placeholder="Enter your WiFi network name"
@@ -605,9 +634,16 @@ const DeviceWifiSetup = () => {
                     className="bg-gray-700 border-gray-600 text-white"
                     style={{ backgroundColor: '#374151', color: 'white', borderColor: '#4B5563' }}
                   />
-                  <p className="text-gray-400 text-xs mt-1">
-                    Enter the exact name of your WiFi network
-                  </p>
+                  {wifiNetworks.length === 0 && (
+                    <p className="text-gray-400 text-xs mt-1">
+                      Enter the exact name of your WiFi network
+                    </p>
+                  )}
+                  {wifiNetworks.length > 0 && !selectedSsid && (
+                    <p className="text-blue-400 text-xs mt-1">
+                      💡 Tip: Click "Choose from list" to select from {wifiNetworks.length} available networks
+                    </p>
+                  )}
                 </div>
 
                 <div>
