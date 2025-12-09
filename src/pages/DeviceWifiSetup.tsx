@@ -645,17 +645,36 @@ const DeviceWifiSetup = () => {
                   Example: Tipwave-TPW-5C07-3VQ
                 </p>
               </div>
-              <Button
-                type="primary"
-                size="large"
-                icon={scanning ? <LoadingOutlined /> : <ScanOutlined />}
-                onClick={scanForDevices}
-                loading={scanning}
-                disabled={!environment?.supportsWebBluetooth}
-                className="bg-blue-600 hover:bg-blue-700 border-none px-8"
-              >
-                {scanning ? 'Scanning...' : 'Find My Device'}
-              </Button>
+              <div className="flex flex-col gap-3 items-center">
+                <Button
+                  type="primary"
+                  size="large"
+                  icon={scanning ? <LoadingOutlined /> : <ScanOutlined />}
+                  onClick={scanForDevices}
+                  loading={scanning}
+                  disabled={!environment?.supportsWebBluetooth}
+                  className="bg-blue-600 hover:bg-blue-700 border-none px-8"
+                >
+                  {scanning ? 'Scanning...' : 'Find My Device'}
+                </Button>
+                
+                <div className="text-gray-400 text-sm">or</div>
+                
+                <Button
+                  type="default"
+                  size="large"
+                  onClick={(e) => {
+                    // Simulate shift key press
+                    Object.defineProperty(e, 'shiftKey', { value: true, writable: false });
+                    (window as any).event = e;
+                    scanForDevices();
+                  }}
+                  className="bg-yellow-600 hover:bg-yellow-700 text-white border-none px-8"
+                >
+                  🧪 Test Demo Mode
+                </Button>
+              </div>
+              
               {!environment?.supportsWebBluetooth && (
                 <p className="text-yellow-400 mt-4 text-sm">
                   🚫 Provisioning requires desktop or Tipply PWA wrapper
