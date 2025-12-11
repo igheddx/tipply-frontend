@@ -177,13 +177,13 @@ const TippingInterface: React.FC = () => {
 
   const checkPaymentMethods = async (): Promise<PaymentMethodsCheckResult> => {
     const tempUserId = localStorage.getItem('tipply_user_id')
-    if (!tempUserId) {
+    if (!tempUserId || !deviceId) {
       return { hasPaymentMethods: false }
     }
 
     // Check cached payment status first (valid for 5 minutes)
-    const cachedPaymentStatus = localStorage.getItem(`payment_status_${tempUserId}`)
-    const cachedTimestamp = localStorage.getItem(`payment_status_timestamp_${tempUserId}`)
+    const cachedPaymentStatus = localStorage.getItem(`payment_status_${tempUserId}_${deviceId}`)
+    const cachedTimestamp = localStorage.getItem(`payment_status_timestamp_${tempUserId}_${deviceId}`)
     
     if (cachedPaymentStatus && cachedTimestamp) {
       const now = Date.now()
@@ -198,7 +198,17 @@ const TippingInterface: React.FC = () => {
     }
 
     try {
-      const response = await fetch(`${getApiBaseUrl()}/api/stripe/payment-methods/${tempUserId}`)
+      const response = await fetch(`${getApiBaseUrl()}/api/stripe/check-payment-methods`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          deviceUuid: deviceId,
+          userId: tempUserId
+        })
+      })
+      
       const data = await response.json()
       
       if (response.ok && data.hasPaymentMethods) {
@@ -207,9 +217,9 @@ const TippingInterface: React.FC = () => {
           paymentMethodType: data.paymentMethodType
         }
         
-        // Cache the successful result
-        localStorage.setItem(`payment_status_${tempUserId}`, JSON.stringify(result))
-        localStorage.setItem(`payment_status_timestamp_${tempUserId}`, Date.now().toString())
+        // Cache the successful result with device-specific key
+        localStorage.setItem(`payment_status_${tempUserId}_${deviceId}`, JSON.stringify(result))
+        localStorage.setItem(`payment_status_timestamp_${tempUserId}_${deviceId}`, Date.now().toString())
         
         return result
       }
@@ -222,9 +232,9 @@ const TippingInterface: React.FC = () => {
 
   const clearPaymentCache = () => {
     const tempUserId = localStorage.getItem('tipply_user_id')
-    if (tempUserId) {
-      localStorage.removeItem(`payment_status_${tempUserId}`)
-      localStorage.removeItem(`payment_status_timestamp_${tempUserId}`)
+    if (tempUserId && deviceId) {
+      localStorage.removeItem(`payment_status_${tempUserId}_${deviceId}`)
+      localStorage.removeItem(`payment_status_timestamp_${tempUserId}_${deviceId}`)
     }
   }
 
