@@ -81,7 +81,7 @@ const SongCatalogSearch: React.FC<SongCatalogSearchProps> = ({
     
     try {
       const response = await fetch(
-        `${API_BASE_URL}/api/songcatalog/performer/${deviceUuid}?search=${encodeURIComponent(query)}&limit=50`
+        `${API_BASE_URL}/api/songcatalog/performer/${deviceUuid}?search=${encodeURIComponent(query)}&limit=20`
       )
       
       if (response.ok) {
