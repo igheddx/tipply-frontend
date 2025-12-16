@@ -1,4 +1,4 @@
-const CACHE_NAME = "tipply-v2";
+const CACHE_NAME = "tipply-v3";
 const urlsToCache = [
   "/",
   "/index.html",
@@ -51,16 +51,24 @@ self.addEventListener("activate", (event) => {
 self.addEventListener("fetch", (event) => {
   const url = new URL(event.request.url);
   
+  // Skip caching for POST, PUT, DELETE, PATCH requests
+  if (event.request.method !== 'GET') {
+    event.respondWith(fetch(event.request));
+    return;
+  }
+  
   // Network first strategy for device setup page and API calls
   if (url.pathname === '/device-setup' || url.pathname.startsWith('/api/')) {
     event.respondWith(
       fetch(event.request)
         .then((response) => {
-          // Clone the response before caching
-          const responseToCache = response.clone();
-          caches.open(CACHE_NAME).then((cache) => {
-            cache.put(event.request, responseToCache);
-          });
+          // Only cache successful GET responses
+          if (response && response.status === 200) {
+            const responseToCache = response.clone();
+            caches.open(CACHE_NAME).then((cache) => {
+              cache.put(event.request, responseToCache);
+            });
+          }
           return response;
         })
         .catch(() => {
@@ -74,10 +82,13 @@ self.addEventListener("fetch", (event) => {
       caches.match(event.request).then((response) => {
         return response || fetch(event.request).then((fetchResponse) => {
           // Cache new requests
-          return caches.open(CACHE_NAME).then((cache) => {
-            cache.put(event.request, fetchResponse.clone());
-            return fetchResponse;
-          });
+          if (fetchResponse && fetchResponse.status === 200) {
+            return caches.open(CACHE_NAME).then((cache) => {
+              cache.put(event.request, fetchResponse.clone());
+              return fetchResponse;
+            });
+          }
+          return fetchResponse;
         });
       })
     );
