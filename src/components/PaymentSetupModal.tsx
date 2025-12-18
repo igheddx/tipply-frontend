@@ -10,7 +10,7 @@ const stripePromise = loadStripe((import.meta as any).env.VITE_STRIPE_PUBLISHABL
 interface PaymentSetupModalProps {
   isOpen: boolean
   onClose: () => void
-  onComplete: () => void
+  onComplete: (paymentMethodId?: string) => void
   deviceUuid: string
   userId: string
 }
@@ -53,7 +53,7 @@ function PaymentForm({
 }: { 
   deviceUuid: string
   userId: string
-  onComplete: () => void
+  onComplete: (paymentMethodId?: string) => void
   onClose: () => void
 }) {
   const stripe = useStripe()
@@ -114,9 +114,21 @@ function PaymentForm({
             setError(error.message || 'Payment setup failed')
           } else {
             console.log('Payment Request setup successful')
+            // Store setup success in localStorage
+            const tempUserId = localStorage.getItem('tipply_user_id')
+            if (tempUserId) {
+              localStorage.setItem(`payment_status_${tempUserId}_${deviceUuid}`, JSON.stringify({
+                hasPaymentMethods: true,
+                paymentMethodType: 'card'
+              }))
+              localStorage.setItem(`payment_status_timestamp_${tempUserId}_${deviceUuid}`, Date.now().toString())
+            }
             event.complete('success')
             toast.success('Payment method added successfully!')
-            onComplete()
+            // Extract payment method ID from the payment method event
+            const paymentMethodId = event.paymentMethod?.id
+            console.log('💳 Payment method ID from wallet:', paymentMethodId)
+            onComplete(paymentMethodId)
           }
         } catch (error) {
           console.error('Payment Request error:', error)
@@ -184,8 +196,21 @@ function PaymentForm({
         setError(result.error.message || 'Card error')
       } else {
         console.log('Payment method setup successful:', result.setupIntent)
+        // Extract payment method ID from the setup intent
+        const paymentMethodId = result.setupIntent?.payment_method as string | undefined
+        console.log('💳 Payment method ID from card:', paymentMethodId)
+        
+        // Store setup success in localStorage
+        const tempUserId = localStorage.getItem('tipply_user_id')
+        if (tempUserId) {
+          localStorage.setItem(`payment_status_${tempUserId}_${deviceUuid}`, JSON.stringify({
+            hasPaymentMethods: true,
+            paymentMethodType: 'card'
+          }))
+          localStorage.setItem(`payment_status_timestamp_${tempUserId}_${deviceUuid}`, Date.now().toString())
+        }
         toast.success('Payment method added successfully!')
-        onComplete()
+        onComplete(paymentMethodId)
       }
     } catch (error) {
       console.error('Card submission error:', error)
