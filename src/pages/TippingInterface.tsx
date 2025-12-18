@@ -85,6 +85,15 @@ const TippingInterface: React.FC = () => {
     }
   }, [])
 
+  // Update mobile status bar / theme color to match UI mode
+  useEffect(() => {
+    const themeColor = uiMode === 'cards' ? '#1e1b4b' : '#d8ded6'
+    const meta = document.querySelector('meta[name="theme-color"]')
+    if (meta) {
+      meta.setAttribute('content', themeColor)
+    }
+  }, [uiMode])
+
   // Check if device is mobile
   useEffect(() => {
     const checkMobile = () => {
