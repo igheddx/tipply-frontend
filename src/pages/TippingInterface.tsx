@@ -786,7 +786,7 @@ const TippingInterface: React.FC = () => {
       {/* Classic Swipe UI - Full Screen Bill */}
       {uiMode === 'classic' && (
         <div
-          className="fixed inset-0 z-50"
+          className="fixed inset-0 z-50 pt-[max(env(safe-area-inset-top),1rem)]"
           onTouchStart={handleClassicTouchStart}
           onTouchEnd={handleClassicTouchEnd}
         >

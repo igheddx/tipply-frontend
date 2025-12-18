@@ -1,4 +1,5 @@
-const CACHE_NAME = "tipply-v3";
+const CACHE_NAME = "tipply-v4";
+const IS_DEV = self.location.hostname === 'localhost' || self.location.hostname === '127.0.0.1';
 const urlsToCache = [
   "/",
   "/index.html",
@@ -16,6 +17,10 @@ const urlsToCache = [
 // Install event - cache core assets
 self.addEventListener("install", (event) => {
   console.log('[SW] Installing service worker...');
+  if (IS_DEV) {
+    event.waitUntil(self.skipWaiting());
+    return;
+  }
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
       console.log('[SW] Caching app shell');
@@ -31,7 +36,7 @@ self.addEventListener("install", (event) => {
 self.addEventListener("activate", (event) => {
   console.log('[SW] Activating service worker...');
   event.waitUntil(
-    caches.keys().then((cacheNames) => {
+    (IS_DEV ? Promise.resolve() : caches.keys().then((cacheNames) => {
       return Promise.all(
         cacheNames.map((cacheName) => {
           if (cacheName !== CACHE_NAME) {
@@ -40,7 +45,7 @@ self.addEventListener("activate", (event) => {
           }
         })
       );
-    }).then(() => {
+    })).then(() => {
       console.log('[SW] Claiming clients');
       return self.clients.claim();
     })
@@ -51,9 +56,17 @@ self.addEventListener("activate", (event) => {
 self.addEventListener("fetch", (event) => {
   const url = new URL(event.request.url);
   
-  // Skip caching for POST, PUT, DELETE, PATCH requests
+  // Skip caching for non-GET requests
   if (event.request.method !== 'GET') {
     event.respondWith(fetch(event.request));
+    return;
+  }
+
+  // In development, always go to network first and do not cache
+  if (IS_DEV) {
+    event.respondWith(
+      fetch(event.request).catch(() => caches.match(event.request))
+    );
     return;
   }
   
@@ -62,7 +75,6 @@ self.addEventListener("fetch", (event) => {
     event.respondWith(
       fetch(event.request)
         .then((response) => {
-          // Only cache successful GET responses
           if (response && response.status === 200) {
             const responseToCache = response.clone();
             caches.open(CACHE_NAME).then((cache) => {
@@ -71,17 +83,13 @@ self.addEventListener("fetch", (event) => {
           }
           return response;
         })
-        .catch(() => {
-          return caches.match(event.request);
-        })
+        .catch(() => caches.match(event.request))
     );
-  } 
-  // Cache first strategy for static assets
-  else {
+  } else {
+    // Cache first for static assets
     event.respondWith(
       caches.match(event.request).then((response) => {
         return response || fetch(event.request).then((fetchResponse) => {
-          // Cache new requests
           if (fetchResponse && fetchResponse.status === 200) {
             return caches.open(CACHE_NAME).then((cache) => {
               cache.put(event.request, fetchResponse.clone());
