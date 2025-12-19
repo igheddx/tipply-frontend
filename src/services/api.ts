@@ -318,12 +318,12 @@ class ApiService {
     effect: string
     duration: number
   }): Promise<ApiResponse<any>> {
-    console.log('Submitting tip with data:', tipData)
+    console.log('🎰 API SERVICE - Submitting tip with data:', tipData)
     const response = await this.request('/api/tips', {
       method: 'POST',
       body: JSON.stringify(tipData),
     })
-    console.log('Tip submission response:', response)
+    console.log('🎰 API SERVICE - Tip submission response:', response)
     return response
   }
 

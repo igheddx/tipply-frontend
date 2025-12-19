@@ -573,21 +573,16 @@ const TippingInterface: React.FC = () => {
 
     // Submit tip
     try {
-      const iotPayload = {
-        device_id: deviceInfo!.uuid,
-        cmd: 'led_effect',
-        action: getIoTEffect(amount),
-        sound: true
-      }
-      console.log('IOT PAYLOAD', iotPayload)
-
-      const response = await apiService.submitTip({
+      const tipPayload = {
         deviceId: deviceInfo!.uuid,
         userId: userId,
         amount: amount,
         effect: getLightEffect(amount),
         duration: 3000
-      })
+      }
+      console.log('🎰 SUBMITTING TIP PAYLOAD TO BACKEND (Classic Mode):', tipPayload)
+
+      const response = await apiService.submitTip(tipPayload)
 
       if (response.data) {
         toast.success(`$${amount} tip submitted!`)
@@ -627,19 +622,19 @@ const TippingInterface: React.FC = () => {
       const iotPayload = {
         device_id: deviceInfo!.uuid,
         cmd: 'led_effect',
-        action: getIoTEffect(amount),
-        sound: true
+        action: getIoTEffect(amount)
       }
-      console.log('IOT PAYLOAD', iotPayload)
-
-      // Submit tip
-      const response = await apiService.submitTip({
+      const tipPayload = {
         deviceId: deviceInfo!.uuid,
         userId: userId,
         amount: amount,
         effect: getLightEffect(amount),
         duration: 3000
-      })
+      }
+      console.log('🎰 SUBMITTING TIP PAYLOAD TO BACKEND (Cards Mode):', tipPayload)
+
+      // Submit tip
+      const response = await apiService.submitTip(tipPayload)
 
       if (response.data) {
         // Submit song request
