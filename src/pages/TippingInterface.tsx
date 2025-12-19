@@ -507,13 +507,6 @@ const TippingInterface: React.FC = () => {
     return 'basic'
   }
 
-  const getIoTEffect = (amount: number): 'effect1' | 'effect2' | 'effect3' => {
-    if (amount === 1 || amount === 5) return 'effect1'
-    if (amount === 10 || amount === 20) return 'effect2'
-    if (amount === 50 || amount === 100) return 'effect3'
-    return 'effect1'
-  }
-
   const triggerCelebration = (amount: number) => {
     const tier = getCelebrationTier(amount)
     setCelebrationTier(tier)
