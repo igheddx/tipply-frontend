@@ -619,11 +619,6 @@ const TippingInterface: React.FC = () => {
     }
 
     try {
-      const iotPayload = {
-        device_id: deviceInfo!.uuid,
-        cmd: 'led_effect',
-        action: getIoTEffect(amount)
-      }
       const tipPayload = {
         deviceId: deviceInfo!.uuid,
         userId: userId,
