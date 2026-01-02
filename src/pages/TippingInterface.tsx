@@ -980,7 +980,7 @@ const TippingInterface: React.FC = () => {
             className="flex flex-col items-center w-full px-4 pb-[16rem]"
             style={{ 
               paddingTop: isIOS 
-                ? 'max(5rem, calc(env(safe-area-inset-top) + 3.5rem))' 
+                ? 'max(7rem, calc(env(safe-area-inset-top) + 5rem))' 
                 : 'max(3rem, calc(env(safe-area-inset-top) + 1.5rem))'
             }}
           >
