@@ -608,12 +608,20 @@ const TippingInterface: React.FC = () => {
 
     // Submit tip
     try {
+      // Get stored payment method ID
+      const tempUserId = localStorage.getItem('tipply_user_id')
+      const paymentMethodKey = `payment_method_id_${tempUserId}_${deviceId}`
+      const paymentMethodId = localStorage.getItem(paymentMethodKey)
+      
+      console.log('💳 Retrieved payment method ID from localStorage:', paymentMethodId)
+      
       const tipPayload = {
         deviceId: deviceInfo!.uuid,
         userId: userId,
         amount: amount,
         effect: getLightEffect(amount),
-        duration: 3000
+        duration: 3000,
+        paymentMethodId: paymentMethodId || undefined
       }
       console.log('🎰 SUBMITTING TIP PAYLOAD TO BACKEND (Classic Mode):', tipPayload)
 

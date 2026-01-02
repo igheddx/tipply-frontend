@@ -317,6 +317,7 @@ class ApiService {
     amount: number
     effect: string
     duration: number
+    paymentMethodId?: string
   }): Promise<ApiResponse<any>> {
     console.log('🎰 API SERVICE - Submitting tip with data:', tipData)
     const response = await this.request('/api/tips', {
