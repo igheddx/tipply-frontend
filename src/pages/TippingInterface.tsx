@@ -1046,7 +1046,7 @@ const TippingInterface: React.FC = () => {
                 {/* Amount display */}
                 <div className="text-center mb-2">
                   <span className="text-white/80 text-sm uppercase tracking-wider mr-2">Amount:</span>
-                  <span className="font-bold text-white text-lg">
+                  <span className="font-black text-white text-4xl">
                     {gridSelectedAmount !== null ? `$${gridSelectedAmount}` : '—'}
                   </span>
                 </div>
@@ -1054,7 +1054,7 @@ const TippingInterface: React.FC = () => {
                 {/* Total display */}
                 <div className="text-center mb-3">
                   <span className="text-white/80 text-sm uppercase tracking-wider mr-2">Total:</span>
-                  <span className="font-bold text-white text-lg">${totalTipped}</span>
+                  <span className="font-black text-white text-4xl">${totalTipped}</span>
                 </div>
 
                 {/* Toggle back to Swipe UI */}
