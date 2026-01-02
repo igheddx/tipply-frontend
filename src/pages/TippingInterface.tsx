@@ -620,7 +620,7 @@ const TippingInterface: React.FC = () => {
       const response = await apiService.submitTip(tipPayload)
 
       if (response.data) {
-        toast.success(`$${amount} tip sent!`, { duration: 1500 })
+        toast.success(`$${amount} tip sent!`, { duration: 800 })
         // Refresh payment method session on successful tip (extends 30-day memory)
         refreshPaymentMethodSession()
       } else {
