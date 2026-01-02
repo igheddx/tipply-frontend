@@ -993,6 +993,16 @@ const TippingInterface: React.FC = () => {
               paddingBottom: isIOS ? '24rem' : '18rem'
             }}
           >
+            {/* Title inside scrollable container */}
+            <h1 
+              className="text-2xl font-bold text-white truncate text-center w-full"
+              style={{
+                marginBottom: isIOS ? '1rem' : '1rem'
+              }}
+            >
+              Tip {deviceInfo?.ownerFirstName} {deviceInfo?.ownerLastName}
+            </h1>
+
             {/* Tip buttons grid - wraps naturally */}
             <div className="flex flex-wrap justify-center gap-4 max-w-2xl w-full -mt-2 mb-4">
               {tipAmounts.map((amount, index) => (
