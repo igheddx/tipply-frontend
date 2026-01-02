@@ -35,7 +35,11 @@ const TippingInterface: React.FC = () => {
   const [audioEnabled, setAudioEnabled] = useState(false)
   const [clickedAmount, setClickedAmount] = useState<number | null>(null)
   const [isMobile, setIsMobile] = useState(false)
-  const [isIOS, setIsIOS] = useState(false)
+  const [isIOS, setIsIOS] = useState(() => {
+    // Detect iOS on initialization to prevent layout shift
+    return /iPhone|iPad|iPod/i.test(navigator.userAgent) || 
+           (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+  })
   
   // Song request state
   const [showSongSearch, setShowSongSearch] = useState(false)
@@ -100,16 +104,11 @@ const TippingInterface: React.FC = () => {
     }
   }, [uiMode])
 
-  // Check if device is mobile and iOS
+  // Check if device is mobile
   useEffect(() => {
     const checkMobile = () => {
       const mobile = window.innerWidth <= 768
       setIsMobile(mobile)
-      
-      // Detect iOS (iPhone, iPad, iPod) - including iPadOS 13+
-      const ios = /iPhone|iPad|iPod/i.test(navigator.userAgent) || 
-                  (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
-      setIsIOS(ios)
     }
     
     checkMobile()
