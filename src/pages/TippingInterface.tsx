@@ -988,8 +988,8 @@ const TippingInterface: React.FC = () => {
             className="flex flex-col items-center w-full px-4"
             style={{ 
               paddingTop: isIOS 
-                ? 'max(12rem, calc(env(safe-area-inset-top) + 8rem))' 
-                : 'max(2rem, calc(env(safe-area-inset-top) + 1rem))',
+                ? 'max(11rem, calc(env(safe-area-inset-top) + 7rem))' 
+                : 'max(1rem, calc(env(safe-area-inset-top) + 0.5rem))',
               paddingBottom: isIOS ? '24rem' : '18rem'
             }}
           >
@@ -997,7 +997,7 @@ const TippingInterface: React.FC = () => {
             <h1 
               className="text-2xl font-bold text-white truncate text-center w-full"
               style={{
-                marginBottom: isIOS ? '1rem' : '1rem'
+                marginBottom: '2rem'
               }}
             >
               Tip {deviceInfo?.ownerFirstName} {deviceInfo?.ownerLastName}
