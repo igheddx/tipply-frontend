@@ -32,8 +32,6 @@ const TippingInterface: React.FC = () => {
   const [isPaymentSetup, setIsPaymentSetup] = useState(false)
   const [userId, setUserId] = useState<string>('')
   const [checkingPaymentMethods, setCheckingPaymentMethods] = useState(true)
-  const [showCelebration, setShowCelebration] = useState(false)
-  const [celebrationTier, setCelebrationTier] = useState<'basic' | 'enhanced' | 'premium' | 'epic'>('basic')
   const [audioEnabled, setAudioEnabled] = useState(false)
   const [clickedAmount, setClickedAmount] = useState<number | null>(null)
   const [isMobile, setIsMobile] = useState(false)
@@ -502,13 +500,6 @@ const TippingInterface: React.FC = () => {
       setBillRefresh((v) => v + 1)
       setIsBillFlying(false)
     }, exitDuration)
-  }
-
-  const getCelebrationTier = (amount: number): 'basic' | 'enhanced' | 'premium' | 'epic' => {
-    if (amount >= 100) return 'epic'
-    if (amount >= 50) return 'premium'
-    if (amount >= 20) return 'enhanced'
-    return 'basic'
   }
 
   // Trigger haptic feedback (Web Vibration API)
