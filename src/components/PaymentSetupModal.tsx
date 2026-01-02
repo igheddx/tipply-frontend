@@ -61,6 +61,7 @@ function PaymentForm({
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [paymentRequest, setPaymentRequest] = useState<any>(null)
+  const [isApplePay, setIsApplePay] = useState(false)
 
   useEffect(() => {
     if (stripe) {
@@ -76,6 +77,7 @@ function PaymentForm({
         console.log('Payment Request canMakePayment result:', result)
         if (result) {
           setPaymentRequest(pr)
+          setIsApplePay(!!result.applePay)
           console.log('Payment Request is available:', result.applePay ? 'Apple Pay' : 'Google Pay')
         }
       })
@@ -227,14 +229,14 @@ function PaymentForm({
           <div className="mb-2">
             <button
               onClick={() => paymentRequest.show()}
-              disabled={!paymentRequest.canMakePayment()?.applePay || loading}
+              disabled={loading}
               className="w-full bg-black text-white py-3 px-4 rounded-lg hover:bg-gray-800 transition-colors disabled:opacity-50"
             >
-              {paymentRequest.canMakePayment()?.applePay ? 'Pay with Apple Pay' : 'Pay with Google Pay'}
+              {isApplePay ? 'Pay with Apple Pay' : 'Pay with Google Pay'}
             </button>
           </div>
           <div className="text-center text-xs text-gray-500">
-            {paymentRequest.canMakePayment()?.applePay ? 'Apple Pay' : 'Google Pay'} supported
+            {isApplePay ? 'Apple Pay' : 'Google Pay'} supported
           </div>
         </div>
       ) : (
