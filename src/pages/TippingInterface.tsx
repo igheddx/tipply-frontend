@@ -574,7 +574,7 @@ const TippingInterface: React.FC = () => {
     
     // Show confetti immediately (unless skipped for classic mode)
     if (!skipConfetti) {
-      triggerCelebration(amount)
+      triggerCanvasConfetti(amount)
     }
     
     // Update total
@@ -629,7 +629,7 @@ const TippingInterface: React.FC = () => {
   const processTipWithSong = async (amount: number) => {
     setLoading(true)
     setClickedAmount(amount)
-    triggerCelebration(amount)
+    triggerCanvasConfetti(amount)
     setTotalTipped(prev => prev + amount)
 
     // Play sound
