@@ -35,7 +35,7 @@ const TippingInterface: React.FC = () => {
   const [audioEnabled, setAudioEnabled] = useState(false)
   const [clickedAmount, setClickedAmount] = useState<number | null>(null)
   const [isMobile, setIsMobile] = useState(false)
-  const [isIOS, setIsIOS] = useState(() => {
+  const [isIOS] = useState(() => {
     // Detect iOS on initialization to prevent layout shift
     return /iPhone|iPad|iPod/i.test(navigator.userAgent) || 
            (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
