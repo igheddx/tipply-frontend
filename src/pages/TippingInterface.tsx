@@ -807,7 +807,7 @@ const TippingInterface: React.FC = () => {
           <div 
             className="relative z-10 px-6 text-center"
             style={{
-              paddingTop: isIOS ? '6rem' : '2rem'
+              paddingTop: isIOS ? '10rem' : '2rem'
             }}
           >
             <motion.div
