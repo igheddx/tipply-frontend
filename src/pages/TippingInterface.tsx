@@ -802,26 +802,6 @@ const TippingInterface: React.FC = () => {
           />
         ))}
           </div>
-
-          {/* Header - cards mode only */}
-          <div 
-            className="relative z-10 px-6 text-center"
-            style={{
-              paddingTop: isIOS ? '8rem' : '0.5rem'
-            }}
-          >
-            <motion.div
-              initial={{ opacity: 0, y: -20 }}
-              animate={{ opacity: 1, y: 0 }}
-              style={{
-                marginBottom: isIOS ? '-2rem' : '1rem'
-              }}
-            >
-              <h1 className="text-2xl font-bold text-white truncate">
-                Tip {deviceInfo?.ownerFirstName} {deviceInfo?.ownerLastName}
-              </h1>
-            </motion.div>
-          </div>
         </>
       )}
 
@@ -989,7 +969,7 @@ const TippingInterface: React.FC = () => {
             style={{ 
               paddingTop: isIOS 
                 ? 'max(11rem, calc(env(safe-area-inset-top) + 7rem))' 
-                : 'max(1rem, calc(env(safe-area-inset-top) + 0.5rem))',
+                : 'max(0.5rem, calc(env(safe-area-inset-top) + 0.25rem))',
               paddingBottom: isIOS ? '24rem' : '18rem'
             }}
           >
