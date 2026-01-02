@@ -983,11 +983,12 @@ const TippingInterface: React.FC = () => {
         <div className="relative z-10 w-full min-h-[100dvh] overflow-y-auto overscroll-contain" style={{ WebkitOverflowScrolling: 'touch' }}>
           {/* Responsive container with natural reflow */}
           <div 
-            className="flex flex-col items-center w-full px-4 pb-[24rem]"
+            className="flex flex-col items-center w-full px-4"
             style={{ 
               paddingTop: isIOS 
                 ? 'max(12rem, calc(env(safe-area-inset-top) + 8rem))' 
-                : 'max(3rem, calc(env(safe-area-inset-top) + 1.5rem))'
+                : 'max(2rem, calc(env(safe-area-inset-top) + 1rem))',
+              paddingBottom: isIOS ? '24rem' : '18rem'
             }}
           >
             {/* Tip buttons grid - wraps naturally */}
