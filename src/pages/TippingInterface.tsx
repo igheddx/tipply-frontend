@@ -804,7 +804,12 @@ const TippingInterface: React.FC = () => {
           </div>
 
           {/* Header - cards mode only */}
-          <div className="relative z-10 pt-8 px-6 text-center">
+          <div 
+            className="relative z-10 px-6 text-center"
+            style={{
+              paddingTop: isIOS ? '6rem' : '2rem'
+            }}
+          >
             <motion.div
               initial={{ opacity: 0, y: -20 }}
               animate={{ opacity: 1, y: 0 }}
