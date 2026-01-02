@@ -971,7 +971,7 @@ const TippingInterface: React.FC = () => {
       {uiMode === 'cards' && (
         <div className="relative z-10 w-full min-h-[100dvh] overflow-y-auto overscroll-contain" style={{ WebkitOverflowScrolling: 'touch' }}>
           {/* Responsive container with natural reflow */}
-          <div className="flex flex-col items-center w-full px-4 pt-[max(4rem,calc(env(safe-area-inset-top)+2.5rem))] pb-[16rem]">
+          <div className="flex flex-col items-center w-full px-4 pt-[max(3rem,calc(env(safe-area-inset-top)+1.5rem))] pb-[16rem]">
             {/* Tip buttons grid - wraps naturally */}
             <div className="flex flex-wrap justify-center gap-4 max-w-2xl w-full -mt-1 mb-4">
               {tipAmounts.map((amount, index) => (
@@ -1015,7 +1015,7 @@ const TippingInterface: React.FC = () => {
 
             {/* Song request section - naturally flows below buttons */}
             {deviceInfo?.isAllowSongRequest && (
-              <div className="w-full max-w-2xl px-2 mb-6">
+              <div className="w-full max-w-2xl px-2 mb-2">
                 {selectedSong ? (
                   <div className="bg-green-500/20 backdrop-blur-md rounded-2xl px-4 py-3 border border-green-400/30 break-words">
                     <div className="text-white text-xs font-semibold mb-2">🎵 Song Selected</div>
@@ -1041,7 +1041,7 @@ const TippingInterface: React.FC = () => {
             )}
 
             {/* Control block - naturally flows below everything */}
-            <div className="w-full max-w-2xl px-2 mb-[6rem]">
+            <div className="w-full max-w-2xl px-2 mb-[4rem]">
               <div className="relative bg-black/60 backdrop-blur-md rounded-3xl p-4 w-full border border-white/20 shadow-2xl text-center">
                 {/* Amount display */}
                 <div className="text-center mb-2">
