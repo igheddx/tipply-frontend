@@ -971,7 +971,7 @@ const TippingInterface: React.FC = () => {
       {uiMode === 'cards' && (
         <div className="relative z-10 w-full min-h-[100dvh] overflow-y-auto overscroll-contain" style={{ WebkitOverflowScrolling: 'touch' }}>
           {/* Responsive container with natural reflow */}
-          <div className="flex flex-col items-center w-full px-4 pt-[max(5rem,calc(env(safe-area-inset-top)+3rem))] pb-[20rem]">
+          <div className="flex flex-col items-center w-full px-4 pt-[max(4rem,calc(env(safe-area-inset-top)+2.5rem))] pb-[16rem]">
             {/* Tip buttons grid - wraps naturally */}
             <div className="flex flex-wrap justify-center gap-4 max-w-2xl w-full mb-4">
               {tipAmounts.map((amount, index) => (
@@ -1041,7 +1041,7 @@ const TippingInterface: React.FC = () => {
             )}
 
             {/* Control block - naturally flows below everything */}
-            <div className="w-full max-w-2xl px-2 mb-[8rem]">
+            <div className="w-full max-w-2xl px-2 mb-[6rem]">
               <div className="relative bg-black/60 backdrop-blur-md rounded-3xl p-4 w-full border border-white/20 shadow-2xl text-center">
                 {/* Amount display */}
                 <div className="text-center mb-2">
