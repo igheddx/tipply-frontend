@@ -798,13 +798,13 @@ const TippingInterface: React.FC = () => {
           </div>
 
           {/* Header - cards mode only */}
-          <div className="relative z-10 pt-8 px-6 text-center">
+          <div className="relative z-10 pt-4 px-6 text-center">
             <motion.div
               initial={{ opacity: 0, y: -20 }}
               animate={{ opacity: 1, y: 0 }}
               className="mb-2"
             >
-              <h1 className="text-3xl font-bold text-white">
+              <h1 className="text-2xl font-bold text-white truncate">
                 Tip {deviceInfo?.ownerFirstName} {deviceInfo?.ownerLastName}
               </h1>
             </motion.div>
@@ -971,7 +971,7 @@ const TippingInterface: React.FC = () => {
       {uiMode === 'cards' && (
         <div className="relative z-10 w-full min-h-[100dvh] overflow-y-auto overscroll-contain" style={{ WebkitOverflowScrolling: 'touch' }}>
           {/* Responsive container with natural reflow */}
-          <div className="flex flex-col items-center w-full px-4 py-6 pb-[20rem]">
+          <div className="flex flex-col items-center w-full px-4 pt-2 pb-[20rem]">
             {/* Tip buttons grid - wraps naturally */}
             <div className="flex flex-wrap justify-center gap-4 max-w-2xl w-full mb-4">
               {tipAmounts.map((amount, index) => (
@@ -1046,7 +1046,7 @@ const TippingInterface: React.FC = () => {
                 {/* Amount display */}
                 <div className="text-center mb-2">
                   <span className="text-white/80 text-sm uppercase tracking-wider mr-2">Amount:</span>
-                  <span className="font-bold text-white text-2xl">
+                  <span className="font-bold text-white text-lg">
                     {gridSelectedAmount !== null ? `$${gridSelectedAmount}` : '—'}
                   </span>
                 </div>
@@ -1054,7 +1054,7 @@ const TippingInterface: React.FC = () => {
                 {/* Total display */}
                 <div className="text-center mb-3">
                   <span className="text-white/80 text-sm uppercase tracking-wider mr-2">Total:</span>
-                  <span className="font-bold text-white text-2xl">${totalTipped}</span>
+                  <span className="font-bold text-white text-lg">${totalTipped}</span>
                 </div>
 
                 {/* Toggle back to Swipe UI */}
