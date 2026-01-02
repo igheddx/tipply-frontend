@@ -808,7 +808,7 @@ const TippingInterface: React.FC = () => {
             <motion.div
               initial={{ opacity: 0, y: -20 }}
               animate={{ opacity: 1, y: 0 }}
-              className="mb-0"
+              className="mb-8"
             >
               <h1 className="text-2xl font-bold text-white truncate">
                 Tip {deviceInfo?.ownerFirstName} {deviceInfo?.ownerLastName}
@@ -986,7 +986,7 @@ const TippingInterface: React.FC = () => {
             }}
           >
             {/* Tip buttons grid - wraps naturally */}
-            <div className="flex flex-wrap justify-center gap-4 max-w-2xl w-full -mt-16 mb-4">
+            <div className="flex flex-wrap justify-center gap-4 max-w-2xl w-full -mt-2 mb-4">
               {tipAmounts.map((amount, index) => (
                 <motion.button
                   key={amount}
