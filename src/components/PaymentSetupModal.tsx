@@ -71,14 +71,17 @@ function PaymentForm({
         total: { label: 'Tipply Tip', amount: 100 }, // $1 for setup
         requestPayerName: true,
         requestPayerEmail: true,
+        displayItems: [{ label: 'Tip Setup', amount: 100 }]
       })
       
       pr.canMakePayment().then((result) => {
         console.log('Payment Request canMakePayment result:', result)
+        console.log('User Agent:', navigator.userAgent)
+        console.log('Platform:', navigator.platform)
         if (result) {
           setPaymentRequest(pr)
           setIsApplePay(!!result.applePay)
-          console.log('Payment Request is available:', result.applePay ? 'Apple Pay' : 'Google Pay')
+          console.log('Payment Request is available - Apple Pay:', result.applePay, 'Google Pay:', result.googlePay)
         }
       })
 
