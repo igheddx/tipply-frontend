@@ -106,8 +106,9 @@ const TippingInterface: React.FC = () => {
       const mobile = window.innerWidth <= 768
       setIsMobile(mobile)
       
-      // Detect iOS (iPhone, iPad, iPod)
-      const ios = /iPhone|iPad|iPod/i.test(navigator.userAgent)
+      // Detect iOS (iPhone, iPad, iPod) - including iPadOS 13+
+      const ios = /iPhone|iPad|iPod/i.test(navigator.userAgent) || 
+                  (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
       setIsIOS(ios)
     }
     
@@ -980,7 +981,7 @@ const TippingInterface: React.FC = () => {
             className="flex flex-col items-center w-full px-4 pb-[16rem]"
             style={{ 
               paddingTop: isIOS 
-                ? 'max(7rem, calc(env(safe-area-inset-top) + 5rem))' 
+                ? 'max(10rem, calc(env(safe-area-inset-top) + 7rem))' 
                 : 'max(3rem, calc(env(safe-area-inset-top) + 1.5rem))'
             }}
           >
