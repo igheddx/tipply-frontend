@@ -35,6 +35,7 @@ const TippingInterface: React.FC = () => {
   const [audioEnabled, setAudioEnabled] = useState(false)
   const [clickedAmount, setClickedAmount] = useState<number | null>(null)
   const [isMobile, setIsMobile] = useState(false)
+  const [isIOS, setIsIOS] = useState(false)
   
   // Song request state
   const [showSongSearch, setShowSongSearch] = useState(false)
@@ -99,11 +100,15 @@ const TippingInterface: React.FC = () => {
     }
   }, [uiMode])
 
-  // Check if device is mobile
+  // Check if device is mobile and iOS
   useEffect(() => {
     const checkMobile = () => {
       const mobile = window.innerWidth <= 768
       setIsMobile(mobile)
+      
+      // Detect iOS (iPhone, iPad, iPod)
+      const ios = /iPhone|iPad|iPod/i.test(navigator.userAgent)
+      setIsIOS(ios)
     }
     
     checkMobile()
@@ -971,7 +976,14 @@ const TippingInterface: React.FC = () => {
       {uiMode === 'cards' && (
         <div className="relative z-10 w-full min-h-[100dvh] overflow-y-auto overscroll-contain" style={{ WebkitOverflowScrolling: 'touch' }}>
           {/* Responsive container with natural reflow */}
-          <div className="flex flex-col items-center w-full px-4 pt-[max(4.5rem,calc(env(safe-area-inset-top)+3rem))] pb-[16rem]">
+          <div 
+            className="flex flex-col items-center w-full px-4 pb-[16rem]"
+            style={{ 
+              paddingTop: isIOS 
+                ? 'max(5rem, calc(env(safe-area-inset-top) + 3.5rem))' 
+                : 'max(3rem, calc(env(safe-area-inset-top) + 1.5rem))'
+            }}
+          >
             {/* Tip buttons grid - wraps naturally */}
             <div className="flex flex-wrap justify-center gap-4 max-w-2xl w-full -mt-1 mb-4">
               {tipAmounts.map((amount, index) => (
