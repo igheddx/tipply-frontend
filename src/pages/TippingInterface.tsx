@@ -971,7 +971,7 @@ const TippingInterface: React.FC = () => {
       {uiMode === 'cards' && (
         <div className="relative z-10 flex flex-col items-center min-h-screen w-full">
           {/* Responsive container with natural reflow */}
-          <div className="flex flex-col items-center w-full flex-1 px-4 py-6 pb-[max(8rem,calc(env(safe-area-inset-bottom)+6rem))] overflow-y-auto">
+          <div className="flex flex-col items-center w-full flex-1 px-4 py-6 pb-[max(2rem,calc(env(safe-area-inset-bottom)+1rem))] overflow-y-auto">
             {/* Tip buttons grid - wraps naturally */}
             <div className="flex flex-wrap justify-center gap-4 max-w-2xl w-full mb-4">
               {tipAmounts.map((amount, index) => (
@@ -1041,18 +1041,18 @@ const TippingInterface: React.FC = () => {
             )}
 
             {/* Control block - naturally flows below everything */}
-            <div className="w-full max-w-2xl px-2 mb-8">
-              <div className="relative bg-black/60 backdrop-blur-md rounded-3xl p-6 w-full border border-white/20 shadow-2xl text-center">
+            <div className="w-full max-w-2xl px-2 mb-4">
+              <div className="relative bg-black/60 backdrop-blur-md rounded-3xl p-4 w-full border border-white/20 shadow-2xl text-center">
                 {/* Amount display */}
                 <div className="text-center mb-2">
                   <span className="text-white/80 text-xs uppercase tracking-wider mr-2">Amount:</span>
-                  <span className="text-white text-4xl sm:text-5xl font-black drop-shadow-2xl">
+                  <span className="text-white text-3xl font-black drop-shadow-2xl">
                     {gridSelectedAmount !== null ? `$${gridSelectedAmount}` : '—'}
                   </span>
                 </div>
 
                 {/* Total display */}
-                <div className="text-center mb-4">
+                <div className="text-center mb-3">
                   <span className="text-white/80 text-xs uppercase tracking-wider mr-2">Total:</span>
                   <span className="font-bold text-white text-lg">${totalTipped}</span>
                 </div>
