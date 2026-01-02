@@ -970,7 +970,7 @@ const TippingInterface: React.FC = () => {
       {uiMode === 'cards' && (
         <div className="relative z-10 flex flex-col items-center min-h-screen w-full">
           {/* Responsive container with natural reflow */}
-          <div className="flex flex-col items-center w-full flex-1 px-4 py-6 pb-[calc(env(safe-area-inset-bottom)+1.5rem)] overflow-y-auto">
+          <div className="flex flex-col items-center w-full flex-1 px-4 py-6 pb-[max(8rem,calc(env(safe-area-inset-bottom)+6rem))] overflow-y-auto">
             {/* Tip buttons grid - wraps naturally */}
             <div className="flex flex-wrap justify-center gap-4 max-w-2xl w-full mb-4">
               {tipAmounts.map((amount, index) => (
@@ -1014,15 +1014,15 @@ const TippingInterface: React.FC = () => {
 
             {/* Song request section - naturally flows below buttons */}
             {deviceInfo?.isAllowSongRequest && (
-              <div className="w-full max-w-2xl px-2 mb-4">
+              <div className="w-full max-w-2xl px-2 mb-6">
                 {selectedSong ? (
-                  <div className="bg-green-500/20 backdrop-blur-md rounded-2xl px-4 py-3 border border-green-400/30">
-                    <div className="text-white text-xs font-semibold mb-1">🎵 Song Selected</div>
-                    <div className="text-white/90 text-sm">{selectedSong.title}</div>
-                    <div className="text-white/70 text-xs">{selectedSong.artist}</div>
+                  <div className="bg-green-500/20 backdrop-blur-md rounded-2xl px-4 py-3 border border-green-400/30 break-words">
+                    <div className="text-white text-xs font-semibold mb-2">🎵 Song Selected</div>
+                    <div className="text-white/90 text-sm truncate">{selectedSong.title}</div>
+                    <div className="text-white/70 text-xs truncate">{selectedSong.artist}</div>
                     <button
                       onClick={() => setSelectedSong(null)}
-                      className="text-white/70 hover:text-white text-xs mt-1 underline"
+                      className="text-white/70 active:text-white text-xs mt-2 underline"
                     >
                       Cancel
                     </button>
@@ -1040,7 +1040,7 @@ const TippingInterface: React.FC = () => {
             )}
 
             {/* Control block - naturally flows below everything */}
-            <div className="w-full max-w-2xl px-2 mb-4">
+            <div className="w-full max-w-2xl px-2 mb-8">
               <div className="relative bg-black/60 backdrop-blur-md rounded-3xl p-6 w-full border border-white/20 shadow-2xl text-center">
                 {/* Amount display */}
                 <div className="text-center mb-4">
