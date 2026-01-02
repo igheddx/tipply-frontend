@@ -804,7 +804,7 @@ const TippingInterface: React.FC = () => {
           </div>
 
           {/* Header - cards mode only */}
-          <div className="relative z-10 pt-2 px-6 text-center">
+          <div className="relative z-10 pt-8 px-6 text-center">
             <motion.div
               initial={{ opacity: 0, y: -20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -986,7 +986,7 @@ const TippingInterface: React.FC = () => {
             }}
           >
             {/* Tip buttons grid - wraps naturally */}
-            <div className="flex flex-wrap justify-center gap-4 max-w-2xl w-full -mt-1 mb-4">
+            <div className="flex flex-wrap justify-center gap-4 max-w-2xl w-full -mt-16 mb-4">
               {tipAmounts.map((amount, index) => (
                 <motion.button
                   key={amount}
