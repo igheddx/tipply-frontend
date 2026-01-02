@@ -964,7 +964,7 @@ const TippingInterface: React.FC = () => {
       {uiMode === 'cards' && (
         <div className="relative z-10 flex flex-col items-center min-h-screen w-full">
           {/* Responsive container with natural reflow */}
-          <div className="flex flex-col items-center w-full flex-1 px-4 py-6 pb-safe overflow-y-auto">
+          <div className="flex flex-col items-center w-full flex-1 px-4 py-6 pb-[calc(env(safe-area-inset-bottom)+1.5rem)] overflow-y-auto">
             {/* Tip buttons grid - wraps naturally */}
             <div className="flex flex-wrap justify-center gap-4 max-w-2xl w-full mb-4">
               {tipAmounts.map((amount, index) => (
