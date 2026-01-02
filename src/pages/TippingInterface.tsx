@@ -542,18 +542,6 @@ const TippingInterface: React.FC = () => {
     })
   }
 
-  const triggerCelebration = (amount: number) => {
-    const tier = getCelebrationTier(amount)
-    setCelebrationTier(tier)
-    setShowCelebration(true)
-    
-    // Reliable timer-based cleanup
-    const duration = tier === 'epic' ? 2500 : tier === 'premium' ? 2000 : tier === 'enhanced' ? 1500 : 1200
-    setTimeout(() => {
-      setShowCelebration(false)
-    }, duration + 200) // Add small buffer
-  }
-
   const handleTipClick = async (amount: number) => {
     if (loading || !deviceInfo || !userId) return
 
