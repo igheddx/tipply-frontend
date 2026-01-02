@@ -347,6 +347,13 @@ class ApiService {
     })
   }
 
+  async updateDeviceConfiguration(deviceId: string, config: { isSoundEnabled?: boolean, effectConfiguration?: string }): Promise<ApiResponse<any>> {
+    return this.request(`/api/devices/${deviceId}/configuration`, {
+      method: 'PUT',
+      body: JSON.stringify(config)
+    })
+  }
+
   // Password reset endpoints (public - no API key required)
   async forgotPassword(email: string): Promise<ApiResponse<any>> {
     return this.request('/api/auth/forgot-password', {

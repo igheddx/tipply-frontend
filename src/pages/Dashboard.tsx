@@ -43,6 +43,8 @@ interface DeviceSummary {
   lastTipReceived: string
   qrCodeUrl: string
   isAllowSongRequest: boolean
+  isSoundEnabled?: boolean
+  effectConfiguration?: string
 }
 
 interface TipSummary {
@@ -98,6 +100,10 @@ const Dashboard: React.FC = () => {
   
   // Song Request Toggle States
   const [updatingSongRequest, setUpdatingSongRequest] = useState<string | null>(null)
+  
+  // Device Configuration States
+  const [expandedDeviceConfig, setExpandedDeviceConfig] = useState<string | null>(null)
+  const [updatingDeviceConfig, setUpdatingDeviceConfig] = useState<string | null>(null)
   
   // Song Request Monitoring States
   const [showMonitorFullscreen, setShowMonitorFullscreen] = useState(false)
@@ -825,6 +831,57 @@ const Dashboard: React.FC = () => {
     }
   }
 
+  const updateDeviceConfiguration = async (deviceId: string, isSoundEnabled: boolean, effectConfig: Record<string, string>) => {
+    setUpdatingDeviceConfig(deviceId)
+    try {
+      const response = await apiService.updateDeviceConfiguration(deviceId, {
+        isSoundEnabled,
+        effectConfiguration: JSON.stringify(effectConfig)
+      })
+
+      if (response.data) {
+        // Update the device in the stats state
+        setStats(prevStats => {
+          if (!prevStats) return prevStats
+          return {
+            ...prevStats,
+            devices: prevStats.devices.map(d => 
+              d.id === deviceId 
+                ? { ...d, isSoundEnabled, effectConfiguration: JSON.stringify(effectConfig) }
+                : d
+            )
+          }
+        })
+      } else {
+        alert('Failed to update device configuration: ' + (response.error || 'Unknown error'))
+      }
+    } catch (error) {
+      console.error('Error updating device configuration:', error)
+      alert('Error updating device configuration')
+    } finally {
+      setUpdatingDeviceConfig(null)
+    }
+  }
+
+  const getEffectConfig = (device: DeviceSummary): Record<string, string> => {
+    try {
+      if (device.effectConfiguration) {
+        return JSON.parse(device.effectConfiguration)
+      }
+    } catch (e) {
+      console.error('Error parsing effect configuration:', e)
+    }
+    // Default configuration
+    return {
+      "1": "effect1",
+      "5": "effect1",
+      "10": "effect2",
+      "20": "effect2",
+      "50": "effect3",
+      "100": "effect3"
+    }
+  }
+
   const loadSongRequests = async () => {
     if (!userProfile?.id) return
     
@@ -1495,6 +1552,80 @@ const Dashboard: React.FC = () => {
                               : 'Enable Song Request'
                             }
                           </button>
+                          
+                          {/* Device Configuration Section */}
+                          <button
+                            onClick={() => setExpandedDeviceConfig(expandedDeviceConfig === device.id ? null : device.id)}
+                            className="w-full px-3 py-2 bg-purple-100 text-purple-700 text-sm rounded-lg hover:bg-purple-200 transition-colors flex items-center justify-between"
+                          >
+                            <span>Device Configuration</span>
+                            <svg 
+                              className={`w-4 h-4 transition-transform ${expandedDeviceConfig === device.id ? 'rotate-180' : ''}`} 
+                              fill="none" 
+                              stroke="currentColor" 
+                              viewBox="0 0 24 24"
+                            >
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                            </svg>
+                          </button>
+
+                          {/* Expanded Configuration Panel */}
+                          {expandedDeviceConfig === device.id && (
+                            <div className="mt-3 p-4 bg-white rounded-lg border border-purple-200 space-y-4">
+                              {/* Sound Toggle */}
+                              <div className="flex items-center justify-between">
+                                <span className="text-sm font-medium text-gray-700">Sound Enabled</span>
+                                <label className="relative inline-flex items-center cursor-pointer">
+                                  <input
+                                    type="checkbox"
+                                    checked={device.isSoundEnabled ?? true}
+                                    onChange={(e) => {
+                                      const effectConfig = getEffectConfig(device)
+                                      updateDeviceConfiguration(device.id, e.target.checked, effectConfig)
+                                    }}
+                                    disabled={updatingDeviceConfig === device.id}
+                                    className="sr-only peer"
+                                  />
+                                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-purple-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-600"></div>
+                                </label>
+                              </div>
+
+                              {/* Effect Configuration */}
+                              <div className="space-y-2">
+                                <h4 className="text-sm font-medium text-gray-700 mb-2">Light Effects by Amount</h4>
+                                {(() => {
+                                  const effectConfig = getEffectConfig(device)
+                                  const amounts = [1, 5, 10, 20, 50, 100]
+                                  const effects = ['effect1', 'effect2', 'effect3']
+                                  
+                                  return amounts.map(amount => (
+                                    <div key={amount} className="flex items-center justify-between text-sm">
+                                      <span className="text-gray-600">${amount}</span>
+                                      <select
+                                        value={effectConfig[amount.toString()] || 'effect1'}
+                                        onChange={(e) => {
+                                          const newConfig = { ...effectConfig, [amount.toString()]: e.target.value }
+                                          updateDeviceConfiguration(device.id, device.isSoundEnabled ?? true, newConfig)
+                                        }}
+                                        disabled={updatingDeviceConfig === device.id}
+                                        className="px-2 py-1 border border-gray-300 rounded text-xs focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                                      >
+                                        {effects.map(effect => (
+                                          <option key={effect} value={effect}>
+                                            {effect === 'effect1' ? 'Flash' : effect === 'effect2' ? 'Swirl' : 'Breathing'}
+                                          </option>
+                                        ))}
+                                      </select>
+                                    </div>
+                                  ))
+                                })()}
+                              </div>
+
+                              {updatingDeviceConfig === device.id && (
+                                <div className="text-xs text-purple-600 text-center">Updating configuration...</div>
+                              )}
+                            </div>
+                          )}
                         </div>
                       </div>
                     )

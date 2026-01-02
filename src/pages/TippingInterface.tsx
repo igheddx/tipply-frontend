@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react'
 import { useParams } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { toast } from 'sonner'
+import confetti from 'canvas-confetti'
 import PaymentSetupModal from '../components/PaymentSetupModal'
 import SongCatalogSearch from '../components/SongCatalogSearch'
 import apiService from '../services/api'
@@ -164,7 +165,7 @@ const TippingInterface: React.FC = () => {
       if (!deviceId) return
       
       try {
-        const deviceResponse = await fetch(`${getApiBaseUrl()}/api/devices/${deviceId}`)
+        const deviceResponse = await fetch(`${getApiBaseUrl()}/api/devices/${deviceId}/public`)
         if (!deviceResponse.ok) {
           toast.error('Device not found')
           return
@@ -176,8 +177,8 @@ const TippingInterface: React.FC = () => {
           uuid: device.uuid,
           ownerFirstName: device.ownerFirstName,
           ownerLastName: device.ownerLastName,
-          ownerId: device.profileId,
-          stripeAccountId: device.stripeAccountId,
+          ownerId: device.id, // Using device.id since profileId is not exposed in public endpoint
+          stripeAccountId: '', // Not exposed in public endpoint
           isAllowSongRequest: device.isAllowSongRequest
         }
         setDeviceInfo(deviceInfoData)
@@ -485,6 +486,9 @@ const TippingInterface: React.FC = () => {
     const amount = tipAmounts[classicIndex]
     const exitDuration = 800
 
+    // Trigger haptic feedback immediately
+    triggerHaptic()
+
     // Trigger exit animation (don't change key yet - old bill stays and exits)
     setIsBillFlying(true)
 
@@ -493,7 +497,7 @@ const TippingInterface: React.FC = () => {
 
     // After exit completes: fire confetti, THEN mount new bill with updated key
     setTimeout(() => {
-      triggerCelebration(amount)
+      triggerCanvasConfetti(amount)
       setEnterSide('bottom')
       setBillRefresh((v) => v + 1)
       setIsBillFlying(false)
@@ -505,6 +509,46 @@ const TippingInterface: React.FC = () => {
     if (amount >= 50) return 'premium'
     if (amount >= 20) return 'enhanced'
     return 'basic'
+  }
+
+  // Trigger haptic feedback (Web Vibration API)
+  const triggerHaptic = () => {
+    if ('vibrate' in navigator) {
+      navigator.vibrate(50) // 50ms subtle vibration
+    }
+  }
+
+  // Canvas confetti with gradual intensity per denomination
+  const triggerCanvasConfetti = (amount: number) => {
+    // Confetti configuration based on denomination
+    const getConfettiConfig = (amt: number) => {
+      if (amt >= 100) {
+        return { particleCount: 150, spread: 100, startVelocity: 50, duration: 500 }
+      } else if (amt >= 50) {
+        return { particleCount: 100, spread: 90, startVelocity: 45, duration: 450 }
+      } else if (amt >= 20) {
+        return { particleCount: 70, spread: 80, startVelocity: 40, duration: 400 }
+      } else if (amt >= 10) {
+        return { particleCount: 60, spread: 75, startVelocity: 38, duration: 375 }
+      } else if (amt >= 5) {
+        return { particleCount: 60, spread: 75, startVelocity: 38, duration: 375 }
+      } else {
+        return { particleCount: 60, spread: 75, startVelocity: 38, duration: 375 }
+      }
+    }
+
+    const config = getConfettiConfig(amount)
+
+    confetti({
+      particleCount: config.particleCount,
+      spread: config.spread,
+      startVelocity: config.startVelocity,
+      origin: { y: 0.6 },
+      colors: ['#ff0000', '#00ff00', '#0000ff', '#ffff00', '#ff00ff', '#00ffff'],
+      ticks: config.duration / 16.67, // Convert ms to ticks (60fps)
+      gravity: 1.2,
+      scalar: 1.2
+    })
   }
 
   const triggerCelebration = (amount: number) => {
@@ -521,6 +565,14 @@ const TippingInterface: React.FC = () => {
 
   const handleTipClick = async (amount: number) => {
     if (loading || !deviceInfo || !userId) return
+
+    // Trigger haptic feedback immediately
+    triggerHaptic()
+
+    // Trigger canvas confetti immediately (grid mode)
+    if (uiMode === 'cards') {
+      triggerCanvasConfetti(amount)
+    }
 
     // Enable audio on first interaction
     if (!audioEnabled) {
@@ -778,7 +830,7 @@ const TippingInterface: React.FC = () => {
       {/* Classic Swipe UI - Full Screen Bill */}
       {uiMode === 'classic' && (
         <div
-          className="fixed inset-0 z-50 pt-[max(env(safe-area-inset-top),1rem)]"
+          className="fixed inset-0 z-50 flex flex-col"
           onTouchStart={handleClassicTouchStart}
           onTouchEnd={handleClassicTouchEnd}
         >
@@ -786,7 +838,7 @@ const TippingInterface: React.FC = () => {
           <AnimatePresence mode="wait">
             <motion.div
               key={`bill-${classicIndex}-${billRefresh}`}
-              className="absolute inset-0"
+              className="absolute inset-0 flex-1"
               initial={
                 isBillFlying 
                   ? { y: 0, opacity: 1, scale: 1 }
@@ -855,7 +907,7 @@ const TippingInterface: React.FC = () => {
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: 20 }}
-                  className="absolute bottom-48 left-0 right-0 z-40 flex justify-center px-4"
+                  className="absolute bottom-[min(40vh,20rem)] left-0 right-0 z-40 flex justify-center px-4"
                 >
                   {selectedSong ? (
                     <div className="bg-green-500/30 backdrop-blur-md rounded-2xl px-4 py-3 border border-green-400/30 shadow-2xl max-w-sm w-full">
@@ -889,9 +941,9 @@ const TippingInterface: React.FC = () => {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: 20 }}
-                className="fixed bottom-0 left-0 right-0 z-40 flex items-end justify-center pb-6 px-4"
+                className="absolute bottom-0 left-0 right-0 z-40 flex items-end justify-center pb-[max(env(safe-area-inset-bottom),1.5rem)] px-4"
               >
-                <div className="relative bg-black/60 backdrop-blur-md rounded-3xl p-6 pb-16 w-full max-w-sm border border-white/20 shadow-2xl space-y-4">
+                <div className="relative bg-black/60 backdrop-blur-md rounded-3xl p-6 w-full max-w-sm border border-white/20 shadow-2xl">
                   <div className="text-white/90 text-xs mb-4 font-medium text-center">Swipe left/right to change • Swipe up to send</div>
                   <div className="flex items-center justify-center gap-4 mb-4">
                     <button
@@ -911,16 +963,16 @@ const TippingInterface: React.FC = () => {
                       →
                     </button>
                   </div>
-                  <div className="text-white/70 text-xs text-center">
-                    Total: <span className="font-bold text-white">${totalTipped}</span>
+                  <div className="text-white/70 text-sm text-center mb-4">
+                    Total: <span className="font-bold text-white text-lg">${totalTipped}</span>
                   </div>
 
-                  {/* Grid UI toggle in bottom-left of control block */}
+                  {/* Grid UI toggle button */}
                   <button
                     onClick={() => persistUiMode('cards')}
-                    className="absolute left-4 bottom-4 bg-white/15 backdrop-blur-sm text-white px-3 py-2 rounded-full text-xs font-semibold border border-white/20 hover:bg-white/25 transition-colors"
+                    className="w-full bg-white/15 backdrop-blur-sm text-white px-4 py-2.5 rounded-xl text-sm font-semibold border border-white/20 active:bg-white/25 transition-colors"
                   >
-                    Grid UI
+                    Switch to Grid UI
                   </button>
                 </div>
               </motion.div>
@@ -930,244 +982,106 @@ const TippingInterface: React.FC = () => {
       )}
 
       {/* Cards UI Grid - cards mode only */}
-      {/* Cards UI Grid - cards mode only */}
       {uiMode === 'cards' && (
-        <div className="relative z-10 flex flex-col items-center justify-start min-h-screen px-6 py-12 pb-64">
-          <div className="grid grid-cols-2 gap-6 max-w-lg w-full mb-8">
-            {tipAmounts.map((amount, index) => (
-              <motion.button
-                key={amount}
-                onClick={() => {
-                  setGridSelectedAmount(amount)
-                  handleTipClick(amount)
-                }}
-                disabled={loading}
-                className={`
-                  relative h-32 rounded-2xl bg-gradient-to-br ${cardColors[index]}
-                  flex items-center justify-center font-black text-white text-5xl
-                  shadow-2xl border border-white/20 overflow-hidden
-                  ${loading && clickedAmount === amount ? 'scale-95' : 'hover:scale-105'}
-                  transition-all duration-200 disabled:opacity-50
-                `}
-                initial={{ opacity: 0, y: 50 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: index * 0.1 }}
-                whileTap={{ scale: 0.95 }}
-              >
-                {/* Shimmer effect */}
-                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -skew-x-12 animate-pulse"></div>
-                
-                {/* Amount */}
-                <span className="relative z-10">${amount}</span>
-                
-                {/* Click ripple effect */}
-                {clickedAmount === amount && (
-                  <motion.div
-                    className="absolute inset-0 bg-white/30 rounded-2xl"
-                    initial={{ scale: 0, opacity: 1 }}
-                    animate={{ scale: 2, opacity: 0 }}
-                    transition={{ duration: 0.6 }}
-                  />
-                )}
-              </motion.button>
-            ))}
-          </div>
-
-          {/* Bottom control block - Grid UI */}
-          <div className="fixed bottom-0 left-0 right-0 z-40 flex justify-center pb-6 px-4">
-            <div className="relative bg-black/60 backdrop-blur-md rounded-3xl p-6 pb-16 w-full max-w-lg border border-white/20 shadow-2xl text-center space-y-4">
-              {/* Request song trigger */}
-              {deviceInfo?.isAllowSongRequest && (
-                <button
-                  onClick={() => setShowSongSearch(true)}
-                  className="w-full bg-white/10 backdrop-blur-md text-white px-4 py-3 rounded-2xl border border-white/20 hover:bg-white/20 transition-colors flex items-center justify-center gap-2 text-sm font-semibold shadow-2xl"
+        <div className="relative z-10 flex flex-col items-center min-h-screen w-full">
+          {/* Responsive container with natural reflow */}
+          <div className="flex flex-col items-center w-full flex-1 px-4 py-6 pb-safe overflow-y-auto">
+            {/* Tip buttons grid - wraps naturally */}
+            <div className="flex flex-wrap justify-center gap-4 max-w-2xl w-full mb-4">
+              {tipAmounts.map((amount, index) => (
+                <motion.button
+                  key={amount}
+                  onClick={() => {
+                    setGridSelectedAmount(amount)
+                    handleTipClick(amount)
+                  }}
+                  disabled={loading}
+                  className={`
+                    relative min-h-[7rem] min-w-[9rem] flex-1 basis-[calc(50%-0.5rem)] max-w-[12rem]
+                    rounded-2xl bg-gradient-to-br ${cardColors[index]}
+                    flex items-center justify-center font-black text-white text-5xl
+                    shadow-2xl border border-white/20 overflow-hidden
+                    ${loading && clickedAmount === amount ? 'scale-95' : 'active:scale-95'}
+                    transition-transform duration-150 disabled:opacity-50
+                  `}
+                  initial={{ opacity: 0, y: 50 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: index * 0.1 }}
                 >
-                  <span>🎵</span>
-                  <span>Request Song</span>
-                </button>
-              )}
+                  {/* Shimmer effect */}
+                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -skew-x-12 animate-pulse"></div>
+                  
+                  {/* Amount */}
+                  <span className="relative z-10">${amount}</span>
+                  
+                  {/* Click ripple effect */}
+                  {clickedAmount === amount && (
+                    <motion.div
+                      className="absolute inset-0 bg-white/30 rounded-2xl"
+                      initial={{ scale: 0, opacity: 1 }}
+                      animate={{ scale: 2, opacity: 0 }}
+                      transition={{ duration: 0.6 }}
+                    />
+                  )}
+                </motion.button>
+              ))}
+            </div>
 
-              {/* Amount display */}
-              <div className="text-center">
-                <div className="text-white/80 text-xs mb-1 uppercase tracking-wider">Amount</div>
-                <div className="text-white text-5xl font-black drop-shadow-2xl">
-                  {gridSelectedAmount !== null ? `$${gridSelectedAmount}` : '—'}
+            {/* Song request section - naturally flows below buttons */}
+            {deviceInfo?.isAllowSongRequest && (
+              <div className="w-full max-w-2xl px-2 mb-4">
+                {selectedSong ? (
+                  <div className="bg-green-500/20 backdrop-blur-md rounded-2xl px-4 py-3 border border-green-400/30">
+                    <div className="text-white text-xs font-semibold mb-1">🎵 Song Selected</div>
+                    <div className="text-white/90 text-sm">{selectedSong.title}</div>
+                    <div className="text-white/70 text-xs">{selectedSong.artist}</div>
+                    <button
+                      onClick={() => setSelectedSong(null)}
+                      className="text-white/70 hover:text-white text-xs mt-1 underline"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => setShowSongSearch(true)}
+                    className="w-full bg-white/10 backdrop-blur-md text-white px-4 py-3 rounded-2xl border border-white/20 active:bg-white/20 transition-colors flex items-center justify-center gap-2 text-sm font-semibold"
+                  >
+                    <span>🎵</span>
+                    <span>Request Song</span>
+                  </button>
+                )}
+              </div>
+            )}
+
+            {/* Control block - naturally flows below everything */}
+            <div className="w-full max-w-2xl px-2 mb-4">
+              <div className="relative bg-black/60 backdrop-blur-md rounded-3xl p-6 w-full border border-white/20 shadow-2xl text-center">
+                {/* Amount display */}
+                <div className="text-center mb-4">
+                  <div className="text-white/80 text-xs mb-1 uppercase tracking-wider">Amount</div>
+                  <div className="text-white text-4xl sm:text-5xl font-black drop-shadow-2xl">
+                    {gridSelectedAmount !== null ? `$${gridSelectedAmount}` : '—'}
+                  </div>
                 </div>
-              </div>
 
-              {/* Total display */}
-              <div className="text-white/70 text-xs text-center">
-                Total: <span className="font-bold text-white">${totalTipped}</span>
-              </div>
+                {/* Total display */}
+                <div className="text-white/70 text-sm text-center mb-4">
+                  Total: <span className="font-bold text-white text-lg">${totalTipped}</span>
+                </div>
 
-              {/* Toggle back to Swipe UI */}
-              <button
-                onClick={() => persistUiMode('classic')}
-                className="absolute left-4 bottom-4 bg-white/15 backdrop-blur-sm text-white px-3 py-2 rounded-full text-xs font-semibold border border-white/20 hover:bg-white/25 transition-colors"
-              >
-                Swipe UI
-              </button>
+                {/* Toggle back to Swipe UI */}
+                <button
+                  onClick={() => persistUiMode('classic')}
+                  className="w-full bg-white/15 backdrop-blur-sm text-white px-4 py-2.5 rounded-xl text-sm font-semibold border border-white/20 active:bg-white/25 transition-colors"
+                >
+                  Switch to Swipe UI
+                </button>
+              </div>
             </div>
           </div>
         </div>
       )}
-
-      {/* Tiered Confetti Animation */}
-      <AnimatePresence>
-        {showCelebration && (
-          <>
-            {/* Screen Shake Effect for Epic Tier */}
-            {celebrationTier === 'epic' && (
-              <motion.div
-                className="absolute inset-0 pointer-events-none z-40"
-                animate={{
-                  x: [0, -4, 4, -4, 4, 0],
-                  y: [0, -2, 2, -2, 2, 0]
-                }}
-                transition={{
-                  duration: 0.8,
-                  times: [0, 0.2, 0.4, 0.6, 0.8, 1]
-                }}
-              />
-            )}
-
-            {/* Confetti Particles */}
-            <div className="absolute inset-0 pointer-events-none z-[60]">
-              {(() => {
-                const getConfettiConfig = () => {
-                  switch (celebrationTier) {
-                    case 'epic':
-                      return {
-                        count: 40,
-                        duration: 2.5,
-                        emojis: ['🎉', '💰', '⭐', '🎵', '💝', '🔥', '💎', '👑', '🌟', '💫', '🎊', '🏆'],
-                        textSize: 'text-4xl',
-                        maxScale: 2.0,
-                        yTravel: -200
-                      }
-                    case 'premium':
-                      return {
-                        count: 30,
-                        duration: 2.0,
-                        emojis: ['🎉', '💰', '⭐', '🎵', '💝', '🔥', '💎', '🌟', '🎊'],
-                        textSize: 'text-3xl',
-                        maxScale: 1.6,
-                        yTravel: -150
-                      }
-                    case 'enhanced':
-                      return {
-                        count: 20,
-                        duration: 1.5,
-                        emojis: ['🎉', '💰', '⭐', '🎵', '💝', '🔥', '🌟'],
-                        textSize: 'text-3xl',
-                        maxScale: 1.4,
-                        yTravel: -120
-                      }
-                    default: // basic
-                      return {
-                        count: 12,
-                        duration: 1.2,
-                        emojis: ['🎉', '💰', '⭐', '🎵', '💝', '🔥'],
-                        textSize: 'text-2xl',
-                        maxScale: 1.2,
-                        yTravel: -100
-                      }
-                  }
-                }
-
-                const config = getConfettiConfig()
-
-                return [...Array(config.count)].map((_, i) => (
-                  <motion.div
-                    key={`${celebrationTier}-${i}`}
-                    className={`absolute ${config.textSize}`}
-                    initial={{
-                      x: Math.random() * window.innerWidth,
-                      y: window.innerHeight + 50,
-                      opacity: 1,
-                      scale: 0,
-                      rotate: 0
-                    }}
-                    animate={{
-                      y: config.yTravel,
-                      opacity: celebrationTier === 'epic' ? [1, 1, 1, 0] : [1, 1, 0],
-                      scale: [0, config.maxScale, config.maxScale * 0.8],
-                      rotate: [0, 360 + Math.random() * 360],
-                      x: Math.random() * window.innerWidth * 0.3 - window.innerWidth * 0.15
-                    }}
-                    transition={{
-                      duration: config.duration,
-                      delay: i * (celebrationTier === 'epic' ? 0.03 : 0.05),
-                      ease: "easeOut"
-                    }}
-
-                  >
-                    {config.emojis[i % config.emojis.length]}
-                  </motion.div>
-                ))
-              })()}
-
-              {/* Extra Burst Effect for Premium and Epic */}
-              {(celebrationTier === 'premium' || celebrationTier === 'epic') && (
-                [...Array(8)].map((_, i) => (
-                  <motion.div
-                    key={`burst-${i}`}
-                    className="absolute text-yellow-400 text-6xl font-bold"
-                    initial={{
-                      x: window.innerWidth / 2,
-                      y: window.innerHeight / 2,
-                      opacity: 1,
-                      scale: 0
-                    }}
-                    animate={{
-                      x: window.innerWidth / 2 + (Math.cos(i * 45 * Math.PI / 180) * 200),
-                      y: window.innerHeight / 2 + (Math.sin(i * 45 * Math.PI / 180) * 200),
-                      opacity: [1, 0.7, 0],
-                      scale: [0, celebrationTier === 'epic' ? 1.5 : 1.2, 0]
-                    }}
-                    transition={{
-                      duration: celebrationTier === 'epic' ? 1.5 : 1.2,
-                      delay: 0.2 + i * 0.05,
-                      ease: "easeOut"
-                    }}
-                  >
-                    ✨
-                  </motion.div>
-                ))
-              )}
-
-              {/* Epic Tier: Golden Shower Effect */}
-              {celebrationTier === 'epic' && (
-                [...Array(20)].map((_, i) => (
-                  <motion.div
-                    key={`gold-${i}`}
-                    className="absolute text-yellow-400 text-3xl"
-                    initial={{
-                      x: Math.random() * window.innerWidth,
-                      y: -50,
-                      opacity: 1,
-                      rotate: 0
-                    }}
-                    animate={{
-                      y: window.innerHeight + 100,
-                      opacity: [0, 1, 1, 0],
-                      rotate: 360 * 3,
-                      x: Math.random() * 100 - 50
-                    }}
-                    transition={{
-                      duration: 3,
-                      delay: 0.5 + i * 0.1,
-                      ease: "linear"
-                    }}
-                  >
-                    💰
-                  </motion.div>
-                ))
-              )}
-            </div>
-          </>
-        )}
-      </AnimatePresence>
 
       {/* Song Search Modal */}
       <AnimatePresence>
