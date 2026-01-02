@@ -930,7 +930,7 @@ const TippingInterface: React.FC = () => {
               >
                 <div className="relative bg-black/60 backdrop-blur-md rounded-3xl p-6 w-full max-w-sm border border-white/20 shadow-2xl">
                   <div className="text-white/90 text-xs mb-4 font-medium text-center">Swipe left/right to change • Swipe up to send</div>
-                  <div className="flex items-center justify-center gap-4 mb-4">
+                  <div className="flex items-center justify-center gap-4 mb-3">
                     <button
                       onClick={() => cycleClassicIndex(-1)}
                       className="w-12 h-12 rounded-full bg-white/20 backdrop-blur-sm text-white text-2xl flex items-center justify-center hover:bg-white/30 transition-colors border border-white/20 flex-shrink-0"
@@ -938,8 +938,8 @@ const TippingInterface: React.FC = () => {
                       ←
                     </button>
                     <div className="text-center flex-grow">
-                      <div className="text-white/80 text-xs mb-1 uppercase tracking-wider">Amount</div>
-                      <div className="text-white text-5xl font-black drop-shadow-2xl">${tipAmounts[classicIndex]}</div>
+                      <span className="text-white/80 text-xs uppercase tracking-wider mr-2">Amount:</span>
+                      <span className="text-white text-5xl font-black drop-shadow-2xl">${tipAmounts[classicIndex]}</span>
                     </div>
                     <button
                       onClick={() => cycleClassicIndex(1)}
@@ -948,8 +948,9 @@ const TippingInterface: React.FC = () => {
                       →
                     </button>
                   </div>
-                  <div className="text-white/70 text-sm text-center mb-4">
-                    Total: <span className="font-bold text-white text-lg">${totalTipped}</span>
+                  <div className="text-center mb-4">
+                    <span className="text-white/80 text-xs uppercase tracking-wider mr-2">Total:</span>
+                    <span className="font-bold text-white text-lg">${totalTipped}</span>
                   </div>
 
                   {/* Grid UI toggle button */}
@@ -1043,16 +1044,17 @@ const TippingInterface: React.FC = () => {
             <div className="w-full max-w-2xl px-2 mb-8">
               <div className="relative bg-black/60 backdrop-blur-md rounded-3xl p-6 w-full border border-white/20 shadow-2xl text-center">
                 {/* Amount display */}
-                <div className="text-center mb-4">
-                  <div className="text-white/80 text-xs mb-1 uppercase tracking-wider">Amount</div>
-                  <div className="text-white text-4xl sm:text-5xl font-black drop-shadow-2xl">
+                <div className="text-center mb-2">
+                  <span className="text-white/80 text-xs uppercase tracking-wider mr-2">Amount:</span>
+                  <span className="text-white text-4xl sm:text-5xl font-black drop-shadow-2xl">
                     {gridSelectedAmount !== null ? `$${gridSelectedAmount}` : '—'}
-                  </div>
+                  </span>
                 </div>
 
                 {/* Total display */}
-                <div className="text-white/70 text-sm text-center mb-4">
-                  Total: <span className="font-bold text-white text-lg">${totalTipped}</span>
+                <div className="text-center mb-4">
+                  <span className="text-white/80 text-xs uppercase tracking-wider mr-2">Total:</span>
+                  <span className="font-bold text-white text-lg">${totalTipped}</span>
                 </div>
 
                 {/* Toggle back to Swipe UI */}
