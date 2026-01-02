@@ -943,7 +943,7 @@ const TippingInterface: React.FC = () => {
                   </div>
                   <div className="text-center mb-4">
                     <span className="text-white/80 text-xs uppercase tracking-wider mr-2">Total:</span>
-                    <span className="text-white text-xs uppercase tracking-wider font-black drop-shadow-2xl">${totalTipped}</span>
+                    <span className="text-white/80 text-xs uppercase tracking-wider font-black">${totalTipped}</span>
                   </div>
 
                   {/* Grid UI toggle button */}
