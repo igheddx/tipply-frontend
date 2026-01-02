@@ -768,7 +768,7 @@ const TippingInterface: React.FC = () => {
   }
 
   return (
-    <div className={`min-h-screen relative overflow-hidden ${uiMode === 'cards' ? 'bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900' : 'bg-black'}`}>
+    <div className={`min-h-screen relative ${uiMode === 'classic' ? 'overflow-hidden' : ''} ${uiMode === 'cards' ? 'bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900' : 'bg-black'}`}>
       {/* Background Effects - cards mode only */}
       {uiMode === 'cards' && (
         <>
