@@ -807,13 +807,15 @@ const TippingInterface: React.FC = () => {
           <div 
             className="relative z-10 px-6 text-center"
             style={{
-              paddingTop: isIOS ? '10rem' : '2rem'
+              paddingTop: isIOS ? '10rem' : '0.5rem'
             }}
           >
             <motion.div
               initial={{ opacity: 0, y: -20 }}
               animate={{ opacity: 1, y: 0 }}
-              className="mb-8"
+              style={{
+                marginBottom: isIOS ? '2rem' : '1rem'
+              }}
             >
               <h1 className="text-2xl font-bold text-white truncate">
                 Tip {deviceInfo?.ownerFirstName} {deviceInfo?.ownerLastName}
