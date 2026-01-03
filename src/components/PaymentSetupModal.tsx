@@ -126,7 +126,7 @@ function PaymentForm({
             
             // Store setup success in localStorage
             const tempUserId = localStorage.getItem('tipply_user_id')
-            const customerId = data.CustomerId
+            const customerId = data.customerId
             console.log('🔍 Debug - customerId from response:', customerId, 'tempUserId:', tempUserId)
             if (tempUserId && customerId) {
               localStorage.setItem(`stripe_customer_id_${tempUserId}`, customerId)
@@ -221,7 +221,7 @@ function PaymentForm({
         
         // Store setup success in localStorage, including the customer ID returned from backend
         const tempUserId = localStorage.getItem('tipply_user_id')
-        const customerId = data.CustomerId
+        const customerId = data.customerId
         console.log('🔍 Debug - customerId from response (card):', customerId, 'tempUserId:', tempUserId)
         if (tempUserId && customerId) {
           localStorage.setItem(`stripe_customer_id_${tempUserId}`, customerId)
