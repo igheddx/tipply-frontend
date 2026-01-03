@@ -107,6 +107,7 @@ function PaymentForm({
           }
           
           const data = await res.json()
+          console.log('📥 Setup intent response from /api/stripe/setup-intent:', data)
           
           // Confirm the setup intent with the payment method
           const { error, setupIntent } = await stripe.confirmCardSetup(data.clientSecret, {
@@ -126,6 +127,7 @@ function PaymentForm({
             // Store setup success in localStorage
             const tempUserId = localStorage.getItem('tipply_user_id')
             const customerId = data.CustomerId
+            console.log('🔍 Debug - customerId from response:', customerId, 'tempUserId:', tempUserId)
             if (tempUserId && customerId) {
               localStorage.setItem(`stripe_customer_id_${tempUserId}`, customerId)
               console.log('💾 Stored Stripe customer ID:', customerId)
@@ -208,6 +210,7 @@ function PaymentForm({
       })
 
       console.log('Card setup result:', result)
+      console.log('📥 Setup intent response from /api/stripe/setup-intent (card path):', data)
       if (result.error) {
         setError(result.error.message || 'Card error')
       } else {
@@ -219,6 +222,7 @@ function PaymentForm({
         // Store setup success in localStorage, including the customer ID returned from backend
         const tempUserId = localStorage.getItem('tipply_user_id')
         const customerId = data.CustomerId
+        console.log('🔍 Debug - customerId from response (card):', customerId, 'tempUserId:', tempUserId)
         if (tempUserId && customerId) {
           localStorage.setItem(`stripe_customer_id_${tempUserId}`, customerId)
           console.log('💾 Stored Stripe customer ID:', customerId)
