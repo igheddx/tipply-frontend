@@ -144,6 +144,8 @@ function PaymentForm({
                 console.log('💾 Stored payment method ID:', paymentMethodId)
               }
             }
+            
+            // Payment method is automatically attached to customer by Stripe during SetupIntent confirmation
             event.complete('success')
             toast.success('Payment method added successfully!')
             onComplete(paymentMethodId)
@@ -239,6 +241,8 @@ function PaymentForm({
             console.log('💾 Stored payment method ID:', paymentMethodId)
           }
         }
+        
+        // Payment method is automatically attached to customer by Stripe during SetupIntent confirmation
         toast.success('Payment method added successfully!')
         onComplete(paymentMethodId)
       }

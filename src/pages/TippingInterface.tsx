@@ -40,6 +40,7 @@ const TippingInterface: React.FC = () => {
     return /iPhone|iPad|iPod/i.test(navigator.userAgent) || 
            (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
   })
+  const [isPortrait, setIsPortrait] = useState(true)
   
   // Song request state
   const [showSongSearch, setShowSongSearch] = useState(false)
@@ -114,6 +115,29 @@ const TippingInterface: React.FC = () => {
     checkMobile()
     window.addEventListener('resize', checkMobile)
     return () => window.removeEventListener('resize', checkMobile)
+  }, [])
+
+  // Lock UI to portrait by showing overlay when rotated
+  useEffect(() => {
+    const updateOrientation = () => {
+      const portrait = window.matchMedia('(orientation: portrait)').matches || window.innerHeight >= window.innerWidth
+      setIsPortrait(portrait)
+    }
+
+    updateOrientation()
+
+    const mq = window.matchMedia('(orientation: portrait)')
+    const handler = () => updateOrientation()
+
+    mq.addEventListener('change', handler)
+    window.addEventListener('resize', handler)
+    window.addEventListener('orientationchange', handler)
+
+    return () => {
+      mq.removeEventListener('change', handler)
+      window.removeEventListener('resize', handler)
+      window.removeEventListener('orientationchange', handler)
+    }
   }, [])
 
   // Initialize user
@@ -846,6 +870,14 @@ const TippingInterface: React.FC = () => {
 
   return (
     <div className={`min-h-screen relative ${uiMode === 'classic' ? 'overflow-hidden' : ''} ${uiMode === 'cards' ? 'bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900' : 'bg-black'}`}>
+      {!isPortrait && (
+        <div className="fixed inset-0 z-50 bg-black/80 text-white flex flex-col items-center justify-center px-6 text-center">
+          <div className="text-5xl mb-4">🔒</div>
+          <p className="text-lg font-semibold mb-2">Portrait mode only</p>
+          <p className="text-sm text-white/80">Please rotate your device back to portrait to continue tipping.</p>
+        </div>
+      )}
+
       {/* Background Effects - cards mode only */}
       {uiMode === 'cards' && (
         <>
