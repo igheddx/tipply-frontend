@@ -339,15 +339,15 @@ const TippingInterface: React.FC = () => {
   // Retrieve and validate stored payment method ID (checks 30-day expiration)
   const getStoredPaymentMethodId = (): string | null => {
     const tempUserId = localStorage.getItem('tipply_user_id')
-    console.log('🔍 [Retrieve] Getting stored payment method - UserId:', tempUserId, 'DeviceId:', deviceId)
+    console.log('🔍 [Retrieve] Getting stored payment method - UserId:', tempUserId)
     
-    if (!tempUserId || !deviceId) {
-      console.log('❌ [Retrieve] Missing userId or deviceId')
+    if (!tempUserId) {
+      console.log('❌ [Retrieve] Missing userId')
       return null
     }
 
-    const key = `payment_method_id_${tempUserId}_${deviceId}`
-    const timestampKey = `payment_method_timestamp_${tempUserId}_${deviceId}`
+    const key = `payment_method_id_${tempUserId}`
+    const timestampKey = `payment_method_timestamp_${tempUserId}`
     const paymentMethodId = localStorage.getItem(key)
     const timestamp = localStorage.getItem(timestampKey)
 
@@ -383,9 +383,9 @@ const TippingInterface: React.FC = () => {
     const tempUserId = localStorage.getItem('tipply_user_id')
     console.log('🔄 [Refresh] Refreshing payment method session')
     
-    if (tempUserId && deviceId) {
-      const key = `payment_method_id_${tempUserId}_${deviceId}`
-      const timestampKey = `payment_method_timestamp_${tempUserId}_${deviceId}`
+    if (tempUserId) {
+      const key = `payment_method_id_${tempUserId}`
+      const timestampKey = `payment_method_timestamp_${tempUserId}`
       const paymentMethodId = localStorage.getItem(key)
       
       if (paymentMethodId) {
@@ -395,16 +395,16 @@ const TippingInterface: React.FC = () => {
         console.log('⚠️ [Refresh] No payment method ID to refresh')
       }
     } else {
-      console.log('❌ [Refresh] Missing userId or deviceId')
+      console.log('❌ [Refresh] Missing userId')
     }
   }
 
   // Clear stored payment method ID
   const clearPaymentMethodId = () => {
     const tempUserId = localStorage.getItem('tipply_user_id')
-    if (tempUserId && deviceId) {
-      localStorage.removeItem(`payment_method_id_${tempUserId}_${deviceId}`)
-      localStorage.removeItem(`payment_method_timestamp_${tempUserId}_${deviceId}`)
+    if (tempUserId) {
+      localStorage.removeItem(`payment_method_id_${tempUserId}`)
+      localStorage.removeItem(`payment_method_timestamp_${tempUserId}`)
     }
   }
 
