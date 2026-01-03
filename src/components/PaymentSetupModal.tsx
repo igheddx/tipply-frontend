@@ -119,20 +119,31 @@ function PaymentForm({
             setError(error.message || 'Payment setup failed')
           } else {
             console.log('Payment Request setup successful:', setupIntent)
+            // Extract payment method ID from the SetupIntent, NOT the event
+            const paymentMethodId = setupIntent?.payment_method as string
+            console.log('💳 Payment method ID from wallet:', paymentMethodId)
+            
             // Store setup success in localStorage
             const tempUserId = localStorage.getItem('tipply_user_id')
-            if (tempUserId) {
+            const customerId = data.CustomerId
+            if (tempUserId && customerId) {
+              localStorage.setItem(`stripe_customer_id_${tempUserId}`, customerId)
+              console.log('💾 Stored Stripe customer ID:', customerId)
               localStorage.setItem(`payment_status_${tempUserId}_${deviceUuid}`, JSON.stringify({
                 hasPaymentMethods: true,
                 paymentMethodType: 'card'
               }))
               localStorage.setItem(`payment_status_timestamp_${tempUserId}_${deviceUuid}`, Date.now().toString())
+              
+              // Store payment method ID directly here too
+              if (paymentMethodId) {
+                localStorage.setItem(`payment_method_id_${tempUserId}`, paymentMethodId)
+                localStorage.setItem(`payment_method_timestamp_${tempUserId}`, Date.now().toString())
+                console.log('💾 Stored payment method ID:', paymentMethodId)
+              }
             }
             event.complete('success')
             toast.success('Payment method added successfully!')
-            // Extract payment method ID from the SetupIntent, NOT the event
-            const paymentMethodId = setupIntent?.payment_method as string
-            console.log('💳 Payment method ID from wallet:', paymentMethodId)
             onComplete(paymentMethodId)
           }
         } catch (error) {
@@ -205,14 +216,24 @@ function PaymentForm({
         const paymentMethodId = result.setupIntent?.payment_method as string | undefined
         console.log('💳 Payment method ID from card:', paymentMethodId)
         
-        // Store setup success in localStorage
+        // Store setup success in localStorage, including the customer ID returned from backend
         const tempUserId = localStorage.getItem('tipply_user_id')
-        if (tempUserId) {
+        const customerId = data.CustomerId
+        if (tempUserId && customerId) {
+          localStorage.setItem(`stripe_customer_id_${tempUserId}`, customerId)
+          console.log('💾 Stored Stripe customer ID:', customerId)
           localStorage.setItem(`payment_status_${tempUserId}_${deviceUuid}`, JSON.stringify({
             hasPaymentMethods: true,
             paymentMethodType: 'card'
           }))
           localStorage.setItem(`payment_status_timestamp_${tempUserId}_${deviceUuid}`, Date.now().toString())
+          
+          // Store payment method ID directly here too
+          if (paymentMethodId) {
+            localStorage.setItem(`payment_method_id_${tempUserId}`, paymentMethodId)
+            localStorage.setItem(`payment_method_timestamp_${tempUserId}`, Date.now().toString())
+            console.log('💾 Stored payment method ID:', paymentMethodId)
+          }
         }
         toast.success('Payment method added successfully!')
         onComplete(paymentMethodId)

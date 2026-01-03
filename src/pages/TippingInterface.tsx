@@ -608,13 +608,16 @@ const TippingInterface: React.FC = () => {
 
     // Submit tip
     try {
-      // Get stored payment method ID (user-specific, not device-specific)
+      // Get stored payment method ID and customer ID (user-specific, not device-specific)
       const tempUserId = localStorage.getItem('tipply_user_id')
       const paymentMethodKey = `payment_method_id_${tempUserId}`
       const paymentMethodId = localStorage.getItem(paymentMethodKey)
+      const customerIdKey = `stripe_customer_id_${tempUserId}`
+      const stripeCustomerId = localStorage.getItem(customerIdKey)
       
       console.log('💳 Retrieved payment method ID from localStorage:', paymentMethodId)
-      console.log('💳 Using key:', paymentMethodKey)
+      console.log('💳 Retrieved Stripe customer ID from localStorage:', stripeCustomerId)
+      console.log('💳 Using keys:', paymentMethodKey, customerIdKey)
       
       const tipPayload = {
         deviceId: deviceInfo!.uuid,
@@ -622,7 +625,8 @@ const TippingInterface: React.FC = () => {
         amount: amount,
         effect: getLightEffect(amount),
         duration: 3000,
-        paymentMethodId: paymentMethodId || undefined
+        paymentMethodId: paymentMethodId || undefined,
+        stripeCustomerId: stripeCustomerId || undefined
       }
       console.log('🎰 SUBMITTING TIP PAYLOAD TO BACKEND (Classic Mode):', tipPayload)
 
@@ -663,12 +667,21 @@ const TippingInterface: React.FC = () => {
     }
 
     try {
+      // Get stored payment method ID and customer ID (user-specific, not device-specific)
+      const tempUserId = localStorage.getItem('tipply_user_id')
+      const paymentMethodKey = `payment_method_id_${tempUserId}`
+      const paymentMethodId = localStorage.getItem(paymentMethodKey)
+      const customerIdKey = `stripe_customer_id_${tempUserId}`
+      const stripeCustomerId = localStorage.getItem(customerIdKey)
+      
       const tipPayload = {
         deviceId: deviceInfo!.uuid,
         userId: userId,
         amount: amount,
         effect: getLightEffect(amount),
-        duration: 3000
+        duration: 3000,
+        paymentMethodId: paymentMethodId || undefined,
+        stripeCustomerId: stripeCustomerId || undefined
       }
       console.log('🎰 SUBMITTING TIP PAYLOAD TO BACKEND (Cards Mode):', tipPayload)
 
