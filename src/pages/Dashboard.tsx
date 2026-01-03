@@ -1637,7 +1637,7 @@ const Dashboard: React.FC = () => {
                                 <label className="relative inline-flex items-center cursor-pointer">
                                   <input
                                     type="checkbox"
-                                    checked={device.isSoundEnabled ?? true}
+                                    checked={device.isSoundEnabled ?? false}
                                     onChange={(e) => {
                                       const effectConfig = getEffectConfig(device)
                                       updateDeviceConfiguration(device.id, e.target.checked, effectConfig)
@@ -1664,7 +1664,7 @@ const Dashboard: React.FC = () => {
                                         value={effectConfig[amount.toString()] || 'effect1'}
                                         onChange={(e) => {
                                           const newConfig = { ...effectConfig, [amount.toString()]: e.target.value }
-                                          updateDeviceConfiguration(device.id, device.isSoundEnabled ?? true, newConfig)
+                                          updateDeviceConfiguration(device.id, device.isSoundEnabled ?? false, newConfig)
                                         }}
                                         disabled={updatingDeviceConfig === device.id}
                                         className="px-2 py-1 border border-gray-300 rounded text-xs focus:ring-2 focus:ring-purple-500 focus:border-transparent"
