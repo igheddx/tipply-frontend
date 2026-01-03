@@ -319,11 +319,11 @@ const TippingInterface: React.FC = () => {
   const storePaymentMethodId = (paymentMethodId: string) => {
     const tempUserId = localStorage.getItem('tipply_user_id')
     console.log('💾 [Store] Attempting to store payment method ID:', paymentMethodId)
-    console.log('💾 [Store] UserId:', tempUserId, 'DeviceId:', deviceId)
+    console.log('💾 [Store] UserId:', tempUserId)
     
-    if (tempUserId && deviceId) {
-      const key = `payment_method_id_${tempUserId}_${deviceId}`
-      const timestampKey = `payment_method_timestamp_${tempUserId}_${deviceId}`
+    if (tempUserId) {
+      const key = `payment_method_id_${tempUserId}`
+      const timestampKey = `payment_method_timestamp_${tempUserId}`
       localStorage.setItem(key, paymentMethodId)
       localStorage.setItem(timestampKey, Date.now().toString())
       console.log('✅ [Store] Payment method ID stored with keys:', key, timestampKey)
@@ -608,12 +608,13 @@ const TippingInterface: React.FC = () => {
 
     // Submit tip
     try {
-      // Get stored payment method ID
+      // Get stored payment method ID (user-specific, not device-specific)
       const tempUserId = localStorage.getItem('tipply_user_id')
-      const paymentMethodKey = `payment_method_id_${tempUserId}_${deviceId}`
+      const paymentMethodKey = `payment_method_id_${tempUserId}`
       const paymentMethodId = localStorage.getItem(paymentMethodKey)
       
       console.log('💳 Retrieved payment method ID from localStorage:', paymentMethodId)
+      console.log('💳 Using key:', paymentMethodKey)
       
       const tipPayload = {
         deviceId: deviceInfo!.uuid,
