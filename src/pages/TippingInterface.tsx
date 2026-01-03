@@ -341,41 +341,98 @@ const TippingInterface: React.FC = () => {
     const tempUserId = localStorage.getItem('tipply_user_id')
     console.log('🔍 [Retrieve] Getting stored payment method - UserId:', tempUserId)
     
-    if (!tempUserId) {
-      console.log('❌ [Retrieve] Missing userId')
-      return null
+    // Try with current user ID first
+    if (tempUserId) {
+      const key = `payment_method_id_${tempUserId}`
+      const timestampKey = `payment_method_timestamp_${tempUserId}`
+      const paymentMethodId = localStorage.getItem(key)
+      const timestamp = localStorage.getItem(timestampKey)
+
+      console.log('💾 [Retrieve] LocalStorage values with current userId:', { paymentMethodId, timestamp })
+
+      if (paymentMethodId && timestamp) {
+        const storedTime = parseInt(timestamp)
+        const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000
+        const now = Date.now()
+        const age = now - storedTime
+        const daysOld = age / (24 * 60 * 60 * 1000)
+
+        console.log('📅 [Retrieve] Payment method age:', daysOld.toFixed(2), 'days')
+
+        if (age <= thirtyDaysMs) {
+          console.log('✅ [Retrieve] Valid payment method ID found with current userId:', paymentMethodId)
+          return paymentMethodId
+        } else {
+          localStorage.removeItem(key)
+          localStorage.removeItem(timestampKey)
+          console.log('⏰ [Retrieve] Stored payment method ID expired (>30 days)')
+        }
+      }
+    }
+    
+    // Fallback: search for any payment_method_id_* key
+    console.log('🔍 [Retrieve] Searching for any payment_method_id_* key in localStorage')
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i)
+      if (key && key.startsWith('payment_method_id_')) {
+        const paymentMethodId = localStorage.getItem(key)
+        const timestampKey = key.replace('payment_method_id_', 'payment_method_timestamp_')
+        const timestamp = localStorage.getItem(timestampKey)
+        
+        if (paymentMethodId && timestamp) {
+          const storedTime = parseInt(timestamp)
+          const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000
+          const now = Date.now()
+          const age = now - storedTime
+          const daysOld = age / (24 * 60 * 60 * 1000)
+
+          console.log('📅 [Retrieve] Found payment method with age:', daysOld.toFixed(2), 'days')
+
+          if (age <= thirtyDaysMs) {
+            console.log('✅ [Retrieve] Found valid payment method ID via fallback search:', paymentMethodId)
+            return paymentMethodId
+          }
+        }
+      }
     }
 
-    const key = `payment_method_id_${tempUserId}`
-    const timestampKey = `payment_method_timestamp_${tempUserId}`
-    const paymentMethodId = localStorage.getItem(key)
-    const timestamp = localStorage.getItem(timestampKey)
+    console.log('❌ [Retrieve] No valid payment method found')
+    return null
+  }
 
-    console.log('💾 [Retrieve] LocalStorage values:', { paymentMethodId, timestamp })
-
-    if (!paymentMethodId || !timestamp) {
-      console.log('❌ [Retrieve] No stored payment method found')
-      return null
+  // Retrieve stored Stripe customer ID with fallback search
+  const getStoredCustomerId = (): string | null => {
+    const tempUserId = localStorage.getItem('tipply_user_id')
+    console.log('🔍 [Retrieve Customer] Getting stored customer ID - UserId:', tempUserId)
+    
+    // Try with current user ID first
+    if (tempUserId) {
+      const key = `stripe_customer_id_${tempUserId}`
+      const customerId = localStorage.getItem(key)
+      
+      console.log('💾 [Retrieve Customer] LocalStorage value with current userId:', customerId)
+      
+      if (customerId) {
+        console.log('✅ [Retrieve Customer] Found customer ID with current userId:', customerId)
+        return customerId
+      }
+    }
+    
+    // Fallback: search for any stripe_customer_id_* key
+    console.log('🔍 [Retrieve Customer] Searching for any stripe_customer_id_* key in localStorage')
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i)
+      if (key && key.startsWith('stripe_customer_id_')) {
+        const customerId = localStorage.getItem(key)
+        if (customerId) {
+          console.log('✅ [Retrieve Customer] Found customer ID via fallback search:', customerId)
+          return customerId
+        }
+      }
     }
 
-    const storedTime = parseInt(timestamp)
-    const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000
-    const now = Date.now()
-    const age = now - storedTime
-    const daysOld = age / (24 * 60 * 60 * 1000)
-
-    console.log('📅 [Retrieve] Payment method age:', daysOld.toFixed(2), 'days')
-
-    if (age > thirtyDaysMs) {
-      // Expired, remove it
-      localStorage.removeItem(key)
-      localStorage.removeItem(timestampKey)
-      console.log('⏰ [Retrieve] Stored payment method ID expired (>30 days)')
-      return null
-    }
-
-    console.log('✅ [Retrieve] Valid payment method ID found:', paymentMethodId)
-    return paymentMethodId
+    console.log('❌ [Retrieve Customer] No customer ID found')
+    return null
   }
 
   // Refresh/extend the 30-day session for stored payment method
@@ -608,16 +665,12 @@ const TippingInterface: React.FC = () => {
 
     // Submit tip
     try {
-      // Get stored payment method ID and customer ID (user-specific, not device-specific)
-      const tempUserId = localStorage.getItem('tipply_user_id')
-      const paymentMethodKey = `payment_method_id_${tempUserId}`
-      const paymentMethodId = localStorage.getItem(paymentMethodKey)
-      const customerIdKey = `stripe_customer_id_${tempUserId}`
-      const stripeCustomerId = localStorage.getItem(customerIdKey)
+      // Get stored payment method ID and customer ID using fallback search
+      const paymentMethodId = getStoredPaymentMethodId()
+      const stripeCustomerId = getStoredCustomerId()
       
-      console.log('💳 Retrieved payment method ID from localStorage:', paymentMethodId)
-      console.log('💳 Retrieved Stripe customer ID from localStorage:', stripeCustomerId)
-      console.log('💳 Using keys:', paymentMethodKey, customerIdKey)
+      console.log('💳 Retrieved payment method ID:', paymentMethodId)
+      console.log('💳 Retrieved Stripe customer ID:', stripeCustomerId)
       
       const tipPayload = {
         deviceId: deviceInfo!.uuid,
@@ -667,12 +720,9 @@ const TippingInterface: React.FC = () => {
     }
 
     try {
-      // Get stored payment method ID and customer ID (user-specific, not device-specific)
-      const tempUserId = localStorage.getItem('tipply_user_id')
-      const paymentMethodKey = `payment_method_id_${tempUserId}`
-      const paymentMethodId = localStorage.getItem(paymentMethodKey)
-      const customerIdKey = `stripe_customer_id_${tempUserId}`
-      const stripeCustomerId = localStorage.getItem(customerIdKey)
+      // Get stored payment method ID and customer ID using fallback search
+      const paymentMethodId = getStoredPaymentMethodId()
+      const stripeCustomerId = getStoredCustomerId()
       
       const tipPayload = {
         deviceId: deviceInfo!.uuid,
