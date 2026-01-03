@@ -109,7 +109,7 @@ function PaymentForm({
           const data = await res.json()
           
           // Confirm the setup intent with the payment method
-          const { error } = await stripe.confirmCardSetup(data.clientSecret, {
+          const { error, setupIntent } = await stripe.confirmCardSetup(data.clientSecret, {
             payment_method: event.paymentMethod.id,
           })
           
@@ -118,7 +118,7 @@ function PaymentForm({
             event.complete('fail')
             setError(error.message || 'Payment setup failed')
           } else {
-            console.log('Payment Request setup successful')
+            console.log('Payment Request setup successful:', setupIntent)
             // Store setup success in localStorage
             const tempUserId = localStorage.getItem('tipply_user_id')
             if (tempUserId) {
@@ -130,8 +130,8 @@ function PaymentForm({
             }
             event.complete('success')
             toast.success('Payment method added successfully!')
-            // Extract payment method ID from the payment method event
-            const paymentMethodId = event.paymentMethod?.id
+            // Extract payment method ID from the SetupIntent, NOT the event
+            const paymentMethodId = setupIntent?.payment_method as string
             console.log('💳 Payment method ID from wallet:', paymentMethodId)
             onComplete(paymentMethodId)
           }
