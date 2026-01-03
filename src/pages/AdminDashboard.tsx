@@ -102,10 +102,12 @@ const AdminDashboard: React.FC = () => {
   const loadDashboardData = async () => {
     try {
       setLoading(true);
+      // Add timestamp to prevent caching
+      const timestamp = Date.now();
       const [statsResponse, performersResponse, earningsResponse] = await Promise.all([
-        apiService.get('/api/admin/dashboard-stats'),
-        apiService.get('/api/admin/performers'),
-        apiService.get('/api/admin/platform-earnings')
+        apiService.get(`/api/admin/dashboard-stats?_t=${timestamp}`),
+        apiService.get(`/api/admin/performers?_t=${timestamp}`),
+        apiService.get(`/api/admin/platform-earnings?_t=${timestamp}`)
       ]);
 
       if (statsResponse.data) setStats(statsResponse.data);
