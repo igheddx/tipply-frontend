@@ -254,9 +254,14 @@ const Dashboard: React.FC = () => {
         // setProfileId(profileResponse.data.id) // This line was removed as per the new_code
         
         // Fetch real metrics data
+        console.log('🎯 [DASHBOARD DEBUG] Profile ID from getProfile:', profileResponse.data.id)
         const metricsResponse = await apiService.getDashboardMetrics(profileResponse.data.id)
+        console.log('🎯 [DASHBOARD DEBUG] Metrics response:', metricsResponse)
         if (metricsResponse.data) {
+          console.log('🎯 [DASHBOARD DEBUG] Setting metrics with stripeFuturePayouts:', metricsResponse.data.stripeFuturePayouts)
           setMetrics(metricsResponse.data)
+        } else {
+          console.log('🎯 [DASHBOARD DEBUG] No metrics data in response, error:', metricsResponse.error)
         }
         
         // Fetch recent tips
@@ -1187,6 +1192,8 @@ const Dashboard: React.FC = () => {
                   {metrics ? formatCurrency(metrics.stripeFuturePayouts) : '$0.00'}
                 </p>
                 <p className="text-xs text-amber-600">Scheduled</p>
+                {/* DEBUG: Show raw value */}
+                <p className="text-xs text-gray-500 mt-2">[DEBUG: {metrics?.stripeFuturePayouts ?? 'null'}]</p>
               </div>
             </div>
           </div>
