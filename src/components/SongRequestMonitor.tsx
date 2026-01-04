@@ -66,9 +66,11 @@ const SongRequestMonitor: React.FC<SongRequestMonitorProps> = ({
     
     setLoading(true)
     try {
+      const token = localStorage.getItem('token')
       const response = await fetch(`${API_BASE_URL}/api/SongCatalog/monitor/${profileId}`, {
         method: 'GET',
         headers: {
+          'Authorization': `Bearer ${token}`,
           'Cache-Control': 'no-cache, no-store, must-revalidate',
           'Pragma': 'no-cache',
           'Expires': '0'
@@ -97,9 +99,11 @@ const SongRequestMonitor: React.FC<SongRequestMonitorProps> = ({
         profileId 
       })
       
+      const token = localStorage.getItem('token')
       const response = await fetch(`${API_BASE_URL}/api/SongCatalog/monitor/update-status`, {
         method: 'PUT',
         headers: {
+          'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
