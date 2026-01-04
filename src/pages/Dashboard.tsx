@@ -890,7 +890,14 @@ const Dashboard: React.FC = () => {
     if (!userProfile?.id) return
     
     try {
-      const response = await fetch(`${API_BASE_URL}/api/SongCatalog/monitor/${userProfile.id}`)
+      const response = await fetch(`${API_BASE_URL}/api/SongCatalog/monitor/${userProfile.id}`, {
+        method: 'GET',
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0'
+        }
+      })
       if (response.ok) {
         const data = await response.json()
         setSongRequests(data.songRequests || [])
