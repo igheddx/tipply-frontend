@@ -67,7 +67,9 @@ const SongRequestMonitor: React.FC<SongRequestMonitorProps> = ({
     setLoading(true)
     try {
       const token = localStorage.getItem('token')
-      const response = await fetch(`${API_BASE_URL}/api/SongCatalog/monitor/${profileId}`, {
+      // Add cache-busting query parameter to ensure fresh data
+      const cacheBuster = Date.now()
+      const response = await fetch(`${API_BASE_URL}/api/SongCatalog/monitor/${profileId}?_t=${cacheBuster}`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,

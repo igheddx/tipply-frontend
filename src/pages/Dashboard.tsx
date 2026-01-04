@@ -891,7 +891,9 @@ const Dashboard: React.FC = () => {
     
     try {
       const token = localStorage.getItem('token')
-      const response = await fetch(`${API_BASE_URL}/api/SongCatalog/monitor/${userProfile.id}`, {
+      // Add cache-busting query parameter to ensure fresh data
+      const cacheBuster = Date.now()
+      const response = await fetch(`${API_BASE_URL}/api/SongCatalog/monitor/${userProfile.id}?_t=${cacheBuster}`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,
