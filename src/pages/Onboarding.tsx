@@ -347,8 +347,14 @@ const Onboarding: React.FC = () => {
         }
         setErrors(prev => ({ ...prev, isAllowSongRequest: '' }))
         
-        await registerDevice()
-        setStep(step + 1)
+        try {
+          await registerDevice()
+          // Only advance to next step if device registration succeeded
+          setStep(step + 1)
+        } catch (err) {
+          // Error already handled in registerDevice, just don't advance
+          console.error('Device registration failed, not advancing to next step')
+        }
       } else if (step === 5) {
         // Step 5 is the KYC Verification step - user clicks button to continue to Stripe
         // Don't automatically start KYC here - let user click the button in renderStep5
@@ -463,12 +469,17 @@ Please use a different serial number or contact support if this is your device.`
       }
       
       console.log('Device registered successfully for onboarding')
+      
+      // Clear any previous errors
+      setErrors(prev => ({ ...prev, serialNumber: '' }))
     } catch (err) {
       console.error('Failed to register device:', err)
       setErrors(prev => ({ 
         ...prev, 
         serialNumber: err instanceof Error ? err.message : 'Failed to register device. Please try again.' 
       }))
+      // Don't advance to next step if registration failed
+      throw err
     } finally {
       setIsLoading(false)
     }
