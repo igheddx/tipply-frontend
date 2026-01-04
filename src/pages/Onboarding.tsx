@@ -348,13 +348,11 @@ const Onboarding: React.FC = () => {
         setErrors(prev => ({ ...prev, isAllowSongRequest: '' }))
         
         await registerDevice()
-        // Skip Stripe KYC step (step 5) and go directly to completion (step 6)
-        setStep(step + 2)
+        setStep(step + 1)
       } else if (step === 5) {
-        // Start KYC process - this will redirect to Stripe
-        // This step is now skipped during onboarding, but kept for potential future use
-        await startKYC()
-        // Don't advance step here - startKYC will redirect to Stripe
+        // Step 5 is the KYC Verification step - user clicks button to continue to Stripe
+        // Don't automatically start KYC here - let user click the button in renderStep5
+        // The button will call startKYC() when clicked
       }
     } else {
       handleSubmit()
@@ -1365,7 +1363,7 @@ Please use a different serial number or contact support if this is your device.`
                 </button>
                 <button
                   type="button"
-                  onClick={handleNext}
+                  onClick={step === 5 ? startKYC : handleNext}
                   disabled={isLoading || 
                     (step === 3 && (!verificationCode.trim() || !!errors.verificationCode)) ||
                     (step === 4 && (isValidatingDevice || !deviceValidationComplete || !!errors.serialNumber))
@@ -1379,6 +1377,8 @@ Please use a different serial number or contact support if this is your device.`
                     </div>
                   ) : step === 6 ? (
                     'Go to Dashboard'
+                  ) : step === 5 ? (
+                    'Start KYC Process'
                   ) : (
                     'Continue'
                   )}
