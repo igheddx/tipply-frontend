@@ -87,24 +87,26 @@ class ApiService {
       }
       
       if (!response.ok) {
-        let errorData: any = {}
+        let errorMessage = `HTTP ${response.status}: ${response.statusText}`
         try {
           const text = await response.text()
           if (text) {
-            errorData = JSON.parse(text)
+            try {
+              const errorData = JSON.parse(text)
+              errorMessage = errorData.error || errorData.message || errorData || errorMessage
+            } catch (e) {
+              // If JSON parsing fails, use the text directly as error message
+              errorMessage = text
+            }
           }
         } catch (e) {
-          // If JSON parsing fails, use the text as error message
-          errorData = { error: text || response.statusText }
+          console.error('Error reading error response:', e)
         }
         
-        // Include the full error message from the response
-        const errorMessage = errorData.error || errorData.message || errorData || `HTTP ${response.status}: ${response.statusText}`
         console.error('API Error Response:', {
           status: response.status,
           statusText: response.statusText,
-          errorData: errorData,
-          fullResponse: await response.clone().text().catch(() => 'Unable to read response')
+          errorMessage: errorMessage
         })
         throw new Error(errorMessage)
       }

@@ -523,8 +523,7 @@ Please use a different serial number or contact support if this is your device.`
         // Log the full error details for debugging
         console.error('CreateConnectAccount error details:', {
           error: result.error,
-          data: result.data,
-          status: result.status
+          data: result.data
         })
         throw new Error(result.error)
       }
