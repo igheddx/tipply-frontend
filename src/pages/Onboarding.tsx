@@ -283,10 +283,15 @@ const Onboarding: React.FC = () => {
           setErrors(prev => ({ ...prev, password: passwordError }))
           return
         }
-        setErrors(prev => ({ ...prev, password: '', confirmPassword: '' }))
+        setErrors(prev => ({ ...prev, password: '', confirmPassword: '', email: '' }))
         
-        // Create profile and send verification code
-        await createProfile()
+        // Create profile first
+        const profileCreated = await createProfile()
+        if (!profileCreated) {
+          // Profile creation failed, show error and stop
+          console.log('Step 2: Profile creation failed, stopping flow')
+          return
+        }
         
         // Send verification code immediately after profile creation
         console.log('Step 2: Profile created, sending verification code...')
@@ -375,7 +380,7 @@ const Onboarding: React.FC = () => {
     }
   }
 
-  const createProfile = async () => {
+  const createProfile = async (): Promise<boolean> => {
     setIsLoading(true)
     try {
       // Create profile and set password in one step
@@ -388,12 +393,18 @@ const Onboarding: React.FC = () => {
       })
       
       if (result.error) {
-        throw new Error(result.error)
+        setErrors(prev => ({ ...prev, email: result.error || 'Failed to create profile. Email may already be in use.' }))
+        console.error('Failed to create profile:', result.error)
+        return false
       }
       
       console.log('Profile created and password set successfully for onboarding')
+      return true
     } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to create profile. Email may already be in use.'
+      setErrors(prev => ({ ...prev, email: errorMessage }))
       console.error('Failed to create profile:', err)
+      return false
     } finally {
       setIsLoading(false)
     }
