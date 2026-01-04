@@ -33,7 +33,7 @@ const SongRequestMonitor: React.FC<SongRequestMonitorProps> = ({
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date())
   const refreshIntervalRef = useRef<number | null>(null)
 
-  // Auto-refresh every 30 seconds
+  // Auto-refresh every 5 seconds for live updates
   useEffect(() => {
     if (isVisible) {
       loadSongRequests()
@@ -41,7 +41,7 @@ const SongRequestMonitor: React.FC<SongRequestMonitorProps> = ({
       refreshIntervalRef.current = setInterval(() => {
         loadSongRequests()
         setLastRefresh(new Date())
-      }, 30000)
+      }, 5000)
       
       return () => {
         if (refreshIntervalRef.current) {
@@ -66,7 +66,14 @@ const SongRequestMonitor: React.FC<SongRequestMonitorProps> = ({
     
     setLoading(true)
     try {
-      const response = await fetch(`${API_BASE_URL}/api/SongCatalog/monitor/${profileId}`)
+      const response = await fetch(`${API_BASE_URL}/api/SongCatalog/monitor/${profileId}`, {
+        method: 'GET',
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0'
+        }
+      })
       if (response.ok) {
         const data = await response.json()
         setSongRequests(data.songRequests || [])
