@@ -25,6 +25,8 @@ const Profile: React.FC = () => {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
+  const [kycStatus, setKycStatus] = useState<string>('unknown')
+  const [stripeEnabledDevices, setStripeEnabledDevices] = useState<string[]>([])
   
   const [editForm, setEditForm] = useState<ProfileData>({
     firstName: '',
@@ -48,6 +50,7 @@ const Profile: React.FC = () => {
 
   useEffect(() => {
     fetchProfile()
+    checkStripeConnectStatus()
   }, [])
 
   const fetchProfile = async () => {
@@ -237,6 +240,54 @@ const Profile: React.FC = () => {
     navigate('/login')
   }
 
+  const checkStripeConnectStatus = async () => {
+    try {
+      // Get user's devices
+      const devicesResponse = await apiService.getDevices()
+      if (devicesResponse.error || !devicesResponse.data) {
+        console.log('No devices found or error getting devices')
+        return
+      }
+
+      const devices = devicesResponse.data
+      const stripeEnabledDevicesList: string[] = []
+
+      for (const device of devices) {
+        if (device.stripeAccountId) {
+          try {
+            const statusResponse = await apiService.getConnectAccountStatus(device.uuid)
+            if (statusResponse.data) {
+              const status = statusResponse.data
+              
+              // Check verification status directly - try both cases
+              const verificationStatus = status.VerificationStatus || status.verificationStatus || 'unknown'
+              
+              if (verificationStatus.toLowerCase() === 'verified') {
+                stripeEnabledDevicesList.push(device.uuid)
+                setKycStatus('verified')
+              } else if (
+                verificationStatus.toLowerCase() === 'pending' ||
+                verificationStatus.toLowerCase() === 'pending_verification' ||
+                verificationStatus.toLowerCase() === 'incomplete' ||
+                verificationStatus.toLowerCase() === 'requires_verification'
+              ) {
+                setKycStatus('pending')
+              } else {
+                setKycStatus('not_verified')
+              }
+            }
+          } catch (error) {
+            console.error(`Error checking status for device ${device.uuid}:`, error)
+          }
+        }
+      }
+      
+      setStripeEnabledDevices(stripeEnabledDevicesList)
+    } catch (error) {
+      console.error('Error checking Stripe Connect status:', error)
+    }
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -292,6 +343,40 @@ const Profile: React.FC = () => {
             <p className="text-green-600 text-sm">{success}</p>
           </div>
         )}
+
+        {/* Verification Status Section */}
+        <div className="bg-white rounded-xl shadow-sm p-6 mb-6 max-w-2xl">
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">Verification Status</h2>
+          <div className="flex flex-wrap gap-4">
+            {/* KYC Status */}
+            {kycStatus === 'verified' && (
+              <div className="flex items-center space-x-2 bg-green-50 border border-green-200 rounded-lg px-4 py-2">
+                <svg className="w-5 h-5 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                </svg>
+                <span className="text-sm font-medium text-green-800">KYC Verified</span>
+              </div>
+            )}
+            {kycStatus === 'pending' && (
+              <div className="flex items-center space-x-2 bg-yellow-50 border border-yellow-200 rounded-lg px-4 py-2">
+                <svg className="w-5 h-5 text-yellow-600" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                </svg>
+                <span className="text-sm font-medium text-yellow-800">KYC Pending</span>
+              </div>
+            )}
+            
+            {/* Stripe Account Status */}
+            {stripeEnabledDevices.length > 0 && (
+              <div className="flex items-center space-x-2 bg-blue-50 border border-blue-200 rounded-lg px-4 py-2">
+                <svg className="w-5 h-5 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                </svg>
+                <span className="text-sm font-medium text-blue-800">Stripe Verified</span>
+              </div>
+            )}
+          </div>
+        </div>
 
         <div className="bg-white rounded-xl shadow-sm p-6 mb-6 max-w-2xl">
           <div className="flex justify-between items-center mb-6">
