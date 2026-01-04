@@ -93,7 +93,8 @@ class ApiService {
           if (text) {
             try {
               const errorData = JSON.parse(text)
-              errorMessage = errorData.error || errorData.message || errorData || errorMessage
+              // Prioritize 'details' field (contains actual error message), then 'error', then 'message'
+              errorMessage = errorData.details || errorData.error || errorData.message || errorData || errorMessage
             } catch (e) {
               // If JSON parsing fails, use the text directly as error message
               errorMessage = text
