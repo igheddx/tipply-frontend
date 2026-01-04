@@ -482,6 +482,22 @@ Please use a different serial number or contact support if this is your device.`
       sessionStorage.setItem('onboarding_password', formData.password)
 
       console.log('Starting KYC process with serial number:', formData.serialNumber)
+      console.log('Form data being sent:', {
+        serialNumber: formData.serialNumber,
+        firstName: formData.firstName,
+        lastName: formData.lastName,
+        email: formData.email
+      })
+
+      // Validate required fields before making the request
+      if (!formData.serialNumber || !formData.firstName || !formData.lastName || !formData.email) {
+        const missingFields = []
+        if (!formData.serialNumber) missingFields.push('Serial Number')
+        if (!formData.firstName) missingFields.push('First Name')
+        if (!formData.lastName) missingFields.push('Last Name')
+        if (!formData.email) missingFields.push('Email')
+        throw new Error(`Missing required information: ${missingFields.join(', ')}. Please go back and complete the previous steps.`)
+      }
 
       const result = await apiService.createConnectAccount({
         serialNumber: formData.serialNumber, // Changed from deviceUuid to serialNumber
@@ -522,8 +538,26 @@ Please use a different serial number or contact support if this is your device.`
     } catch (err) {
       console.error('Failed to start KYC process:', err)
       
-      // Check if this is a retryable error
+      // Extract error message
       const errorMessage = err instanceof Error ? err.message : String(err)
+      
+      // Show user-friendly error message
+      let userMessage = 'Failed to start KYC process. '
+      if (errorMessage.includes('not found') || errorMessage.includes('Device')) {
+        userMessage += 'Device not found. Please ensure your device was registered successfully in the previous step.'
+      } else if (errorMessage.includes('already has')) {
+        userMessage += 'This device already has a Stripe account. You can proceed to the dashboard.'
+      } else if (errorMessage.includes('required') || errorMessage.includes('Missing')) {
+        userMessage += errorMessage
+      } else if (errorMessage.includes('400') || errorMessage.includes('Bad Request')) {
+        userMessage += 'Invalid request. Please ensure your device was registered successfully and all information is correct.'
+      } else {
+        userMessage += errorMessage
+      }
+      
+      setErrors(prev => ({ ...prev, general: userMessage }))
+      
+      // Check if this is a retryable error
       if (errorMessage.includes('timeout') || errorMessage.includes('network') || errorMessage.includes('creation_error')) {
         // Show retry option
         if (window.confirm('The KYC process encountered an issue. Would you like to try again?')) {
