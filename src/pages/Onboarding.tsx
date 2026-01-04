@@ -1377,10 +1377,8 @@ Please use a different serial number or contact support if this is your device.`
                       <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
                       <span>Processing...</span>
                     </div>
-                  ) : step === 5 ? (
+                  ) : step === 6 ? (
                     'Go to Dashboard'
-                  ) : step === 5 ? (
-                    'Start KYC Process'
                   ) : (
                     'Continue'
                   )}
