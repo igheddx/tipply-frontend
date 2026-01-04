@@ -348,9 +348,11 @@ const Onboarding: React.FC = () => {
         setErrors(prev => ({ ...prev, isAllowSongRequest: '' }))
         
         await registerDevice()
-        setStep(step + 1)
+        // Skip Stripe KYC step (step 5) and go directly to completion (step 6)
+        setStep(step + 2)
       } else if (step === 5) {
         // Start KYC process - this will redirect to Stripe
+        // This step is now skipped during onboarding, but kept for potential future use
         await startKYC()
         // Don't advance step here - startKYC will redirect to Stripe
       }
