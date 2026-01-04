@@ -79,9 +79,12 @@ const SongRequestMonitor: React.FC<SongRequestMonitorProps> = ({
       if (response.ok) {
         const data = await response.json()
         setSongRequests(data.songRequests || [])
+      } else {
+        const errorText = await response.text()
+        console.error(`🔴 [Monitor] Failed to load song requests: ${response.status} ${response.statusText}`, errorText)
       }
     } catch (error) {
-      console.error('Error loading song requests:', error)
+      console.error('🔴 [Monitor] Error loading song requests:', error)
     } finally {
       setLoading(false)
     }

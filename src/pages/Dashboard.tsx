@@ -903,9 +903,12 @@ const Dashboard: React.FC = () => {
       if (response.ok) {
         const data = await response.json()
         setSongRequests(data.songRequests || [])
+      } else {
+        const errorText = await response.text()
+        console.error(`🔴 [Dashboard Monitor] Failed to load song requests: ${response.status} ${response.statusText}`, errorText)
       }
     } catch (error) {
-      console.error('Error loading song requests:', error)
+      console.error('🔴 [Dashboard Monitor] Error loading song requests:', error)
     }
   }
 
