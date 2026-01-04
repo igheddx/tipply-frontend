@@ -87,7 +87,26 @@ const SongManagement: React.FC<SongManagementProps> = ({ profileId }) => {
       })
 
       if (response.ok) {
-        const totalCount = parseInt(response.headers.get('X-Total-Count') || '0')
+        // Try to get count from header first, then fallback to counting the response array
+        const headerCount = response.headers.get('X-Total-Count')
+        let totalCount = 0
+        
+        if (headerCount) {
+          totalCount = parseInt(headerCount, 10)
+        } else {
+          // Fallback: if header is not accessible, fetch without limit to count
+          const fullResponse = await fetch(`${API_BASE_URL}/api/songcatalog/my-songs/${profileId}`, {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json'
+            }
+          })
+          if (fullResponse.ok) {
+            const songs = await fullResponse.json()
+            totalCount = Array.isArray(songs) ? songs.length : 0
+          }
+        }
+        
         setCatalogTotalCount(totalCount)
         setCatalogCount(totalCount)
       }
