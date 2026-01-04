@@ -637,6 +637,8 @@ const TippingInterface: React.FC = () => {
   const handleTipClick = async (amount: number) => {
     if (loading || !deviceInfo || !userId) return
 
+    console.log('🎯 [handleTipClick] Called with amount:', amount, 'selectedSong:', selectedSong)
+
     // Trigger haptic feedback immediately
     triggerHaptic()
 
@@ -652,11 +654,13 @@ const TippingInterface: React.FC = () => {
 
     // If song is selected, this completes the song request
     if (selectedSong) {
+      console.log('🎵 [handleTipClick] Song is selected, calling processTipWithSong:', selectedSong.id)
       await processTipWithSong(amount)
       return
     }
 
     // Regular tip
+    console.log('💰 [handleTipClick] No song selected, calling processTip')
     await processTip(amount)
   }
 
@@ -740,6 +744,7 @@ const TippingInterface: React.FC = () => {
   }
 
   const processTipWithSong = async (amount: number) => {
+    console.log('🎵 [processTipWithSong] Starting, selectedSong:', selectedSong)
     setLoading(true)
     setClickedAmount(amount)
     triggerCanvasConfetti(amount)
@@ -760,6 +765,7 @@ const TippingInterface: React.FC = () => {
       const paymentMethodId = getStoredPaymentMethodId()
       const stripeCustomerId = getStoredCustomerId()
       
+      console.log('🎵 [processTipWithSong] Before payload construction - selectedSong:', selectedSong)
       const tipPayload = {
         deviceId: deviceInfo!.uuid,
         userId: userId,
@@ -767,29 +773,26 @@ const TippingInterface: React.FC = () => {
         effect: getLightEffect(amount),
         duration: 3000,
         paymentMethodId: paymentMethodId || undefined,
-        stripeCustomerId: stripeCustomerId || undefined
+        stripeCustomerId: stripeCustomerId || undefined,
+        // Include song request fields if song is selected
+        ...(selectedSong && {
+          songId: selectedSong.id,
+          requestorName: selectedSong.requestorName,
+          note: selectedSong.note
+        })
       }
       console.log('🎰 SUBMITTING TIP PAYLOAD TO BACKEND (Cards Mode):', tipPayload)
+      console.log('🎵 [processTipWithSong] songId in payload:', tipPayload.songId, 'selectedSong.id was:', selectedSong?.id)
 
       // Submit tip
       const response = await apiService.submitTip(tipPayload)
 
       if (response.data) {
-        // Submit song request
-        await fetch(`${getApiBaseUrl()}/api/songcatalog/request`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            deviceUuid: deviceInfo?.uuid,
-            songId: selectedSong!.id,
-            participantId: userId,
-            tipAmount: amount,
-            requestorName: selectedSong!.requestorName,
-            note: selectedSong!.note
-          })
-        })
-
-        toast.success(`$${amount} tip with song request submitted!`)
+        if (selectedSong) {
+          toast.success(`$${amount} tip with song request submitted!`)
+        } else {
+          toast.success(`$${amount} tip submitted!`)
+        }
         setSelectedSong(null)
         setShowSongSearch(false)
         // Refresh payment method session on successful tip (extends 30-day memory)
