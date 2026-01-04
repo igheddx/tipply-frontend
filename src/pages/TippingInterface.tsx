@@ -703,14 +703,26 @@ const TippingInterface: React.FC = () => {
         effect: getLightEffect(amount),
         duration: 3000,
         paymentMethodId: paymentMethodId || undefined,
-        stripeCustomerId: stripeCustomerId || undefined
+        stripeCustomerId: stripeCustomerId || undefined,
+        // Include song request fields if song is selected
+        ...(selectedSong && {
+          songId: selectedSong.id,
+          requestorName: selectedSong.requestorName,
+          note: selectedSong.note
+        })
       }
       console.log('🎰 SUBMITTING TIP PAYLOAD TO BACKEND (Classic Mode):', tipPayload)
 
       const response = await apiService.submitTip(tipPayload)
 
       if (response.data) {
-        toast.success(`$${amount} tip sent!`, { duration: 800 })
+        if (selectedSong) {
+          toast.success(`$${amount} tip with song request sent!`, { duration: 800 })
+          setSelectedSong(null)
+          setShowSongSearch(false)
+        } else {
+          toast.success(`$${amount} tip sent!`, { duration: 800 })
+        }
         // Refresh payment method session on successful tip (extends 30-day memory)
         refreshPaymentMethodSession()
       } else {
