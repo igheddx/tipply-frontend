@@ -136,10 +136,35 @@ const Dashboard: React.FC = () => {
     checkSongCatalogAlert()
   }, [navigate])
 
-  // Load song requests when monitor tab is active
+  // Refresh data when tab changes to ensure latest data is shown
   useEffect(() => {
-    if (activeTab === 'monitor' && userProfile?.id) {
-      loadSongRequests()
+    if (!userProfile?.id) return
+
+    switch (activeTab) {
+      case 'overview':
+        // Refresh overview stats and metrics
+        fetchDashboardStats()
+        break
+      case 'devices':
+        // Refresh device list and Stripe status
+        fetchDashboardStats()
+        checkStripeConnectStatus()
+        break
+      case 'tips':
+        // Refresh recent tips
+        fetchDashboardStats()
+        break
+      case 'monitor':
+        // Refresh song request monitor
+        loadSongRequests()
+        break
+      case 'songs':
+        // Song catalog is handled by SongManagement component
+        // But we can refresh dashboard stats in case it affects the view
+        fetchDashboardStats()
+        break
+      default:
+        break
     }
   }, [activeTab, userProfile?.id])
 
