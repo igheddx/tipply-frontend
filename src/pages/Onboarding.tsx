@@ -493,6 +493,12 @@ Please use a different serial number or contact support if this is your device.`
       console.log('CreateConnectAccount response:', result)
 
       if (result.error) {
+        // Log the full error details for debugging
+        console.error('CreateConnectAccount error details:', {
+          error: result.error,
+          data: result.data,
+          status: result.status
+        })
         throw new Error(result.error)
       }
 
