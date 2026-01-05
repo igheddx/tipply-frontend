@@ -252,34 +252,46 @@ const Profile: React.FC = () => {
       const devices = devicesResponse.data
       const stripeEnabledDevicesList: string[] = []
 
-      for (const device of devices) {
-        if (device.stripeAccountId) {
-          try {
-            const statusResponse = await apiService.getConnectAccountStatus(device.uuid)
-            if (statusResponse.data) {
-              const status = statusResponse.data
-              
-              // Check verification status directly - try both cases
-              const verificationStatus = status.VerificationStatus || status.verificationStatus || 'unknown'
-              
-              if (verificationStatus.toLowerCase() === 'verified') {
-                stripeEnabledDevicesList.push(device.uuid)
-                setKycStatus('verified')
-              } else if (
-                verificationStatus.toLowerCase() === 'pending' ||
-                verificationStatus.toLowerCase() === 'pending_verification' ||
-                verificationStatus.toLowerCase() === 'incomplete' ||
-                verificationStatus.toLowerCase() === 'requires_verification'
-              ) {
-                setKycStatus('pending')
-              } else {
-                setKycStatus('not_verified')
-              }
+      // Check status for all devices (backend will check Profile.StripeAccountId)
+      // Only need to check one device since all devices share the same Profile.StripeAccountId
+      if (devices.length > 0) {
+        try {
+          const statusResponse = await apiService.getConnectAccountStatus(devices[0].uuid)
+          if (statusResponse.data) {
+            const status = statusResponse.data
+            
+            // Check verification status directly - try both cases
+            const verificationStatus = status.VerificationStatus || status.verificationStatus || 'unknown'
+            
+            // Check if account is enabled and has charges/payouts enabled for KYC verification
+            const isKycVerified = status.IsEnabled && status.ChargesEnabled && status.PayoutsEnabled
+            
+            if (isKycVerified || verificationStatus.toLowerCase() === 'verified') {
+              stripeEnabledDevicesList.push(...devices.map(d => d.uuid))
+              setKycStatus('verified')
+            } else if (
+              verificationStatus.toLowerCase() === 'pending' ||
+              verificationStatus.toLowerCase() === 'pending_verification' ||
+              verificationStatus.toLowerCase() === 'incomplete' ||
+              verificationStatus.toLowerCase() === 'requires_verification' ||
+              status.Status === 'pending' ||
+              status.Status === 'incomplete'
+            ) {
+              setKycStatus('pending')
+            } else {
+              setKycStatus('not_verified')
             }
-          } catch (error) {
-            console.error(`Error checking status for device ${device.uuid}:`, error)
+          } else {
+            // No status data returned, check if it's a not_connected status
+            setKycStatus('not_verified')
           }
+        } catch (error) {
+          console.error(`Error checking status for device ${devices[0].uuid}:`, error)
+          setKycStatus('not_verified')
         }
+      } else {
+        // No devices found
+        setKycStatus('not_verified')
       }
       
       setStripeEnabledDevices(stripeEnabledDevicesList)
