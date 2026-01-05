@@ -32,6 +32,7 @@ const TippingInterface: React.FC = () => {
   const [isPaymentSetup, setIsPaymentSetup] = useState(false)
   const [userId, setUserId] = useState<string>('')
   const [checkingPaymentMethods, setCheckingPaymentMethods] = useState(true)
+  const [isDeviceVerified, setIsDeviceVerified] = useState<boolean | null>(null)
   const [audioEnabled, setAudioEnabled] = useState(false)
   const [clickedAmount, setClickedAmount] = useState<number | null>(null)
   const [isMobile, setIsMobile] = useState(false)
@@ -212,9 +213,21 @@ const TippingInterface: React.FC = () => {
           ownerLastName: device.ownerLastName,
           ownerId: device.id, // Using device.id since profileId is not exposed in public endpoint
           stripeAccountId: '', // Not exposed in public endpoint
-          isAllowSongRequest: device.isAllowSongRequest
+          isAllowSongRequest: device.isAllowSongRequest,
+          isStripeVerified: device.isStripeVerified || false,
+          isKycVerified: device.isKycVerified || false
         }
         setDeviceInfo(deviceInfoData)
+        
+        // Check if device is verified (both Stripe and KYC)
+        const verified = device.isStripeVerified && device.isKycVerified
+        setIsDeviceVerified(verified)
+        
+        // If not verified, don't proceed with payment setup checks
+        if (!verified) {
+          setCheckingPaymentMethods(false)
+          return
+        }
 
         // Check AWS IoT status
         try {
@@ -821,6 +834,21 @@ const TippingInterface: React.FC = () => {
     return (
       <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 flex items-center justify-center">
         <div className="text-white text-xl">Loading...</div>
+      </div>
+    )
+  }
+
+  // Check if device is verified (Stripe and KYC)
+  if (isDeviceVerified === false) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 flex items-center justify-center p-6">
+        <div className="bg-white/10 backdrop-blur-md rounded-2xl p-8 max-w-md w-full text-center">
+          <div className="text-6xl mb-6">⚠️</div>
+          <h2 className="text-2xl font-bold text-white mb-4">Performer Not Set Up</h2>
+          <p className="text-white/80 mb-6">
+            This Performer is currently not set up to fully use the TipWave platform. Please contact your performer.
+          </p>
+        </div>
       </div>
     )
   }
