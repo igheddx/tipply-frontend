@@ -267,7 +267,7 @@ const Profile: React.FC = () => {
             const isKycVerified = status.IsEnabled && status.ChargesEnabled && status.PayoutsEnabled
             
             if (isKycVerified || verificationStatus.toLowerCase() === 'verified') {
-              stripeEnabledDevicesList.push(...devices.map(d => d.uuid))
+              stripeEnabledDevicesList.push(...devices.map((d: { uuid: string }) => d.uuid))
               setKycStatus('verified')
             } else if (
               verificationStatus.toLowerCase() === 'pending' ||
