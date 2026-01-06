@@ -760,19 +760,94 @@ const Dashboard: React.FC = () => {
 
   const downloadQRCode = async (deviceId: string, nickname: string) => {
     try {
-      const blob = await apiService.downloadQRCode(deviceId)
-      if (blob) {
-        const url = window.URL.createObjectURL(blob)
-        const a = document.createElement('a')
-        a.href = url
-        a.download = `qr-code-${nickname || deviceId}.png`
-        document.body.appendChild(a)
-        a.click()
-        window.URL.revokeObjectURL(url)
-        document.body.removeChild(a)
+      // Get the QR code blob from backend
+      const qrBlob = await apiService.downloadQRCode(deviceId)
+      if (!qrBlob) return
+
+      // Get stage name from profile
+      const stageName = userProfile?.stageName || userProfile?.firstName || 'Performer'
+
+      // Create a canvas for the 4x6 card (4in x 6in at 300 DPI = 1200 x 1800 px)
+      const canvas = document.createElement('canvas')
+      const ctx = canvas.getContext('2d')
+      if (!ctx) return
+
+      const width = 1200
+      const height = 1800
+      canvas.width = width
+      canvas.height = height
+
+      // White background
+      ctx.fillStyle = '#ffffff'
+      ctx.fillRect(0, 0, width, height)
+
+      // Load Tipwave logo
+      const logo = new Image()
+      logo.crossOrigin = 'anonymous'
+      logo.src = '/images/logo/tipwave-logo.png'
+
+      // Load QR code
+      const qrImage = new Image()
+      qrImage.crossOrigin = 'anonymous'
+      const qrUrl = URL.createObjectURL(qrBlob)
+      qrImage.src = qrUrl
+
+      // Wait for both images to load
+      await Promise.all([
+        new Promise((resolve) => { logo.onload = resolve; logo.onerror = resolve }),
+        new Promise((resolve) => { qrImage.onload = resolve })
+      ])
+
+      // Draw logo at top (centered, 200px tall)
+      if (logo.complete && logo.naturalHeight > 0) {
+        const logoHeight = 200
+        const logoWidth = (logo.naturalWidth / logo.naturalHeight) * logoHeight
+        ctx.drawImage(logo, (width - logoWidth) / 2, 100, logoWidth, logoHeight)
       }
+
+      // Draw message text
+      ctx.fillStyle = '#111827'
+      ctx.font = 'bold 48px Arial, sans-serif'
+      ctx.textAlign = 'center'
+      ctx.fillText('Support the music you love', width / 2, 400)
+
+      // Draw CTA
+      ctx.fillStyle = '#4B5563'
+      ctx.font = '36px Arial, sans-serif'
+      ctx.fillText('Scan to tip instantly', width / 2, 480)
+
+      // Draw QR code (centered, 600x600)
+      const qrSize = 600
+      const qrX = (width - qrSize) / 2
+      const qrY = 600
+      ctx.drawImage(qrImage, qrX, qrY, qrSize, qrSize)
+
+      // Draw performer name
+      ctx.fillStyle = '#111827'
+      ctx.font = 'bold 56px Arial, sans-serif'
+      ctx.fillText(stageName, width / 2, 1400)
+
+      // Draw footer
+      ctx.fillStyle = '#6B7280'
+      ctx.font = '28px Arial, sans-serif'
+      ctx.fillText('Printed 4x6" QR card · Tipwave', width / 2, 1650)
+
+      // Convert canvas to blob and download
+      canvas.toBlob((blob) => {
+        if (blob) {
+          const url = window.URL.createObjectURL(blob)
+          const a = document.createElement('a')
+          a.href = url
+          a.download = `tipwave-card-${nickname || deviceId}.png`
+          document.body.appendChild(a)
+          a.click()
+          window.URL.revokeObjectURL(url)
+          window.URL.revokeObjectURL(qrUrl)
+          document.body.removeChild(a)
+        }
+      }, 'image/png')
     } catch (error) {
-      console.error('Error downloading QR code:', error)
+      console.error('Error generating QR card:', error)
     }
   }
 
