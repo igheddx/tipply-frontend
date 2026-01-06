@@ -277,8 +277,8 @@ const AdminDashboard: React.FC = () => {
             <div className="flex items-center">
               <div className="relative w-24 h-24 overflow-visible rounded-lg">
                 <img
-                  src="/images/tipply_logo.png"
-                  alt="Tipply Logo"
+                  src="/images/logo/tipwave-logo.png"
+                  alt="Tipwave Logo"
                   className="w-full h-full object-contain"
                   style={{ transform: 'scale(1.2)', objectPosition: 'center' }}
                 />
