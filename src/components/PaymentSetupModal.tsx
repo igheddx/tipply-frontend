@@ -326,15 +326,15 @@ function PaymentForm({
         {/* Security Reassurance with Stripe Logo */}
         <div className="mt-6 pt-4 border-t border-gray-200">
           <div className="flex flex-col items-center text-center space-y-3">
-            <p className="text-xs text-gray-500 leading-relaxed">
-              Payments are securely processed by Stripe. Your card details are encrypted and never stored on your device.
+            <p className="text-xs text-gray-600 leading-relaxed text-center">
+              Payments are securely processed by Stripe. Your card details are encrypted and never stored on your device or our servers — Stripe handles everything with industry-leading security.
             </p>
             <div className="flex items-center justify-center gap-3" aria-label="Secure payment powered by Stripe">
               <svg
                 role="img"
                 aria-label="Secure"
                 viewBox="0 0 24 24"
-                className="w-5 h-5 text-gray-500"
+                className="w-5 h-5 text-indigo-500"
                 fill="none"
                 xmlns="http://www.w3.org/2000/svg"
               >
