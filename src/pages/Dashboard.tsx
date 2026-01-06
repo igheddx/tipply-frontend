@@ -740,26 +740,32 @@ const Dashboard: React.FC = () => {
       setValidatedDeviceUuid('')
       setValidatedSerialNumber('')
       
-      // Force a complete refresh
+      // Force a complete refresh - use a more reliable approach
       setLoading(true)
       
-      // Refresh dashboard data - wait for it to complete
-      console.log('🔄 Refreshing dashboard stats...')
+      // Refresh dashboard data multiple times to ensure it's updated
+      console.log('🔄 Refreshing dashboard stats (attempt 1)...')
       await fetchDashboardStats()
+      
+      // Switch to devices tab first to trigger useEffect
+      setActiveTab('devices')
+      
+      // Wait a bit for tab switch, then refresh again
+      await new Promise(resolve => setTimeout(resolve, 200))
+      
+      console.log('🔄 Refreshing dashboard stats (attempt 2)...')
+      await fetchDashboardStats()
+      
       console.log('🔄 Refreshing Stripe status...')
       await checkStripeConnectStatus()
       
-      // Switch to devices tab - this will trigger useEffect to refresh again
-      console.log('🔄 Switching to devices tab...')
-      setActiveTab('devices')
+      // Final refresh after everything
+      await new Promise(resolve => setTimeout(resolve, 100))
+      console.log('🔄 Final refresh (attempt 3)...')
+      await fetchDashboardStats()
       
-      // Force one more refresh after a short delay to ensure data is fresh
-      setTimeout(async () => {
-        console.log('🔄 Final refresh after tab switch...')
-        await fetchDashboardStats()
-        setLoading(false)
-        console.log('✅ Refresh complete')
-      }, 300)
+      setLoading(false)
+      console.log('✅ Refresh complete. Device should now be visible.')
       
     } catch (error) {
       console.error('Error adding device:', error)
