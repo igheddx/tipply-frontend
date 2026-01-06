@@ -853,6 +853,21 @@ const TippingInterface: React.FC = () => {
     )
   }
 
+  // Block desktop usage and prompt user to open on mobile
+  if (!isMobile) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 flex items-center justify-center p-6">
+        <div className="bg-white/10 backdrop-blur-md rounded-2xl p-8 text-center max-w-md mx-auto border border-white/20">
+          <div className="text-6xl mb-4">📱</div>
+          <h1 className="text-2xl font-bold text-white mb-4">Mobile Only</h1>
+          <p className="text-white/80 text-lg leading-relaxed">
+            This tipping interface is designed for mobile devices only. Please open this page on your smartphone or tablet for the best experience.
+          </p>
+        </div>
+      </div>
+    )
+  }
+
   if (!isPaymentSetup) {
     return (
       <PaymentSetupModal
