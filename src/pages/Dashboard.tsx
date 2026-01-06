@@ -798,11 +798,12 @@ const Dashboard: React.FC = () => {
         new Promise((resolve) => { qrImage.onload = resolve })
       ])
 
-      // Draw logo at top (centered, 200px tall)
+      // Draw logo at top left corner (150px tall)
       if (logo.complete && logo.naturalHeight > 0) {
-        const logoHeight = 200
+        const logoHeight = 150
         const logoWidth = (logo.naturalWidth / logo.naturalHeight) * logoHeight
-        ctx.drawImage(logo, (width - logoWidth) / 2, 100, logoWidth, logoHeight)
+        const padding = 40
+        ctx.drawImage(logo, padding, padding, logoWidth, logoHeight)
       }
 
       // Draw message text
