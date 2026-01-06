@@ -241,11 +241,14 @@ const Profile: React.FC = () => {
   }
 
   const checkStripeConnectStatus = async () => {
+    console.log('🔍 [Profile] checkStripeConnectStatus called')
     try {
       // Get user's devices
+      console.log('🔍 [Profile] Getting devices...')
       const devicesResponse = await apiService.getDevices()
+      console.log('🔍 [Profile] Devices response:', devicesResponse)
       if (devicesResponse.error || !devicesResponse.data) {
-        console.log('No devices found or error getting devices')
+        console.log('❌ [Profile] No devices found or error getting devices:', devicesResponse.error)
         return
       }
 
