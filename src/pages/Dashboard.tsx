@@ -701,21 +701,24 @@ const Dashboard: React.FC = () => {
     }
   }
 
-  const downloadQRCode = async (deviceId: string, nickname: string, qrUrlFromDevice?: string) => {
+  const downloadQRCode = async (deviceId: string, nickname: string) => {
     try {
-      // Prefer the device-provided QR URL; fall back to API blob
-      let qrUrl: string | null = qrUrlFromDevice || null
-      let qrBlobUrl: string | null = null
+      console.info('[QR] Download clicked', { deviceId, nickname })
 
-      if (!qrUrl) {
-        const qrBlob = await apiService.downloadQRCode(deviceId)
-        if (!qrBlob) {
-          alert('Could not download QR code. Please try again or check your connection.')
-          return
-        }
-        qrBlobUrl = URL.createObjectURL(qrBlob)
-        qrUrl = qrBlobUrl
+      // Always fetch QR as a blob from API to avoid cross-origin issues
+      const qrBlob = await apiService.downloadQRCode(deviceId)
+      if (!qrBlob) {
+        alert('Could not download QR code. Please try again or check your connection.')
+        return
       }
+
+      if (!qrBlob.type.startsWith('image/')) {
+        alert(`QR download returned a non-image content-type: ${qrBlob.type || 'unknown'}`)
+        return
+      }
+
+      const qrBlobUrl = URL.createObjectURL(qrBlob)
+      const qrBitmap = await createImageBitmap(qrBlob)
 
       // Get stage name from profile
       const stageName = userProfile?.stageName || userProfile?.firstName || 'Performer'
@@ -739,17 +742,9 @@ const Dashboard: React.FC = () => {
       logo.crossOrigin = 'anonymous'
       logo.src = '/images/logo/tipwave-logo.png'
 
-      // Load QR code
-      const qrImage = new Image()
-      qrImage.crossOrigin = 'anonymous'
-      qrImage.src = qrUrl
-
-      // Wait for images to load (logo is optional, QR is required)
+      // Wait for logo (optional)
       await new Promise((resolve) => { logo.onload = resolve; logo.onerror = resolve })
-      await new Promise((resolve, reject) => {
-        qrImage.onload = resolve
-        qrImage.onerror = () => reject(new Error('QR image failed to load'))
-      })
+      console.info('[QR] QR bitmap ready', { width: qrBitmap.width, height: qrBitmap.height })
 
       // Draw logo at top left corner (150px tall)
       if (logo.complete && logo.naturalHeight > 0) {
@@ -771,13 +766,13 @@ const Dashboard: React.FC = () => {
       ctx.fillText('Scan to tip instantly', width / 2, 480)
 
       // Draw QR code (centered, 600x600)
-      if (!qrImage.naturalWidth || !qrImage.naturalHeight) {
+      if (!qrBitmap.width || !qrBitmap.height) {
         throw new Error('QR image is empty or failed to load')
       }
       const qrSize = 600
       const qrX = (width - qrSize) / 2
       const qrY = 600
-      ctx.drawImage(qrImage, qrX, qrY, qrSize, qrSize)
+      ctx.drawImage(qrBitmap, qrX, qrY, qrSize, qrSize)
 
       // Draw performer name
       ctx.fillStyle = '#111827'
@@ -799,15 +794,13 @@ const Dashboard: React.FC = () => {
           document.body.appendChild(a)
           a.click()
           window.URL.revokeObjectURL(url)
-          if (qrBlobUrl) {
-            window.URL.revokeObjectURL(qrBlobUrl)
-          }
+          window.URL.revokeObjectURL(qrBlobUrl)
           document.body.removeChild(a)
         }
       }, 'image/png')
     } catch (error) {
       console.error('Error generating QR card:', error)
-      alert('Could not generate the QR card. Please try again.')
+      alert(`Could not generate the QR card. ${error instanceof Error ? error.message : 'Please try again.'}`)
     }
   }
 
@@ -1603,7 +1596,7 @@ const Dashboard: React.FC = () => {
                         <div className="space-y-2">
                           <div className="flex space-x-2">
                             <button
-                              onClick={() => downloadQRCode(device.id, device.nickname, device.qrCodeUrl)}
+                              onClick={() => downloadQRCode(device.id, device.nickname)}
                               className="flex-1 px-3 py-2 bg-primary-600 text-white text-sm rounded-lg hover:bg-primary-700 transition-colors"
                             >
                               Download QR
