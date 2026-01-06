@@ -855,35 +855,21 @@ const TippingInterface: React.FC = () => {
 
   if (!isPaymentSetup) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 flex items-center justify-center p-6">
-        <div className="bg-white/10 backdrop-blur-md rounded-2xl p-8 max-w-md w-full text-center">
-          <div className="text-6xl mb-6">💳</div>
-          <h2 className="text-2xl font-bold text-white mb-4">Payment Setup Required</h2>
-          <p className="text-white/80 mb-6">Set up your payment method to start tipping!</p>
-          <button
-            onClick={() => setShowPaymentModal(true)}
-            className="w-full bg-gradient-to-r from-blue-500 to-purple-600 text-white py-3 px-6 rounded-lg font-semibold hover:scale-105 transition-transform"
-          >
-            Set Up Payment
-          </button>
-        </div>
-
-        <PaymentSetupModal
-          isOpen={showPaymentModal}
-          onClose={() => setShowPaymentModal(false)}
-          onComplete={(paymentMethodId) => {
-            console.log('🎉 Payment setup complete! Payment method ID:', paymentMethodId)
-            if (paymentMethodId) {
-              storePaymentMethodId(paymentMethodId)
-            }
-            setIsPaymentSetup(true)
-            setShowPaymentModal(false)
-            toast.success('Payment method added successfully!')
-          }}
-          deviceUuid={deviceInfo?.uuid || ''}
-          userId={userId}
-        />
-      </div>
+      <PaymentSetupModal
+        isOpen={true}
+        onClose={() => setShowPaymentModal(false)}
+        onComplete={(paymentMethodId) => {
+          console.log('🎉 Payment setup complete! Payment method ID:', paymentMethodId)
+          if (paymentMethodId) {
+            storePaymentMethodId(paymentMethodId)
+          }
+          setIsPaymentSetup(true)
+          setShowPaymentModal(false)
+          toast.success('Payment method added successfully!')
+        }}
+        deviceUuid={deviceInfo?.uuid || ''}
+        userId={userId}
+      />
     )
   }
 
