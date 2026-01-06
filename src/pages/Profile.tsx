@@ -27,7 +27,6 @@ const Profile: React.FC = () => {
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
   const [kycStatus, setKycStatus] = useState<string>('unknown')
-  const [stripeEnabledDevices, setStripeEnabledDevices] = useState<string[]>([])
   
   const [editForm, setEditForm] = useState<ProfileData>({
     firstName: '',
@@ -53,7 +52,7 @@ const Profile: React.FC = () => {
     const initProfile = async () => {
       const profileData = await fetchProfile()
       if (profileData) {
-        checkStripeConnectStatus(profileData)
+        checkStripeConnectStatus()
       }
       
       // Check if returning from verification
@@ -64,7 +63,7 @@ const Profile: React.FC = () => {
         window.history.replaceState({}, '', '/profile')
         // Refresh status after a short delay
         setTimeout(() => {
-          checkStripeConnectStatus(profileData)
+          checkStripeConnectStatus()
         }, 2000)
       }
     }
@@ -289,7 +288,7 @@ const Profile: React.FC = () => {
     navigate('/login')
   }
 
-  const checkStripeConnectStatus = async (profileData?: ProfileData) => {
+  const checkStripeConnectStatus = async () => {
     console.log('🔍 [Profile] checkStripeConnectStatus called')
     try {
       // Check the Stripe status endpoint for actual verification status
@@ -450,16 +449,6 @@ const Profile: React.FC = () => {
                 >
                   Start Stripe Verification
                 </button>
-              </div>
-            )}
-            
-            {/* Stripe Account Status */}
-            {stripeEnabledDevices.length > 0 && (
-              <div className="flex items-center space-x-2 bg-blue-50 border border-blue-200 rounded-lg px-4 py-2">
-                <svg className="w-5 h-5 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                </svg>
-                <span className="text-sm font-medium text-blue-800">Stripe Verified</span>
               </div>
             )}
           </div>

@@ -75,7 +75,6 @@ const Dashboard: React.FC = () => {
   const [activeTab, setActiveTab] = useState('overview')
   const [showStripeAlert, setShowStripeAlert] = useState(false)
   const [stripeEnabledDevices, setStripeEnabledDevices] = useState<string[]>([])
-  const [deviceStripeStatus, setDeviceStripeStatus] = useState<{[key: string]: string}>({})
   const [kycStatus, setKycStatus] = useState<string>('unknown')
   const [userProfile, setUserProfile] = useState<any>(null)
   
@@ -389,7 +388,6 @@ const Dashboard: React.FC = () => {
       console.log('🏆 [DEBUG] Device status map:', deviceStatusMap)
       
       setStripeEnabledDevices(stripeEnabledDevicesList)
-      setDeviceStripeStatus(deviceStatusMap)
     } catch (error) {
       console.error('Error checking Stripe Connect status:', error)
     }
@@ -599,61 +597,6 @@ const Dashboard: React.FC = () => {
       setAddDeviceValidationComplete(true)
       setIsValidatingAddDevice(false)
       return { isValid: false, error: errorMessage }
-    }
-  }
-
-  const checkUserStripeStatus = async () => {
-    try {
-      // Check if user has any devices with Stripe accounts directly from backend
-      const stripeCheckResponse = await apiService.checkUserStripeSetup()
-      let hasStripeAccountFromAPI = false
-      
-      if (stripeCheckResponse.data?.hasVerifiedStripeAccount) {
-        hasStripeAccountFromAPI = true
-      }
-      
-      // Also check UI state as fallback
-      const hasStripeAccountFromUI = stats?.devices.some(device => 
-        deviceStripeStatus[device.uuid] === 'Enabled'
-      ) || stripeEnabledDevices.length > 0
-      
-      const hasStripeAccount = hasStripeAccountFromAPI || hasStripeAccountFromUI
-      
-      // Check KYC status from various sources
-      const isKycVerified = kycStatus === 'verified'
-      
-      // Also check if user has completed KYC from onboarding flow
-      const kycResult = localStorage.getItem('kyc_result')
-      let hasCompletedKyc = false
-      if (kycResult) {
-        try {
-          const parsed = JSON.parse(kycResult)
-          hasCompletedKyc = parsed.status === 'success'
-        } catch (e) {
-          console.log('Failed to parse KYC result from localStorage')
-        }
-      }
-      
-      // IMPORTANT: If user already has Stripe devices, they can always add more devices
-      // The backend will handle device linking and Stripe inheritance automatically
-      const canAddDevice = hasStripeAccount || isKycVerified || hasCompletedKyc
-      
-      console.log('Stripe Status Check:', {
-        hasStripeAccountFromAPI,
-        hasStripeAccountFromUI,
-        hasStripeAccount,
-        isKycVerified,
-        hasCompletedKyc,
-        canAddDevice,
-        kycStatus,
-        stripeEnabledDevicesCount: stripeEnabledDevices.length,
-        stripeCheckResponse: stripeCheckResponse.data
-      })
-      
-      return { hasStripeAccount: !!hasStripeAccount, isKycVerified: canAddDevice }
-    } catch (error) {
-      console.error('Error checking Stripe status:', error)
-      return { hasStripeAccount: false, isKycVerified: false }
     }
   }
 
@@ -1611,11 +1554,6 @@ const Dashboard: React.FC = () => {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                   {stats.devices.map((device) => {
-                    const stripeStatus = deviceStripeStatus[device.uuid] || 'Unknown'
-                    const isStripeEnabled = stripeStatus === 'Enabled'
-                    const isStripePending = stripeStatus === 'Pending' || stripeStatus === 'Incomplete'
-                    const isStripeNotSetup = stripeStatus === 'Not Setup' || stripeStatus === 'Unknown'
-                    
                     return (
                       <div key={device.id} className="bg-gray-50 rounded-xl p-6 border border-gray-200">
                         <div className="flex items-start justify-between mb-4">
