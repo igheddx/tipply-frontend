@@ -266,6 +266,17 @@ const Profile: React.FC = () => {
             // Check if account is enabled and has charges/payouts enabled for KYC verification
             const isKycVerified = status.IsEnabled && status.ChargesEnabled && status.PayoutsEnabled
             
+            console.log('Stripe Connect Status Check:', {
+              IsEnabled: status.IsEnabled,
+              ChargesEnabled: status.ChargesEnabled,
+              PayoutsEnabled: status.PayoutsEnabled,
+              VerificationStatus: verificationStatus,
+              Status: status.Status,
+              isKycVerified: isKycVerified,
+              AccountId: status.AccountId,
+              ProfileStripeAccountId: status.ProfileStripeAccountId
+            })
+            
             if (isKycVerified || verificationStatus.toLowerCase() === 'verified') {
               stripeEnabledDevicesList.push(...devices.map((d: { uuid: string }) => d.uuid))
               setKycStatus('verified')
