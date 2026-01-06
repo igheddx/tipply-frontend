@@ -9,6 +9,7 @@ interface ProfileData {
   phone?: string
   stageName?: string
   bio?: string
+  stripeAccountId?: string
 }
 
 interface PasswordData {
@@ -49,8 +50,25 @@ const Profile: React.FC = () => {
   const navigate = useNavigate()
 
   useEffect(() => {
-    fetchProfile()
-    checkStripeConnectStatus()
+    const initProfile = async () => {
+      const profileData = await fetchProfile()
+      if (profileData) {
+        checkStripeConnectStatus(profileData)
+      }
+      
+      // Check if returning from verification
+      const params = new URLSearchParams(window.location.search)
+      if (params.get('verification') === 'complete') {
+        setSuccess('Verification process initiated! Your account will be reviewed by Stripe.')
+        // Remove query params from URL
+        window.history.replaceState({}, '', '/profile')
+        // Refresh status after a short delay
+        setTimeout(() => {
+          checkStripeConnectStatus(profileData)
+        }, 2000)
+      }
+    }
+    initProfile()
   }, [])
 
   const fetchProfile = async () => {
@@ -60,7 +78,7 @@ const Profile: React.FC = () => {
       
       if (response.error) {
         setError('Failed to load profile')
-        return
+        return null
       }
       
       const profileData = response.data
@@ -73,8 +91,10 @@ const Profile: React.FC = () => {
         stageName: profileData.stageName || '',
         bio: profileData.bio || ''
       })
+      return profileData
     } catch (err) {
       setError('Failed to load profile')
+      return null
     } finally {
       setLoading(false)
     }
@@ -234,87 +254,98 @@ const Profile: React.FC = () => {
     }
   }
 
+  const handleStartVerification = async () => {
+    try {
+      setLoading(true)
+      setError('')
+      
+      console.log('🚀 Starting Stripe verification from profile...')
+      
+      // Call profile-level verification endpoint (no device needed)
+      const response = await apiService.post('/stripe/profile-verification-link', {})
+      
+      if (response.error) {
+        setError(response.error)
+        return
+      }
+      
+      if (response.data?.onboardingUrl) {
+        console.log('✅ Verification URL received, redirecting...')
+        window.location.href = response.data.onboardingUrl
+      } else {
+        setError('Failed to create verification link')
+      }
+    } catch (err) {
+      console.error('Error starting verification:', err)
+      setError('Failed to start verification process')
+    } finally {
+      setLoading(false)
+    }
+  }
+
   const handleLogout = () => {
     localStorage.removeItem('token')
     localStorage.removeItem('refreshToken')
     navigate('/login')
   }
 
-  const checkStripeConnectStatus = async () => {
+  const checkStripeConnectStatus = async (profileData?: ProfileData) => {
     console.log('🔍 [Profile] checkStripeConnectStatus called')
     try {
-      // Get user's devices
-      console.log('🔍 [Profile] Getting devices...')
-      const devicesResponse = await apiService.getDevices()
-      console.log('🔍 [Profile] Devices response:', devicesResponse)
-      if (devicesResponse.error || !devicesResponse.data) {
-        console.log('❌ [Profile] No devices found or error getting devices:', devicesResponse.error)
-        return
-      }
-
-      const devices = devicesResponse.data
-      const stripeEnabledDevicesList: string[] = []
-
-      // Check status for all devices (backend will check Profile.StripeAccountId)
-      // Only need to check one device since all devices share the same Profile.StripeAccountId
-      if (devices.length > 0) {
-        console.log('Checking Stripe Connect status for device:', devices[0].uuid)
-        try {
-          const statusResponse = await apiService.getConnectAccountStatus(devices[0].uuid)
-          console.log('Status response received:', statusResponse)
+      // Check the Stripe status endpoint for actual verification status
+      // Don't just check if stripeAccountId exists - account must be enabled
+      console.log('🔍 [Profile] Getting profile Stripe status...')
+      try {
+        const statusResponse = await apiService.get('/stripe/profile-stripe-status')
+        console.log('Status response received:', statusResponse)
+        
+        if (statusResponse && statusResponse.data) {
+          const status = statusResponse.data
           
-          if (statusResponse.data) {
-            const status = statusResponse.data
-            
-            // Check verification status directly - try both cases
-            const verificationStatus = status.VerificationStatus || status.verificationStatus || 'unknown'
-            
-            // Check if account is enabled and has charges/payouts enabled for KYC verification
-            const isKycVerified = status.IsEnabled && status.ChargesEnabled && status.PayoutsEnabled
-            
-            console.log('Stripe Connect Status Check:', {
-              IsEnabled: status.IsEnabled,
-              ChargesEnabled: status.ChargesEnabled,
-              PayoutsEnabled: status.PayoutsEnabled,
-              VerificationStatus: verificationStatus,
-              Status: status.Status,
-              isKycVerified: isKycVerified,
-              AccountId: status.AccountId,
-              ProfileStripeAccountId: status.ProfileStripeAccountId,
-              FullStatus: status
-            })
-            
-            if (isKycVerified || verificationStatus.toLowerCase() === 'verified') {
-              stripeEnabledDevicesList.push(...devices.map((d: { uuid: string }) => d.uuid))
-              setKycStatus('verified')
-            } else if (
-              verificationStatus.toLowerCase() === 'pending' ||
-              verificationStatus.toLowerCase() === 'pending_verification' ||
-              verificationStatus.toLowerCase() === 'incomplete' ||
-              verificationStatus.toLowerCase() === 'requires_verification' ||
-              status.Status === 'pending' ||
-              status.Status === 'incomplete'
-            ) {
-              setKycStatus('pending')
-            } else {
-              setKycStatus('not_verified')
-            }
+          // Check verification status
+          const verificationStatus = status.VerificationStatus || status.verificationStatus || 'unknown'
+          
+          // Check if account is enabled and has charges/payouts enabled for KYC verification
+          // This is the ONLY way to determine if KYC is verified
+          const isKycVerified = status.IsEnabled && status.ChargesEnabled && status.PayoutsEnabled
+          
+          console.log('Stripe Connect Status Check:', {
+            IsEnabled: status.IsEnabled,
+            ChargesEnabled: status.ChargesEnabled,
+            PayoutsEnabled: status.PayoutsEnabled,
+            VerificationStatus: verificationStatus,
+            Status: status.Status,
+            isKycVerified: isKycVerified,
+            AccountId: status.StripeAccountId,
+            FullStatus: status
+          })
+          
+          if (isKycVerified || verificationStatus.toLowerCase() === 'verified') {
+            setKycStatus('verified')
+          } else if (
+            verificationStatus.toLowerCase() === 'pending' ||
+            verificationStatus.toLowerCase() === 'pending_verification' ||
+            verificationStatus.toLowerCase() === 'incomplete' ||
+            verificationStatus.toLowerCase() === 'requires_verification' ||
+            status.Status === 'pending' ||
+            status.Status === 'pending_verification' ||
+            status.Status === 'incomplete'
+          ) {
+            setKycStatus('pending')
+          } else if (status.Status === 'not_connected') {
+            setKycStatus('not_verified')
           } else {
-            // No status data returned, check if it's a not_connected status
-            console.log('No status data returned from getConnectAccountStatus. Response:', statusResponse)
             setKycStatus('not_verified')
           }
-        } catch (error) {
-          console.error(`Error checking status for device ${devices[0].uuid}:`, error)
-          console.error('Full error details:', JSON.stringify(error, null, 2))
+        } else {
+          // No status data returned
+          console.log('No status data returned from profile-stripe-status')
           setKycStatus('not_verified')
         }
-      } else {
-        // No devices found
+      } catch (error) {
+        console.error('Error checking profile Stripe status:', error)
         setKycStatus('not_verified')
       }
-      
-      setStripeEnabledDevices(stripeEnabledDevicesList)
     } catch (error) {
       console.error('Error checking Stripe Connect status:', error)
     }
@@ -390,19 +421,35 @@ const Profile: React.FC = () => {
               </div>
             )}
             {kycStatus === 'pending' && (
-              <div className="flex items-center space-x-2 bg-yellow-50 border border-yellow-200 rounded-lg px-4 py-2">
-                <svg className="w-5 h-5 text-yellow-600" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                </svg>
-                <span className="text-sm font-medium text-yellow-800">KYC Pending</span>
+              <div className="space-y-3">
+                <div className="flex items-center space-x-2 bg-yellow-50 border border-yellow-200 rounded-lg px-4 py-2">
+                  <svg className="w-5 h-5 text-yellow-600" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                  </svg>
+                  <span className="text-sm font-medium text-yellow-800">KYC Pending</span>
+                </div>
+                <button
+                  onClick={handleStartVerification}
+                  className="w-full sm:w-auto px-6 py-2.5 bg-gradient-to-r from-primary-600 to-primary-700 text-white font-medium rounded-lg hover:from-primary-700 hover:to-primary-800 focus:ring-4 focus:ring-primary-200 transition-all duration-200"
+                >
+                  Continue Verification
+                </button>
               </div>
             )}
             {kycStatus === 'not_verified' && (
-              <div className="flex items-center space-x-2 bg-red-50 border border-red-200 rounded-lg px-4 py-2">
-                <svg className="w-5 h-5 text-red-600" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                </svg>
-                <span className="text-sm font-medium text-red-800">KYC Not Verified</span>
+              <div className="space-y-3">
+                <div className="flex items-center space-x-2 bg-red-50 border border-red-200 rounded-lg px-4 py-2">
+                  <svg className="w-5 h-5 text-red-600" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                  </svg>
+                  <span className="text-sm font-medium text-red-800">KYC Not Verified</span>
+                </div>
+                <button
+                  onClick={handleStartVerification}
+                  className="w-full sm:w-auto px-6 py-2.5 bg-gradient-to-r from-primary-600 to-primary-700 text-white font-medium rounded-lg hover:from-primary-700 hover:to-primary-800 focus:ring-4 focus:ring-primary-200 transition-all duration-200"
+                >
+                  Start Stripe Verification
+                </button>
               </div>
             )}
             

@@ -1209,8 +1209,8 @@ Please use a different serial number or contact support if this is your device.`
             </svg>
           </div>
           <p className="text-yellow-800 text-sm">
-            <strong>Note:</strong> You'll be redirected to Stripe's secure platform to complete the verification process. 
-            After completion, you'll be redirected back to Tipply.
+            <strong>Note:</strong> You'll complete your identity verification through Stripe's secure platform. 
+            This is required to receive tips and payouts. Click the button below to get started.
           </p>
         </div>
       </div>
@@ -1438,7 +1438,7 @@ Please use a different serial number or contact support if this is your device.`
                   ) : step === 6 ? (
                     'Go to Dashboard'
                   ) : step === 5 ? (
-                    'Start KYC Process'
+                    'Start Stripe Verification'
                   ) : (
                     'Continue'
                   )}
