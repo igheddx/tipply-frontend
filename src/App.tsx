@@ -15,6 +15,7 @@ import Onboarding from './pages/Onboarding'
 import DeviceWifiSetup from './pages/DeviceWifiSetup'
 import NotFound from './pages/NotFound'
 import ProtectedRoute from './components/ProtectedRoute'
+import QrCardGenerator from './pages/QrCardGenerator'
 
 function App() {
   return (
@@ -31,6 +32,7 @@ function App() {
         <Route path="/manage-devices" element={<ProtectedRoute><ManageDevices /></ProtectedRoute>} />
         <Route path="/tip/:deviceId" element={<TippingInterface />} />
         <Route path="/device-setup" element={<DeviceWifiSetup />} />
+        <Route path="/qr-card" element={<ProtectedRoute><QrCardGenerator /></ProtectedRoute>} />
         <Route path="/stripe-return" element={<StripeReturn />} />
         <Route path="/kyc-return" element={<KYCReturn />} />
         <Route path="/stripe-status" element={<StripeStatus />} />
