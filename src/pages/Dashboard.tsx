@@ -701,11 +701,21 @@ const Dashboard: React.FC = () => {
     }
   }
 
-  const downloadQRCode = async (deviceId: string, nickname: string) => {
+  const downloadQRCode = async (deviceId: string, nickname: string, qrUrlFromDevice?: string) => {
     try {
-      // Get the QR code blob from backend
-      const qrBlob = await apiService.downloadQRCode(deviceId)
-      if (!qrBlob) return
+      // Prefer the device-provided QR URL; fall back to API blob
+      let qrUrl: string | null = qrUrlFromDevice || null
+      let qrBlobUrl: string | null = null
+
+      if (!qrUrl) {
+        const qrBlob = await apiService.downloadQRCode(deviceId)
+        if (!qrBlob) {
+          alert('Could not download QR code. Please try again or check your connection.')
+          return
+        }
+        qrBlobUrl = URL.createObjectURL(qrBlob)
+        qrUrl = qrBlobUrl
+      }
 
       // Get stage name from profile
       const stageName = userProfile?.stageName || userProfile?.firstName || 'Performer'
@@ -732,7 +742,6 @@ const Dashboard: React.FC = () => {
       // Load QR code
       const qrImage = new Image()
       qrImage.crossOrigin = 'anonymous'
-      const qrUrl = URL.createObjectURL(qrBlob)
       qrImage.src = qrUrl
 
       // Wait for both images to load
@@ -786,12 +795,15 @@ const Dashboard: React.FC = () => {
           document.body.appendChild(a)
           a.click()
           window.URL.revokeObjectURL(url)
-          window.URL.revokeObjectURL(qrUrl)
+          if (qrBlobUrl) {
+            window.URL.revokeObjectURL(qrBlobUrl)
+          }
           document.body.removeChild(a)
         }
       }, 'image/png')
     } catch (error) {
       console.error('Error generating QR card:', error)
+      alert('Could not generate the QR card. Please try again.')
     }
   }
 
@@ -1587,7 +1599,7 @@ const Dashboard: React.FC = () => {
                         <div className="space-y-2">
                           <div className="flex space-x-2">
                             <button
-                              onClick={() => downloadQRCode(device.id, device.nickname)}
+                              onClick={() => downloadQRCode(device.id, device.nickname, device.qrCodeUrl)}
                               className="flex-1 px-3 py-2 bg-primary-600 text-white text-sm rounded-lg hover:bg-primary-700 transition-colors"
                             >
                               Download QR
