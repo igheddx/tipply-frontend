@@ -262,7 +262,7 @@ const Profile: React.FC = () => {
       console.log('🚀 Starting Stripe verification from profile...')
       
       // Call profile-level verification endpoint (no device needed)
-      const response = await apiService.post('/stripe/profile-verification-link', {})
+      const response = await apiService.post('/api/stripe/profile-verification-link', {})
       
       if (response.error) {
         setError(response.error)
@@ -296,7 +296,7 @@ const Profile: React.FC = () => {
       // Don't just check if stripeAccountId exists - account must be enabled
       console.log('🔍 [Profile] Getting profile Stripe status...')
       try {
-        const statusResponse = await apiService.get('/stripe/profile-stripe-status')
+        const statusResponse = await apiService.get('/api/stripe/profile-stripe-status')
         console.log('Status response received:', statusResponse)
         
         if (statusResponse && statusResponse.data) {
