@@ -308,6 +308,10 @@ const Dashboard: React.FC = () => {
         navigate('/login')
         return
       }
+      console.log('📊 Dashboard stats received:', {
+        deviceCount: response.data?.devices?.length || 0,
+        devices: response.data?.devices?.map((d: any) => ({ id: d.id, nickname: d.nickname, uuid: d.uuid }))
+      })
       setStats(response.data)
     } catch (error) {
       console.error('Error fetching dashboard stats:', error)
