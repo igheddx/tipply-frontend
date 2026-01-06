@@ -725,7 +725,7 @@ const Dashboard: React.FC = () => {
       }
 
       // Success! Device added and ready (either inherited Stripe or no Stripe needed)
-      console.log('Device added successfully:', response.data.stripeSetupMessage || 'Device linked successfully')
+      console.log('✅ Device added successfully:', response.data)
       
       // Clear form first
       setShowAddDeviceForm(false)
@@ -736,17 +736,26 @@ const Dashboard: React.FC = () => {
       setValidatedDeviceUuid('')
       setValidatedSerialNumber('')
       
+      // Force a complete refresh
+      setLoading(true)
+      
       // Refresh dashboard data - wait for it to complete
+      console.log('🔄 Refreshing dashboard stats...')
       await fetchDashboardStats()
+      console.log('🔄 Refreshing Stripe status...')
       await checkStripeConnectStatus()
       
-      // Force refresh by setting tab - this will trigger the useEffect to refresh again
-      // Set to a different tab first, then back to devices to force refresh
-      setActiveTab('overview')
-      // Use setTimeout to ensure state updates complete before switching tabs
-      setTimeout(() => {
-        setActiveTab('devices')
-      }, 100)
+      // Switch to devices tab - this will trigger useEffect to refresh again
+      console.log('🔄 Switching to devices tab...')
+      setActiveTab('devices')
+      
+      // Force one more refresh after a short delay to ensure data is fresh
+      setTimeout(async () => {
+        console.log('🔄 Final refresh after tab switch...')
+        await fetchDashboardStats()
+        setLoading(false)
+        console.log('✅ Refresh complete')
+      }, 300)
       
     } catch (error) {
       console.error('Error adding device:', error)
