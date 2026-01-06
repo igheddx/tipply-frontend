@@ -87,29 +87,8 @@ class ApiService {
       }
       
       if (!response.ok) {
-        let errorMessage = `HTTP ${response.status}: ${response.statusText}`
-        try {
-          const text = await response.text()
-          if (text) {
-            try {
-              const errorData = JSON.parse(text)
-              // Prioritize 'details' field (contains actual error message), then 'error', then 'message'
-              errorMessage = errorData.details || errorData.error || errorData.message || errorData || errorMessage
-            } catch (e) {
-              // If JSON parsing fails, use the text directly as error message
-              errorMessage = text
-            }
-          }
-        } catch (e) {
-          console.error('Error reading error response:', e)
-        }
-        
-        console.error('API Error Response:', {
-          status: response.status,
-          statusText: response.statusText,
-          errorMessage: errorMessage
-        })
-        throw new Error(errorMessage)
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`)
       }
 
       const data = await response.json()
@@ -183,6 +162,7 @@ class ApiService {
         headers: {
           Authorization: `Bearer ${token}`,
         },
+        cache: 'no-cache'
       })
 
       if (!response.ok) {

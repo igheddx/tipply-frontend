@@ -718,7 +718,32 @@ const Dashboard: React.FC = () => {
       }
 
       const qrBlobUrl = URL.createObjectURL(qrBlob)
-      const qrBitmap = await createImageBitmap(qrBlob)
+      let qrBitmap: ImageBitmap
+      try {
+        qrBitmap = await createImageBitmap(qrBlob)
+      } catch (err) {
+        const blobSize = qrBlob.size
+        let snippet = ''
+        try {
+          const text = await qrBlob.text()
+          snippet = text.slice(0, 200)
+        } catch (e) {
+          snippet = '[unreadable]'
+        }
+        console.error('[QR] Bitmap decode failed', { err, blobType: qrBlob.type, blobSize, snippet })
+
+        // Fallback: download raw QR blob so user still gets the code
+        const rawUrl = URL.createObjectURL(qrBlob)
+        const a = document.createElement('a')
+        a.href = rawUrl
+        a.download = `tipwave-qr-${nickname || deviceId}.png`
+        document.body.appendChild(a)
+        a.click()
+        document.body.removeChild(a)
+        URL.revokeObjectURL(rawUrl)
+        alert('Could not generate the branded card because the QR image could not be decoded. Downloaded the raw QR instead.')
+        return
+      }
 
       // Get stage name from profile
       const stageName = userProfile?.stageName || userProfile?.firstName || 'Performer'
@@ -766,13 +791,27 @@ const Dashboard: React.FC = () => {
       ctx.fillText('Scan to tip instantly', width / 2, 480)
 
       // Draw QR code (centered, 600x600)
-      if (!qrBitmap.width || !qrBitmap.height) {
-        throw new Error('QR image is empty or failed to load')
+      try {
+        if (!qrBitmap.width || !qrBitmap.height) {
+          throw new Error('QR image is empty or failed to load')
+        }
+        const qrSize = 600
+        const qrX = (width - qrSize) / 2
+        const qrY = 600
+        ctx.drawImage(qrBitmap, qrX, qrY, qrSize, qrSize)
+      } catch (err) {
+        console.error('[QR] Draw failed, falling back to raw QR download', err)
+        const rawUrl = URL.createObjectURL(qrBlob)
+        const a = document.createElement('a')
+        a.href = rawUrl
+        a.download = `tipwave-qr-${nickname || deviceId}.png`
+        document.body.appendChild(a)
+        a.click()
+        document.body.removeChild(a)
+        URL.revokeObjectURL(rawUrl)
+        alert('Could not render the branded card. Downloaded the raw QR instead.')
+        return
       }
-      const qrSize = 600
-      const qrX = (width - qrSize) / 2
-      const qrY = 600
-      ctx.drawImage(qrBitmap, qrX, qrY, qrSize, qrSize)
 
       // Draw performer name
       ctx.fillStyle = '#111827'
