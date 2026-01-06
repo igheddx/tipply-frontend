@@ -255,8 +255,11 @@ const Profile: React.FC = () => {
       // Check status for all devices (backend will check Profile.StripeAccountId)
       // Only need to check one device since all devices share the same Profile.StripeAccountId
       if (devices.length > 0) {
+        console.log('Checking Stripe Connect status for device:', devices[0].uuid)
         try {
           const statusResponse = await apiService.getConnectAccountStatus(devices[0].uuid)
+          console.log('Status response received:', statusResponse)
+          
           if (statusResponse.data) {
             const status = statusResponse.data
             
@@ -274,7 +277,8 @@ const Profile: React.FC = () => {
               Status: status.Status,
               isKycVerified: isKycVerified,
               AccountId: status.AccountId,
-              ProfileStripeAccountId: status.ProfileStripeAccountId
+              ProfileStripeAccountId: status.ProfileStripeAccountId,
+              FullStatus: status
             })
             
             if (isKycVerified || verificationStatus.toLowerCase() === 'verified') {
@@ -294,10 +298,12 @@ const Profile: React.FC = () => {
             }
           } else {
             // No status data returned, check if it's a not_connected status
+            console.log('No status data returned from getConnectAccountStatus. Response:', statusResponse)
             setKycStatus('not_verified')
           }
         } catch (error) {
           console.error(`Error checking status for device ${devices[0].uuid}:`, error)
+          console.error('Full error details:', JSON.stringify(error, null, 2))
           setKycStatus('not_verified')
         }
       } else {
