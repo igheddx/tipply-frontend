@@ -744,11 +744,12 @@ const Dashboard: React.FC = () => {
       qrImage.crossOrigin = 'anonymous'
       qrImage.src = qrUrl
 
-      // Wait for both images to load
-      await Promise.all([
-        new Promise((resolve) => { logo.onload = resolve; logo.onerror = resolve }),
-        new Promise((resolve) => { qrImage.onload = resolve })
-      ])
+      // Wait for images to load (logo is optional, QR is required)
+      await new Promise((resolve) => { logo.onload = resolve; logo.onerror = resolve })
+      await new Promise((resolve, reject) => {
+        qrImage.onload = resolve
+        qrImage.onerror = () => reject(new Error('QR image failed to load'))
+      })
 
       // Draw logo at top left corner (150px tall)
       if (logo.complete && logo.naturalHeight > 0) {
@@ -770,6 +771,9 @@ const Dashboard: React.FC = () => {
       ctx.fillText('Scan to tip instantly', width / 2, 480)
 
       // Draw QR code (centered, 600x600)
+      if (!qrImage.naturalWidth || !qrImage.naturalHeight) {
+        throw new Error('QR image is empty or failed to load')
+      }
       const qrSize = 600
       const qrX = (width - qrSize) / 2
       const qrY = 600
