@@ -13,6 +13,7 @@ interface DeviceInfo {
   uuid: string
   ownerFirstName: string
   ownerLastName: string
+    stageName?: string
   ownerId: string
   stripeAccountId?: string
   isAllowSongRequest?: boolean
@@ -211,6 +212,7 @@ const TippingInterface: React.FC = () => {
           uuid: device.uuid,
           ownerFirstName: device.ownerFirstName,
           ownerLastName: device.ownerLastName,
+            stageName: device.stageName,
           ownerId: device.id, // Using device.id since profileId is not exposed in public endpoint
           stripeAccountId: '', // Not exposed in public endpoint
           isAllowSongRequest: device.isAllowSongRequest,
@@ -1018,7 +1020,7 @@ const TippingInterface: React.FC = () => {
               >
                 <div className="bg-black/50 backdrop-blur-md px-6 py-3 rounded-2xl border border-white/20">
                   <h1 className="text-2xl font-bold text-white drop-shadow-lg">
-                    Tip {deviceInfo?.ownerFirstName} {deviceInfo?.ownerLastName}
+                      Tip {deviceInfo?.stageName || `${deviceInfo?.ownerFirstName} ${deviceInfo?.ownerLastName}`}
                   </h1>
                 </div>
               </motion.div>
@@ -1127,7 +1129,7 @@ const TippingInterface: React.FC = () => {
                 marginBottom: '2rem'
               }}
             >
-              Tip {deviceInfo?.ownerFirstName} {deviceInfo?.ownerLastName}
+                Tip {deviceInfo?.stageName || `${deviceInfo?.ownerFirstName} ${deviceInfo?.ownerLastName}`}
             </h1>
 
             {/* Tip buttons grid - wraps naturally */}
