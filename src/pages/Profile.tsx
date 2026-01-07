@@ -265,19 +265,23 @@ const Profile: React.FC = () => {
       
       if (response.error) {
         setError(response.error)
+        setLoading(false)
         return
       }
       
       if (response.data?.onboardingUrl) {
-        console.log('✅ Verification URL received, redirecting...')
-        window.location.href = response.data.onboardingUrl
+        console.log('✅ Verification URL received, performing full-page navigation...')
+        // Use top.location.href to guarantee full-page navigation that escapes SPA context
+        // This prevents iOS Safari ITP from blocking hCaptcha due to frame-ancestry restrictions
+        top.location.href = response.data.onboardingUrl
+        // Never reaches here due to navigation
       } else {
         setError('Failed to create verification link')
+        setLoading(false)
       }
     } catch (err) {
       console.error('Error starting verification:', err)
       setError('Failed to start verification process')
-    } finally {
       setLoading(false)
     }
   }

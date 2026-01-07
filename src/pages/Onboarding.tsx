@@ -27,7 +27,9 @@ const Onboarding: React.FC = () => {
   const [verificationCode, setVerificationCode] = useState('')
   const [verificationSent, setVerificationSent] = useState(false)
   const [profileCreated, setProfileCreated] = useState(false)
+  const [onboardingUrl, setOnboardingUrl] = useState<string | null>(null)
   const navigate = useNavigate()
+  const isIOS = typeof navigator !== 'undefined' && (/iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.userAgent.includes('Mac') && 'ontouchend' in (document as any)))
 
   // Generate API key on component mount
   useEffect(() => {
@@ -550,9 +552,19 @@ Please use a different serial number or contact support if this is your device.`
 
       // Handle legacy immediate response format
       if (result.data?.onboardingUrl) {
-        console.log('Received immediate onboarding URL, redirecting...')
-        window.location.href = result.data.onboardingUrl
-        return // Exit early, don't set loading to false
+        console.log('Received immediate onboarding URL, performing full-page navigation...')
+        // Use top.location.href to guarantee full-page navigation that escapes SPA context
+        // This prevents iOS Safari ITP from blocking hCaptcha due to frame-ancestry restrictions
+        if (isIOS) {
+          // On iOS, show modal offering new-tab option to avoid WebView restrictions
+          setOnboardingUrl(result.data.onboardingUrl)
+          setIsLoading(false)
+        } else {
+          // On desktop/non-iOS, use top.location.href for full-page navigation
+          top.location.href = result.data.onboardingUrl
+          // Never reaches here due to navigation, but don't set loading to false
+        }
+        return
       } else {
         console.error('Unexpected response format:', result.data)
         throw new Error('No onboarding URL received from Stripe')
@@ -622,8 +634,17 @@ Please use a different serial number or contact support if this is your device.`
         
         // Check if we have an onboarding URL
         if (status?.onboardingUrl) {
-          console.log('Onboarding URL received, redirecting to Stripe')
-          window.location.href = status.onboardingUrl
+          console.log('Onboarding URL received, performing full-page navigation...')
+          // Use top.location.href to guarantee full-page navigation that escapes SPA context
+          if (isIOS) {
+            // On iOS, show modal offering new-tab option to avoid WebView restrictions
+            setOnboardingUrl(status.onboardingUrl)
+            setIsLoading(false)
+          } else {
+            // On desktop/non-iOS, use top.location.href for full-page navigation
+            top.location.href = status.onboardingUrl
+            // Never reaches here due to navigation
+          }
           return
         }
         
@@ -1481,6 +1502,39 @@ Please use a different serial number or contact support if this is your device.`
             </div>
           </div>
         </div>
+
+      {onboardingUrl && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-white rounded-2xl shadow-xl p-6 max-w-md w-full mx-4">
+            <h3 className="text-xl font-semibold text-gray-900">Open Stripe Verification</h3>
+            <p className="text-gray-600 mt-2">
+              We’ll open Stripe in a new tab to avoid iOS restrictions that can block the verification challenge (hCaptcha).
+            </p>
+            <div className="mt-5 space-y-3">
+              <a
+                href={onboardingUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="block w-full text-center px-4 py-3 rounded-lg bg-primary-600 text-white hover:bg-primary-700"
+              >
+                Open in new tab
+              </a>
+              <button
+                onClick={() => { if (onboardingUrl) window.location.href = onboardingUrl }}
+                className="w-full px-4 py-3 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50"
+              >
+                Continue here
+              </button>
+            </div>
+            <button
+              onClick={() => setOnboardingUrl(null)}
+              className="mt-4 text-sm text-gray-500 hover:text-gray-700"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
 
         {/* Back to Login */}
         <div className="mt-8 text-center">
