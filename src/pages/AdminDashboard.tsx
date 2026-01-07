@@ -1,17 +1,25 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Row, Col, Statistic, Table, Button, Input, Modal, message, Spin } from 'antd';
+import { Row, Col, Statistic, Table, Button, Input, Modal, message, Spin, Card, Tag, Select, DatePicker, Space, Divider } from 'antd';
 import { 
   UserOutlined, 
   DesktopOutlined, 
   DollarOutlined, 
   ReloadOutlined,
   PlayCircleOutlined,
-  ArrowLeftOutlined
+  ArrowLeftOutlined,
+  CheckCircleOutlined,
+  CloseCircleOutlined,
+  SyncOutlined,
+  DownloadOutlined,
+  SearchOutlined,
+  FilterOutlined
 } from '@ant-design/icons';
 import { apiService } from '../services/api';
+import dayjs from 'dayjs';
 
 const { Search } = Input;
+const { RangePicker } = DatePicker;
 
 interface AdminDashboardStats {
   totalUsers: number;
@@ -49,6 +57,37 @@ interface PlatformEarningsSummary {
   monthlyBreakdown: Record<string, number>;
 }
 
+interface BatchStatus {
+  id?: string;
+  startedAt?: string;
+  completedAt?: string;
+  status: string;
+  tipsProcessed: number;
+  tipsFailed: number;
+  tipsPending: number;
+  totalAmount: number;
+  errorMessage?: string;
+  failureDetails?: string[];
+  durationSeconds?: number;
+}
+
+interface TipDetail {
+  id: string;
+  createdAt: string;
+  processedAt?: string;
+  amount: number;
+  deviceNickname: string;
+  performerFirstName: string;
+  performerLastName: string;
+  performerEmail: string;
+  status: string;
+  stripePaymentIntentId?: string;
+  effect: string;
+  duration: number;
+  platformFee: number;
+  performerEarnings: number;
+}
+
 const AdminDashboard: React.FC = () => {
   const navigate = useNavigate();
   const [stats, setStats] = useState<AdminDashboardStats | null>(null);
@@ -61,6 +100,24 @@ const AdminDashboard: React.FC = () => {
   const [selectedPerformer, setSelectedPerformer] = useState<PerformerSummary | null>(null);
   const [newFeePercentage, setNewFeePercentage] = useState<number>(10);
   const [updatingFee, setUpdatingFee] = useState(false);
+
+  // Batch processing state
+  const [batchStatus, setBatchStatus] = useState<BatchStatus | null>(null);
+  const [batchHistory, setBatchHistory] = useState<BatchStatus[]>([]);
+  const [batchHistoryModal, setBatchHistoryModal] = useState(false);
+
+  // Tips management state
+  const [tips, setTips] = useState<TipDetail[]>([]);
+  const [tipsLoading, setTipsLoading] = useState(false);
+  const [totalTips, setTotalTips] = useState(0);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize] = useState(20);
+  const [filterStatus, setFilterStatus] = useState<string | undefined>(undefined);
+  const [filterPerformer, setFilterPerformer] = useState<string | undefined>(undefined);
+  const [dateRange, setDateRange] = useState<[dayjs.Dayjs | null, dayjs.Dayjs | null] | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [minAmount, setMinAmount] = useState<number | undefined>(undefined);
+  const [maxAmount, setMaxAmount] = useState<number | undefined>(undefined);
 
   useEffect(() => {
     // Check if user has admin role
@@ -86,7 +143,21 @@ const AdminDashboard: React.FC = () => {
 
     loadDashboardData();
     fetchUserProfile();
+    loadBatchStatus();
+    loadTips();
+
+    // Auto-refresh batch status every 3 minutes
+    const batchRefreshInterval = setInterval(() => {
+      loadBatchStatus();
+    }, 180000);
+
+    return () => clearInterval(batchRefreshInterval);
   }, [navigate]);
+
+  // Reload tips when filters change
+  useEffect(() => {
+    loadTips();
+  }, [currentPage, filterStatus, filterPerformer, dateRange, searchTerm, minAmount, maxAmount]);
 
   const fetchUserProfile = async () => {
     try {
@@ -176,10 +247,104 @@ const AdminDashboard: React.FC = () => {
         message.success('Batch processing completed');
       }
       loadDashboardData(); // Reload to get updated stats
+      loadBatchStatus(); // Reload batch status
     } catch (error) {
       console.error('Error running batch processing:', error);
       message.error('Failed to run batch processing');
     }
+  };
+
+  const loadBatchStatus = async () => {
+    try {
+      const response = await apiService.get('/api/admin/batch-status');
+      if (response.data) {
+        setBatchStatus(response.data);
+      }
+    } catch (error) {
+      console.error('Error loading batch status:', error);
+    }
+  };
+
+  const loadBatchHistory = async () => {
+    try {
+      const response = await apiService.get('/api/admin/batch-history?limit=50');
+      if (response.data?.history) {
+        setBatchHistory(response.data.history);
+        setBatchHistoryModal(true);
+      }
+    } catch (error) {
+      console.error('Error loading batch history:', error);
+      message.error('Failed to load batch history');
+    }
+  };
+
+  const loadTips = async () => {
+    try {
+      setTipsLoading(true);
+      const response = await apiService.post('/api/admin/tips/search', {
+        page: currentPage,
+        pageSize: pageSize,
+        status: filterStatus,
+        performerId: filterPerformer,
+        startDate: dateRange?.[0]?.toISOString(),
+        endDate: dateRange?.[1]?.toISOString(),
+        searchTerm: searchTerm,
+        minAmount: minAmount,
+        maxAmount: maxAmount
+      });
+
+      if (response.data) {
+        setTips(response.data.tips);
+        setTotalTips(response.data.totalCount);
+      }
+    } catch (error) {
+      console.error('Error loading tips:', error);
+      message.error('Failed to load tips');
+    } finally {
+      setTipsLoading(false);
+    }
+  };
+
+  const exportTips = async () => {
+    try {
+      let url = '/api/admin/tips/export-csv';
+      const params = new URLSearchParams();
+      
+      if (filterStatus) params.append('status', filterStatus);
+      if (dateRange?.[0]) params.append('startDate', dateRange[0].toISOString());
+      if (dateRange?.[1]) params.append('endDate', dateRange[1].toISOString());
+      
+      if (params.toString()) {
+        url += '?' + params.toString();
+      }
+
+      const response = await apiService.get(url, { responseType: 'blob' });
+      const blob = new Blob([response.data], { type: 'text/csv' });
+      const link = document.createElement('a');
+      link.href = window.URL.createObjectURL(blob);
+      link.download = `tips_export_${new Date().toISOString().split('T')[0]}.csv`;
+      link.click();
+      message.success('Tips exported successfully');
+    } catch (error) {
+      console.error('Error exporting tips:', error);
+      message.error('Failed to export tips');
+    }
+  };
+
+  const getBatchStatusColor = () => {
+    if (!batchStatus) return 'default';
+    if (batchStatus.status === 'success') return 'success';
+    if (batchStatus.status === 'failed') return 'error';
+    if (batchStatus.status === 'running') return 'processing';
+    return 'default';
+  };
+
+  const getBatchStatusIcon = () => {
+    if (!batchStatus) return null;
+    if (batchStatus.status === 'success') return <CheckCircleOutlined />;
+    if (batchStatus.status === 'failed') return <CloseCircleOutlined />;
+    if (batchStatus.status === 'running') return <SyncOutlined spin />;
+    return null;
   };
 
   const performerColumns = [
@@ -446,6 +611,273 @@ const AdminDashboard: React.FC = () => {
           </Col>
         </Row>
 
+        {/* Batch Processing Status */}
+        <Row gutter={16} className="mb-6">
+          <Col xs={24} lg={12}>
+            <Card 
+              className="shadow-sm"
+              title={
+                <div className="flex items-center gap-2">
+                  {getBatchStatusIcon()}
+                  <span>Batch Processing Status</span>
+                </div>
+              }
+            >
+              {batchStatus ? (
+                <div className="space-y-3">
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-600">Status:</span>
+                    <Tag color={getBatchStatusColor()}>{batchStatus.status?.toUpperCase() || 'UNKNOWN'}</Tag>
+                  </div>
+                  {batchStatus.startedAt && (
+                    <div className="flex justify-between items-center">
+                      <span className="text-gray-600">Started:</span>
+                      <span>{new Date(batchStatus.startedAt).toLocaleString()}</span>
+                    </div>
+                  )}
+                  {batchStatus.completedAt && (
+                    <div className="flex justify-between items-center">
+                      <span className="text-gray-600">Completed:</span>
+                      <span>{new Date(batchStatus.completedAt).toLocaleString()}</span>
+                    </div>
+                  )}
+                  {batchStatus.durationSeconds && (
+                    <div className="flex justify-between items-center">
+                      <span className="text-gray-600">Duration:</span>
+                      <span>{batchStatus.durationSeconds}s</span>
+                    </div>
+                  )}
+                  <Divider className="my-3" />
+                  <div className="grid grid-cols-3 gap-2">
+                    <div className="text-center">
+                      <div className="text-xl font-bold text-green-600">{batchStatus.tipsProcessed}</div>
+                      <div className="text-xs text-gray-500">Processed</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-xl font-bold text-red-600">{batchStatus.tipsFailed}</div>
+                      <div className="text-xs text-gray-500">Failed</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-xl font-bold text-yellow-600">{batchStatus.tipsPending}</div>
+                      <div className="text-xs text-gray-500">Pending</div>
+                    </div>
+                  </div>
+                  <Divider className="my-3" />
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-600">Total Amount:</span>
+                    <span className="font-semibold text-lg">${batchStatus.totalAmount?.toFixed(2) || '0.00'}</span>
+                  </div>
+                  {batchStatus.errorMessage && (
+                    <div className="bg-red-50 p-3 rounded border border-red-200">
+                      <p className="text-xs text-red-700"><strong>Error:</strong> {batchStatus.errorMessage}</p>
+                    </div>
+                  )}
+                  {batchStatus.failureDetails && batchStatus.failureDetails.length > 0 && (
+                    <div className="bg-yellow-50 p-3 rounded border border-yellow-200 max-h-32 overflow-y-auto">
+                      <p className="text-xs font-semibold text-yellow-800 mb-2">Failure Details:</p>
+                      <ul className="space-y-1">
+                        {batchStatus.failureDetails.slice(0, 5).map((detail, idx) => (
+                          <li key={idx} className="text-xs text-yellow-700">• {detail}</li>
+                        ))}
+                        {batchStatus.failureDetails.length > 5 && (
+                          <li className="text-xs text-yellow-700">• ... and {batchStatus.failureDetails.length - 5} more</li>
+                        )}
+                      </ul>
+                    </div>
+                  )}
+                  <Button 
+                    block 
+                    type="link" 
+                    size="small"
+                    onClick={loadBatchHistory}
+                  >
+                    View History
+                  </Button>
+                </div>
+              ) : (
+                <p className="text-gray-500">No batch runs yet</p>
+              )}
+            </Card>
+          </Col>
+          <Col xs={24} lg={12}>
+            <Card 
+              className="shadow-sm"
+              title="Batch History Summary"
+            >
+              {batchHistory.length > 0 ? (
+                <div className="space-y-2 max-h-64 overflow-y-auto">
+                  {batchHistory.slice(0, 10).map((run, idx) => (
+                    <div key={idx} className="flex justify-between items-center p-2 bg-gray-50 rounded text-sm">
+                      <div>
+                        <div className="font-medium">{new Date(run.startedAt || '').toLocaleString()}</div>
+                        <div className="text-xs text-gray-500">{run.tipsProcessed} processed, {run.tipsFailed} failed</div>
+                      </div>
+                      <Tag color={run.status === 'success' ? 'green' : run.status === 'failed' ? 'red' : 'orange'}>
+                        {run.status}
+                      </Tag>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-gray-500 text-center py-4">No history available</p>
+              )}
+            </Card>
+          </Col>
+        </Row>
+
+        {/* Tips Management */}
+        <div className="bg-white p-6 rounded-lg shadow-sm border mb-6">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">Tips Management</h3>
+          
+          {/* Filters */}
+          <div className="space-y-4 mb-4">
+            <Row gutter={[16, 16]}>
+              <Col xs={24} sm={12}>
+                <Input 
+                  placeholder="Search by device name, performer name, or email..." 
+                  prefix={<SearchOutlined />}
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
+              </Col>
+              <Col xs={24} sm={12}>
+                <Select
+                  placeholder="Filter by status..."
+                  allowClear
+                  value={filterStatus}
+                  onChange={setFilterStatus}
+                  className="w-full"
+                  options={[
+                    { label: 'Pending', value: 'pending' },
+                    { label: 'Processed', value: 'processed' },
+                    { label: 'Failed', value: 'failed' },
+                    { label: 'Error', value: 'error' }
+                  ]}
+                />
+              </Col>
+              <Col xs={24} sm={12}>
+                <RangePicker 
+                  className="w-full"
+                  placeholder={['Start Date', 'End Date']}
+                  value={dateRange}
+                  onChange={setDateRange}
+                  format="YYYY-MM-DD"
+                />
+              </Col>
+              <Col xs={24} sm={12}>
+                <Space className="w-full">
+                  <Input 
+                    placeholder="Min Amount" 
+                    type="number"
+                    value={minAmount}
+                    onChange={(e) => setMinAmount(e.target.value ? Number(e.target.value) : undefined)}
+                    style={{ width: '100px' }}
+                  />
+                  <Input 
+                    placeholder="Max Amount" 
+                    type="number"
+                    value={maxAmount}
+                    onChange={(e) => setMaxAmount(e.target.value ? Number(e.target.value) : undefined)}
+                    style={{ width: '100px' }}
+                  />
+                  <Button 
+                    icon={<DownloadOutlined />}
+                    onClick={exportTips}
+                  >
+                    Export CSV
+                  </Button>
+                </Space>
+              </Col>
+            </Row>
+          </div>
+
+          {/* Tips Table */}
+          <Spin spinning={tipsLoading}>
+            <Table
+              columns={[
+                {
+                  title: 'Created At',
+                  dataIndex: 'createdAt',
+                  key: 'createdAt',
+                  render: (date) => new Date(date).toLocaleString(),
+                  width: 180
+                },
+                {
+                  title: 'Processed At',
+                  dataIndex: 'processedAt',
+                  key: 'processedAt',
+                  render: (date) => date ? new Date(date).toLocaleString() : '-',
+                  width: 180
+                },
+                {
+                  title: 'Amount',
+                  dataIndex: 'amount',
+                  key: 'amount',
+                  render: (amount) => `$${amount.toFixed(2)}`,
+                  width: 100
+                },
+                {
+                  title: 'Device',
+                  dataIndex: 'deviceNickname',
+                  key: 'deviceNickname',
+                  width: 150
+                },
+                {
+                  title: 'Performer',
+                  key: 'performer',
+                  render: (_, record: TipDetail) => `${record.performerFirstName} ${record.performerLastName}`,
+                  width: 150
+                },
+                {
+                  title: 'Email',
+                  dataIndex: 'performerEmail',
+                  key: 'performerEmail',
+                  width: 200,
+                  ellipsis: true
+                },
+                {
+                  title: 'Status',
+                  dataIndex: 'status',
+                  key: 'status',
+                  render: (status) => {
+                    let color = 'default';
+                    if (status === 'processed') color = 'green';
+                    if (status === 'failed' || status === 'error') color = 'red';
+                    if (status === 'pending') color = 'orange';
+                    return <Tag color={color}>{status.toUpperCase()}</Tag>;
+                  },
+                  width: 100
+                },
+                {
+                  title: 'Effect',
+                  dataIndex: 'effect',
+                  key: 'effect',
+                  width: 80
+                },
+                {
+                  title: 'Performer Earnings',
+                  dataIndex: 'performerEarnings',
+                  key: 'performerEarnings',
+                  render: (earnings) => `$${earnings.toFixed(2)}`,
+                  width: 130
+                }
+              ]}
+              dataSource={tips}
+              rowKey="id"
+              pagination={{
+                current: currentPage,
+                pageSize: pageSize,
+                total: totalTips,
+                onChange: (page) => setCurrentPage(page),
+                showSizeChanger: false,
+                pageSizeOptions: ['20']
+              }}
+              scroll={{ x: 1500 }}
+              size="small"
+            />
+          </Spin>
+        </div>
+
         {/* Performers Management */}
         <div className="bg-white p-6 rounded-lg shadow-sm border">
           <div className="flex items-center justify-between mb-4">
@@ -512,6 +944,74 @@ const AdminDashboard: React.FC = () => {
               </div>
             </div>
           )}
+        </Modal>
+
+        {/* Batch History Modal */}
+        <Modal
+          title="Batch Processing History"
+          open={batchHistoryModal}
+          onCancel={() => setBatchHistoryModal(false)}
+          footer={null}
+          width={900}
+        >
+          <Table
+            columns={[
+              {
+                title: 'Started At',
+                dataIndex: 'startedAt',
+                key: 'startedAt',
+                render: (date) => new Date(date).toLocaleString(),
+                width: 180
+              },
+              {
+                title: 'Completed At',
+                dataIndex: 'completedAt',
+                key: 'completedAt',
+                render: (date) => date ? new Date(date).toLocaleString() : '-',
+                width: 180
+              },
+              {
+                title: 'Status',
+                dataIndex: 'status',
+                key: 'status',
+                render: (status) => {
+                  let color = 'default';
+                  if (status === 'success') color = 'green';
+                  if (status === 'failed') color = 'red';
+                  if (status === 'running') color = 'orange';
+                  return <Tag color={color}>{status.toUpperCase()}</Tag>;
+                }
+              },
+              {
+                title: 'Processed',
+                dataIndex: 'tipsProcessed',
+                key: 'tipsProcessed',
+                render: (num) => <span className="text-green-600 font-medium">{num}</span>
+              },
+              {
+                title: 'Failed',
+                dataIndex: 'tipsFailed',
+                key: 'tipsFailed',
+                render: (num) => <span className="text-red-600 font-medium">{num}</span>
+              },
+              {
+                title: 'Total',
+                dataIndex: 'totalAmount',
+                key: 'totalAmount',
+                render: (amount) => `$${amount.toFixed(2)}`
+              },
+              {
+                title: 'Duration',
+                dataIndex: 'durationSeconds',
+                key: 'durationSeconds',
+                render: (seconds) => seconds ? `${seconds}s` : '-'
+              }
+            ]}
+            dataSource={batchHistory}
+            rowKey="id"
+            pagination={false}
+            size="small"
+          />
         </Modal>
       </div>
     </div>
