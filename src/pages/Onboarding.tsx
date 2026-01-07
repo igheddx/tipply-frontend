@@ -561,7 +561,12 @@ Please use a different serial number or contact support if this is your device.`
           setIsLoading(false)
         } else {
           // On desktop/non-iOS, use top.location.href for full-page navigation
-          top.location.href = result.data.onboardingUrl
+          // Fallback to window.location.href if top is unavailable (should never happen in normal contexts)
+          if (top) {
+            top.location.href = result.data.onboardingUrl
+          } else {
+            window.location.href = result.data.onboardingUrl
+          }
           // Never reaches here due to navigation, but don't set loading to false
         }
         return
@@ -642,7 +647,12 @@ Please use a different serial number or contact support if this is your device.`
             setIsLoading(false)
           } else {
             // On desktop/non-iOS, use top.location.href for full-page navigation
-            top.location.href = status.onboardingUrl
+            // Fallback to window.location.href if top is unavailable (should never happen in normal contexts)
+            if (top) {
+              top.location.href = status.onboardingUrl
+            } else {
+              window.location.href = status.onboardingUrl
+            }
             // Never reaches here due to navigation
           }
           return

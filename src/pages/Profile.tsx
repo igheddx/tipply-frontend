@@ -273,7 +273,12 @@ const Profile: React.FC = () => {
         console.log('✅ Verification URL received, performing full-page navigation...')
         // Use top.location.href to guarantee full-page navigation that escapes SPA context
         // This prevents iOS Safari ITP from blocking hCaptcha due to frame-ancestry restrictions
-        top.location.href = response.data.onboardingUrl
+        // Fallback to window.location.href if top is unavailable (should never happen in normal contexts)
+        if (top) {
+          top.location.href = response.data.onboardingUrl
+        } else {
+          window.location.href = response.data.onboardingUrl
+        }
         // Never reaches here due to navigation
       } else {
         setError('Failed to create verification link')
