@@ -283,7 +283,6 @@ const AdminDashboard: React.FC = () => {
         page: currentPage,
         pageSize: pageSize,
         status: filterStatus,
-        performerId: filterPerformer,
         startDate: dateRange?.[0]?.toISOString(),
         endDate: dateRange?.[1]?.toISOString(),
         searchTerm: searchTerm,
