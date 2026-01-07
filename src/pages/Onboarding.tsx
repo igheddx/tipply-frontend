@@ -256,6 +256,9 @@ const Onboarding: React.FC = () => {
     if (!formData.lastName.trim()) {
       newErrors.lastName = 'Last name is required'
     }
+    if (!formData.stageName.trim()) {
+      newErrors.stageName = 'Stage name is required'
+    }
     if (!formData.email.trim()) {
       newErrors.email = 'Email is required'
     } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
@@ -739,17 +742,19 @@ Please use a different serial number or contact support if this is your device.`
       
       <div className="space-y-2">
         <label htmlFor="stageName" className="block text-sm font-semibold text-gray-700">
-          Stage Name
+          Stage Name *
         </label>
         <input
           type="text"
           id="stageName"
           name="stageName"
+          required
           className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all duration-200"
           placeholder="Your stage name or artist name"
           value={formData.stageName}
           onChange={handleInputChange}
         />
+        {errors.stageName && <p className="text-red-500 text-xs mt-1">{errors.stageName}</p>}
         <p className="text-sm text-gray-500">This is how you'll appear to your audience</p>
       </div>
       
@@ -1326,8 +1331,8 @@ Please use a different serial number or contact support if this is your device.`
         <div className="text-center mb-12">
           <div className="mx-auto w-36 h-36 overflow-visible rounded-2xl mb-6">
             <img 
-              src="/images/tipply_logo.png" 
-              alt="Tipply Logo" 
+              src="/images/logo/tipwave-logo2.png" 
+              alt="Tipwave Logo" 
               className="w-full h-full object-contain"
               style={{ transform: 'scale(1.25)', objectPosition: 'center' }}
             />
