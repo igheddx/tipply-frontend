@@ -12,8 +12,7 @@ import {
   CloseCircleOutlined,
   SyncOutlined,
   DownloadOutlined,
-  SearchOutlined,
-  FilterOutlined
+  SearchOutlined
 } from '@ant-design/icons';
 import { apiService } from '../services/api';
 import dayjs from 'dayjs';
@@ -113,7 +112,6 @@ const AdminDashboard: React.FC = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize] = useState(20);
   const [filterStatus, setFilterStatus] = useState<string | undefined>(undefined);
-  const [filterPerformer, setFilterPerformer] = useState<string | undefined>(undefined);
   const [dateRange, setDateRange] = useState<[dayjs.Dayjs | null, dayjs.Dayjs | null] | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [minAmount, setMinAmount] = useState<number | undefined>(undefined);
@@ -157,7 +155,7 @@ const AdminDashboard: React.FC = () => {
   // Reload tips when filters change
   useEffect(() => {
     loadTips();
-  }, [currentPage, filterStatus, filterPerformer, dateRange, searchTerm, minAmount, maxAmount]);
+  }, [currentPage, filterStatus, dateRange, searchTerm, minAmount, maxAmount]);
 
   const fetchUserProfile = async () => {
     try {
@@ -318,7 +316,7 @@ const AdminDashboard: React.FC = () => {
         url += '?' + params.toString();
       }
 
-      const response = await apiService.get(url, { responseType: 'blob' });
+      const response = await apiService.get(url);
       const blob = new Blob([response.data], { type: 'text/csv' });
       const link = document.createElement('a');
       link.href = window.URL.createObjectURL(blob);
