@@ -1060,7 +1060,7 @@ Please use a different serial number or contact support if this is your device.`
               className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all duration-200 ${
                 errors.serialNumber ? 'border-red-500 focus:ring-red-200' : 'border-gray-300'
               }`}
-              placeholder="12345678901234567890"
+              placeholder="e.g., TPY-5C07-K73"
               value={formData.serialNumber}
               onChange={handleInputChange}
               onBlur={async () => {
@@ -1079,8 +1079,8 @@ Please use a different serial number or contact support if this is your device.`
           {deviceValidationComplete && !errors.serialNumber && formData.serialNumber.trim() && (
             <p className="text-green-500 text-xs mt-1">✓ Serial Number validated successfully</p>
           )}
-          <p className="text-sm text-gray-500">
-            Enter the serial number from your Tipply device (16-20 characters)
+          <p className="text-sm text-gray-500 mt-1">
+            Enter the serial number from your Tipply device (e.g., TPY-5C07-K73)
           </p>
         </div>
         
