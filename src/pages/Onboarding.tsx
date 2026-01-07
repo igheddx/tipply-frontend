@@ -1228,6 +1228,26 @@ Please use a different serial number or contact support if this is your device.`
           </p>
         </div>
       </div>
+
+      {/* Help: Troubleshooting Stripe verification (hCaptcha) */}
+      <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+        <div className="flex items-start space-x-3">
+          <div className="flex-shrink-0">
+            <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </div>
+          <div>
+            <p className="text-blue-900 text-sm font-medium">Having trouble opening Stripe or passing the verification challenge?</p>
+            <ul className="mt-2 text-blue-800 text-sm list-disc pl-5 space-y-1">
+              <li>Use a non-disposable email and try an Incognito/Private window</li>
+              <li>Temporarily disable ad/tracker blockers and allow third‑party cookies for stripe.com and hcaptcha.com</li>
+              <li>Turn off VPN/Private Relay and try a different network if possible</li>
+              <li>On iPhone Safari, temporarily disable “Prevent Cross‑Site Tracking” in Settings → Safari</li>
+            </ul>
+          </div>
+        </div>
+      </div>
     </div>
   )
 
