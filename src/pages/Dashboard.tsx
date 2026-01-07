@@ -717,23 +717,42 @@ const Dashboard: React.FC = () => {
         return
       }
 
-      const qrBlobUrl = URL.createObjectURL(qrBlob)
+      // Some environments return base64 PNG text with image/png header. Try to normalize it to real binary before decoding.
+      let sourceBlob: Blob = qrBlob
+      if (qrBlob.size < 10000) {
+        try {
+          const possibleBase64 = (await qrBlob.text()).trim()
+          const isLikelyBase64Png = possibleBase64.startsWith('iVBORw0KGgo') && /^[A-Za-z0-9+/=\n\r]+$/.test(possibleBase64)
+          if (isLikelyBase64Png) {
+            const byteChars = atob(possibleBase64)
+            const byteNumbers = new Array(byteChars.length)
+            for (let i = 0; i < byteChars.length; i++) byteNumbers[i] = byteChars.charCodeAt(i)
+            const byteArray = new Uint8Array(byteNumbers)
+            sourceBlob = new Blob([byteArray], { type: 'image/png' })
+            console.info('[QR] Detected base64 PNG response; converted to binary', { originalSize: qrBlob.size, binarySize: sourceBlob.size })
+          }
+        } catch (decodeErr) {
+          console.warn('[QR] Base64 normalization failed; using original blob', decodeErr)
+        }
+      }
+
+      const qrBlobUrl = URL.createObjectURL(sourceBlob)
       let qrBitmap: ImageBitmap
       try {
-        qrBitmap = await createImageBitmap(qrBlob)
+        qrBitmap = await createImageBitmap(sourceBlob)
       } catch (err) {
-        const blobSize = qrBlob.size
+        const blobSize = sourceBlob.size
         let snippet = ''
         try {
-          const text = await qrBlob.text()
+          const text = await sourceBlob.text()
           snippet = text.slice(0, 200)
         } catch (e) {
           snippet = '[unreadable]'
         }
-        console.error('[QR] Bitmap decode failed', { err, blobType: qrBlob.type, blobSize, snippet })
+        console.error('[QR] Bitmap decode failed', { err, blobType: sourceBlob.type, blobSize, snippet })
 
         // Fallback: download raw QR blob so user still gets the code
-        const rawUrl = URL.createObjectURL(qrBlob)
+        const rawUrl = URL.createObjectURL(sourceBlob)
         const a = document.createElement('a')
         a.href = rawUrl
         a.download = `tipwave-qr-${nickname || deviceId}.png`
