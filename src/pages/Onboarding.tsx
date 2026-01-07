@@ -26,6 +26,7 @@ const Onboarding: React.FC = () => {
   const [deviceValidationComplete, setDeviceValidationComplete] = useState(false)
   const [verificationCode, setVerificationCode] = useState('')
   const [verificationSent, setVerificationSent] = useState(false)
+  const [profileCreated, setProfileCreated] = useState(false)
   const navigate = useNavigate()
 
   // Generate API key on component mount
@@ -93,6 +94,11 @@ const Onboarding: React.FC = () => {
       [name]: value
     }))
     setErrors(prev => ({ ...prev, [name]: '' }))
+
+    // If the user edits email, allow profile creation to run again for the new address
+    if (name === 'email') {
+      setProfileCreated(false)
+    }
     
     // Reset device validation state when serial number changes
     if (name === 'serialNumber') {
@@ -288,12 +294,15 @@ const Onboarding: React.FC = () => {
         }
         setErrors(prev => ({ ...prev, password: '', confirmPassword: '', email: '' }))
         
-        // Create profile first
-        const profileCreated = await createProfile()
+        // Create profile once; avoid re-creating on retries (e.g., verification resend)
         if (!profileCreated) {
-          // Profile creation failed, show error and stop
-          console.log('Step 2: Profile creation failed, stopping flow')
-          return
+          const created = await createProfile()
+          if (!created) {
+            // Profile creation failed, show error and stop
+            console.log('Step 2: Profile creation failed, stopping flow')
+            return
+          }
+          setProfileCreated(true)
         }
         
         // Send verification code immediately after profile creation
