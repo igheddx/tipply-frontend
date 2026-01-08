@@ -21,7 +21,7 @@ The Tipply Device Setup page (`/device-setup`) has been converted into a fully-f
   - Cache versioning (tipply-v2)
   - Automatic cleanup of old caches
 
-- **HTTPS**: Enforced via CloudFront on test.tipply.live (required for PWA and Web Bluetooth)
+- **HTTPS**: Enforced via CloudFront on app.tipply.live (required for PWA and Web Bluetooth)
 
 ### 2. Permission Hooks ✅
 
@@ -121,7 +121,7 @@ When Web Bluetooth not supported:
 ## Installation
 
 ### Android (Chrome/Edge/Opera)
-1. Visit `https://test.tipply.live/device-setup`
+1. Visit `https://app.tipply.live/device-setup`
 2. Look for the blue "Install Tipply App" banner at the bottom
 3. Tap "Install Now" button
 4. OR tap browser menu (⋮) → "Install app" or "Add to Home Screen"
@@ -129,7 +129,7 @@ When Web Bluetooth not supported:
 6. Launch from home screen - runs fullscreen without browser UI
 
 ### iOS (Safari)
-1. Visit `https://test.tipply.live/device-setup` in Safari
+1. Visit `https://app.tipply.live/device-setup` in Safari
 2. Look for the blue "Install Tipply App" banner at the bottom
 3. Tap "View Instructions" to see step-by-step guide
 4. OR manually: Tap Share button (□↑) → "Add to Home Screen" → "Add"
@@ -137,7 +137,7 @@ When Web Bluetooth not supported:
 6. **⚠️ Important**: iOS Safari does NOT support Web Bluetooth, so device WiFi setup will not work on iOS. The app will install and run, but Bluetooth features require an Android device.
 
 ### Desktop (Chrome/Edge/Opera)
-1. Visit `https://test.tipply.live/device-setup`
+1. Visit `https://app.tipply.live/device-setup`
 2. Look for install icon in address bar
 3. Click "Install" button
 4. App installs as desktop PWA
@@ -146,7 +146,7 @@ When Web Bluetooth not supported:
 ## Testing Instructions
 
 ### Test PWA Installation (Android Chrome)
-1. Open `https://test.tipply.live/device-setup` on Android Chrome
+1. Open `https://app.tipply.live/device-setup` on Android Chrome
 2. Verify environment banner shows: "📱 Mobile Browser - Chrome • ✅ Bluetooth Ready • 🔔 Notifications Available"
 3. Install PWA via Chrome menu → "Install app"
 4. Reopen from home screen
@@ -203,7 +203,7 @@ When Web Bluetooth not supported:
 
 ## Deployment
 
-Changes deployed to: `https://test.tipply.live/device-setup`
+Changes deployed to: `https://app.tipply.live/device-setup`
 
 The page is accessible to all users without authentication (public route).
 
