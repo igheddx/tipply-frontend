@@ -3,6 +3,8 @@ import { API_BASE_URL } from '../utils/config';
 interface ApiResponse<T> {
   data?: T
   error?: string
+  status?: number
+  raw?: any
 }
 
 class ApiService {
@@ -76,19 +78,19 @@ class ApiService {
             }
           } catch (refreshError) {
             console.error('Token refresh failed:', refreshError)
-            // Do not force logout here; surface the error so the UI can handle gracefully
-            return { error: 'Authentication failed while refreshing token.' }
+            // Surface the error and status so caller can decide (do not redirect)
+            return { error: 'Authentication failed while refreshing token.', status: 401, raw: refreshError }
           }
         }
       }
       
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}))
-        throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`)
+        return { error: errorData.error || `HTTP ${response.status}: ${response.statusText}`, status: response.status, raw: errorData }
       }
 
       const data = await response.json()
-      return { data }
+      return { data, status: response.status }
     } catch (error) {
       console.error('API request failed:', error)
       console.error('Request URL was:', url)

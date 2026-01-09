@@ -268,6 +268,12 @@ const AdminDashboard: React.FC = () => {
       
       const response = await apiService.post('/api/stripe-config/mode', { mode: newMode });
       
+      if (response.error) {
+        // Show inline error, keep the modal open, do not navigate
+        message.error(response.error);
+        return;
+      }
+
       if (response.data) {
         setStripeMode(newMode);
         message.success(`Stripe mode switched to ${newMode.toUpperCase()}`);
