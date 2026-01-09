@@ -95,6 +95,13 @@ const AdminDashboard: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [userProfile, setUserProfile] = useState<any>(null);
 
+  // Stripe mode state
+  const [stripeMode, setStripeMode] = useState<'test' | 'live'>('test');
+  const [isProductionEnv, setIsProductionEnv] = useState(false);
+  const [canToggleStripe, setCanToggleStripe] = useState(false);
+  const [stripeModeLoading, setStripeModeLoading] = useState(false);
+  const [stripeModeModal, setStripeModeModal] = useState(false);
+
   const [updateFeeModal, setUpdateFeeModal] = useState(false);
   const [selectedPerformer, setSelectedPerformer] = useState<PerformerSummary | null>(null);
   const [newFeePercentage, setNewFeePercentage] = useState<number>(10);
@@ -143,6 +150,7 @@ const AdminDashboard: React.FC = () => {
     fetchUserProfile();
     loadBatchStatus();
     loadTips();
+    loadStripeMode();
 
     // Auto-refresh batch status every 3 minutes
     const batchRefreshInterval = setInterval(() => {
@@ -233,6 +241,43 @@ const AdminDashboard: React.FC = () => {
       message.error('Failed to update platform fee');
     } finally {
       setUpdatingFee(false);
+    }
+  };
+
+  const loadStripeMode = async () => {
+    try {
+      const response = await apiService.get('/api/stripe-config/mode');
+      if (response.data) {
+        setStripeMode(response.data.mode);
+        setIsProductionEnv(response.data.isProductionEnvironment);
+        setCanToggleStripe(response.data.canToggle);
+      }
+    } catch (error) {
+      console.error('Error loading Stripe mode:', error);
+    }
+  };
+
+  const handleToggleStripeMode = () => {
+    setStripeModeModal(true);
+  };
+
+  const confirmToggleStripeMode = async () => {
+    try {
+      setStripeModeLoading(true);
+      const newMode = stripeMode === 'test' ? 'live' : 'test';
+      
+      const response = await apiService.post('/api/stripe-config/mode', { mode: newMode });
+      
+      if (response.data) {
+        setStripeMode(newMode);
+        message.success(`Stripe mode switched to ${newMode.toUpperCase()}`);
+        setStripeModeModal(false);
+      }
+    } catch (error: any) {
+      console.error('Error toggling Stripe mode:', error);
+      message.error(error.response?.data?.error || 'Failed to toggle Stripe mode');
+    } finally {
+      setStripeModeLoading(false);
     }
   };
 
@@ -434,8 +479,7 @@ const AdminDashboard: React.FC = () => {
       {/* Header */}
       <div className="bg-white shadow-sm border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-1">
-            {/* Left side - Logo */}
+          <div className="flex justify-between items-center py-1">{/* Left side - Logo */}
             <div className="flex items-center">
               <div className="relative w-24 h-24 overflow-visible rounded-lg">
                 <img
@@ -602,6 +646,91 @@ const AdminDashboard: React.FC = () => {
                 </Button>
                 <div className="text-sm text-gray-500 text-center">
                   {stats?.pendingTips || 0} pending tips
+                </div>
+              </div>
+            </div>
+          </Col>
+        </Row>
+
+        {/* Stripe Mode Configuration */}
+        <Row gutter={[16, 16]} className="mb-8">
+          <Col xs={24}>
+            <div className={`p-6 rounded-lg shadow-sm border ${
+              stripeMode === 'live' && isProductionEnv 
+                ? 'bg-red-50 border-red-300' 
+                : stripeMode === 'test' && isProductionEnv 
+                  ? 'bg-green-50 border-green-300'
+                  : 'bg-gray-50 border-gray-300'
+            }`}>
+              <div className="flex items-center justify-between">
+                <div className="flex-1">
+                  <div className="flex items-center space-x-3 mb-2">
+                    {stripeMode === 'live' && isProductionEnv && (
+                      <>
+                        <span className="flex h-3 w-3">
+                          <span className="animate-ping absolute inline-flex h-3 w-3 rounded-full bg-red-600 opacity-75"></span>
+                          <span className="relative inline-flex rounded-full h-3 w-3 bg-red-600"></span>
+                        </span>
+                        <h3 className="text-xl font-bold text-red-800">⚠️ STRIPE LIVE MODE ACTIVE</h3>
+                      </>
+                    )}
+                    {stripeMode === 'test' && isProductionEnv && (
+                      <>
+                        <span className="inline-flex rounded-full h-3 w-3 bg-green-600"></span>
+                        <h3 className="text-xl font-bold text-green-800">✓ STRIPE TEST MODE</h3>
+                      </>
+                    )}
+                    {!isProductionEnv && (
+                      <>
+                        <span className="inline-flex rounded-full h-3 w-3 bg-gray-600"></span>
+                        <h3 className="text-xl font-bold text-gray-800">🛠️ DEVELOPMENT ENVIRONMENT</h3>
+                      </>
+                    )}
+                  </div>
+                  <div className="space-y-1">
+                    {stripeMode === 'live' && isProductionEnv && (
+                      <>
+                        <p className="text-red-700 font-semibold">All transactions are processing with REAL MONEY</p>
+                        <p className="text-red-600 text-sm">• Customers will be charged actual amounts</p>
+                        <p className="text-red-600 text-sm">• All Stripe fees apply</p>
+                      </>
+                    )}
+                    {stripeMode === 'test' && isProductionEnv && (
+                      <>
+                        <p className="text-green-700 font-semibold">Safe to experiment - No real charges will be made</p>
+                        <p className="text-green-600 text-sm">• Using Stripe test mode keys</p>
+                        <p className="text-green-600 text-sm">• No actual money is processed</p>
+                      </>
+                    )}
+                    {!isProductionEnv && (
+                      <>
+                        <p className="text-gray-700 font-semibold">Local development - Always uses TEST mode</p>
+                        <p className="text-gray-600 text-sm">• Cannot switch to live mode in development</p>
+                        <p className="text-gray-600 text-sm">• Deploy to production to enable live mode</p>
+                      </>
+                    )}
+                  </div>
+                </div>
+                <div className="ml-6">
+                  {canToggleStripe && isProductionEnv && (
+                    <Button 
+                      type="primary"
+                      size="large"
+                      danger={stripeMode === 'test'}
+                      ghost={stripeMode === 'live'}
+                      onClick={handleToggleStripeMode}
+                      loading={stripeModeLoading}
+                      className={stripeMode === 'live' ? 'border-red-600 text-red-600 hover:bg-red-50' : ''}
+                    >
+                      {stripeMode === 'test' ? '🔴 Enable Live Mode' : '🟢 Switch to Test Mode'}
+                    </Button>
+                  )}
+                  {!canToggleStripe && (
+                    <div className="text-sm text-gray-500 text-center max-w-xs">
+                      Mode toggle not available
+                      {!isProductionEnv && ' in development'}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -1009,6 +1138,75 @@ const AdminDashboard: React.FC = () => {
             pagination={false}
             size="small"
           />
+        </Modal>
+
+        {/* Stripe Mode Toggle Confirmation Modal */}
+        <Modal
+          title={stripeMode === 'test' ? '⚠️ Enable Live Mode' : '✓ Switch to Test Mode'}
+          open={stripeModeModal}
+          onOk={confirmToggleStripeMode}
+          onCancel={() => setStripeModeModal(false)}
+          okText={stripeMode === 'test' ? 'Enable Live Mode' : 'Switch to Test Mode'}
+          cancelText="Cancel"
+          okButtonProps={{ 
+            danger: stripeMode === 'test',
+            loading: stripeModeLoading
+          }}
+        >
+          {stripeMode === 'test' ? (
+            <div className="space-y-4">
+              <div className="bg-red-50 border-l-4 border-red-500 p-4">
+                <div className="flex items-start">
+                  <div className="flex-shrink-0">
+                    <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                    </svg>
+                  </div>
+                  <div className="ml-3">
+                    <h3 className="text-sm font-medium text-red-800">Warning: Production Mode</h3>
+                    <div className="mt-2 text-sm text-red-700">
+                      <p>You are about to enable <strong>LIVE MODE</strong>. This means:</p>
+                      <ul className="list-disc list-inside mt-2 space-y-1">
+                        <li>All transactions will process <strong>REAL MONEY</strong></li>
+                        <li>Customers will be charged actual amounts</li>
+                        <li>All Stripe fees will apply</li>
+                        <li>This change affects the entire platform immediately</li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <p className="text-gray-700">
+                Are you absolutely sure you want to switch to live mode?
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="bg-green-50 border-l-4 border-green-500 p-4">
+                <div className="flex items-start">
+                  <div className="flex-shrink-0">
+                    <svg className="h-5 w-5 text-green-400" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                    </svg>
+                  </div>
+                  <div className="ml-3">
+                    <h3 className="text-sm font-medium text-green-800">Switching to Test Mode</h3>
+                    <div className="mt-2 text-sm text-green-700">
+                      <p>This will switch the system back to test mode where:</p>
+                      <ul className="list-disc list-inside mt-2 space-y-1">
+                        <li>No real charges will be processed</li>
+                        <li>Safe to test and experiment</li>
+                        <li>Test Stripe keys will be used</li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <p className="text-gray-700">
+                Confirm switching to test mode?
+              </p>
+            </div>
+          )}
         </Modal>
       </div>
     </div>
