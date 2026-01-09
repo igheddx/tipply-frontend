@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Row, Col, Statistic, Table, Button, Input, Modal, message, Spin, Card, Tag, Select, DatePicker, Space, Divider } from 'antd';
+import { Row, Col, Statistic, Table, Button, Input, Modal, message, Spin, Card, Tag, Select, DatePicker, Space, Divider, Alert } from 'antd';
 import { 
   UserOutlined, 
   DesktopOutlined, 
@@ -101,6 +101,7 @@ const AdminDashboard: React.FC = () => {
   const [canToggleStripe, setCanToggleStripe] = useState(false);
   const [stripeModeLoading, setStripeModeLoading] = useState(false);
   const [stripeModeModal, setStripeModeModal] = useState(false);
+  const [stripeModeError, setStripeModeError] = useState<string | null>(null);
 
   const [updateFeeModal, setUpdateFeeModal] = useState(false);
   const [selectedPerformer, setSelectedPerformer] = useState<PerformerSummary | null>(null);
@@ -258,30 +259,33 @@ const AdminDashboard: React.FC = () => {
   };
 
   const handleToggleStripeMode = () => {
+    setStripeModeError(null);
     setStripeModeModal(true);
   };
 
   const confirmToggleStripeMode = async () => {
     try {
       setStripeModeLoading(true);
+      setStripeModeError(null);
       const newMode = stripeMode === 'test' ? 'live' : 'test';
       
       const response = await apiService.post('/api/stripe-config/mode', { mode: newMode });
       
       if (response.error) {
-        // Show inline error, keep the modal open, do not navigate
-        message.error(response.error);
+        // Surface inline error, keep the modal open
+        setStripeModeError(response.error);
         return;
       }
 
       if (response.data) {
+        setStripeModeError(null);
         setStripeMode(newMode);
         message.success(`Stripe mode switched to ${newMode.toUpperCase()}`);
         setStripeModeModal(false);
       }
     } catch (error: any) {
       console.error('Error toggling Stripe mode:', error);
-      message.error(error.response?.data?.error || 'Failed to toggle Stripe mode');
+      setStripeModeError(error.response?.data?.error || 'Failed to toggle Stripe mode');
     } finally {
       setStripeModeLoading(false);
     }
@@ -1159,6 +1163,15 @@ const AdminDashboard: React.FC = () => {
             loading: stripeModeLoading
           }}
         >
+          {stripeModeError && (
+            <Alert
+              type="error"
+              showIcon
+              message={stripeModeError}
+              style={{ marginBottom: 16 }}
+            />
+          )}
+
           {stripeMode === 'test' ? (
             <div className="space-y-4">
               <div className="bg-red-50 border-l-4 border-red-500 p-4">
