@@ -76,12 +76,8 @@ class ApiService {
             }
           } catch (refreshError) {
             console.error('Token refresh failed:', refreshError)
-            // Clear invalid tokens
-            localStorage.removeItem('token')
-            localStorage.removeItem('refreshToken')
-            // Redirect to login
-            window.location.href = '/login'
-            return { error: 'Authentication expired. Please log in again.' }
+            // Do not force logout here; surface the error so the UI can handle gracefully
+            return { error: 'Authentication failed while refreshing token.' }
           }
         }
       }
