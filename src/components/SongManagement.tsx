@@ -44,23 +44,16 @@ const SongManagement: React.FC<SongManagementProps> = ({ profileId }) => {
   // State management
   const [activeView, setActiveView] = useState<'search' | 'catalog'>('search')
   const [searchQuery, setSearchQuery] = useState('')
-  const [searchResults, setSearchResults] = useState<ExternalSong[]>([])
+  const [searchResults, setSearchResults] = useState<any[]>([])
   const [myCatalog, setMyCatalog] = useState<Song[]>([])
   const [catalogSearch, setCatalogSearch] = useState('')
   const [catalogCount, setCatalogCount] = useState<number>(0)
-  
-  // Pagination
-  const [searchPage, setSearchPage] = useState(1)
-  const [searchTotalCount, setSearchTotalCount] = useState(0)
-  const [catalogPage, setCatalogPage] = useState(1)
-  const [catalogTotalCount, setCatalogTotalCount] = useState(0)
   
   // Loading states
   const [isSearching, setIsSearching] = useState(false)
   const [isLoadingCatalog, setIsLoadingCatalog] = useState(false)
   const [isAddingSong, setIsAddingSong] = useState<string | null>(null)
   const [isRemovingSong, setIsRemovingSong] = useState<string | null>(null)
-  
   // Bulk operations
   const [selectedSongs, setSelectedSongs] = useState<Set<string>>(new Set())
   const [selectedCatalogSongs, setSelectedCatalogSongs] = useState<Set<string>>(new Set())
@@ -188,26 +181,13 @@ const SongManagement: React.FC<SongManagementProps> = ({ profileId }) => {
       setSelectedSongs(new Set()) // Clear any previous selections
     }
     try {
-      const token = localStorage.getItem('token')
-      const response = await fetch(`${API_BASE_URL}/api/songcatalog/search`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          query: query.trim(),
-          profileId,
-          page,
-          limit
-        })
-      })
-
+      const response = await fetch(`${API_BASE_URL}/api/songcatalog/musicbrainz/search?query=${encodeURIComponent(query.trim())}&limit=20`)
+      
       if (response.ok) {
-        const data: SearchResponse = await response.json()
-        setSearchResults(data.songs)
-        setSearchTotalCount(data.totalCount)
-        setSearchPage(data.page)
+        const data = await response.json()
+        setSearchResults(data)
+        setSearchTotalCount(data.length)
+        setSearchPage(1)
       } else {
         showNotification('error', 'Failed to search songs')
       }
@@ -220,8 +200,8 @@ const SongManagement: React.FC<SongManagementProps> = ({ profileId }) => {
   }
 
   // Add song to catalog
-  const addSongToCatalog = async (song: ExternalSong) => {
-    setIsAddingSong(`${song.songTitle}-${song.artist}`)
+  const addSongToCatalog = async (song: any) => {
+    setIsAddingSong(`${song.title}-${song.artist}`)
     try {
       const token = localStorage.getItem('token')
       const response = await fetch(`${API_BASE_URL}/api/songcatalog/add`, {
@@ -232,37 +212,47 @@ const SongManagement: React.FC<SongManagementProps> = ({ profileId }) => {
         },
         body: JSON.stringify({
           profileId,
-          songTitle: song.songTitle,
+          songTitle: song.title,
           artist: song.artist,
           album: song.album,
-          genre: song.genre
+          genre: song.genre,
+          musicBrainzId: song.id
         })
       })
 
       if (response.ok) {
-        showNotification('success', `Added "${song.songTitle}" to your catalog`)
-        // Update search results to show song is now in catalog
+        showNotification('success', `Added "${song.title}" to your catalog`)
         setSearchResults(prev => prev.map(s => 
-          s.songTitle === song.songTitle && s.artist === song.artist 
+          s.id === song.id 
             ? { ...s, isInCatalog: true }
             : s
         ))
-        // Reload catalog if we're viewing it, otherwise just refresh the count
-        if (activeView === 'catalog') {
-          loadMyCatalog(catalogPage, catalogSearch)
-        } else {
-          refreshCatalogCount()
-        }
+        refreshCatalogCount()
       } else {
         const error = await response.json()
         showNotification('error', error.error || 'Failed to add song')
       }
     } catch (error) {
       console.error('Error adding song:', error)
-      showNotification('error', 'Failed to add song')
+      showNotification('error', 'Failed to add song to catalog')
     } finally {
       setIsAddingSong(null)
     }
+  }
+
+  // Handle search form submission
+  const handleSearchSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (searchQuery.trim()) {
+      searchSongs(searchQuery)
+    }
+  }
+
+  // Handle catalog search
+  const handleCatalogSearch = (e: React.FormEvent) => {
+    e.preventDefault()
+    setCatalogPage(1)
+    loadMyCatalog(1, catalogSearch)
   }
 
   // Remove song from catalog
@@ -279,7 +269,7 @@ const SongManagement: React.FC<SongManagementProps> = ({ profileId }) => {
 
       if (response.ok) {
         showNotification('success', 'Song removed from catalog')
-        loadMyCatalog(catalogPage, catalogSearch)
+        loadMyCatalog(1, catalogSearch)
       } else {
         showNotification('error', 'Failed to remove song')
       }
@@ -290,47 +280,6 @@ const SongManagement: React.FC<SongManagementProps> = ({ profileId }) => {
       setIsRemovingSong(null)
     }
   }
-
-  // Bulk add selected songs
-  const bulkAddSongs = async () => {
-    const songsToAdd = searchResults.filter(song => 
-      selectedSongs.has(`${song.songTitle}-${song.artist}`) && !song.isInCatalog
-    )
-    
-    if (songsToAdd.length === 0) {
-      showNotification('info', 'No songs selected for adding')
-      return
-    }
-
-    setIsBulkAdding(true)
-    try {
-      const token = localStorage.getItem('token')
-      const response = await fetch(`${API_BASE_URL}/api/songcatalog/bulk-add`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          profileId,
-          songs: songsToAdd.map(song => ({
-            profileId,
-            songTitle: song.songTitle,
-            artist: song.artist,
-            album: song.album,
-            genre: song.genre
-          }))
-        })
-      })
-
-      if (response.ok) {
-        const result: BulkOperationResponse = await response.json()
-        showNotification('success', `Added ${result.successCount} songs to your catalog`)
-        
-        if (result.failureCount > 0) {
-          console.log('Failed to add:', result.failures)
-        }
-        
         // Clear selections and refresh
         setSelectedSongs(new Set())
         searchSongs(searchQuery, searchPage)
@@ -511,6 +460,13 @@ const SongManagement: React.FC<SongManagementProps> = ({ profileId }) => {
           {/* Search View */}
           {activeView === 'search' && (
             <div className="space-y-6">
+              {/* Info Banner */}
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <p className="text-blue-800 text-sm">
+                  🎵 Search the free MusicBrainz catalog for high-quality music data. Only original albums and singles with no cover versions are shown.
+                </p>
+              </div>
+
               {/* Search Form */}
               <form onSubmit={handleSearchSubmit} className="flex space-x-4">
                 <div className="flex-1">
@@ -575,95 +531,32 @@ const SongManagement: React.FC<SongManagementProps> = ({ profileId }) => {
               {/* Search Results */}
               {searchResults.length > 0 && (
                 <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-lg font-medium text-gray-900">
-                      Search Results ({searchTotalCount} total)
-                    </h3>
-                  </div>
-
+                  <p className="text-sm text-gray-600">Found {searchResults.length} results</p>
                   <div className="grid gap-4">
-                    {searchResults.map((song) => {
-                      const songKey = `${song.songTitle}-${song.artist}`
-                      return (
-                        <div key={songKey} className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center space-x-3">
-                              <input
-                                type="checkbox"
-                                checked={selectedSongs.has(songKey)}
-                                onChange={() => toggleSongSelection(songKey)}
-                                disabled={song.isInCatalog}
-                                className="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
-                              />
-                              <div>
-                                <div className="flex items-center space-x-2">
-                                  <h4 className="font-medium text-gray-900">{song.songTitle}</h4>
-                                  {song.isInCatalog && (
-                                    <span className="px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full">
-                                      In Catalog
-                                    </span>
-                                  )}
-                                </div>
-                                <p className="text-gray-600">by {song.artist}</p>
-                                {song.album && (
-                                  <p className="text-sm text-gray-500">Album: {song.album}</p>
-                                )}
-                                {song.genre && (
-                                  <p className="text-sm text-gray-500">Genre: {song.genre}</p>
-                                )}
-                              </div>
-                            </div>
-                            <div>
-                              {song.isInCatalog ? (
-                                <span className="text-green-600 text-sm">✓ Added</span>
-                              ) : (
-                                <button
-                                  onClick={() => addSongToCatalog(song)}
-                                  disabled={isAddingSong === songKey}
-                                  className="px-3 py-1 bg-primary-600 text-white rounded hover:bg-primary-700 disabled:opacity-50 text-sm"
-                                >
-                                  {isAddingSong === songKey ? 'Adding...' : 'Add'}
-                                </button>
-                              )}
-                            </div>
+                    {searchResults.map((song: any) => (
+                      <div key={song.id} className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition">
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <h4 className="font-medium text-gray-900">{song.title}</h4>
+                            <p className="text-gray-600 text-sm">by {song.artist}</p>
+                            {song.album && (
+                              <p className="text-sm text-gray-500">Album: {song.album}</p>
+                            )}
+                            {song.genre && (
+                              <p className="text-sm text-gray-500">Genre: {song.genre}</p>
+                            )}
                           </div>
+                          <button
+                            onClick={() => addSongToCatalog(song)}
+                            disabled={isAddingSong === `${song.title}-${song.artist}`}
+                            className="ml-4 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 whitespace-nowrap text-sm"
+                          >
+                            {isAddingSong === `${song.title}-${song.artist}` ? 'Adding...' : 'Add'}
+                          </button>
                         </div>
-                      )
-                    })}
+                      </div>
+                    ))}
                   </div>
-
-                  {/* Search Pagination */}
-                  {searchTotalCount > limit && (
-                    <div className="flex items-center justify-between">
-                      <div className="text-sm text-gray-700">
-                        Showing {(searchPage - 1) * limit + 1} to {Math.min(searchPage * limit, searchTotalCount)} of {searchTotalCount} results
-                      </div>
-                      <div className="flex space-x-2">
-                        <button
-                          onClick={() => {
-                            const newPage = searchPage - 1
-                            setSearchPage(newPage)
-                            searchSongs(searchQuery, newPage)
-                          }}
-                          disabled={searchPage <= 1 || isSearching}
-                          className="px-3 py-1 border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 text-sm"
-                        >
-                          Previous
-                        </button>
-                        <button
-                          onClick={() => {
-                            const newPage = searchPage + 1
-                            setSearchPage(newPage)
-                            searchSongs(searchQuery, newPage)
-                          }}
-                          disabled={searchPage * limit >= searchTotalCount || isSearching}
-                          className="px-3 py-1 border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 text-sm"
-                        >
-                          Next
-                        </button>
-                      </div>
-                    </div>
-                  )}
                 </div>
               )}
 
