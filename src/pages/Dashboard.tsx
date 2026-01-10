@@ -1611,6 +1611,12 @@ const Dashboard: React.FC = () => {
                       <span>Refresh Status</span>
                     </button>
                     <button
+                      onClick={() => window.open('https://app.tipply.live/device-setup', '_blank')}
+                      className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-semibold"
+                    >
+                      Connect Device To Wifi
+                    </button>
+                    <button
                       onClick={handleAddDeviceClick}
                       className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
                     >
@@ -1673,12 +1679,6 @@ const Dashboard: React.FC = () => {
                               {isDeletingDevice === device.id ? 'Deleting...' : 'Delete'}
                             </button>
                           </div>
-                          <button
-                            onClick={() => window.open('https://app.tipply.live/device-setup', '_blank')}
-                            className="w-full px-3 py-2 bg-green-100 text-green-700 text-sm rounded-lg hover:bg-green-200 transition-colors"
-                          >
-                            Connect Device
-                          </button>
                           <button
                             onClick={() => toggleSongRequestSetting(device)}
                             disabled={updatingSongRequest === device.id}
