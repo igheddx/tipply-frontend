@@ -19,13 +19,6 @@ interface ExternalSong {
   isInCatalog: boolean
 }
 
-interface SearchResponse {
-  songs: ExternalSong[]
-  totalCount: number
-  page: number
-  limit: number
-}
-
 interface BulkOperationResponse {
   successCount: number
   failureCount: number
@@ -81,15 +74,11 @@ const SongManagement: React.FC<SongManagementProps> = ({ profileId }) => {
   const [isRemovingSong, setIsRemovingSong] = useState<string | null>(null)
   
   // Pagination
-  const [searchPage, setSearchPage] = useState(1)
-  const [searchTotalCount, setSearchTotalCount] = useState(0)
   const [catalogPage, setCatalogPage] = useState(1)
   const [catalogTotalCount, setCatalogTotalCount] = useState(0)
   
   // Bulk operations
-  const [selectedSongs, setSelectedSongs] = useState<Set<string>>(new Set())
   const [selectedCatalogSongs, setSelectedCatalogSongs] = useState<Set<string>>(new Set())
-  const [isBulkAdding, setIsBulkAdding] = useState(false)
   const [isBulkRemoving, setIsBulkRemoving] = useState(false)
   
   // Notifications
@@ -209,8 +198,6 @@ const SongManagement: React.FC<SongManagementProps> = ({ profileId }) => {
     // Clear previous results when starting a new search (page 1)
     if (page === 1) {
       setSearchResults([])
-      setSearchTotalCount(0)
-      setSelectedSongs(new Set()) // Clear any previous selections
     }
     try {
       const response = await fetch(`${API_BASE_URL}/api/songcatalog/musicbrainz/search?query=${encodeURIComponent(query.trim())}&limit=20`)
@@ -218,8 +205,6 @@ const SongManagement: React.FC<SongManagementProps> = ({ profileId }) => {
       if (response.ok) {
         const data = await response.json()
         setSearchResults(data)
-        setSearchTotalCount(data.length)
-        setSearchPage(1)
       } else {
         showNotification('error', 'Failed to search songs')
       }
@@ -556,22 +541,6 @@ const SongManagement: React.FC<SongManagementProps> = ({ profileId }) => {
     setTimeout(() => setNotification(null), 5000)
   }
 
-  // Handle search form submission
-  const handleSearchSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    if (searchQuery.trim()) {
-      setSearchPage(1)
-      searchSongs(searchQuery, 1)
-    }
-  }
-
-  // Handle catalog search
-  const handleCatalogSearch = (e: React.FormEvent) => {
-    e.preventDefault()
-    setCatalogPage(1)
-    loadMyCatalog(1, catalogSearch)
-  }
-
   // Initialize
   useEffect(() => {
     if (activeView === 'catalog') {
@@ -588,19 +557,6 @@ const SongManagement: React.FC<SongManagementProps> = ({ profileId }) => {
       refreshCatalogCount()
     }
   }, [profileId])
-
-  // Toggle song selection for bulk operations
-  const toggleSongSelection = (songKey: string) => {
-    setSelectedSongs(prev => {
-      const newSet = new Set(prev)
-      if (newSet.has(songKey)) {
-        newSet.delete(songKey)
-      } else {
-        newSet.add(songKey)
-      }
-      return newSet
-    })
-  }
 
   const toggleCatalogSongSelection = (songId: string) => {
     setSelectedCatalogSongs(prev => {
@@ -723,32 +679,6 @@ const SongManagement: React.FC<SongManagementProps> = ({ profileId }) => {
                   )}
                 </button>
               </form>
-
-              {/* Bulk Actions for Search Results */}
-              {selectedSongs.size > 0 && (
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                  <div className="flex items-center justify-between">
-                    <span className="text-blue-800 font-medium">
-                      {selectedSongs.size} song(s) selected
-                    </span>
-                    <div className="flex space-x-2">
-                      <button
-                        onClick={() => setSelectedSongs(new Set())}
-                        className="px-3 py-1 text-blue-600 hover:text-blue-800 text-sm"
-                      >
-                        Clear Selection
-                      </button>
-                      <button
-                        onClick={bulkAddSongs}
-                        disabled={isBulkAdding}
-                        className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 text-sm"
-                      >
-                        {isBulkAdding ? 'Adding...' : 'Add Selected'}
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              )}
 
               {/* Search Results */}
               {searchResults.length > 0 && (
