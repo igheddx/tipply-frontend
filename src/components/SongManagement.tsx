@@ -498,7 +498,12 @@ const SongManagement: React.FC<SongManagementProps> = ({ profileId }) => {
         },
         body: JSON.stringify({
           profileId,
-          songs: parsedSongs
+          songs: parsedSongs.map(song => ({
+            title: song.title,
+            artist: song.artist,
+            album: song.album || null,
+            genre: song.genre || null
+          }))
         })
       })
 
