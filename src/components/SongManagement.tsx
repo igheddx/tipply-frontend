@@ -506,10 +506,10 @@ const SongManagement: React.FC<SongManagementProps> = ({ profileId }) => {
         body: JSON.stringify({
           profileId,
           songs: parsedSongs.map(song => ({
-            title: song.title,
-            artist: song.artist,
-            album: song.album || null,
-            genre: song.genre || null
+            Title: song.title,
+            Artist: song.artist,
+            Album: song.album || null,
+            Genre: song.genre || null
           }))
         })
       })
