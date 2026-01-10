@@ -5,9 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc --noEmit false --skipLibCheck && vite build",
-    "build:test": "VITE_API_URL=https://uhxejjh8s1.execute-api.us-east-1.amazonaws.com/dev tsc --noEmit false --skipLibCheck && vite build",
-    "build:production": "VITE_API_URL=https://uhxejjh8s1.execute-api.us-east-1.amazonaws.com/dev tsc --noEmit false --skipLibCheck && vite build",
+    "build": "tsc --skipLibCheck && vite build",
+    "build:test": "VITE_API_URL=https://uhxejjh8s1.execute-api.us-east-1.amazonaws.com/dev tsc --skipLibCheck && vite build",
+    "build:production": "VITE_API_URL=https://uhxejjh8s1.execute-api.us-east-1.amazonaws.com/dev tsc --skipLibCheck && vite build",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview",
     "test:unit": "vitest run",
