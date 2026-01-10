@@ -290,10 +290,7 @@ const AdminDashboard: React.FC = () => {
     }
   };
 
-  const cancelToggleStripeMode = () => {
-    setStripeModeConfirming(false);
-    setStripeModeError(null);
-  };
+
 
   const runBatchProcessing = async () => {
     try {
@@ -1157,9 +1154,9 @@ const AdminDashboard: React.FC = () => {
         {/* Stripe Mode Toggle Confirmation Modal */}
         <Modal
           title={stripeMode === 'test' ? '⚠️ Enable Live Mode' : '✓ Switch to Test Mode'}
-          open={stripeModeModal}
+          open={stripeModeConfirming}
           onOk={confirmToggleStripeMode}
-          onCancel={() => setStripeModeModal(false)}
+          onCancel={() => setStripeModeConfirming(false)}
           okText={stripeMode === 'test' ? 'Enable Live Mode' : 'Switch to Test Mode'}
           cancelText="Cancel"
           okButtonProps={{ 
