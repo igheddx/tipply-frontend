@@ -102,7 +102,7 @@ const SongManagement: React.FC<SongManagementProps> = ({ profileId }) => {
           totalCount = parseInt(headerCount, 10)
         } else {
           // Fallback: if header is not accessible, fetch without limit to count
-          const fullResponse = await fetch(`${API_BASE_URL}/api/songcatalog/my-songs/${profileId}`, {
+          const fullResponse = await fetch(`${API_BASE_URL}/api/songcatalog/my-songs/${profileId}?page=1&limit=1000`, {
             headers: {
               'Authorization': `Bearer ${token}`,
               'Content-Type': 'application/json'
@@ -153,7 +153,7 @@ const SongManagement: React.FC<SongManagementProps> = ({ profileId }) => {
         } else {
           // Fallback: if header is not accessible, fetch without limit to count
           try {
-            const fullResponse = await fetch(`${API_BASE_URL}/api/songcatalog/my-songs/${profileId}`, {
+            const fullResponse = await fetch(`${API_BASE_URL}/api/songcatalog/my-songs/${profileId}?page=1&limit=1000`, {
               headers: {
                 'Authorization': `Bearer ${token}`,
                 'Content-Type': 'application/json'
@@ -655,7 +655,7 @@ const SongManagement: React.FC<SongManagementProps> = ({ profileId }) => {
               {/* Info Banner */}
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                 <p className="text-blue-800 text-sm">
-                  🎵 Search the free MusicBrainz catalog for high-quality music data. Only original albums and singles with no cover versions are shown.
+                  🎵 Search for high-quality music data. Only original albums and singles with no cover versions are shown.
                 </p>
               </div>
 
