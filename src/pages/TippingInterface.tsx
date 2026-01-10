@@ -547,11 +547,6 @@ const TippingInterface: React.FC = () => {
     }
   }, [])
 
-  const persistUiMode = (mode: 'classic' | 'cards') => {
-    // Keep grid mode primary; ignore requests to switch to classic for now
-    setUiMode('cards')
-  }
-
   const cycleClassicIndex = (direction: -1 | 1) => {
     if (isBillFlying) return
     setEnterSide(direction === -1 ? 'left' : 'right')
@@ -1037,8 +1032,8 @@ const TippingInterface: React.FC = () => {
                   {selectedSong ? (
                     <div className="bg-green-500/30 backdrop-blur-md rounded-2xl px-4 py-3 border border-green-400/30 shadow-2xl max-w-sm w-full">
                       <div className="text-white text-xs font-semibold mb-1">🎵 Song Selected</div>
-                      <div className="text-white/90 text-sm">{selectedSong.title}</div>
-                      <div className="text-white/70 text-xs">{selectedSong.artist}</div>
+                      <div className="text-white/90 text-sm">{selectedSong?.title}</div>
+                      <div className="text-white/70 text-xs">{selectedSong?.artist}</div>
                       <button
                         onClick={() => setSelectedSong(null)}
                         className="text-white/70 hover:text-white text-xs mt-1 underline"
@@ -1167,8 +1162,8 @@ const TippingInterface: React.FC = () => {
                 {selectedSong ? (
                   <div className="bg-green-500/20 backdrop-blur-md rounded-2xl px-4 py-3 border border-green-400/30 break-words">
                     <div className="text-white text-xs font-semibold mb-2">🎵 Song Selected</div>
-                    <div className="text-white/90 text-sm truncate">{selectedSong.title}</div>
-                    <div className="text-white/70 text-xs truncate">{selectedSong.artist}</div>
+                    <div className="text-white/90 text-sm truncate">{selectedSong?.title}</div>
+                    <div className="text-white/70 text-xs truncate">{selectedSong?.artist}</div>
                     <button
                       onClick={() => setSelectedSong(null)}
                       className="text-white/70 active:text-white text-xs mt-2 underline"
