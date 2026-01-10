@@ -45,6 +45,7 @@ const SongManagement: React.FC<SongManagementProps> = ({ profileId }) => {
   // State management
   const [activeView, setActiveView] = useState<'search' | 'upload' | 'catalog'>('search')
   const [searchQuery, setSearchQuery] = useState('')
+  const [searchArtist, setSearchArtist] = useState('')
   const [searchResults, setSearchResults] = useState<any[]>([])
   const [myCatalog, setMyCatalog] = useState<Song[]>([])
   const [catalogSearch, setCatalogSearch] = useState('')
@@ -183,20 +184,26 @@ const SongManagement: React.FC<SongManagementProps> = ({ profileId }) => {
   }
 
   // Search external songs
-  const searchSongs = async (query: string, page = 1) => {
-    if (!query.trim()) return
+  const searchSongs = async (title: string, artist: string = '') => {
+    if (!title.trim()) return
     
     setIsSearching(true)
-    // Clear previous results when starting a new search (page 1)
-    if (page === 1) {
-      setSearchResults([])
-    }
+    setSearchResults([])
     try {
-      const response = await fetch(`${API_BASE_URL}/api/songcatalog/musicbrainz/search?query=${encodeURIComponent(query.trim())}&limit=20`)
+      // Build query: title, optionally with artist
+      let query = title.trim()
+      if (artist.trim()) {
+        query += ` ${artist.trim()}`
+      }
+      
+      const response = await fetch(`${API_BASE_URL}/api/songcatalog/musicbrainz/search?query=${encodeURIComponent(query)}&artist=${encodeURIComponent(artist.trim())}&limit=20`)
       
       if (response.ok) {
         const data = await response.json()
         setSearchResults(data)
+        if (data.length === 0) {
+          showNotification('info', 'No songs found matching your criteria')
+        }
       } else {
         showNotification('error', 'Failed to search songs')
       }
@@ -253,7 +260,7 @@ const SongManagement: React.FC<SongManagementProps> = ({ profileId }) => {
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if (searchQuery.trim()) {
-      searchSongs(searchQuery)
+      searchSongs(searchQuery, searchArtist)
     }
   }
 
@@ -655,20 +662,33 @@ const SongManagement: React.FC<SongManagementProps> = ({ profileId }) => {
               </div>
 
               {/* Search Form */}
-              <form onSubmit={handleSearchSubmit} className="flex space-x-4">
-                <div className="flex-1">
-                  <input
-                    type="text"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Search for songs, artists, or albums..."
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                  />
+              <form onSubmit={handleSearchSubmit} className="flex flex-col space-y-3">
+                <div className="flex space-x-4">
+                  <div className="flex-1">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Song Title *</label>
+                    <input
+                      type="text"
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      placeholder="e.g., Your Love Is King"
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                    />
+                  </div>
+                  <div className="flex-1">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Artist (Optional)</label>
+                    <input
+                      type="text"
+                      value={searchArtist}
+                      onChange={(e) => setSearchArtist(e.target.value)}
+                      placeholder="e.g., Sade"
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                    />
+                  </div>
                 </div>
                 <button
                   type="submit"
                   disabled={isSearching || !searchQuery.trim()}
-                  className="px-6 py-3 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
+                  className="px-6 py-3 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2 w-full sm:w-auto"
                 >
                   {isSearching ? (
                     <>
