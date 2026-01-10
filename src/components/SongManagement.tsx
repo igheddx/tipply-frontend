@@ -190,13 +190,12 @@ const SongManagement: React.FC<SongManagementProps> = ({ profileId }) => {
     setIsSearching(true)
     setSearchResults([])
     try {
-      // Build query: title, optionally with artist
-      let query = title.trim()
-      if (artist.trim()) {
-        query += ` ${artist.trim()}`
-      }
+      // Build query: pass title only; send artist separately
+      const queryTitle = title.trim()
+      const artistParam = artist.trim()
+      const url = `${API_BASE_URL}/api/songcatalog/musicbrainz/search?query=${encodeURIComponent(queryTitle)}${artistParam ? `&artist=${encodeURIComponent(artistParam)}` : ''}&limit=20`
       
-      const response = await fetch(`${API_BASE_URL}/api/songcatalog/musicbrainz/search?query=${encodeURIComponent(query)}&artist=${encodeURIComponent(artist.trim())}&limit=20`)
+      const response = await fetch(url)
       
       if (response.ok) {
         const data = await response.json()
