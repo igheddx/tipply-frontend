@@ -36,24 +36,56 @@ interface BulkOperationResponse {
   }>
 }
 
+interface UploadSong {
+  title: string
+  artist: string
+  album?: string
+  genre?: string
+}
+
+interface BulkUploadResponse {
+  addedCount: number
+  duplicateCount: number
+  failedCount: number
+  addedSongs: UploadSong[]
+  duplicateSongs: Array<UploadSong & { reason?: string }>
+  failedSongs: Array<UploadSong & { reason?: string }>
+}
+
 interface SongManagementProps {
   profileId: string
 }
 
 const SongManagement: React.FC<SongManagementProps> = ({ profileId }) => {
   // State management
-  const [activeView, setActiveView] = useState<'search' | 'catalog'>('search')
+  const [activeView, setActiveView] = useState<'search' | 'upload' | 'catalog'>('search')
   const [searchQuery, setSearchQuery] = useState('')
   const [searchResults, setSearchResults] = useState<any[]>([])
   const [myCatalog, setMyCatalog] = useState<Song[]>([])
   const [catalogSearch, setCatalogSearch] = useState('')
   const [catalogCount, setCatalogCount] = useState<number>(0)
   
+  // Upload states
+  const [uploadedFile, setUploadedFile] = useState<File | null>(null)
+  const [parsedSongs, setParsedSongs] = useState<UploadSong[]>([])
+  const [showPreviewModal, setShowPreviewModal] = useState(false)
+  const [showSummaryModal, setShowSummaryModal] = useState(false)
+  const [uploadSummary, setUploadSummary] = useState<BulkUploadResponse | null>(null)
+  const [isUploading, setIsUploading] = useState(false)
+  const [isDragging, setIsDragging] = useState(false)
+  
   // Loading states
   const [isSearching, setIsSearching] = useState(false)
   const [isLoadingCatalog, setIsLoadingCatalog] = useState(false)
   const [isAddingSong, setIsAddingSong] = useState<string | null>(null)
   const [isRemovingSong, setIsRemovingSong] = useState<string | null>(null)
+  
+  // Pagination
+  const [searchPage, setSearchPage] = useState(1)
+  const [searchTotalCount, setSearchTotalCount] = useState(0)
+  const [catalogPage, setCatalogPage] = useState(1)
+  const [catalogTotalCount, setCatalogTotalCount] = useState(0)
+  
   // Bulk operations
   const [selectedSongs, setSelectedSongs] = useState<Set<string>>(new Set())
   const [selectedCatalogSongs, setSelectedCatalogSongs] = useState<Set<string>>(new Set())
@@ -280,21 +312,6 @@ const SongManagement: React.FC<SongManagementProps> = ({ profileId }) => {
       setIsRemovingSong(null)
     }
   }
-        // Clear selections and refresh
-        setSelectedSongs(new Set())
-        searchSongs(searchQuery, searchPage)
-        // Refresh catalog count
-        refreshCatalogCount()
-      } else {
-        showNotification('error', 'Failed to add songs')
-      }
-    } catch (error) {
-      console.error('Error bulk adding songs:', error)
-      showNotification('error', 'Failed to add songs')
-    } finally {
-      setIsBulkAdding(false)
-    }
-  }
 
   // Bulk remove selected songs
   const bulkRemoveSongs = async () => {
@@ -336,6 +353,201 @@ const SongManagement: React.FC<SongManagementProps> = ({ profileId }) => {
     } finally {
       setIsBulkRemoving(false)
     }
+  }
+
+  // Parse uploaded file
+  const parseFile = async (file: File): Promise<UploadSong[]> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader()
+      
+      reader.onload = (e) => {
+        try {
+          const content = e.target?.result as string
+          const songs: UploadSong[] = []
+          
+          // Determine file type
+          const isCSV = file.name.toLowerCase().endsWith('.csv')
+          
+          if (isCSV) {
+            // Parse CSV
+            const lines = content.split('\n').filter(line => line.trim())
+            if (lines.length === 0) {
+              reject(new Error('File is empty'))
+              return
+            }
+            
+            // Skip header row
+            const dataLines = lines.slice(1)
+            
+            for (const line of dataLines) {
+              const columns = line.split(',').map(col => col.trim())
+              if (columns.length >= 2) {
+                songs.push({
+                  title: columns[0] || '',
+                  artist: columns[1] || '',
+                  album: columns[2] || undefined,
+                  genre: columns[3] || undefined
+                })
+              }
+            }
+          } else {
+            // Parse text file - try different delimiters
+            const lines = content.split('\n').filter(line => line.trim())
+            
+            for (const line of lines) {
+              let columns: string[] = []
+              
+              // Try comma first
+              if (line.includes(',')) {
+                columns = line.split(',').map(col => col.trim())
+              }
+              // Try pipe
+              else if (line.includes('|')) {
+                columns = line.split('|').map(col => col.trim())
+              }
+              // Try tab
+              else if (line.includes('\t')) {
+                columns = line.split('\t').map(col => col.trim())
+              }
+              // Single item per line (title only - invalid)
+              else {
+                columns = [line.trim()]
+              }
+              
+              if (columns.length >= 2) {
+                songs.push({
+                  title: columns[0] || '',
+                  artist: columns[1] || '',
+                  album: columns[2] || undefined,
+                  genre: columns[3] || undefined
+                })
+              }
+            }
+          }
+          
+          resolve(songs)
+        } catch (error) {
+          reject(error)
+        }
+      }
+      
+      reader.onerror = () => reject(new Error('Failed to read file'))
+      reader.readAsText(file)
+    })
+  }
+
+  // Handle file selection
+  const handleFileSelect = async (file: File) => {
+    // Check file size (5MB limit)
+    const maxSize = 5 * 1024 * 1024 // 5MB
+    if (file.size > maxSize) {
+      showNotification('error', 'File size exceeds 5MB limit')
+      return
+    }
+    
+    // Check file type
+    const validExtensions = ['.csv', '.txt']
+    const fileExtension = file.name.toLowerCase().slice(file.name.lastIndexOf('.'))
+    if (!validExtensions.includes(fileExtension)) {
+      showNotification('error', 'Only CSV and TXT files are supported')
+      return
+    }
+    
+    setUploadedFile(file)
+    
+    try {
+      const songs = await parseFile(file)
+      if (songs.length === 0) {
+        showNotification('error', 'No valid songs found in file')
+        return
+      }
+      
+      setParsedSongs(songs)
+      setShowPreviewModal(true)
+    } catch (error) {
+      console.error('Error parsing file:', error)
+      showNotification('error', 'Failed to parse file')
+    }
+  }
+
+  // Handle file input change
+  const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      handleFileSelect(file)
+    }
+  }
+
+  // Handle drag and drop
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault()
+    setIsDragging(true)
+  }
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault()
+    setIsDragging(false)
+  }
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault()
+    setIsDragging(false)
+    
+    const file = e.dataTransfer.files[0]
+    if (file) {
+      handleFileSelect(file)
+    }
+  }
+
+  // Confirm upload
+  const confirmUpload = async () => {
+    setShowPreviewModal(false)
+    setIsUploading(true)
+    
+    try {
+      const token = localStorage.getItem('token')
+      const response = await fetch(`${API_BASE_URL}/api/songcatalog/bulk-upload`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          profileId,
+          songs: parsedSongs
+        })
+      })
+
+      if (response.ok) {
+        const result: BulkUploadResponse = await response.json()
+        setUploadSummary(result)
+        setShowSummaryModal(true)
+        
+        // Reset upload state
+        setUploadedFile(null)
+        setParsedSongs([])
+        
+        // Refresh catalog
+        refreshCatalogCount()
+        if (activeView === 'catalog') {
+          loadMyCatalog()
+        }
+      } else {
+        showNotification('error', 'Failed to upload songs')
+      }
+    } catch (error) {
+      console.error('Error uploading songs:', error)
+      showNotification('error', 'Failed to upload songs')
+    } finally {
+      setIsUploading(false)
+    }
+  }
+
+  // Cancel upload
+  const cancelUpload = () => {
+    setShowPreviewModal(false)
+    setUploadedFile(null)
+    setParsedSongs([])
   }
 
   // Show notification
@@ -442,6 +654,16 @@ const SongManagement: React.FC<SongManagementProps> = ({ profileId }) => {
               }`}
             >
               Search Songs
+            </button>
+            <button
+              onClick={() => setActiveView('upload')}
+              className={`py-4 px-1 border-b-2 font-medium text-sm ${
+                activeView === 'upload'
+                  ? 'border-primary-500 text-primary-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              Upload Songs
             </button>
             <button
               onClick={() => setActiveView('catalog')}
@@ -572,6 +794,101 @@ const SongManagement: React.FC<SongManagementProps> = ({ profileId }) => {
                   <p className="text-gray-500">Try searching with different keywords or artist names.</p>
                 </div>
               )}
+            </div>
+          )}
+
+          {/* Upload View */}
+          {activeView === 'upload' && (
+            <div className="space-y-6">
+              {/* Info Banner */}
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <p className="text-blue-800 text-sm">
+                  📤 Upload a CSV or text file with your song list. Format: <strong>title, artist, album, genre</strong> (title and artist are required).
+                  Text files can use comma, pipe (|), or tab delimiters.
+                </p>
+              </div>
+
+              {/* Drag and Drop Zone */}
+              <div
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onDrop={handleDrop}
+                className={`border-2 border-dashed rounded-lg p-12 text-center transition ${
+                  isDragging
+                    ? 'border-primary-500 bg-primary-50'
+                    : 'border-gray-300 bg-gray-50 hover:border-gray-400'
+                }`}
+              >
+                <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center mx-auto mb-4 shadow-sm">
+                  <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                  </svg>
+                </div>
+                <h3 className="text-lg font-medium text-gray-900 mb-2">
+                  {isDragging ? 'Drop file here' : 'Drag and drop your file here'}
+                </h3>
+                <p className="text-gray-500 mb-4">or</p>
+                <label className="inline-block">
+                  <input
+                    type="file"
+                    accept=".csv,.txt"
+                    onChange={handleFileInputChange}
+                    className="hidden"
+                  />
+                  <span className="px-6 py-3 bg-primary-600 text-white rounded-lg hover:bg-primary-700 cursor-pointer inline-block">
+                    Select File
+                  </span>
+                </label>
+                <p className="text-sm text-gray-500 mt-4">Supports CSV and TXT files (max 5MB)</p>
+              </div>
+
+              {/* File Info */}
+              {uploadedFile && (
+                <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-3">
+                      <svg className="w-5 h-5 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M6 2a2 2 0 00-2 2v12a2 2 0 002 2h8a2 2 0 002-2V7.414A2 2 0 0015.414 6L12 2.586A2 2 0 0010.586 2H6zm5 6a1 1 0 10-2 0v3.586l-1.293-1.293a1 1 0 10-1.414 1.414l3 3a1 1 0 001.414 0l3-3a1 1 0 00-1.414-1.414L11 11.586V8z" clipRule="evenodd" />
+                      </svg>
+                      <div>
+                        <p className="text-green-800 font-medium">{uploadedFile.name}</p>
+                        <p className="text-sm text-green-600">{(uploadedFile.size / 1024).toFixed(1)} KB</p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => {
+                        setUploadedFile(null)
+                        setParsedSongs([])
+                      }}
+                      className="text-green-600 hover:text-green-800"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Format Examples */}
+              <div className="bg-gray-50 border border-gray-200 rounded-lg p-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">File Format Examples</h3>
+                <div className="grid md:grid-cols-2 gap-6">
+                  <div>
+                    <h4 className="font-medium text-gray-700 mb-2">CSV Format</h4>
+                    <pre className="bg-white p-3 rounded border border-gray-200 text-xs overflow-x-auto">
+{`title,artist,album,genre
+Bohemian Rhapsody,Queen,A Night at the Opera,Rock
+Hotel California,Eagles,Hotel California,Rock`}
+                    </pre>
+                  </div>
+                  <div>
+                    <h4 className="font-medium text-gray-700 mb-2">Text Format (Comma/Pipe/Tab)</h4>
+                    <pre className="bg-white p-3 rounded border border-gray-200 text-xs overflow-x-auto">
+{`Bohemian Rhapsody,Queen,A Night at the Opera,Rock
+Hotel California|Eagles|Hotel California|Rock`}
+                    </pre>
+                  </div>
+                </div>
+              </div>
             </div>
           )}
 
@@ -718,6 +1035,160 @@ const SongManagement: React.FC<SongManagementProps> = ({ profileId }) => {
           )}
         </div>
       </div>
+
+      {/* Preview Modal */}
+      {showPreviewModal && (
+        <div className="fixed inset-0 z-50 overflow-y-auto">
+          <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+            <div className="fixed inset-0 transition-opacity bg-gray-500 bg-opacity-75" onClick={cancelUpload}></div>
+
+            <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-4xl sm:w-full">
+              <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                <div className="sm:flex sm:items-start">
+                  <div className="w-full">
+                    <h3 className="text-lg leading-6 font-medium text-gray-900 mb-4">
+                      Preview Upload - {parsedSongs.length} Songs
+                    </h3>
+                    <div className="max-h-96 overflow-y-auto border border-gray-200 rounded-lg">
+                      <table className="min-w-full divide-y divide-gray-200">
+                        <thead className="bg-gray-50 sticky top-0">
+                          <tr>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Title</th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Artist</th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Album</th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Genre</th>
+                          </tr>
+                        </thead>
+                        <tbody className="bg-white divide-y divide-gray-200">
+                          {parsedSongs.map((song, index) => (
+                            <tr key={index} className="hover:bg-gray-50">
+                              <td className="px-4 py-3 text-sm text-gray-900">{song.title}</td>
+                              <td className="px-4 py-3 text-sm text-gray-600">{song.artist}</td>
+                              <td className="px-4 py-3 text-sm text-gray-500">{song.album || '-'}</td>
+                              <td className="px-4 py-3 text-sm text-gray-500">{song.genre || '-'}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                <button
+                  type="button"
+                  onClick={confirmUpload}
+                  disabled={isUploading}
+                  className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-primary-600 text-base font-medium text-white hover:bg-primary-700 focus:outline-none sm:ml-3 sm:w-auto sm:text-sm disabled:opacity-50"
+                >
+                  {isUploading ? 'Uploading...' : 'Confirm Upload'}
+                </button>
+                <button
+                  type="button"
+                  onClick={cancelUpload}
+                  disabled={isUploading}
+                  className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Summary Modal */}
+      {showSummaryModal && uploadSummary && (
+        <div className="fixed inset-0 z-50 overflow-y-auto">
+          <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+            <div className="fixed inset-0 transition-opacity bg-gray-500 bg-opacity-75" onClick={() => setShowSummaryModal(false)}></div>
+
+            <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-4xl sm:w-full">
+              <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                <div className="sm:flex sm:items-start">
+                  <div className="w-full">
+                    <h3 className="text-lg leading-6 font-medium text-gray-900 mb-4">
+                      Upload Complete
+                    </h3>
+                    
+                    {/* Summary Stats */}
+                    <div className="grid grid-cols-3 gap-4 mb-6">
+                      <div className="bg-green-50 border border-green-200 rounded-lg p-4 text-center">
+                        <div className="text-2xl font-bold text-green-600">{uploadSummary.addedCount}</div>
+                        <div className="text-sm text-green-800">Added</div>
+                      </div>
+                      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 text-center">
+                        <div className="text-2xl font-bold text-yellow-600">{uploadSummary.duplicateCount}</div>
+                        <div className="text-sm text-yellow-800">Duplicates</div>
+                      </div>
+                      <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-center">
+                        <div className="text-2xl font-bold text-red-600">{uploadSummary.failedCount}</div>
+                        <div className="text-sm text-red-800">Failed</div>
+                      </div>
+                    </div>
+
+                    {/* Details */}
+                    <div className="max-h-96 overflow-y-auto space-y-4">
+                      {/* Added Songs */}
+                      {uploadSummary.addedSongs.length > 0 && (
+                        <div>
+                          <h4 className="font-medium text-green-800 mb-2">✓ Successfully Added ({uploadSummary.addedCount})</h4>
+                          <div className="bg-green-50 border border-green-200 rounded p-3 space-y-1 max-h-40 overflow-y-auto">
+                            {uploadSummary.addedSongs.map((song, idx) => (
+                              <div key={idx} className="text-sm text-green-900">
+                                {song.title} - {song.artist}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Duplicate Songs */}
+                      {uploadSummary.duplicateSongs.length > 0 && (
+                        <div>
+                          <h4 className="font-medium text-yellow-800 mb-2">⚠ Skipped Duplicates ({uploadSummary.duplicateCount})</h4>
+                          <div className="bg-yellow-50 border border-yellow-200 rounded p-3 space-y-1 max-h-40 overflow-y-auto">
+                            {uploadSummary.duplicateSongs.map((song, idx) => (
+                              <div key={idx} className="text-sm text-yellow-900">
+                                {song.title} - {song.artist}
+                                {song.reason && <span className="text-yellow-700 ml-2">({song.reason})</span>}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Failed Songs */}
+                      {uploadSummary.failedSongs.length > 0 && (
+                        <div>
+                          <h4 className="font-medium text-red-800 mb-2">✗ Failed ({uploadSummary.failedCount})</h4>
+                          <div className="bg-red-50 border border-red-200 rounded p-3 space-y-1 max-h-40 overflow-y-auto">
+                            {uploadSummary.failedSongs.map((song, idx) => (
+                              <div key={idx} className="text-sm text-red-900">
+                                {song.title} - {song.artist}
+                                {song.reason && <span className="text-red-700 ml-2">({song.reason})</span>}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                <button
+                  type="button"
+                  onClick={() => setShowSummaryModal(false)}
+                  className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-primary-600 text-base font-medium text-white hover:bg-primary-700 focus:outline-none sm:ml-3 sm:w-auto sm:text-sm"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
