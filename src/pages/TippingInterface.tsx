@@ -69,7 +69,7 @@ const TippingInterface: React.FC = () => {
 
   // Classic swipe UI state
   // Force grid/cards UI as the primary experience
-  const [uiMode, setUiMode] = useState<'classic' | 'cards'>('cards')
+  const [uiMode] = useState<'classic' | 'cards'>('cards')
   const [classicIndex, setClassicIndex] = useState(0)
   const [isBillFlying, setIsBillFlying] = useState(false)
   const [enterSide, setEnterSide] = useState<'bottom' | 'left' | 'right'>('bottom')
