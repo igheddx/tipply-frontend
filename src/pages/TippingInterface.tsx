@@ -140,6 +140,30 @@ const TippingInterface: React.FC = () => {
     }
   }, [])
 
+  // Try to lock orientation to portrait where supported (Android Chrome/PWA)
+  useEffect(() => {
+    const attemptLock = async () => {
+      const ori: any = (window.screen as any).orientation
+      if (ori && typeof ori.lock === 'function') {
+        try {
+          await ori.lock('portrait-primary')
+        } catch (e) {
+          // Ignore if not supported or requires fullscreen/user gesture
+        }
+      }
+    }
+
+    // Try immediately and again on first interaction (helps Chrome on Android)
+    attemptLock()
+    const onFirstInteraction = () => attemptLock()
+    window.addEventListener('touchstart', onFirstInteraction, { once: true })
+    window.addEventListener('click', onFirstInteraction, { once: true })
+    return () => {
+      window.removeEventListener('touchstart', onFirstInteraction)
+      window.removeEventListener('click', onFirstInteraction)
+    }
+  }, [])
+
   // Initialize user
   useEffect(() => {
     const initializeUser = async () => {
