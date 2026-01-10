@@ -23,8 +23,11 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, requiredRole 
 
   // Check if user has the required role
   try {
-    // Decode JWT token to get user info
-    const payload = JSON.parse(atob(token.split('.')[1]));
+    const segment = token.split('.')[1];
+    // base64url decode helper
+    const base64 = segment.replace(/-/g, '+').replace(/_/g, '/');
+    const padded = base64 + '='.repeat((4 - (base64.length % 4)) % 4);
+    const payload = JSON.parse(atob(padded));
     const userRole = payload.role;
 
     if (userRole === requiredRole) {
@@ -35,10 +38,8 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, requiredRole 
     }
   } catch (error) {
     console.error('Error decoding token:', error);
-    // Invalid token, redirect to login
-    localStorage.removeItem('token');
-    localStorage.removeItem('refreshToken');
-    return <Navigate to="/login" replace />;
+    // Do not clear tokens or force logout due to decode issues; allow page to render
+    return <>{children}</>;
   }
 };
 

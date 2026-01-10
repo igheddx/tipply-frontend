@@ -100,7 +100,7 @@ const AdminDashboard: React.FC = () => {
   const [isProductionEnv, setIsProductionEnv] = useState(false);
   const [canToggleStripe, setCanToggleStripe] = useState(false);
   const [stripeModeLoading, setStripeModeLoading] = useState(false);
-  const [stripeModeModal, setStripeModeModal] = useState(false);
+  const [stripeModeConfirming, setStripeModeConfirming] = useState(false);
   const [stripeModeError, setStripeModeError] = useState<string | null>(null);
 
   const [updateFeeModal, setUpdateFeeModal] = useState(false);
@@ -126,39 +126,38 @@ const AdminDashboard: React.FC = () => {
   const [maxAmount, setMaxAmount] = useState<number | undefined>(undefined);
 
   useEffect(() => {
-    // Check if user has admin role
-    const token = localStorage.getItem('token');
-    if (token) {
-      try {
-        const payload = JSON.parse(atob(token.split('.')[1]));
-        if (payload.role !== 'root_admin') {
-          message.error('Access denied. Admin privileges required.');
-          navigate('/dashboard');
-          return;
-        }
-      } catch (error) {
-        console.error('Error decoding token:', error);
-        message.error('Invalid authentication token.');
+    // Verify admin access via profile to avoid JWT decode issues
+    const verifyAdmin = async () => {
+      const token = localStorage.getItem('token');
+      if (!token) {
         navigate('/login');
-        return;
+        return false;
       }
-    } else {
-      navigate('/login');
-      return;
-    }
+      const profile = await apiService.getProfile();
+      if (profile?.data?.role === 'root_admin') {
+        return true;
+      }
+      message.error('Access denied. Admin privileges required.');
+      navigate('/dashboard');
+      return false;
+    };
 
-    loadDashboardData();
-    fetchUserProfile();
-    loadBatchStatus();
-    loadTips();
-    loadStripeMode();
-
-    // Auto-refresh batch status every 3 minutes
-    const batchRefreshInterval = setInterval(() => {
+    // Run verification, then load data
+    verifyAdmin().then((isAdmin) => {
+      if (!isAdmin) return;
+      loadDashboardData();
+      fetchUserProfile();
       loadBatchStatus();
-    }, 180000);
+      loadTips();
+      loadStripeMode();
 
-    return () => clearInterval(batchRefreshInterval);
+      // Auto-refresh batch status every 3 minutes
+      const batchRefreshInterval = setInterval(() => {
+        loadBatchStatus();
+      }, 180000);
+
+      return () => clearInterval(batchRefreshInterval);
+    });
   }, [navigate]);
 
   // Reload tips when filters change
@@ -260,7 +259,7 @@ const AdminDashboard: React.FC = () => {
 
   const handleToggleStripeMode = () => {
     setStripeModeError(null);
-    setStripeModeModal(true);
+    setStripeModeConfirming(true);
   };
 
   const confirmToggleStripeMode = async () => {
@@ -272,7 +271,6 @@ const AdminDashboard: React.FC = () => {
       const response = await apiService.post('/api/stripe-config/mode', { mode: newMode });
       
       if (response.error) {
-        // Surface inline error, keep the modal open
         setStripeModeError(response.error);
         return;
       }
@@ -281,14 +279,20 @@ const AdminDashboard: React.FC = () => {
         setStripeModeError(null);
         setStripeMode(newMode);
         message.success(`Stripe mode switched to ${newMode.toUpperCase()}`);
-        setStripeModeModal(false);
+        setStripeModeConfirming(false);
       }
     } catch (error: any) {
       console.error('Error toggling Stripe mode:', error);
-      setStripeModeError(error.response?.data?.error || 'Failed to toggle Stripe mode');
+      const errorMsg = error?.response?.data?.error || error?.message || 'Failed to toggle Stripe mode';
+      setStripeModeError(errorMsg);
     } finally {
       setStripeModeLoading(false);
     }
+  };
+
+  const cancelToggleStripeMode = () => {
+    setStripeModeConfirming(false);
+    setStripeModeError(null);
   };
 
   const runBatchProcessing = async () => {

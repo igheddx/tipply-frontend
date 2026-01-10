@@ -22,6 +22,7 @@ interface SongCatalogSearchProps {
   onSongSelect: (song: {id: string, title: string, artist: string, requestorName?: string, note?: string}) => void
   onBackToTip: () => void
   isVisible: boolean
+  refreshKey?: number
 }
 
 const SongCatalogSearch: React.FC<SongCatalogSearchProps> = ({
@@ -29,7 +30,8 @@ const SongCatalogSearch: React.FC<SongCatalogSearchProps> = ({
   userTempId,
   onSongSelect,
   onBackToTip,
-  isVisible
+  isVisible,
+  refreshKey
 }) => {
   const [searchQuery, setSearchQuery] = useState('')
   const [songs, setSongs] = useState<Song[]>([])
@@ -50,16 +52,23 @@ const SongCatalogSearch: React.FC<SongCatalogSearchProps> = ({
     }
   }, [isVisible])
 
-  // Load daily tip total
+  // Load user's total tips (all time)
   useEffect(() => {
     if (isVisible && userTempId) {
-      loadDailyTotal()
+      loadUserTotal()
     }
   }, [isVisible, userTempId])
 
-  const loadDailyTotal = async () => {
+  // Refresh user total when parent signals a change (e.g., new tip submitted)
+  useEffect(() => {
+    if (isVisible && userTempId && refreshKey !== undefined) {
+      loadUserTotal()
+    }
+  }, [refreshKey])
+
+  const loadUserTotal = async () => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/songcatalog/daily-tips/${userTempId}`)
+      const response = await fetch(`${API_BASE_URL}/api/songcatalog/user-total/${userTempId}`)
       if (response.ok) {
         const data = await response.json()
         setDailyTotal(data)
@@ -145,7 +154,7 @@ const SongCatalogSearch: React.FC<SongCatalogSearchProps> = ({
 
                 {dailyTotal && (
                   <div className="text-right">
-                    <div className="text-sm text-gray-500">Today's Tips</div>
+                    <div className="text-sm text-gray-500">Your Tips</div>
                     <div className="font-semibold text-green-600">
                       ${dailyTotal.totalAmount.toFixed(2)} ({dailyTotal.tipCount})
                     </div>

@@ -27,6 +27,7 @@ interface PaymentMethodsCheckResult {
 const TippingInterface: React.FC = () => {
   const { deviceId } = useParams<{ deviceId: string }>()
   const [totalTipped, setTotalTipped] = useState<number>(0)
+  const [tipsRefreshKey, setTipsRefreshKey] = useState(0)
   const [loading, setLoading] = useState(false)
   const [deviceInfo, setDeviceInfo] = useState<DeviceInfo | null>(null)
   const [showPaymentModal, setShowPaymentModal] = useState(false)
@@ -756,6 +757,7 @@ const TippingInterface: React.FC = () => {
           toast.success(`$${amount} tip with song request sent!`, { duration: 800 })
           setSelectedSong(null)
           setShowSongSearch(false)
+          setTipsRefreshKey(prev => prev + 1)
         } else {
           toast.success(`$${amount} tip sent!`, { duration: 800 })
         }
@@ -827,6 +829,7 @@ const TippingInterface: React.FC = () => {
         }
         setSelectedSong(null)
         setShowSongSearch(false)
+        setTipsRefreshKey(prev => prev + 1)
         // Refresh payment method session on successful tip (extends 30-day memory)
         refreshPaymentMethodSession()
       } else {
@@ -1253,6 +1256,7 @@ const TippingInterface: React.FC = () => {
                 onSongSelect={handleSongSelect}
                 onBackToTip={() => setShowSongSearch(false)}
                 isVisible={showSongSearch}
+                refreshKey={tipsRefreshKey}
               />
             </motion.div>
           </motion.div>
