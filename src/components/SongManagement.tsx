@@ -285,7 +285,29 @@ const SongManagement: React.FC<SongManagementProps> = ({ profileId }) => {
 
       if (response.ok) {
         showNotification('success', 'Song removed from catalog')
-        loadMyCatalog(1, catalogSearch)
+        // Optimistically update UI immediately
+        setMyCatalog(prev => prev.filter(s => s.id !== songId))
+        setCatalogTotalCount(prev => Math.max(0, prev - 1))
+        setCatalogCount(prev => Math.max(0, prev - 1))
+
+        // If current page becomes empty and we're not on the first page, go back a page
+        setTimeout(() => {
+          // Use latest values after state updates
+          const totalAfter = catalogTotalCount - 1
+          const totalPagesAfter = Math.max(1, Math.ceil(totalAfter / limit))
+          const currentPage = catalogPage
+
+          if (currentPage > totalPagesAfter && currentPage > 1) {
+            const newPage = currentPage - 1
+            setCatalogPage(newPage)
+            loadMyCatalog(newPage, catalogSearch)
+          } else {
+            // Refill the current page from server if there are more items beyond
+            if ((currentPage * limit) <= totalAfter) {
+              loadMyCatalog(currentPage, catalogSearch)
+            }
+          }
+        }, 0)
       } else {
         showNotification('error', 'Failed to remove song')
       }
