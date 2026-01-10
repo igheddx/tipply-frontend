@@ -11,14 +11,6 @@ interface Song {
   createdAt: string
 }
 
-interface ExternalSong {
-  songTitle: string
-  artist: string
-  album: string
-  genre: string
-  isInCatalog: boolean
-}
-
 interface BulkOperationResponse {
   successCount: number
   failureCount: number
