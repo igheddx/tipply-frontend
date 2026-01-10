@@ -483,6 +483,13 @@ const SongManagement: React.FC<SongManagementProps> = ({ profileId }) => {
     
     try {
       const token = localStorage.getItem('token')
+      
+      console.log('Starting upload...', {
+        profileId,
+        songCount: parsedSongs.length,
+        endpoint: `${API_BASE_URL}/api/songcatalog/bulk-upload`
+      })
+      
       const response = await fetch(`${API_BASE_URL}/api/songcatalog/bulk-upload`, {
         method: 'POST',
         headers: {
@@ -495,8 +502,11 @@ const SongManagement: React.FC<SongManagementProps> = ({ profileId }) => {
         })
       })
 
+      console.log('Upload response status:', response.status)
+      
       if (response.ok) {
         const result: BulkUploadResponse = await response.json()
+        console.log('Upload result:', result)
         setUploadSummary(result)
         setShowSummaryModal(true)
         
@@ -510,11 +520,13 @@ const SongManagement: React.FC<SongManagementProps> = ({ profileId }) => {
           loadMyCatalog()
         }
       } else {
-        showNotification('error', 'Failed to upload songs')
+        const errorText = await response.text()
+        console.error('Upload failed:', response.status, errorText)
+        showNotification('error', `Failed to upload songs: ${errorText}`)
       }
     } catch (error) {
       console.error('Error uploading songs:', error)
-      showNotification('error', 'Failed to upload songs')
+      showNotification('error', `Failed to upload songs: ${error instanceof Error ? error.message : 'Unknown error'}`)
     } finally {
       setIsUploading(false)
     }
