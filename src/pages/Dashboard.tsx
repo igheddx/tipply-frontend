@@ -1674,6 +1674,12 @@ const Dashboard: React.FC = () => {
                             </button>
                           </div>
                           <button
+                            onClick={() => window.open('https://app.tipply.live/device-setup', '_blank')}
+                            className="w-full px-3 py-2 bg-green-100 text-green-700 text-sm rounded-lg hover:bg-green-200 transition-colors"
+                          >
+                            Connect Device
+                          </button>
+                          <button
                             onClick={() => toggleSongRequestSetting(device)}
                             disabled={updatingSongRequest === device.id}
                             className={`w-full px-3 py-2 text-sm rounded-lg transition-colors disabled:opacity-50 ${
