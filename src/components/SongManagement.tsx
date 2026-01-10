@@ -492,7 +492,6 @@ const SongManagement: React.FC<SongManagementProps> = ({ profileId }) => {
       const token = localStorage.getItem('token')
       
       console.log('Starting upload...', {
-        profileId,
         songCount: parsedSongs.length,
         endpoint: `${API_BASE_URL}/api/songcatalog/bulk-upload`
       })
@@ -504,7 +503,6 @@ const SongManagement: React.FC<SongManagementProps> = ({ profileId }) => {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          profileId,
           songs: parsedSongs.map(song => ({
             Title: song.title,
             Artist: song.artist,
