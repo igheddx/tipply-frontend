@@ -346,10 +346,32 @@ const SongManagement: React.FC<SongManagementProps> = ({ profileId }) => {
       if (response.ok) {
         const result: BulkOperationResponse = await response.json()
         showNotification('success', `Removed ${result.successCount} songs from your catalog`)
-        
-        // Clear selections and refresh
+
+        // Optimistically update UI immediately
+        const selectedIdsSet = new Set(songIdsToRemove)
+        setMyCatalog(prev => prev.filter(s => !selectedIdsSet.has(s.id)))
+        setCatalogTotalCount(prev => Math.max(0, prev - result.successCount))
+        setCatalogCount(prev => Math.max(0, prev - result.successCount))
+
+        // Clear selections
         setSelectedCatalogSongs(new Set())
-        loadMyCatalog(catalogPage, catalogSearch)
+
+        // Adjust pagination: if page emptied and not first page, go back; else refill current page if there are more items
+        setTimeout(() => {
+          const totalAfter = Math.max(0, catalogTotalCount - result.successCount)
+          const totalPagesAfter = Math.max(1, Math.ceil(totalAfter / limit))
+          const currentPage = catalogPage
+
+          if (currentPage > totalPagesAfter && currentPage > 1) {
+            const newPage = currentPage - 1
+            setCatalogPage(newPage)
+            loadMyCatalog(newPage, catalogSearch)
+          } else {
+            if ((currentPage * limit) <= totalAfter) {
+              loadMyCatalog(currentPage, catalogSearch)
+            }
+          }
+        }, 0)
       } else {
         showNotification('error', 'Failed to remove songs')
       }
