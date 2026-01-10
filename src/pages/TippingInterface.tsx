@@ -68,10 +68,8 @@ const TippingInterface: React.FC = () => {
   ]
 
   // Classic swipe UI state
-  const [uiMode, setUiMode] = useState<'classic' | 'cards'>(() => {
-    const stored = localStorage.getItem('tip_ui_mode')
-    return stored === 'cards' ? 'cards' : 'classic'
-  })
+  // Force grid/cards UI as the primary experience
+  const [uiMode, setUiMode] = useState<'classic' | 'cards'>('cards')
   const [classicIndex, setClassicIndex] = useState(0)
   const [isBillFlying, setIsBillFlying] = useState(false)
   const [enterSide, setEnterSide] = useState<'bottom' | 'left' | 'right'>('bottom')
@@ -550,8 +548,8 @@ const TippingInterface: React.FC = () => {
   }, [])
 
   const persistUiMode = (mode: 'classic' | 'cards') => {
-    setUiMode(mode)
-    localStorage.setItem('tip_ui_mode', mode)
+    // Keep grid mode primary; ignore requests to switch to classic for now
+    setUiMode('cards')
   }
 
   const cycleClassicIndex = (direction: -1 | 1) => {
@@ -955,7 +953,7 @@ const TippingInterface: React.FC = () => {
       )}
 
       {/* Classic Swipe UI - Full Screen Bill */}
-      {uiMode === 'classic' && (
+      {uiMode === 'classic' && false && (
         <div
           className="fixed inset-0 z-50 flex flex-col"
           onTouchStart={handleClassicTouchStart}
@@ -1095,13 +1093,6 @@ const TippingInterface: React.FC = () => {
                     <span className="text-white/80 text-xs uppercase tracking-wider font-black">${totalTipped}</span>
                   </div>
 
-                  {/* Grid UI toggle button */}
-                  <button
-                    onClick={() => persistUiMode('cards')}
-                    className="w-full bg-white/15 backdrop-blur-sm text-white px-4 py-2.5 rounded-xl text-sm font-semibold border border-white/20 active:bg-white/25 transition-colors"
-                  >
-                    Switch to Grid UI
-                  </button>
                 </div>
               </motion.div>
             )}
@@ -1111,29 +1102,26 @@ const TippingInterface: React.FC = () => {
 
       {/* Cards UI Grid - cards mode only */}
       {uiMode === 'cards' && (
-        <div className="relative z-10 w-full min-h-[100dvh] overflow-y-auto overscroll-contain" style={{ WebkitOverflowScrolling: 'touch' }}>
-          {/* Responsive container with natural reflow */}
+        <div className="relative z-10 w-full h-[100dvh] overflow-hidden bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900">
+          {/* Responsive container with controlled spacing to avoid scroll on mobile */}
           <div 
-            className="flex flex-col items-center w-full px-4"
+            className="flex flex-col items-center w-full px-4 h-full"
             style={{ 
               paddingTop: isIOS 
-                ? 'max(11rem, calc(env(safe-area-inset-top) + 7rem))' 
-                : 'max(0.5rem, calc(env(safe-area-inset-top) + 0.25rem))',
-              paddingBottom: isIOS ? '24rem' : '18rem'
+                ? 'calc(env(safe-area-inset-top) + 1.5rem)' 
+                : 'calc(env(safe-area-inset-top) + 0.75rem)',
+              paddingBottom: 'calc(env(safe-area-inset-bottom) + 3.5rem)'
             }}
           >
-            {/* Title inside scrollable container */}
+            {/* Title with tighter spacing */}
             <h1 
-              className="text-2xl font-bold text-white truncate text-center w-full"
-              style={{
-                marginBottom: '2rem'
-              }}
+              className="text-2xl font-bold text-white truncate text-center w-full mb-4"
             >
                 Tip {deviceInfo?.stageName || `${deviceInfo?.ownerFirstName} ${deviceInfo?.ownerLastName}`}
             </h1>
 
             {/* Tip buttons grid - wraps naturally */}
-            <div className="flex flex-wrap justify-center gap-4 max-w-2xl w-full -mt-2 mb-4">
+            <div className="flex flex-wrap justify-center gap-3 max-w-xl w-full -mt-1 mb-3">
               {tipAmounts.map((amount, index) => (
                 <motion.button
                   key={amount}
@@ -1143,9 +1131,9 @@ const TippingInterface: React.FC = () => {
                   }}
                   disabled={loading}
                   className={`
-                    relative min-h-[7rem] min-w-[9rem] flex-1 basis-[calc(50%-0.5rem)] max-w-[12rem]
+                    relative min-h-[6.25rem] min-w-[8.25rem] flex-1 basis-[calc(50%-0.5rem)] max-w-[10.5rem]
                     rounded-2xl bg-gradient-to-br ${cardColors[index]}
-                    flex items-center justify-center font-black text-white text-5xl
+                    flex items-center justify-center font-black text-white text-4xl
                     shadow-2xl border border-white/20 overflow-hidden
                     ${loading && clickedAmount === amount ? 'scale-95' : 'active:scale-95'}
                     transition-transform duration-150 disabled:opacity-50
@@ -1175,7 +1163,7 @@ const TippingInterface: React.FC = () => {
 
             {/* Song request section - naturally flows below buttons */}
             {deviceInfo?.isAllowSongRequest && (
-              <div className="w-full max-w-2xl px-2 mb-3">
+              <div className="w-full max-w-xl px-2 mb-3">
                 {selectedSong ? (
                   <div className="bg-green-500/20 backdrop-blur-md rounded-2xl px-4 py-3 border border-green-400/30 break-words">
                     <div className="text-white text-xs font-semibold mb-2">🎵 Song Selected</div>
@@ -1201,7 +1189,7 @@ const TippingInterface: React.FC = () => {
             )}
 
             {/* Control block - naturally flows below everything */}
-            <div className="w-full max-w-2xl px-2 mb-[5rem]">
+            <div className="w-full max-w-xl px-2 mt-auto mb-[2.25rem]">
               <div className="relative bg-black/60 backdrop-blur-md rounded-3xl p-4 w-full border border-white/20 shadow-2xl text-center">
                 {/* Amount display */}
                 <div className="text-center mb-2">
@@ -1217,13 +1205,8 @@ const TippingInterface: React.FC = () => {
                   <span className="font-black text-white text-sm uppercase tracking-wider">${totalTipped}</span>
                 </div>
 
-                {/* Toggle back to Swipe UI */}
-                <button
-                  onClick={() => persistUiMode('classic')}
-                  className="w-full bg-white/15 backdrop-blur-sm text-white px-4 py-2.5 rounded-xl text-sm font-semibold border border-white/20 active:bg-white/25 transition-colors"
-                >
-                  Switch to Swipe UI
-                </button>
+                {/* Swipe UI toggle hidden for now */}
+                <div className="hidden" />
               </div>
             </div>
           </div>
