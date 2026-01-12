@@ -411,6 +411,144 @@ class ApiService {
     })
   }
 
+  async uploadProfilePhoto(file: File): Promise<ApiResponse<any>> {
+    const url = `${API_BASE_URL}/api/profiles/me/photo`
+    const token = localStorage.getItem('token')
+
+    const formData = new FormData()
+    formData.append('file', file)
+
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          ...(token && { Authorization: `Bearer ${token}` }),
+        },
+        body: formData,
+      })
+
+      if (response.status === 401) {
+        const refreshToken = localStorage.getItem('refreshToken')
+        if (refreshToken) {
+          try {
+            const refreshResponse = await fetch(`${API_BASE_URL}/api/auth/refresh`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({ refreshToken }),
+            })
+
+            if (refreshResponse.ok) {
+              const refreshData = await refreshResponse.json()
+              localStorage.setItem('token', refreshData.token)
+              if (refreshData.refreshToken) {
+                localStorage.setItem('refreshToken', refreshData.refreshToken)
+              }
+
+              // Retry the original request
+              const retryResponse = await fetch(url, {
+                method: 'POST',
+                headers: {
+                  Authorization: `Bearer ${refreshData.token}`,
+                },
+                body: formData,
+              })
+
+              if (retryResponse.ok) {
+                return { data: await retryResponse.json() }
+              }
+              return { error: 'Failed to upload photo' }
+            }
+          } catch (refreshError) {
+            console.error('Token refresh failed:', refreshError)
+            return { error: 'Authentication failed' }
+          }
+        }
+        return { error: 'Unauthorized' }
+      }
+
+      if (response.ok) {
+        return { data: await response.json() }
+      }
+
+      const errorData = await response.json()
+      return { error: errorData.error || 'Failed to upload photo', status: response.status }
+    } catch (error) {
+      console.error('Error uploading photo:', error)
+      return { error: 'Upload failed' }
+    }
+  }
+
+  async uploadPerformerProfilePhoto(file: File): Promise<ApiResponse<any>> {
+    const url = `${API_BASE_URL}/api/profiles/profile-photo`
+    const token = localStorage.getItem('token')
+
+    const formData = new FormData()
+    formData.append('file', file)
+
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          ...(token && { Authorization: `Bearer ${token}` }),
+        },
+        body: formData,
+      })
+
+      if (response.status === 401) {
+        const refreshToken = localStorage.getItem('refreshToken')
+        if (refreshToken) {
+          try {
+            const refreshResponse = await fetch(`${API_BASE_URL}/api/auth/refresh`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({ refreshToken }),
+            })
+
+            if (refreshResponse.ok) {
+              const refreshData = await refreshResponse.json()
+              localStorage.setItem('token', refreshData.token)
+              if (refreshData.refreshToken) {
+                localStorage.setItem('refreshToken', refreshData.refreshToken)
+              }
+
+              // Retry the original request
+              const retryResponse = await fetch(url, {
+                method: 'POST',
+                headers: {
+                  Authorization: `Bearer ${refreshData.token}`,
+                },
+                body: formData,
+              })
+
+              if (retryResponse.ok) {
+                return { data: await retryResponse.json() }
+              }
+              return { error: 'Failed to upload photo' }
+            }
+          } catch (refreshError) {
+            console.error('Token refresh failed:', refreshError)
+            return { error: 'Authentication failed' }
+          }
+        }
+        return { error: 'Unauthorized' }
+      }
+
+      if (response.ok) {
+        return { data: await response.json() }
+      }
+
+      const errorData = await response.json()
+      return { error: errorData.error || 'Failed to upload photo', status: response.status }
+    } catch (error) {
+      console.error('Error uploading photo:', error)
+      return { error: 'Upload failed' }
+    }
+  }
+
   async delete(endpoint: string): Promise<ApiResponse<any>> {
     return this.request(endpoint, { method: 'DELETE' })
   }

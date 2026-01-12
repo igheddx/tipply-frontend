@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import apiService from '../services/api'
 import { getEncryptDecryptNoUserName } from '../utils/encryption'
+import PhotoUpload from '../components/PhotoUpload'
 
 const Onboarding: React.FC = () => {
   const [formData, setFormData] = useState({
@@ -18,6 +19,7 @@ const Onboarding: React.FC = () => {
     isAllowSongRequest: null as boolean | null
   })
 
+  const [profilePhotoUrl, setProfilePhotoUrl] = useState<string>('')
   const [errors, setErrors] = useState<{[key: string]: string}>({})
   const [isLoading, setIsLoading] = useState(false)
   const [step, setStep] = useState(1)
@@ -743,6 +745,18 @@ Please use a different serial number or contact support if this is your device.`
         <div className="text-6xl mb-4">👤</div>
         <h3 className="text-2xl font-bold text-gray-900 mb-2">Personal Information</h3>
         <p className="text-gray-600">Let's start with your basic details and tell us about yourself</p>
+      </div>
+
+      {/* Profile Photo Upload */}
+      <div className="bg-gray-50 rounded-lg p-6">
+        <label className="block text-sm font-semibold text-gray-700 mb-4 text-center">
+          Profile Photo (Optional)
+        </label>
+        <PhotoUpload
+          photoUrl={profilePhotoUrl}
+          onPhotoChange={(url) => setProfilePhotoUrl(url)}
+          variant="onboarding"
+        />
       </div>
       
       <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">

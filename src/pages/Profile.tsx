@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import apiService from '../services/api'
+import PhotoUpload from '../components/PhotoUpload'
 
 interface ProfileData {
   firstName: string
@@ -10,6 +11,7 @@ interface ProfileData {
   stageName?: string
   bio?: string
   stripeAccountId?: string
+  profilePhotoUrl?: string
 }
 
 interface PasswordData {
@@ -474,6 +476,20 @@ const Profile: React.FC = () => {
                 Edit Profile
               </button>
             )}
+          </div>
+
+          {/* Profile Photo Section */}
+          <div className="mb-8 border-b border-gray-200 pb-8">
+            <h3 className="text-sm font-medium text-gray-700 mb-4">Profile Photo</h3>
+            <PhotoUpload
+              photoUrl={profile?.profilePhotoUrl}
+              onPhotoChange={(url) => {
+                if (profile) {
+                  setProfile({ ...profile, profilePhotoUrl: url })
+                }
+              }}
+              variant="profile"
+            />
           </div>
 
           {isEditing ? (
