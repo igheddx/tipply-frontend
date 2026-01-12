@@ -3,6 +3,7 @@ import { loadStripe } from '@stripe/stripe-js'
 import { Elements, CardElement, useStripe, useElements } from '@stripe/react-stripe-js'
 import { toast } from 'sonner'
 import { getApiBaseUrl } from '../utils/config'
+import PerformerHeader from './PerformerHeader'
 
 // Initialize Stripe
 const stripePromise = loadStripe((import.meta as any).env.VITE_STRIPE_PUBLISHABLE_KEY || 'pk_test_placeholder')
@@ -13,6 +14,10 @@ interface PaymentSetupModalProps {
   onComplete: (paymentMethodId?: string) => void
   deviceUuid: string
   userId: string
+  performerStageName?: string
+  performerFirstName?: string
+  performerLastName?: string
+  performerPhotoUrl?: string
 }
 
 export default function PaymentSetupModal({ 
@@ -20,16 +25,26 @@ export default function PaymentSetupModal({
   onClose, 
   onComplete, 
   deviceUuid, 
-  userId 
+  userId,
+  performerStageName,
+  performerFirstName,
+  performerLastName,
+  performerPhotoUrl
 }: PaymentSetupModalProps) {
   if (!isOpen) return null
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-lg p-6 max-w-md w-full max-h-[90vh] overflow-y-auto">
+        <PerformerHeader
+          stageName={performerStageName}
+          firstName={performerFirstName}
+          lastName={performerLastName}
+          photoUrl={performerPhotoUrl}
+        />
         <h2 className="text-2xl font-bold mb-2 text-gray-900">Add Payment Method</h2>
         <p className="text-gray-600 mb-6">
-          To start tipping performers, please add a payment method below.
+          Please add a payment method to continue.
         </p>
         
         <Elements stripe={stripePromise}>

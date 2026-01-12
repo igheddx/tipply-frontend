@@ -14,6 +14,7 @@ interface DeviceInfo {
   ownerFirstName: string
   ownerLastName: string
     stageName?: string
+  profilePhotoUrl?: string
   ownerId: string
   stripeAccountId?: string
   isAllowSongRequest?: boolean
@@ -236,6 +237,7 @@ const TippingInterface: React.FC = () => {
           ownerFirstName: device.ownerFirstName,
           ownerLastName: device.ownerLastName,
             stageName: device.stageName,
+          profilePhotoUrl: device.profilePhotoUrl,
           ownerId: device.id, // Using device.id since profileId is not exposed in public endpoint
           stripeAccountId: '', // Not exposed in public endpoint
           isAllowSongRequest: device.isAllowSongRequest,
@@ -906,6 +908,10 @@ const TippingInterface: React.FC = () => {
         }}
         deviceUuid={deviceInfo?.uuid || ''}
         userId={userId}
+        performerStageName={deviceInfo?.stageName}
+        performerFirstName={deviceInfo?.ownerFirstName}
+        performerLastName={deviceInfo?.ownerLastName}
+        performerPhotoUrl={deviceInfo?.profilePhotoUrl}
       />
     )
   }
