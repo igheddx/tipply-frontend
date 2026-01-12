@@ -971,8 +971,9 @@ const Dashboard: React.FC = () => {
         effectConfiguration: JSON.stringify(effectConfig)
       })
 
-      if (response.data) {
-        // Update the device in the stats state
+      if (response.data && response.data.success) {
+        console.log('✅ Device configuration updated successfully:', response.data)
+        // Update the device in the stats state immediately
         setStats(prevStats => {
           if (!prevStats) return prevStats
           return {
@@ -984,12 +985,15 @@ const Dashboard: React.FC = () => {
             )
           }
         })
+        // Refetch fresh data from server to ensure sync
+        setTimeout(() => fetchDashboardStats(), 500)
       } else {
+        console.error('❌ Failed to update device configuration:', response)
         alert('Failed to update device configuration: ' + (response.error || 'Unknown error'))
       }
     } catch (error) {
-      console.error('Error updating device configuration:', error)
-      alert('Error updating device configuration')
+      console.error('❌ Error updating device configuration:', error)
+      alert('Error updating device configuration: ' + (error instanceof Error ? error.message : 'Unknown error'))
     } finally {
       setUpdatingDeviceConfig(null)
     }
