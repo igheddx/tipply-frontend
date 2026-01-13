@@ -747,17 +747,7 @@ Please use a different serial number or contact support if this is your device.`
         <p className="text-gray-600">Let's start with your basic details and tell us about yourself</p>
       </div>
 
-      {/* Profile Photo Upload */}
-      <div className="bg-gray-50 rounded-lg p-6">
-        <label className="block text-sm font-semibold text-gray-700 mb-4 text-center">
-          Profile Photo (Optional)
-        </label>
-        <PhotoUpload
-          photoUrl={profilePhotoUrl}
-          onPhotoChange={(url) => setProfilePhotoUrl(url)}
-          variant="onboarding"
-        />
-      </div>
+      {/* Note: Profile Photo upload moved to Profile page after authentication */}
       
       <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
         <div className="space-y-2">
