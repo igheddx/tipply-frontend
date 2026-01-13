@@ -984,13 +984,20 @@ const Dashboard: React.FC = () => {
         // Update the device in the stats state immediately
         setStats(prevStats => {
           if (!prevStats) return prevStats
+          console.log('📝 Before state update - devices:', prevStats.devices.map(d => ({ id: d.id, sound: d.isSoundEnabled })))
+          const newDevices = prevStats.devices.map(d => {
+            if (d.id === deviceId) {
+              console.log(`✏️ Updating device ${d.id}: sound ${d.isSoundEnabled} → ${isSoundEnabled}`)
+              return { ...d, isSoundEnabled, effectConfiguration: JSON.stringify(effectConfig) }
+            } else {
+              console.log(`⏭️ Skipping device ${d.id} (not matching ${deviceId})`)
+              return d
+            }
+          })
+          console.log('📝 After state update - devices:', newDevices.map(d => ({ id: d.id, sound: d.isSoundEnabled })))
           return {
             ...prevStats,
-            devices: prevStats.devices.map(d => 
-              d.id === deviceId 
-                ? { ...d, isSoundEnabled, effectConfiguration: JSON.stringify(effectConfig) }
-                : d
-            )
+            devices: newDevices
           }
         })
         // Refetch fresh data from server to ensure sync
