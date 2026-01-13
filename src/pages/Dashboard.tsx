@@ -966,11 +966,13 @@ const Dashboard: React.FC = () => {
   const updateDeviceConfiguration = async (deviceId: string, isSoundEnabled: boolean, effectConfig: Record<string, string>) => {
     setUpdatingDeviceConfig(deviceId)
     try {
+      console.log('📤 Sending device configuration update:', { deviceId, isSoundEnabled, effectConfig })
       const response = await apiService.updateDeviceConfiguration(deviceId, {
         isSoundEnabled,
         effectConfiguration: JSON.stringify(effectConfig)
       })
 
+      console.log('📥 Device configuration response:', response)
       if (response.data && response.data.success) {
         console.log('✅ Device configuration updated successfully:', response.data)
         // Update the device in the stats state immediately
@@ -986,13 +988,20 @@ const Dashboard: React.FC = () => {
           }
         })
         // Refetch fresh data from server to ensure sync
-        setTimeout(() => fetchDashboardStats(), 500)
+        setTimeout(() => {
+          console.log('🔄 Refetching dashboard stats after device configuration update...')
+          fetchDashboardStats()
+        }, 1000)
       } else {
-        console.error('❌ Failed to update device configuration:', response)
+        console.error('❌ Failed to update device configuration - response:', response)
+        console.error('Response data:', response.data)
+        console.error('Response error:', response.error)
+        console.error('Response status:', response.status)
         alert('Failed to update device configuration: ' + (response.error || 'Unknown error'))
       }
     } catch (error) {
       console.error('❌ Error updating device configuration:', error)
+      console.error('Error details:', error instanceof Error ? error.message : 'Unknown error')
       alert('Error updating device configuration: ' + (error instanceof Error ? error.message : 'Unknown error'))
     } finally {
       setUpdatingDeviceConfig(null)
