@@ -1003,7 +1003,6 @@ const Dashboard: React.FC = () => {
         // Don't refetch - trust the local state and the server response which confirmed the update
         console.log('✅ Device configuration persisted in state. Skipping refetch to avoid race conditions.')
       } else {
-      } else {
         console.error('❌ Failed to update device configuration - response:', response)
         console.error('Response data:', response.data)
         console.error('Response error:', response.error)
