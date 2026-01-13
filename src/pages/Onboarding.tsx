@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import apiService from '../services/api'
 import { getEncryptDecryptNoUserName } from '../utils/encryption'
-import PhotoUpload from '../components/PhotoUpload'
 
 const Onboarding: React.FC = () => {
   const [formData, setFormData] = useState({
@@ -19,7 +18,6 @@ const Onboarding: React.FC = () => {
     isAllowSongRequest: null as boolean | null
   })
 
-  const [profilePhotoUrl, setProfilePhotoUrl] = useState<string>('')
   const [errors, setErrors] = useState<{[key: string]: string}>({})
   const [isLoading, setIsLoading] = useState(false)
   const [step, setStep] = useState(1)
