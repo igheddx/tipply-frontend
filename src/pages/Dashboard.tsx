@@ -1019,14 +1019,18 @@ const Dashboard: React.FC = () => {
   }
 
   const getEffectConfig = (device: DeviceSummary): Record<string, string> => {
+    console.log(`🎨 Getting effect config for device ${device.id}:`, device.effectConfiguration)
     try {
       if (device.effectConfiguration) {
-        return JSON.parse(device.effectConfiguration)
+        const parsed = JSON.parse(device.effectConfiguration)
+        console.log(`✅ Parsed effect config:`, parsed)
+        return parsed
       }
     } catch (e) {
-      console.error('Error parsing effect configuration:', e)
+      console.error('❌ Error parsing effect configuration:', e, 'Raw value:', device.effectConfiguration)
     }
     // Default configuration
+    console.log('⚠️ Using default effect config for device', device.id)
     return {
       "1": "effect1",
       "5": "effect1",
