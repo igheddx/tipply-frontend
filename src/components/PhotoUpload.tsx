@@ -66,7 +66,7 @@ const PhotoUpload: React.FC<PhotoUploadProps> = ({
       setUploading(true)
       setError('')
 
-      const response = await apiService.uploadProfilePhoto(file)
+      const response = await apiService.uploadPerformerProfilePhoto(file)
 
       if (response.error) {
         setError(response.error)
