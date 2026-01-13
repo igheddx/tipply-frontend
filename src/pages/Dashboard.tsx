@@ -309,7 +309,13 @@ const Dashboard: React.FC = () => {
       }
       console.log('📊 Dashboard stats received:', {
         deviceCount: response.data?.devices?.length || 0,
-        devices: response.data?.devices?.map((d: any) => ({ id: d.id, nickname: d.nickname, uuid: d.uuid }))
+        devices: response.data?.devices?.map((d: any) => ({ 
+          id: d.id, 
+          nickname: d.nickname, 
+          uuid: d.uuid,
+          isSoundEnabled: d.isSoundEnabled,
+          effectConfiguration: d.effectConfiguration
+        }))
       })
       setStats(response.data)
     } catch (error) {
