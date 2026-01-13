@@ -1000,11 +1000,9 @@ const Dashboard: React.FC = () => {
             devices: newDevices
           }
         })
-        // Refetch fresh data from server to ensure sync
-        setTimeout(() => {
-          console.log('🔄 Refetching dashboard stats after device configuration update...')
-          fetchDashboardStats()
-        }, 1000)
+        // Don't refetch - trust the local state and the server response which confirmed the update
+        console.log('✅ Device configuration persisted in state. Skipping refetch to avoid race conditions.')
+      } else {
       } else {
         console.error('❌ Failed to update device configuration - response:', response)
         console.error('Response data:', response.data)
