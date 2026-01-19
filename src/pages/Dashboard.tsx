@@ -126,7 +126,7 @@ const Dashboard: React.FC = () => {
       return
     }
 
-    // Fetch profile once, then use it for everything
+    // Fetch only profile and overview data on init - lazy-load tab data when selected
     const initDashboard = async () => {
       try {
         setLoading(true)
@@ -148,13 +148,11 @@ const Dashboard: React.FC = () => {
         setUserProfile(profileResp.data)
         const profileId = profileResp.data.id
 
-        // Run all other fetches in parallel using the profile data
-        const [statsResp, metricsResp, tipsResp, deletedResp, devicesResp] = await Promise.all([
+        // ONLY fetch overview data on init (stats, metrics)
+        // Defer tips, deleted devices, devices until tabs are selected
+        const [statsResp, metricsResp] = await Promise.all([
           apiService.getDashboardStats(),
-          apiService.getDashboardMetrics(profileId),
-          apiService.getRecentTips(profileId),
-          apiService.getDeletedDevices(),
-          apiService.getDevices()
+          apiService.getDashboardMetrics(profileId)
         ])
 
         if (statsResp.data) {
@@ -165,36 +163,7 @@ const Dashboard: React.FC = () => {
           setMetrics(metricsResp.data)
         }
 
-        if (tipsResp.data) {
-          setRecentTips(tipsResp.data.map((tip: any) => ({
-            id: tip.id,
-            amount: tip.amount,
-            deviceNickname: 'Device',
-            createdAt: tip.createdAt,
-            status: tip.status
-          })))
-        }
-
-        if (deletedResp.data) {
-          setDeletedDevices(deletedResp.data)
-        }
-
-        // Check Stripe status if profile has Stripe account
-        if (profileResp.data.stripeAccountId && devicesResp.data?.length > 0) {
-          try {
-            const statusResp = await apiService.getConnectAccountStatus(devicesResp.data[0].uuid)
-            if (statusResp.data) {
-              const verificationStatus = statusResp.data.VerificationStatus || statusResp.data.verificationStatus || 'unknown'
-              if (verificationStatus.toLowerCase() === 'verified') {
-                setStripeEnabledDevices(devicesResp.data.map((d: any) => d.uuid))
-              }
-            }
-          } catch (error) {
-            console.error('Error checking Stripe status:', error)
-          }
-        }
-
-        // Check song catalog alert
+        // Check song catalog alert in background
         if (statsResp.data?.devices) {
           const devicesWithSongRequests = statsResp.data.devices.filter((device: DeviceSummary) => device.isAllowSongRequest)
           if (devicesWithSongRequests.length > 0) {
@@ -218,6 +187,22 @@ const Dashboard: React.FC = () => {
           }
         }
 
+        // Load devices in background for Stripe status check (needed on init)
+        const devicesResp = await apiService.getDevices()
+        if (profileResp.data.stripeAccountId && devicesResp.data?.length > 0) {
+          try {
+            const statusResp = await apiService.getConnectAccountStatus(devicesResp.data[0].uuid)
+            if (statusResp.data) {
+              const verificationStatus = statusResp.data.VerificationStatus || statusResp.data.verificationStatus || 'unknown'
+              if (verificationStatus.toLowerCase() === 'verified') {
+                setStripeEnabledDevices(devicesResp.data.map((d: any) => d.uuid))
+              }
+            }
+          } catch (error) {
+            console.error('Error checking Stripe status:', error)
+          }
+        }
+
         setLoading(false)
       } catch (error) {
         console.error('Error initializing dashboard:', error)
@@ -237,37 +222,54 @@ const Dashboard: React.FC = () => {
       
       switch (activeTab) {
         case 'overview':
-        case 'devices':
-        case 'tips':
-          // Parallelize refresh
-          const [statsResp, metricsResp, tipsResp] = await Promise.all([
-            apiService.getDashboardStats(),
-            apiService.getDashboardMetrics(profileId),
-            apiService.getRecentTips(profileId)
-          ])
-          
-          if (statsResp.data) setStats(statsResp.data)
+          // Just refresh overview data
+          const metricsResp = await apiService.getDashboardMetrics(profileId)
           if (metricsResp.data) setMetrics(metricsResp.data)
-          if (tipsResp.data) {
-            setRecentTips(tipsResp.data.map((tip: any) => ({
-              id: tip.id,
-              amount: tip.amount,
-              deviceNickname: 'Device',
-              createdAt: tip.createdAt,
-              status: tip.status
-            })))
+          break
+          
+        case 'devices':
+          // Lazy-load devices tab data if not already loaded
+          if (!stats?.devices) {
+            const statsResp = await apiService.getDashboardStats()
+            if (statsResp.data) setStats(statsResp.data)
           }
           break
+          
+        case 'tips':
+          // Lazy-load tips if not already loaded
+          if (recentTips.length === 0) {
+            const tipsResp = await apiService.getRecentTips(profileId)
+            if (tipsResp.data) {
+              setRecentTips(tipsResp.data.map((tip: any) => ({
+                id: tip.id,
+                amount: tip.amount,
+                deviceNickname: 'Device',
+                createdAt: tip.createdAt,
+                status: tip.status
+              })))
+            }
+          }
+          break
+          
+        case 'deletedDevices':
+          // Lazy-load deleted devices if not already loaded
+          if (deletedDevices.length === 0) {
+            const deletedResp = await apiService.getDeletedDevices()
+            if (deletedResp.data) setDeletedDevices(deletedResp.data)
+          }
+          break
+          
         case 'monitor':
           loadSongRequests()
           break
+          
         default:
           break
       }
     }
 
     refreshData()
-  }, [activeTab, userProfile?.id])
+  }, [activeTab, userProfile?.id, stats?.devices, recentTips.length, deletedDevices.length])
 
   const handleLogout = () => {
     localStorage.removeItem('token')
