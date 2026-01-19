@@ -129,10 +129,15 @@ const Dashboard: React.FC = () => {
     // Fetch only profile and overview data on init - lazy-load tab data when selected
     const initDashboard = async () => {
       try {
+        const startTime = performance.now()
+        console.log('🚀 [PERF] Dashboard init started')
         setLoading(true)
         
         // Get profile first
+        let profileTime = performance.now()
         const profileResp = await apiService.getProfile()
+        console.log(`⏱️ [PERF] getProfile() took ${(performance.now() - profileTime).toFixed(0)}ms`)
+        
         if (profileResp.error?.includes('401')) {
           localStorage.removeItem('token')
           localStorage.removeItem('refreshToken')
@@ -147,20 +152,24 @@ const Dashboard: React.FC = () => {
         
         setUserProfile(profileResp.data)
         const profileId = profileResp.data.id
+        console.log(`✅ [PERF] User profile set: ${profileId}`)
 
         // ONLY fetch overview data on init (stats, metrics)
-        // Defer tips, deleted devices, devices until tabs are selected
+        let parallelTime = performance.now()
         const [statsResp, metricsResp] = await Promise.all([
           apiService.getDashboardStats(),
           apiService.getDashboardMetrics(profileId)
         ])
+        console.log(`⏱️ [PERF] getDashboardStats() + getDashboardMetrics() took ${(performance.now() - parallelTime).toFixed(0)}ms`)
 
         if (statsResp.data) {
           setStats(statsResp.data)
+          console.log(`✅ [PERF] Stats set: ${statsResp.data.devices?.length || 0} devices`)
         }
 
         if (metricsResp.data) {
           setMetrics(metricsResp.data)
+          console.log('✅ [PERF] Metrics set')
         }
 
         // Check song catalog alert in background
@@ -168,11 +177,13 @@ const Dashboard: React.FC = () => {
           const devicesWithSongRequests = statsResp.data.devices.filter((device: DeviceSummary) => device.isAllowSongRequest)
           if (devicesWithSongRequests.length > 0) {
             try {
+              let catalogTime = performance.now()
               const catalogResp = await fetch(`${API_BASE_URL}/api/songcatalog/my-songs/${profileId}`)
               if (catalogResp.ok) {
                 const catalogData = await catalogResp.json()
                 const count = catalogData.length || 0
                 setSongCatalogCount(count)
+                console.log(`⏱️ [PERF] Song catalog check took ${(performance.now() - catalogTime).toFixed(0)}ms`)
                 
                 if (count === 0) {
                   const alertDismissed = localStorage.getItem(`songCatalogAlertDismissed_${profileId}`)
@@ -187,23 +198,30 @@ const Dashboard: React.FC = () => {
           }
         }
 
-        // Load devices in background for Stripe status check (needed on init)
-        const devicesResp = await apiService.getDevices()
-        if (profileResp.data.stripeAccountId && devicesResp.data?.length > 0) {
-          try {
-            const statusResp = await apiService.getConnectAccountStatus(devicesResp.data[0].uuid)
-            if (statusResp.data) {
-              const verificationStatus = statusResp.data.VerificationStatus || statusResp.data.verificationStatus || 'unknown'
-              if (verificationStatus.toLowerCase() === 'verified') {
-                setStripeEnabledDevices(devicesResp.data.map((d: any) => d.uuid))
+        // Don't wait for Stripe check - do it in background after loading complete
+        // This was blocking the init!
+        if (profileResp.data.stripeAccountId) {
+          let stripeTime = performance.now()
+          apiService.getDevices()
+            .then(devicesResp => {
+              if (devicesResp.data?.length > 0) {
+                return apiService.getConnectAccountStatus(devicesResp.data[0].uuid)
+                  .then(statusResp => {
+                    if (statusResp.data) {
+                      const verificationStatus = statusResp.data.VerificationStatus || statusResp.data.verificationStatus || 'unknown'
+                      if (verificationStatus.toLowerCase() === 'verified') {
+                        setStripeEnabledDevices(devicesResp.data.map((d: any) => d.uuid))
+                      }
+                    }
+                    console.log(`⏱️ [PERF] Background Stripe check took ${(performance.now() - stripeTime).toFixed(0)}ms`)
+                  })
               }
-            }
-          } catch (error) {
-            console.error('Error checking Stripe status:', error)
-          }
+            })
+            .catch(error => console.error('Error checking Stripe status:', error))
         }
 
         setLoading(false)
+        console.log(`🎉 [PERF] Dashboard init complete in ${(performance.now() - startTime).toFixed(0)}ms`)
       } catch (error) {
         console.error('Error initializing dashboard:', error)
         setLoading(false)
