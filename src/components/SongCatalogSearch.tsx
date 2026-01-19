@@ -64,11 +64,11 @@ const SongCatalogSearch: React.FC<SongCatalogSearchProps> = ({
     if (isVisible && userTempId && refreshKey !== undefined) {
       loadUserTotal()
     }
-  }, [refreshKey])
+  }, [refreshKey, isVisible, userTempId])
 
   const loadUserTotal = async () => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/songcatalog/user-total/${userTempId}`)
+      const response = await fetch(`${API_BASE_URL}/api/tips/user-total/${userTempId}`)
       if (response.ok) {
         const data = await response.json()
         setDailyTotal(data)
