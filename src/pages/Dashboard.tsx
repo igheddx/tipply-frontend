@@ -76,6 +76,7 @@ const Dashboard: React.FC = () => {
   const [showStripeAlert, setShowStripeAlert] = useState(false)
   const [stripeEnabledDevices, setStripeEnabledDevices] = useState<string[]>([])
   const [userProfile, setUserProfile] = useState<any>(null)
+  const [stripeMetricsLoading, setStripeMetricsLoading] = useState(true)
   
   // Add Device Form States
   const [showAddDeviceForm, setShowAddDeviceForm] = useState(false)
@@ -229,6 +230,7 @@ const Dashboard: React.FC = () => {
         // Background fetch: load Stripe metrics and merge into state when ready
         try {
           const stripeStart = performance.now()
+          setStripeMetricsLoading(true)
           const fullMetrics = await apiService.getDashboardMetrics(profileId, { skipStripe: false })
           if (fullMetrics.data) {
             setMetrics(prev => prev ? {
@@ -244,10 +246,13 @@ const Dashboard: React.FC = () => {
           }
         } catch (e) {
           console.warn('Skipping Stripe metrics due to error:', e)
+        } finally {
+          setStripeMetricsLoading(false)
         }
       } catch (error) {
         console.error('Error initializing dashboard:', error)
         setLoading(false)
+        setStripeMetricsLoading(false)
       }
     }
 
@@ -327,6 +332,7 @@ const Dashboard: React.FC = () => {
   const refreshDashboard = async () => {
     try {
       setLoading(true)
+      setStripeMetricsLoading(true)
       
       // Only fetch what actually changed - don't re-fetch profile
       // Just refresh the volatile data: stats, metrics, tips, deleted devices, devices
@@ -387,6 +393,7 @@ const Dashboard: React.FC = () => {
       console.error('Error refreshing dashboard:', error)
     } finally {
       setLoading(false)
+      setStripeMetricsLoading(false)
     }
   }
 
@@ -1190,6 +1197,15 @@ const Dashboard: React.FC = () => {
             <p className="text-gray-600">
               Here's how you're connecting with your audience and building meaningful social connections today.
             </p>
+            {stripeMetricsLoading && (
+              <div className="mt-3 inline-flex items-center gap-2 bg-blue-50 text-blue-700 text-sm px-3 py-2 rounded-full border border-blue-100 shadow-sm">
+                <svg className="w-4 h-4 animate-spin text-blue-600" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+                </svg>
+                <span>Updating payouts and balances...</span>
+              </div>
+            )}
           </div>
           <button
             onClick={() => refreshDashboard()}
