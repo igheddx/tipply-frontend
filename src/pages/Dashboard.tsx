@@ -263,9 +263,12 @@ const Dashboard: React.FC = () => {
       
       switch (activeTab) {
         case 'overview':
-          // Just refresh overview data
-          const metricsResp = await apiService.getDashboardMetrics(profileId)
-          if (metricsResp.data) setMetrics(metricsResp.data)
+          // Avoid redundant heavy call: if we already have metrics, skip.
+          // If not loaded yet (e.g., direct tab switch), fetch fast path without Stripe.
+          if (!metrics) {
+            const metricsResp = await apiService.getDashboardMetrics(profileId, { skipStripe: true })
+            if (metricsResp.data) setMetrics(metricsResp.data)
+          }
           break
           
         case 'devices':
