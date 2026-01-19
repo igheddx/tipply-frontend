@@ -35,26 +35,39 @@ export default function PaymentSetupModal({
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg p-6 max-w-md w-full max-h-[90vh] overflow-y-auto">
-        <PerformerHeader
-          stageName={performerStageName}
-          firstName={performerFirstName}
-          lastName={performerLastName}
-          photoUrl={performerPhotoUrl}
-        />
-        <h2 className="text-2xl font-bold mb-2 text-gray-900">Add Payment Method</h2>
-        <p className="text-gray-600 mb-6">
-          Please add a payment method to continue.
-        </p>
-        
-        <Elements stripe={stripePromise}>
-          <PaymentForm 
-            deviceUuid={deviceUuid}
-            userId={userId}
-            onComplete={onComplete}
-            onClose={onClose}
-          />
-        </Elements>
+      <div className="bg-white rounded-2xl max-w-md w-full max-h-[90vh] overflow-y-auto shadow-xl">
+        {/* Performer Hero Section */}
+        <div className="bg-gradient-to-b from-purple-50 to-white px-6 pt-8 pb-6">
+          <div className="flex flex-col items-center text-center space-y-4">
+            {performerPhotoUrl && (
+              <img
+                src={performerPhotoUrl}
+                alt="Performer"
+                className="w-20 h-20 rounded-full object-cover border-4 border-white shadow-md"
+              />
+            )}
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900">
+                {performerStageName || `${performerFirstName} ${performerLastName}`}
+              </h1>
+              <p className="text-purple-600 font-medium text-sm mt-1">
+                You're about to light up their stage ✨
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Content */}
+        <div className="px-6 py-6">
+          <Elements stripe={stripePromise}>
+            <PaymentForm 
+              deviceUuid={deviceUuid}
+              userId={userId}
+              onComplete={onComplete}
+              onClose={onClose}
+            />
+          </Elements>
+        </div>
       </div>
     </div>
   )
