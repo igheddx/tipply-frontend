@@ -72,10 +72,7 @@ const SongRequestMonitor: React.FC<SongRequestMonitorProps> = ({
       const response = await fetch(`${API_BASE_URL}/api/SongCatalog/monitor/${profileId}?_t=${cacheBuster}`, {
         method: 'GET',
         headers: {
-          'Authorization': `Bearer ${token}`,
-          'Cache-Control': 'no-cache, no-store, must-revalidate',
-          'Pragma': 'no-cache',
-          'Expires': '0'
+          'Authorization': `Bearer ${token}`
         }
       })
       if (response.ok) {
