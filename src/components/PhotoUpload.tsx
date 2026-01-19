@@ -135,7 +135,7 @@ const PhotoUpload: React.FC<PhotoUploadProps> = ({
   return (
     <div className={`flex flex-col items-center gap-4 ${isOnboarding ? 'py-6' : ''}`}>
       {/* Photo Preview Circle */}
-      <div className="relative">
+      <div className="relative w-fit">
         <div className="w-32 h-32 rounded-full bg-gray-200 flex items-center justify-center overflow-hidden border-4 border-gray-300">
           {preview ? (
             <img
@@ -148,12 +148,12 @@ const PhotoUpload: React.FC<PhotoUploadProps> = ({
           )}
         </div>
 
-        {/* Upload Badge */}
+        {/* Delete Badge - positioned outside circle */}
         {preview && (
           <button
             onClick={handleRemovePhoto}
             disabled={uploading || isLoading}
-            className="absolute bottom-0 right-0 bg-red-500 hover:bg-red-600 disabled:bg-gray-400 text-white rounded-full w-10 h-10 flex items-center justify-center shadow-lg transition"
+            className="absolute top-0 right-0 bg-red-500 hover:bg-red-600 disabled:bg-gray-400 text-white rounded-full w-10 h-10 flex items-center justify-center shadow-lg transition -translate-y-1 translate-x-1"
             title="Remove photo"
           >
             ✕

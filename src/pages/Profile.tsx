@@ -481,15 +481,17 @@ const Profile: React.FC = () => {
           {/* Profile Photo Section */}
           <div className="mb-8 border-b border-gray-200 pb-8">
             <h3 className="text-sm font-medium text-gray-700 mb-4">Profile Photo</h3>
-            <PhotoUpload
-              photoUrl={profile?.profilePhotoUrl}
-              onPhotoChange={(url) => {
-                if (profile) {
-                  setProfile({ ...profile, profilePhotoUrl: url })
-                }
-              }}
-              variant="profile"
-            />
+            <div className="min-h-[200px]">
+              <PhotoUpload
+                photoUrl={profile?.profilePhotoUrl}
+                onPhotoChange={(url) => {
+                  if (profile) {
+                    setProfile({ ...profile, profilePhotoUrl: url })
+                  }
+                }}
+                variant="profile"
+              />
+            </div>
           </div>
 
           {isEditing ? (
