@@ -97,11 +97,29 @@ const PhotoUpload: React.FC<PhotoUploadProps> = ({
     fileInputRef.current?.click()
   }
 
-  const handleRemovePhoto = () => {
-    setPreview(null)
-    if (fileInputRef.current) fileInputRef.current.value = ''
-    if (onPhotoChange) {
-      onPhotoChange('')
+  const handleRemovePhoto = async () => {
+    try {
+      setUploading(true)
+      setError('')
+      
+      // Delete from S3 via backend
+      const response = await apiService.deletePerformerProfilePhoto()
+      
+      if (response.error) {
+        setError('Failed to delete photo')
+        return
+      }
+      
+      // Clear preview and callback
+      setPreview(null)
+      if (fileInputRef.current) fileInputRef.current.value = ''
+      if (onPhotoChange) {
+        onPhotoChange('')
+      }
+    } catch (err) {
+      setError('Failed to delete photo')
+    } finally {
+      setUploading(false)
     }
   }
 

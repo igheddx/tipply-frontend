@@ -582,6 +582,67 @@ class ApiService {
     }
   }
 
+  async deletePerformerProfilePhoto(): Promise<ApiResponse<any>> {
+    const token = localStorage.getItem('token')
+    const refreshToken = localStorage.getItem('refreshToken')
+    const authHeaders: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {}
+
+    const refreshAuth = async (): Promise<string | null> => {
+      if (!refreshToken) return null
+      try {
+        const refreshResponse = await fetch(`${API_BASE_URL}/api/auth/refresh`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ refreshToken }),
+        })
+        if (!refreshResponse.ok) return null
+        const refreshData = await refreshResponse.json()
+        localStorage.setItem('token', refreshData.token)
+        if (refreshData.refreshToken) {
+          localStorage.setItem('refreshToken', refreshData.refreshToken)
+        }
+        return refreshData.token as string
+      } catch (err) {
+        console.error('Token refresh failed:', err)
+        return null
+      }
+    }
+
+    try {
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        ...authHeaders,
+      }
+
+      let response = await fetch(`${API_BASE_URL}/api/profiles/profile-photo`, {
+        method: 'DELETE',
+        headers,
+      })
+
+      if (response.status === 401) {
+        const newToken = await refreshAuth()
+        if (!newToken) return { error: 'Unauthorized' }
+        response = await fetch(`${API_BASE_URL}/api/profiles/profile-photo`, {
+          method: 'DELETE',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${newToken}`,
+          },
+        })
+      }
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        return { error: errorData.error || 'Failed to delete photo', status: response.status }
+      }
+
+      return { data: { success: true } }
+    } catch (error) {
+      console.error('Error deleting profile photo:', error)
+      return { error: 'Failed to delete photo' }
+    }
+  }
+
   async delete(endpoint: string): Promise<ApiResponse<any>> {
     return this.request(endpoint, { method: 'DELETE' })
   }
