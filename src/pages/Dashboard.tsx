@@ -114,7 +114,6 @@ const Dashboard: React.FC = () => {
   // Song Catalog Alert States
   const [showSongCatalogAlert, setShowSongCatalogAlert] = useState(false)
   const [songCatalogCount, setSongCatalogCount] = useState(0)
-  const [hasDevicesWithSongRequests, setHasDevicesWithSongRequests] = useState(false)
   
   const navigate = useNavigate()
 
@@ -127,137 +126,148 @@ const Dashboard: React.FC = () => {
       return
     }
 
-    // Run all initial fetches in parallel
-    Promise.all([
-      fetchDashboardStats(),
-      fetchUserProfile(),
-      fetchDeletedDevices()
-    ]).then(() => {
-      // Run dependent fetches after initial data is loaded
-      checkStripeConnectStatus()
-      checkSongCatalogAlert()
-    })
+    // Fetch profile once, then use it for everything
+    const initDashboard = async () => {
+      try {
+        setLoading(true)
+        
+        // Get profile first
+        const profileResp = await apiService.getProfile()
+        if (profileResp.error?.includes('401')) {
+          localStorage.removeItem('token')
+          localStorage.removeItem('refreshToken')
+          navigate('/login')
+          return
+        }
+        
+        if (!profileResp.data) {
+          setLoading(false)
+          return
+        }
+        
+        setUserProfile(profileResp.data)
+        const profileId = profileResp.data.id
+
+        // Run all other fetches in parallel using the profile data
+        const [statsResp, metricsResp, tipsResp, deletedResp, devicesResp] = await Promise.all([
+          apiService.getDashboardStats(),
+          apiService.getDashboardMetrics(profileId),
+          apiService.getRecentTips(profileId),
+          apiService.getDeletedDevices(),
+          apiService.getDevices()
+        ])
+
+        if (statsResp.data) {
+          setStats(statsResp.data)
+        }
+
+        if (metricsResp.data) {
+          setMetrics(metricsResp.data)
+        }
+
+        if (tipsResp.data) {
+          setRecentTips(tipsResp.data.map((tip: any) => ({
+            id: tip.id,
+            amount: tip.amount,
+            deviceNickname: 'Device',
+            createdAt: tip.createdAt,
+            status: tip.status
+          })))
+        }
+
+        if (deletedResp.data) {
+          setDeletedDevices(deletedResp.data)
+        }
+
+        // Check Stripe status if profile has Stripe account
+        if (profileResp.data.stripeAccountId && devicesResp.data?.length > 0) {
+          try {
+            const statusResp = await apiService.getConnectAccountStatus(devicesResp.data[0].uuid)
+            if (statusResp.data) {
+              const verificationStatus = statusResp.data.VerificationStatus || statusResp.data.verificationStatus || 'unknown'
+              if (verificationStatus.toLowerCase() === 'verified') {
+                setStripeEnabledDevices(devicesResp.data.map((d: any) => d.uuid))
+              }
+            }
+          } catch (error) {
+            console.error('Error checking Stripe status:', error)
+          }
+        }
+
+        // Check song catalog alert
+        if (statsResp.data?.devices) {
+          const devicesWithSongRequests = statsResp.data.devices.filter((device: DeviceSummary) => device.isAllowSongRequest)
+          if (devicesWithSongRequests.length > 0) {
+            try {
+              const catalogResp = await fetch(`${API_BASE_URL}/api/songcatalog/my-songs/${profileId}`)
+              if (catalogResp.ok) {
+                const catalogData = await catalogResp.json()
+                const count = catalogData.length || 0
+                setSongCatalogCount(count)
+                
+                if (count === 0) {
+                  const alertDismissed = localStorage.getItem(`songCatalogAlertDismissed_${profileId}`)
+                  if (!alertDismissed) {
+                    setShowSongCatalogAlert(true)
+                  }
+                }
+              }
+            } catch (error) {
+              console.error('Error checking song catalog:', error)
+            }
+          }
+        }
+
+        setLoading(false)
+      } catch (error) {
+        console.error('Error initializing dashboard:', error)
+        setLoading(false)
+      }
+    }
+
+    initDashboard()
   }, [navigate])
 
-  // Refresh data when tab changes to ensure latest data is shown
+  // Refresh data when tab changes
   useEffect(() => {
     if (!userProfile?.id) return
 
-    switch (activeTab) {
-      case 'overview':
-        // Refresh overview stats and metrics
-        fetchDashboardStats()
-        break
-      case 'devices':
-        // Refresh device list and Stripe status
-        fetchDashboardStats()
-        checkStripeConnectStatus()
-        break
-      case 'tips':
-        // Refresh recent tips
-        fetchDashboardStats()
-        break
-      case 'monitor':
-        // Refresh song request monitor
-        loadSongRequests()
-        break
-      case 'songs':
-        // Song catalog is handled by SongManagement component
-        // But we can refresh dashboard stats in case it affects the view
-        fetchDashboardStats()
-        break
-      default:
-        break
-    }
-  }, [activeTab, userProfile?.id])
-
-  // Debug logging for admin button visibility
-  useEffect(() => {
-    console.log('🔍 [DEBUG] userProfile:', userProfile)
-    console.log('🔍 [DEBUG] userProfile?.role:', userProfile?.role)
-  }, [userProfile])
-
-  const fetchUserProfile = async () => {
-    try {
-      const response = await apiService.getProfile()
-      if (response.data) {
-        console.log('🔍 [DEBUG] Profile API response:', response.data)
-        console.log('🔍 [DEBUG] Profile role from API:', response.data.role)
-        setUserProfile(response.data)
-      }
-    } catch (error) {
-      console.error('Error fetching user profile:', error)
-    }
-  }
-
-  const checkSongCatalogAlert = async () => {
-    try {
-      console.log('🎵 [DEBUG] Starting song catalog alert check...')
+    const refreshData = async () => {
+      const profileId = userProfile.id
       
-      // Use stats data if already loaded to avoid duplicate API call
-      let devices = stats?.devices
-      let profileId = userProfile?.id
-
-      // Only fetch if we don't have the data yet
-      if (!devices) {
-        const response = await apiService.getDashboardStats()
-        if (response.data?.devices) {
-          devices = response.data.devices
-        }
-      }
-
-      if (!profileId) {
-        const profileResponse = await apiService.getProfile()
-        if (profileResponse.data) {
-          profileId = profileResponse.data.id
-        }
-      }
-
-      if (!devices || !profileId) {
-        console.log('🎵 [DEBUG] No devices or profile data available')
-        return
-      }
-
-      const devicesWithSongRequests = devices.filter((device: DeviceSummary) => device.isAllowSongRequest)
-      console.log('🎵 [DEBUG] Devices with song requests enabled:', devicesWithSongRequests.length)
-      
-      setHasDevicesWithSongRequests(devicesWithSongRequests.length > 0)
-      
-      if (devicesWithSongRequests.length > 0) {
-        // Check song catalog count
-        const catalogResponse = await fetch(`${API_BASE_URL}/api/songcatalog/my-songs/${profileId}`)
-        
-        if (catalogResponse.ok) {
-          const catalogData = await catalogResponse.json()
-          const count = catalogData.length || 0
-          console.log('🎵 [DEBUG] Song catalog count:', count)
-          setSongCatalogCount(count)
+      switch (activeTab) {
+        case 'overview':
+        case 'devices':
+        case 'tips':
+          // Parallelize refresh
+          const [statsResp, metricsResp, tipsResp] = await Promise.all([
+            apiService.getDashboardStats(),
+            apiService.getDashboardMetrics(profileId),
+            apiService.getRecentTips(profileId)
+          ])
           
-          if (count > 0) {
-            console.log('🎵 [DEBUG] Catalog has songs, hiding alert')
-            localStorage.removeItem(`songCatalogAlertDismissed_${profileId}`)
-            setShowSongCatalogAlert(false)
-          } else {
-            const alertDismissed = localStorage.getItem(`songCatalogAlertDismissed_${profileId}`)
-            console.log('🎵 [DEBUG] Alert dismissed flag:', alertDismissed)
-            
-            if (!alertDismissed) {
-              console.log('🎵 [DEBUG] Showing song catalog alert!')
-              setShowSongCatalogAlert(true)
-            } else {
-              console.log('🎵 [DEBUG] Alert was previously dismissed')
-            }
+          if (statsResp.data) setStats(statsResp.data)
+          if (metricsResp.data) setMetrics(metricsResp.data)
+          if (tipsResp.data) {
+            setRecentTips(tipsResp.data.map((tip: any) => ({
+              id: tip.id,
+              amount: tip.amount,
+              deviceNickname: 'Device',
+              createdAt: tip.createdAt,
+              status: tip.status
+            })))
           }
-        } else {
-          console.log('🎵 [DEBUG] Failed to fetch catalog:', catalogResponse.status)
-        }
-      } else {
-        console.log('🎵 [DEBUG] No devices with song requests enabled')
+          break
+        case 'monitor':
+          loadSongRequests()
+          break
+        default:
+          break
       }
-    } catch (error) {
-      console.error('🎵 [ERROR] Error checking song catalog alert:', error)
     }
-  }
+
+    refreshData()
+  }, [activeTab, userProfile?.id])
 
   const handleLogout = () => {
     localStorage.removeItem('token')
@@ -267,113 +277,70 @@ const Dashboard: React.FC = () => {
 
   // Removed checkKycResult function
 
-  // Removed dismissKycAlert function
-
-  const fetchDashboardStats = async () => {
+  // Optimized refresh function that doesn't make redundant getProfile() calls
+  const refreshDashboard = async () => {
     try {
-      // Parallelize all initial API calls instead of sequential
-      const [profileResponse, statsResponse] = await Promise.all([
-        apiService.getProfile(),
-        apiService.getDashboardStats()
+      setLoading(true)
+      
+      // Only fetch what actually changed - don't re-fetch profile
+      // Just refresh the volatile data: stats, metrics, tips, deleted devices, devices
+      const profileId = userProfile?.id
+      if (!profileId) {
+        console.warn('No profile ID available for refresh')
+        return
+      }
+
+      // Parallelize all refreshes at once
+      const [statsResp, metricsResp, tipsResp, deletedResp, devicesResp] = await Promise.all([
+        apiService.getDashboardStats(),
+        apiService.getDashboardMetrics(profileId),
+        apiService.getRecentTips(profileId),
+        apiService.getDeletedDevices(),
+        apiService.getDevices()
       ])
 
-      // Check for auth errors
-      if (profileResponse.error?.includes('401') || statsResponse.error?.includes('401')) {
-        console.log('Authentication failed, redirecting to login')
-        localStorage.removeItem('token')
-        localStorage.removeItem('refreshToken')
-        navigate('/login')
-        return
-      }
-      
-      if (profileResponse.data) {
-        const profileId = profileResponse.data.id
-        
-        // Parallelize metrics and tips fetch
-        const [metricsResponse, recentTipsResponse] = await Promise.all([
-          apiService.getDashboardMetrics(profileId),
-          apiService.getRecentTips(profileId)
-        ])
-
-        if (metricsResponse.data) {
-          setMetrics(metricsResponse.data)
-        }
-        
-        if (recentTipsResponse.data) {
-          setRecentTips(recentTipsResponse.data.map((tip: any) => ({
-            id: tip.id,
-            amount: tip.amount,
-            deviceNickname: 'Device',
-            createdAt: tip.createdAt,
-            status: tip.status
-          })))
-        }
-      }
-      
-      console.log('📊 Dashboard stats received:', {
-        deviceCount: statsResponse.data?.devices?.length || 0,
-        devices: statsResponse.data?.devices?.map((d: any) => ({ 
-          id: d.id, 
-          nickname: d.nickname, 
-          uuid: d.uuid,
-          isSoundEnabled: d.isSoundEnabled,
-          effectConfiguration: d.effectConfiguration
-        }))
-      })
-      setStats(statsResponse.data)
-    } catch (error) {
-      console.error('Error fetching dashboard stats:', error)
-      if (error instanceof Error && error.message.includes('401')) {
-        localStorage.removeItem('token')
-        localStorage.removeItem('refreshToken')
-        navigate('/login')
-        return
-      }
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const checkStripeConnectStatus = async () => {
-    try {
-      // Check Stripe status at profile level, not per device
-      const profileResponse = await apiService.getProfile()
-      if (profileResponse.error || !profileResponse.data) {
-        console.log('No profile found or error getting profile')
-        return
+      if (statsResp.data) {
+        setStats(statsResp.data)
       }
 
-      const profile = profileResponse.data
-      
-      // If profile has Stripe account, check its status once
-      if (profile.stripeAccountId) {
+      if (metricsResp.data) {
+        setMetrics(metricsResp.data)
+      }
+
+      if (tipsResp.data) {
+        setRecentTips(tipsResp.data.map((tip: any) => ({
+          id: tip.id,
+          amount: tip.amount,
+          deviceNickname: 'Device',
+          createdAt: tip.createdAt,
+          status: tip.status
+        })))
+      }
+
+      if (deletedResp.data) {
+        setDeletedDevices(deletedResp.data)
+      }
+
+      // Update Stripe status if we have devices
+      if (userProfile?.stripeAccountId && devicesResp.data?.length > 0) {
         try {
-          // Get any device to use its UUID for the status check (backend uses profile's Stripe account)
-          const devicesResponse = await apiService.getDevices()
-          if (devicesResponse.data && devicesResponse.data.length > 0) {
-            const firstDevice = devicesResponse.data[0]
-            const statusResponse = await apiService.getConnectAccountStatus(firstDevice.uuid)
-            
-            if (statusResponse.data) {
-              const status = statusResponse.data
-              const verificationStatus = status.VerificationStatus || status.verificationStatus || 'unknown'
-              console.log('🏆 [DEBUG] Profile KYC Status:', verificationStatus)
-              
-              if (verificationStatus.toLowerCase() === 'verified') {
-                // All devices inherit the profile's verified status
-                const allDeviceUuids = devicesResponse.data.map((d: any) => d.uuid)
-                setStripeEnabledDevices(allDeviceUuids)
-              }
+          const statusResp = await apiService.getConnectAccountStatus(devicesResp.data[0].uuid)
+          if (statusResp.data) {
+            const verificationStatus = statusResp.data.VerificationStatus || statusResp.data.verificationStatus || 'unknown'
+            if (verificationStatus.toLowerCase() === 'verified') {
+              setStripeEnabledDevices(devicesResp.data.map((d: any) => d.uuid))
             }
           }
         } catch (error) {
-          console.error('Error checking Stripe status:', error)
+          console.error('Error checking Stripe status on refresh:', error)
         }
-      } else {
-        console.log('🏆 [DEBUG] Profile has no Stripe account')
       }
+
+      console.log('✅ Dashboard refresh complete')
     } catch (error) {
-      console.error('Error checking Stripe Connect status:', error)
+      console.error('Error refreshing dashboard:', error)
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -381,18 +348,11 @@ const Dashboard: React.FC = () => {
     setShowStripeAlert(false)
   }
 
-  const dismissSongCatalogAlert = async () => {
-    try {
-      const profileResponse = await apiService.getProfile()
-      if (profileResponse.data) {
-        const profileId = profileResponse.data.id
-        localStorage.setItem(`songCatalogAlertDismissed_${profileId}`, 'true')
-        setShowSongCatalogAlert(false)
-      }
-    } catch (error) {
-      console.error('Error dismissing song catalog alert:', error)
-      setShowSongCatalogAlert(false)
+  const dismissSongCatalogAlert = () => {
+    if (userProfile?.id) {
+      localStorage.setItem(`songCatalogAlertDismissed_${userProfile.id}`, 'true')
     }
+    setShowSongCatalogAlert(false)
   }
 
   // Add Device Functions
@@ -453,7 +413,7 @@ const Dashboard: React.FC = () => {
         console.log('Success:', result.data.message || 'Device successfully linked to existing Stripe account!')
         
         // Refresh the devices list to show the updated device
-        await fetchDashboardStats()
+        await refreshDashboard()
         setActiveTab('devices')
         return // Exit early - no onboarding needed
       }
@@ -652,31 +612,13 @@ const Dashboard: React.FC = () => {
       setValidatedDeviceUuid('')
       setValidatedSerialNumber('')
       
-      // Force a complete refresh - use a more reliable approach
-      setLoading(true)
+      // Force a complete refresh with single efficient call
+      console.log('🔄 Refreshing dashboard stats...')
+      await refreshDashboard()
       
-      // Refresh dashboard data multiple times to ensure it's updated
-      console.log('🔄 Refreshing dashboard stats (attempt 1)...')
-      await fetchDashboardStats()
-      
-      // Switch to devices tab first to trigger useEffect
+      // Switch to devices tab to show the newly added device
       setActiveTab('devices')
       
-      // Wait a bit for tab switch, then refresh again
-      await new Promise(resolve => setTimeout(resolve, 200))
-      
-      console.log('🔄 Refreshing dashboard stats (attempt 2)...')
-      await fetchDashboardStats()
-      
-      console.log('🔄 Refreshing Stripe status...')
-      await checkStripeConnectStatus()
-      
-      // Final refresh after everything
-      await new Promise(resolve => setTimeout(resolve, 100))
-      console.log('🔄 Final refresh (attempt 3)...')
-      await fetchDashboardStats()
-      
-      setLoading(false)
       console.log('✅ Refresh complete. Device should now be visible.')
       
     } catch (error) {
@@ -870,8 +812,7 @@ const Dashboard: React.FC = () => {
       const response = await apiService.softDeleteDevice(deviceToDelete.id)
       if (response.data) {
         // Refresh both active and deleted devices
-        fetchDashboardStats()
-        fetchDeletedDevices()
+        await refreshDashboard()
         setShowDeleteModal(false)
         setDeviceToDelete(null)
       } else {
@@ -896,8 +837,7 @@ const Dashboard: React.FC = () => {
       const response = await apiService.restoreDevice(deviceId)
       if (response.data) {
         // Refresh both active and deleted devices
-        fetchDashboardStats()
-        fetchDeletedDevices()
+        await refreshDashboard()
       } else {
         alert('Failed to restore device: ' + (response.error || 'Unknown error'))
       }
@@ -1081,7 +1021,7 @@ const Dashboard: React.FC = () => {
         <div className="text-center">
           <p className="text-gray-600">Failed to load dashboard data</p>
           <button
-            onClick={fetchDashboardStats}
+            onClick={refreshDashboard}
             className="mt-4 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
           >
             Retry
@@ -1206,7 +1146,7 @@ const Dashboard: React.FC = () => {
             </p>
           </div>
           <button
-            onClick={() => fetchDashboardStats()}
+            onClick={() => refreshDashboard()}
             className="flex items-center gap-2 px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors duration-200 shadow-sm hover:shadow-md"
             title="Refresh dashboard data"
           >
@@ -1218,7 +1158,7 @@ const Dashboard: React.FC = () => {
         </div>
 
         {/* Song Catalog Alert */}
-        {showSongCatalogAlert && hasDevicesWithSongRequests && songCatalogCount === 0 && (
+        {showSongCatalogAlert && songCatalogCount === 0 && (
           <div className="mb-6">
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 shadow-sm">
               <div className="flex items-start">
@@ -1607,7 +1547,7 @@ const Dashboard: React.FC = () => {
                   <h3 className="text-lg font-semibold text-gray-900">Your Devices</h3>
                   <div className="flex space-x-3">
                     <button
-                      onClick={checkStripeConnectStatus}
+                      onClick={refreshDashboard}
                       className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors flex items-center space-x-2"
                     >
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
