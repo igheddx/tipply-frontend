@@ -183,17 +183,10 @@ function PaymentForm({
             const paymentMethodId = setupIntent?.payment_method as string
             console.log('💳 Payment method ID from wallet:', paymentMethodId)
             
-            // Store setup success in localStorage
-            let tempUserId = localStorage.getItem('tipply_user_id')
-            if (!tempUserId) {
-              // Create a user ID if it doesn't exist yet
-              tempUserId = `user_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`
-              localStorage.setItem('tipply_user_id', tempUserId)
-              setCookie('tipply_user_id', tempUserId, 60)
-              console.log('👤 Created new tipply_user_id:', tempUserId)
-            }
+            // Use userId from props (already initialized by parent)
+            const tempUserId = userId
             const customerId = data.customerId
-            console.log('🔍 Debug - customerId from response:', customerId, 'tempUserId:', tempUserId)
+            console.log('🔍 [ApplePay] Using userId from props:', tempUserId, 'customerId:', customerId)
             if (customerId) {
               localStorage.setItem(`stripe_customer_id_${tempUserId}`, customerId)
               setCookie('tipply_user_id', tempUserId, 60)
@@ -292,17 +285,10 @@ function PaymentForm({
         const paymentMethodId = result.setupIntent?.payment_method as string | undefined
         console.log('💳 Payment method ID from card:', paymentMethodId)
         
-        // Store setup success in localStorage, including the customer ID returned from backend
-        let tempUserId = localStorage.getItem('tipply_user_id')
-        if (!tempUserId) {
-          // Create a user ID if it doesn't exist yet
-          tempUserId = `user_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`
-          localStorage.setItem('tipply_user_id', tempUserId)
-          setCookie('tipply_user_id', tempUserId, 60)
-          console.log('👤 Created new tipply_user_id:', tempUserId)
-        }
+        // Use userId from props (already initialized by parent)
+        const tempUserId = userId
         const customerId = data.customerId
-        console.log('🔍 Debug - customerId from response (card):', customerId, 'tempUserId:', tempUserId)
+        console.log('🔍 [CardSubmit] Using userId from props:', tempUserId, 'customerId:', customerId)
         if (customerId) {
           localStorage.setItem(`stripe_customer_id_${tempUserId}`, customerId)
                 setCookie('tipply_user_id', tempUserId, 60)
