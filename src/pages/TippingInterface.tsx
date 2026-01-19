@@ -198,15 +198,21 @@ const TippingInterface: React.FC = () => {
     const loadUserTotal = async (userTempId?: string) => {
       try {
         const tempUserId = userTempId || localStorage.getItem('tipply_user_id')
-        if (!tempUserId) return
+        if (!tempUserId) return false
       
         const response = await fetch(`${getApiBaseUrl()}/api/songcatalog/user-total/${tempUserId}`)
         if (response.ok) {
           const data = await response.json()
+          console.log('✅ [loadUserTotal] Updated total tips:', data.totalAmount)
           setTotalTipped(data.totalAmount)
+          return true
+        } else {
+          console.error('[loadUserTotal] Failed response:', response.status, response.statusText)
+          return false
         }
       } catch (error) {
-        console.error('Error loading user total:', error)
+        console.error('❌ [loadUserTotal] Error:', error)
+        return false
       }
     }
 
@@ -776,10 +782,10 @@ const TippingInterface: React.FC = () => {
           setSelectedSong(null)
           setShowSongSearch(false)
           setTipsRefreshKey(prev => prev + 1)
-            loadUserTotal()
+          await loadUserTotal()
         } else {
           toast.success(`$${amount} tip sent!`, { duration: 800 })
-            loadUserTotal()
+          await loadUserTotal()
         }
         // Refresh payment method session on successful tip (extends 30-day memory)
         refreshPaymentMethodSession()
@@ -844,7 +850,7 @@ const TippingInterface: React.FC = () => {
         } else {
           toast.success(`$${amount} tip submitted!`)
         }
-          loadUserTotal()
+        await loadUserTotal()
         setSelectedSong(null)
         setShowSongSearch(false)
         setTipsRefreshKey(prev => prev + 1)
