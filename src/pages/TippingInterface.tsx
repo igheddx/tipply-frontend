@@ -794,10 +794,10 @@ const TippingInterface: React.FC = () => {
           setSelectedSong(null)
           setShowSongSearch(false)
           setTipsRefreshKey(prev => prev + 1)
-          await loadUserTotal()
+          await loadUserTotal(userId)
         } else {
           toast.success(`$${amount} tip sent!`, { duration: 800 })
-          await loadUserTotal()
+          await loadUserTotal(userId)
         }
         // Refresh payment method session on successful tip (extends 30-day memory)
         refreshPaymentMethodSession()
@@ -864,7 +864,7 @@ const TippingInterface: React.FC = () => {
         } else {
           toast.success(`$${amount} tip submitted!`)
         }
-        await loadUserTotal()
+        await loadUserTotal(userId)
         setSelectedSong(null)
         setShowSongSearch(false)
         setTipsRefreshKey(prev => prev + 1)
