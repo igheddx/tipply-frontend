@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react'
+import React, { useState, useRef, useEffect } from 'react'
 import apiService from '../services/api'
 
 interface PhotoUploadProps {
@@ -18,6 +18,13 @@ const PhotoUpload: React.FC<PhotoUploadProps> = ({
   const [error, setError] = useState('')
   const [uploading, setUploading] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // Sync preview when photoUrl prop changes
+  useEffect(() => {
+    if (photoUrl) {
+      setPreview(photoUrl)
+    }
+  }, [photoUrl])
 
   const validateFile = (file: File): string | null => {
     const allowedTypes = ['image/jpeg', 'image/png']
