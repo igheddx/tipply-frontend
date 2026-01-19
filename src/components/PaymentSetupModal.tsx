@@ -3,6 +3,7 @@ import { loadStripe } from '@stripe/stripe-js'
 import { Elements, CardElement, useStripe, useElements } from '@stripe/react-stripe-js'
 import { toast } from 'sonner'
 import { getApiBaseUrl } from '../utils/config'
+import { setCookie } from '../utils/cookies'
 
 // Initialize Stripe
 const stripePromise = loadStripe((import.meta as any).env.VITE_STRIPE_PUBLISHABLE_KEY || 'pk_test_placeholder')
@@ -157,6 +158,8 @@ function PaymentForm({
             console.log('🔍 Debug - customerId from response:', customerId, 'tempUserId:', tempUserId)
             if (tempUserId && customerId) {
               localStorage.setItem(`stripe_customer_id_${tempUserId}`, customerId)
+              setCookie('tipply_user_id', tempUserId, 60)
+              setCookie(`stripe_customer_id_${tempUserId}`, customerId, 60)
               console.log('💾 Stored Stripe customer ID:', customerId)
               localStorage.setItem(`payment_status_${tempUserId}_${deviceUuid}`, JSON.stringify({
                 hasPaymentMethods: true,
@@ -168,6 +171,8 @@ function PaymentForm({
               if (paymentMethodId) {
                 localStorage.setItem(`payment_method_id_${tempUserId}`, paymentMethodId)
                 localStorage.setItem(`payment_method_timestamp_${tempUserId}`, Date.now().toString())
+                // Keep payment method id cookie for resilience (non-sensitive, still scoped to app domain)
+                setCookie(`payment_method_id_${tempUserId}`, paymentMethodId, 60)
                 console.log('💾 Stored payment method ID:', paymentMethodId)
               }
             }
@@ -191,6 +196,8 @@ function PaymentForm({
       })
     }
   }, [stripe, deviceUuid, userId, onComplete])
+              setCookie('tipply_user_id', tempUserId, 60)
+              setCookie(`stripe_customer_id_${tempUserId}`, customerId, 60)
 
   const handleCardSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -202,6 +209,7 @@ function PaymentForm({
     try {
       // Get setup intent from backend
                 const res = await fetch(`${getApiBaseUrl()}/api/stripe/setup-intent`, {
+                setCookie(`payment_method_id_${tempUserId}`, paymentMethodId, 60)
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ deviceUuid, userId })
@@ -254,6 +262,8 @@ function PaymentForm({
         console.log('🔍 Debug - customerId from response (card):', customerId, 'tempUserId:', tempUserId)
         if (tempUserId && customerId) {
           localStorage.setItem(`stripe_customer_id_${tempUserId}`, customerId)
+                setCookie('tipply_user_id', tempUserId, 60)
+                setCookie(`stripe_customer_id_${tempUserId}`, customerId, 60)
           console.log('💾 Stored Stripe customer ID:', customerId)
           localStorage.setItem(`payment_status_${tempUserId}_${deviceUuid}`, JSON.stringify({
             hasPaymentMethods: true,
@@ -265,6 +275,7 @@ function PaymentForm({
           if (paymentMethodId) {
             localStorage.setItem(`payment_method_id_${tempUserId}`, paymentMethodId)
             localStorage.setItem(`payment_method_timestamp_${tempUserId}`, Date.now().toString())
+                  setCookie(`payment_method_id_${tempUserId}`, paymentMethodId, 60)
             console.log('💾 Stored payment method ID:', paymentMethodId)
           }
         }

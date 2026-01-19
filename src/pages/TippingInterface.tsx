@@ -7,6 +7,7 @@ import PaymentSetupModal from '../components/PaymentSetupModal'
 import SongCatalogSearch from '../components/SongCatalogSearch'
 import apiService from '../services/api'
 import { getApiBaseUrl } from '../utils/config'
+import { getCookie, setCookie } from '../utils/cookies'
 
 interface DeviceInfo {
   id: string
@@ -169,26 +170,28 @@ const TippingInterface: React.FC = () => {
   // Initialize user
   useEffect(() => {
     const initializeUser = async () => {
-      let tempUserId = localStorage.getItem('tipply_user_id')
+      // Prefer cookie to survive cache clears; fallback to localStorage; last resort generate new
+      let tempUserId = getCookie('tipply_user_id') || localStorage.getItem('tipply_user_id')
       if (!tempUserId) {
         tempUserId = `user_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`
-        localStorage.setItem('tipply_user_id', tempUserId)
       }
+
+      // Persist to both cookie and localStorage to keep them in sync
+      setCookie('tipply_user_id', tempUserId, 60)
+      localStorage.setItem('tipply_user_id', tempUserId)
 
       try {
         const response = await fetch(`${getApiBaseUrl()}/api/songcatalog/user/${tempUserId}`)
         if (response.ok) {
-          // We deliberately keep using the temp user ID so totals and tips align
           await response.json() // consume body (not used)
         }
-        // Always set the temp ID for tip submission and totals
         setUserId(tempUserId)
       } catch (error) {
         setUserId(tempUserId)
       }
       
-        // Load user's total tips (last 24 hours)
-        loadUserTotal(tempUserId)
+      // Load user's total tips (last 24 hours)
+      loadUserTotal(tempUserId)
     }
 
     initializeUser()
