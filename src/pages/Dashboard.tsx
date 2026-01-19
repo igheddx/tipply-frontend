@@ -128,11 +128,16 @@ const Dashboard: React.FC = () => {
       return
     }
 
-    fetchDashboardStats()
-    checkStripeConnectStatus()
-    fetchUserProfile()
-    fetchDeletedDevices()
-    checkSongCatalogAlert()
+    // Run all initial fetches in parallel
+    Promise.all([
+      fetchDashboardStats(),
+      fetchUserProfile(),
+      fetchDeletedDevices()
+    ]).then(() => {
+      // Run dependent fetches after initial data is loaded
+      checkStripeConnectStatus()
+      checkSongCatalogAlert()
+    })
   }, [navigate])
 
   // Refresh data when tab changes to ensure latest data is shown
@@ -190,67 +195,68 @@ const Dashboard: React.FC = () => {
     try {
       console.log('🎵 [DEBUG] Starting song catalog alert check...')
       
-      // Check if user has devices with song requests enabled
-      const response = await apiService.getDashboardStats()
-      console.log('🎵 [DEBUG] Dashboard stats response:', response)
-      console.log('🎵 [DEBUG] Response data:', response.data)
-      console.log('🎵 [DEBUG] Response error:', response.error)
+      // Use stats data if already loaded to avoid duplicate API call
+      let devices = stats?.devices
+      let profileId = userProfile?.id
+
+      // Only fetch if we don't have the data yet
+      if (!devices) {
+        const response = await apiService.getDashboardStats()
+        if (response.data?.devices) {
+          devices = response.data.devices
+        }
+      }
+
+      if (!profileId) {
+        const profileResponse = await apiService.getProfile()
+        if (profileResponse.data) {
+          profileId = profileResponse.data.id
+        }
+      }
+
+      if (!devices || !profileId) {
+        console.log('🎵 [DEBUG] No devices or profile data available')
+        return
+      }
+
+      const devicesWithSongRequests = devices.filter((device: DeviceSummary) => device.isAllowSongRequest)
+      console.log('🎵 [DEBUG] Devices with song requests enabled:', devicesWithSongRequests.length)
       
-      if (response.data && response.data.devices) {
-        const devicesWithSongRequests = response.data.devices.filter((device: DeviceSummary) => device.isAllowSongRequest)
-        console.log('🎵 [DEBUG] All devices:', response.data.devices)
-        console.log('🎵 [DEBUG] Devices with song requests enabled:', devicesWithSongRequests)
+      setHasDevicesWithSongRequests(devicesWithSongRequests.length > 0)
+      
+      if (devicesWithSongRequests.length > 0) {
+        // Check song catalog count
+        const catalogResponse = await fetch(`${API_BASE_URL}/api/songcatalog/my-songs/${profileId}`)
         
-        setHasDevicesWithSongRequests(devicesWithSongRequests.length > 0)
-        
-        if (devicesWithSongRequests.length > 0) {
-          // Get profile ID to check song catalog count
-          const profileResponse = await apiService.getProfile()
-          if (profileResponse.data) {
-            const profileId = profileResponse.data.id
-            console.log('🎵 [DEBUG] Profile ID:', profileId)
+        if (catalogResponse.ok) {
+          const catalogData = await catalogResponse.json()
+          const count = catalogData.length || 0
+          console.log('🎵 [DEBUG] Song catalog count:', count)
+          setSongCatalogCount(count)
+          
+          if (count > 0) {
+            console.log('🎵 [DEBUG] Catalog has songs, hiding alert')
+            localStorage.removeItem(`songCatalogAlertDismissed_${profileId}`)
+            setShowSongCatalogAlert(false)
+          } else {
+            const alertDismissed = localStorage.getItem(`songCatalogAlertDismissed_${profileId}`)
+            console.log('🎵 [DEBUG] Alert dismissed flag:', alertDismissed)
             
-            // Check song catalog count
-            const catalogResponse = await fetch(`${API_BASE_URL}/api/songcatalog/my-songs/${profileId}`)
-            console.log('🎵 [DEBUG] Catalog response status:', catalogResponse.status)
-            
-            if (catalogResponse.ok) {
-              const catalogData = await catalogResponse.json()
-              const count = catalogData.length || 0
-              console.log('🎵 [DEBUG] Song catalog count:', count)
-              setSongCatalogCount(count)
-              
-              // Show alert if catalog is empty (always check on login regardless of dismissal)
-              // If catalog count is now > 0, remove the dismissal flag so alert can show again if count goes back to 0
-              if (count > 0) {
-                console.log('🎵 [DEBUG] Catalog has songs, hiding alert')
-                localStorage.removeItem(`songCatalogAlertDismissed_${profileId}`)
-                setShowSongCatalogAlert(false)
-              } else {
-                // Show alert if catalog is empty and wasn't dismissed
-                const alertDismissed = localStorage.getItem(`songCatalogAlertDismissed_${profileId}`)
-                console.log('🎵 [DEBUG] Alert dismissed flag:', alertDismissed)
-                
-                if (!alertDismissed) {
-                  console.log('🎵 [DEBUG] Showing song catalog alert!')
-                  setShowSongCatalogAlert(true)
-                } else {
-                  console.log('🎵 [DEBUG] Alert was previously dismissed')
-                }
-              }
+            if (!alertDismissed) {
+              console.log('🎵 [DEBUG] Showing song catalog alert!')
+              setShowSongCatalogAlert(true)
             } else {
-              console.log('🎵 [DEBUG] Failed to fetch catalog:', catalogResponse.status)
+              console.log('🎵 [DEBUG] Alert was previously dismissed')
             }
           }
         } else {
-          console.log('🎵 [DEBUG] No devices with song requests enabled')
+          console.log('🎵 [DEBUG] Failed to fetch catalog:', catalogResponse.status)
         }
       } else {
-        console.log('🎵 [DEBUG] No response data or devices found')
+        console.log('🎵 [DEBUG] No devices with song requests enabled')
       }
     } catch (error) {
       console.error('🎵 [ERROR] Error checking song catalog alert:', error)
-      console.error('🎵 [ERROR] Error stack:', (error as Error)?.stack)
     }
   }
 
@@ -266,9 +272,14 @@ const Dashboard: React.FC = () => {
 
   const fetchDashboardStats = async () => {
     try {
-      // First get the profile to get the profile ID
-      const profileResponse = await apiService.getProfile()
-      if (profileResponse.error && profileResponse.error.includes('401')) {
+      // Parallelize all initial API calls instead of sequential
+      const [profileResponse, statsResponse] = await Promise.all([
+        apiService.getProfile(),
+        apiService.getDashboardStats()
+      ])
+
+      // Check for auth errors
+      if (profileResponse.error?.includes('401') || statsResponse.error?.includes('401')) {
         console.log('Authentication failed, redirecting to login')
         localStorage.removeItem('token')
         localStorage.removeItem('refreshToken')
@@ -277,39 +288,32 @@ const Dashboard: React.FC = () => {
       }
       
       if (profileResponse.data) {
-        // setProfileId(profileResponse.data.id) // This line was removed as per the new_code
+        const profileId = profileResponse.data.id
         
-        // Fetch real metrics data
-        const metricsResponse = await apiService.getDashboardMetrics(profileResponse.data.id)
+        // Parallelize metrics and tips fetch
+        const [metricsResponse, recentTipsResponse] = await Promise.all([
+          apiService.getDashboardMetrics(profileId),
+          apiService.getRecentTips(profileId)
+        ])
+
         if (metricsResponse.data) {
           setMetrics(metricsResponse.data)
         }
         
-        // Fetch recent tips
-        const recentTipsResponse = await apiService.getRecentTips(profileResponse.data.id)
         if (recentTipsResponse.data) {
           setRecentTips(recentTipsResponse.data.map((tip: any) => ({
             id: tip.id,
             amount: tip.amount,
-            deviceNickname: 'Device', // We'll need to get device info separately
+            deviceNickname: 'Device',
             createdAt: tip.createdAt,
             status: tip.status
           })))
         }
       }
       
-      // Keep the existing dashboard stats for devices and other info
-      const response = await apiService.getDashboardStats()
-      if (response.error && response.error.includes('401')) {
-        console.log('Authentication failed, redirecting to login')
-        localStorage.removeItem('token')
-        localStorage.removeItem('refreshToken')
-        navigate('/login')
-        return
-      }
       console.log('📊 Dashboard stats received:', {
-        deviceCount: response.data?.devices?.length || 0,
-        devices: response.data?.devices?.map((d: any) => ({ 
+        deviceCount: statsResponse.data?.devices?.length || 0,
+        devices: statsResponse.data?.devices?.map((d: any) => ({ 
           id: d.id, 
           nickname: d.nickname, 
           uuid: d.uuid,
@@ -317,10 +321,9 @@ const Dashboard: React.FC = () => {
           effectConfiguration: d.effectConfiguration
         }))
       })
-      setStats(response.data)
+      setStats(statsResponse.data)
     } catch (error) {
       console.error('Error fetching dashboard stats:', error)
-      // Check if it's an authentication error
       if (error instanceof Error && error.message.includes('401')) {
         localStorage.removeItem('token')
         localStorage.removeItem('refreshToken')
@@ -334,7 +337,6 @@ const Dashboard: React.FC = () => {
 
   const checkStripeConnectStatus = async () => {
     try {
-      // Get user's devices
       const devicesResponse = await apiService.getDevices()
       if (devicesResponse.error || !devicesResponse.data) {
         console.log('No devices found or error getting devices')
@@ -343,55 +345,54 @@ const Dashboard: React.FC = () => {
 
       const devices = devicesResponse.data
       const stripeEnabledDevicesList: string[] = []
-      const deviceStatusMap: {[key: string]: string} = {}
 
-      for (const device of devices) {
-        if (device.stripeAccountId) {
-          try {
-            const statusResponse = await apiService.getConnectAccountStatus(device.uuid)
-            if (statusResponse.data) {
-              const status = statusResponse.data
-              deviceStatusMap[device.uuid] = status.VerificationStatus || status.verificationStatus || 'Unknown'
-              
-              // Check verification status directly - try both cases
-              const verificationStatus = status.VerificationStatus || status.verificationStatus || 'unknown'
-              console.log('🏆 [DEBUG] KYC Status for device', device.uuid, ':', verificationStatus)
-              
-              if (verificationStatus.toLowerCase() === 'verified') {
-                stripeEnabledDevicesList.push(device.uuid)
-                console.log('🏆 [DEBUG] Setting KYC status to verified')
-                if (kycStatus !== 'verified') {
-                  setKycStatus('verified')
-                }
-              } else if (
-                verificationStatus.toLowerCase() === 'pending' ||
-                verificationStatus.toLowerCase() === 'pending_verification' ||
-                verificationStatus.toLowerCase() === 'incomplete' ||
-                verificationStatus.toLowerCase() === 'requires_verification'
-              ) {
-                console.log('🏆 [DEBUG] Setting KYC status to pending')
-                if (kycStatus !== 'verified') {
-                  setKycStatus('pending')
-                }
-              } else {
-                console.log('🏆 [DEBUG] Setting KYC status to not_verified')
-                if (kycStatus !== 'verified' && kycStatus !== 'pending') {
-                  setKycStatus('not_verified')
-                }
-              }
+      // Parallelize all device status checks instead of sequential loop
+      const statusPromises = devices
+        .filter((device: any) => device.stripeAccountId)
+        .map((device: any) => 
+          apiService.getConnectAccountStatus(device.uuid)
+            .then(response => ({ device, status: response.data }))
+            .catch(error => {
+              console.error(`Error checking status for device ${device.uuid}:`, error)
+              return { device, status: null }
+            })
+        )
+
+      const statusResults = await Promise.all(statusPromises)
+
+      // Process results
+      for (const { device, status } of statusResults) {
+        if (status) {
+          const verificationStatus = status.VerificationStatus || status.verificationStatus || 'unknown'
+          console.log('🏆 [DEBUG] KYC Status for device', device.uuid, ':', verificationStatus)
+          
+          if (verificationStatus.toLowerCase() === 'verified') {
+            stripeEnabledDevicesList.push(device.uuid)
+            console.log('🏆 [DEBUG] Setting KYC status to verified')
+            if (kycStatus !== 'verified') {
+              setKycStatus('verified')
             }
-          } catch (error) {
-            console.error(`Error checking status for device ${device.uuid}:`, error)
-            deviceStatusMap[device.uuid] = 'Error'
+          } else if (
+            verificationStatus.toLowerCase() === 'pending' ||
+            verificationStatus.toLowerCase() === 'pending_verification' ||
+            verificationStatus.toLowerCase() === 'incomplete' ||
+            verificationStatus.toLowerCase() === 'requires_verification'
+          ) {
+            console.log('🏆 [DEBUG] Setting KYC status to pending')
+            if (kycStatus !== 'verified') {
+              setKycStatus('pending')
+            }
+          } else {
+            console.log('🏆 [DEBUG] Setting KYC status to not_verified')
+            if (kycStatus !== 'verified' && kycStatus !== 'pending') {
+              setKycStatus('not_verified')
+            }
           }
-        } else {
-          deviceStatusMap[device.uuid] = 'Not Setup'
         }
       }
 
       console.log('🏆 [DEBUG] Final KYC status:', kycStatus)
       console.log('🏆 [DEBUG] Stripe enabled devices:', stripeEnabledDevicesList)
-      console.log('🏆 [DEBUG] Device status map:', deviceStatusMap)
       
       setStripeEnabledDevices(stripeEnabledDevicesList)
     } catch (error) {
