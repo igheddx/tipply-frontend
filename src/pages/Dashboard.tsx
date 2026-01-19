@@ -75,7 +75,6 @@ const Dashboard: React.FC = () => {
   const [activeTab, setActiveTab] = useState('overview')
   const [showStripeAlert, setShowStripeAlert] = useState(false)
   const [stripeEnabledDevices, setStripeEnabledDevices] = useState<string[]>([])
-  const [kycStatus, setKycStatus] = useState<string>('unknown')
   const [userProfile, setUserProfile] = useState<any>(null)
   
   // Add Device Form States
@@ -337,64 +336,42 @@ const Dashboard: React.FC = () => {
 
   const checkStripeConnectStatus = async () => {
     try {
-      const devicesResponse = await apiService.getDevices()
-      if (devicesResponse.error || !devicesResponse.data) {
-        console.log('No devices found or error getting devices')
+      // Check Stripe status at profile level, not per device
+      const profileResponse = await apiService.getProfile()
+      if (profileResponse.error || !profileResponse.data) {
+        console.log('No profile found or error getting profile')
         return
       }
 
-      const devices = devicesResponse.data
-      const stripeEnabledDevicesList: string[] = []
-
-      // Parallelize all device status checks instead of sequential loop
-      const statusPromises = devices
-        .filter((device: any) => device.stripeAccountId)
-        .map((device: any) => 
-          apiService.getConnectAccountStatus(device.uuid)
-            .then(response => ({ device, status: response.data }))
-            .catch(error => {
-              console.error(`Error checking status for device ${device.uuid}:`, error)
-              return { device, status: null }
-            })
-        )
-
-      const statusResults = await Promise.all(statusPromises)
-
-      // Process results
-      for (const { device, status } of statusResults) {
-        if (status) {
-          const verificationStatus = status.VerificationStatus || status.verificationStatus || 'unknown'
-          console.log('🏆 [DEBUG] KYC Status for device', device.uuid, ':', verificationStatus)
-          
-          if (verificationStatus.toLowerCase() === 'verified') {
-            stripeEnabledDevicesList.push(device.uuid)
-            console.log('🏆 [DEBUG] Setting KYC status to verified')
-            if (kycStatus !== 'verified') {
-              setKycStatus('verified')
-            }
-          } else if (
-            verificationStatus.toLowerCase() === 'pending' ||
-            verificationStatus.toLowerCase() === 'pending_verification' ||
-            verificationStatus.toLowerCase() === 'incomplete' ||
-            verificationStatus.toLowerCase() === 'requires_verification'
-          ) {
-            console.log('🏆 [DEBUG] Setting KYC status to pending')
-            if (kycStatus !== 'verified') {
-              setKycStatus('pending')
-            }
-          } else {
-            console.log('🏆 [DEBUG] Setting KYC status to not_verified')
-            if (kycStatus !== 'verified' && kycStatus !== 'pending') {
-              setKycStatus('not_verified')
+      const profile = profileResponse.data
+      
+      // If profile has Stripe account, check its status once
+      if (profile.stripeAccountId) {
+        try {
+          // Get any device to use its UUID for the status check (backend uses profile's Stripe account)
+          const devicesResponse = await apiService.getDevices()
+          if (devicesResponse.data && devicesResponse.data.length > 0) {
+            const firstDevice = devicesResponse.data[0]
+            const statusResponse = await apiService.getConnectAccountStatus(firstDevice.uuid)
+            
+            if (statusResponse.data) {
+              const status = statusResponse.data
+              const verificationStatus = status.VerificationStatus || status.verificationStatus || 'unknown'
+              console.log('🏆 [DEBUG] Profile KYC Status:', verificationStatus)
+              
+              if (verificationStatus.toLowerCase() === 'verified') {
+                // All devices inherit the profile's verified status
+                const allDeviceUuids = devicesResponse.data.map((d: any) => d.uuid)
+                setStripeEnabledDevices(allDeviceUuids)
+              }
             }
           }
+        } catch (error) {
+          console.error('Error checking Stripe status:', error)
         }
+      } else {
+        console.log('🏆 [DEBUG] Profile has no Stripe account')
       }
-
-      console.log('🏆 [DEBUG] Final KYC status:', kycStatus)
-      console.log('🏆 [DEBUG] Stripe enabled devices:', stripeEnabledDevicesList)
-      
-      setStripeEnabledDevices(stripeEnabledDevicesList)
     } catch (error) {
       console.error('Error checking Stripe Connect status:', error)
     }
