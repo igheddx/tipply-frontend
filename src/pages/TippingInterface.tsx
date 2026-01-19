@@ -1045,9 +1045,18 @@ const TippingInterface: React.FC = () => {
                 className="absolute top-24 left-1/2 -translate-x-1/2 z-40 text-center"
               >
                 <div className="bg-black/50 backdrop-blur-md px-6 py-3 rounded-2xl border border-white/20">
-                  <h1 className="text-2xl font-bold text-white drop-shadow-lg">
-                      Tip {deviceInfo?.stageName || `${deviceInfo?.ownerFirstName} ${deviceInfo?.ownerLastName}`}
-                  </h1>
+                  <div className="flex items-center gap-3">
+                    {deviceInfo?.profilePhotoUrl && (
+                      <img
+                        src={deviceInfo?.profilePhotoUrl}
+                        alt="Performer"
+                        className="w-10 h-10 rounded-full object-cover border-2 border-white/30"
+                      />
+                    )}
+                    <h1 className="text-2xl font-bold text-white drop-shadow-lg">
+                        Tip {deviceInfo?.stageName || `${deviceInfo?.ownerFirstName} ${deviceInfo?.ownerLastName}`}
+                    </h1>
+                  </div>
                 </div>
               </motion.div>
             )}
@@ -1141,12 +1150,19 @@ const TippingInterface: React.FC = () => {
               paddingBottom: 'calc(env(safe-area-inset-bottom) + 3.5rem)'
             }}
           >
-            {/* Title with tighter spacing */}
-            <h1 
-              className="text-2xl font-bold text-white truncate text-center w-full mb-4"
-            >
-                Tip {deviceInfo?.stageName || `${deviceInfo?.ownerFirstName} ${deviceInfo?.ownerLastName}`}
-            </h1>
+            {/* Title with profile picture */}
+            <div className="flex items-center justify-center gap-3 mb-4 w-full">
+              {deviceInfo?.profilePhotoUrl && (
+                <img
+                  src={deviceInfo?.profilePhotoUrl}
+                  alt="Performer"
+                  className="w-10 h-10 rounded-full object-cover border-2 border-white/30 flex-shrink-0"
+                />
+              )}
+              <h1 className="text-2xl font-bold text-white truncate">
+                  Tip {deviceInfo?.stageName || `${deviceInfo?.ownerFirstName} ${deviceInfo?.ownerLastName}`}
+              </h1>
+            </div>
 
             {/* Tip buttons grid - wraps naturally */}
             <div className="flex flex-wrap justify-center gap-3 max-w-xl w-full -mt-1 mb-3">
