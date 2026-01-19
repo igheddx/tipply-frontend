@@ -196,9 +196,6 @@ function PaymentForm({
       })
     }
   }, [stripe, deviceUuid, userId, onComplete])
-              setCookie('tipply_user_id', tempUserId, 60)
-              setCookie(`stripe_customer_id_${tempUserId}`, customerId, 60)
-
   const handleCardSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!stripe || !elements) return
@@ -208,8 +205,7 @@ function PaymentForm({
     
     try {
       // Get setup intent from backend
-                const res = await fetch(`${getApiBaseUrl()}/api/stripe/setup-intent`, {
-                setCookie(`payment_method_id_${tempUserId}`, paymentMethodId, 60)
+      const res = await fetch(`${getApiBaseUrl()}/api/stripe/setup-intent`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ deviceUuid, userId })
