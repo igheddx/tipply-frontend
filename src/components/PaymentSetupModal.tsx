@@ -93,10 +93,16 @@ function PaymentForm({
 
   // Persist payment details to backend so ownership verification passes
   const storePaymentInfo = async (persistedUserId: string, paymentMethodId?: string, stripeCustomerId?: string) => {
-    if (!paymentMethodId || !stripeCustomerId) return
+    console.log('💾 [storePaymentInfo] Called with:', { persistedUserId, paymentMethodId, stripeCustomerId })
+    
+    if (!paymentMethodId || !stripeCustomerId) {
+      console.warn('⚠️ [storePaymentInfo] Missing paymentMethodId or stripeCustomerId, skipping storage')
+      return
+    }
 
     try {
-      await fetch(`${getApiBaseUrl()}/api/stripe/store-payment-info`, {
+      console.log('📤 [storePaymentInfo] Storing payment info to backend...')
+      const response = await fetch(`${getApiBaseUrl()}/api/stripe/store-payment-info`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -105,8 +111,14 @@ function PaymentForm({
           stripeCustomerId,
         }),
       })
+      
+      if (response.ok) {
+        console.log('✅ [storePaymentInfo] Payment info stored successfully')
+      } else {
+        console.error('❌ [storePaymentInfo] Backend returned error:', response.status, response.statusText)
+      }
     } catch (err) {
-      console.error('Failed to persist payment info to backend', err)
+      console.error('❌ [storePaymentInfo] Failed to persist payment info to backend', err)
     }
   }
 
