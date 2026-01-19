@@ -170,8 +170,20 @@ const TippingInterface: React.FC = () => {
   // Initialize user
   useEffect(() => {
     const initializeUser = async () => {
-      // Prefer cookie to survive cache clears; fallback to localStorage
+      // Detect fresh session - if cookie is gone but localStorage persists, likely a cache clear
+      const hasCookie = !!getCookie('tipply_user_id')
+      const hasLocalStorage = !!localStorage.getItem('tipply_user_id')
+      const isFreshSession = !hasCookie && hasLocalStorage
+      
+      console.log('🔍 [Init] Session detection:', { hasCookie, hasLocalStorage, isFreshSession })
+      
       let tempUserId = getCookie('tipply_user_id') || localStorage.getItem('tipply_user_id')
+      
+      // If fresh session detected (cache cleared but localStorage persists), regenerate userId
+      if (isFreshSession) {
+        console.log('🔄 [Init] Fresh session detected - regenerating userId')
+        tempUserId = null
+      }
       
       // If no stored userId, create one based on device UUID for persistence
       // This ensures the same device/user combo gets the same userId even after cache clear
