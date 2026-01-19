@@ -207,7 +207,7 @@ const TippingInterface: React.FC = () => {
           return false
         }
       
-        const url = `${getApiBaseUrl()}/api/songcatalog/user-total/${tempUserId}`
+        const url = `${getApiBaseUrl()}/api/tips/user-total/${tempUserId}`
         console.log('📡 [loadUserTotal] Request URL:', url)
         const response = await fetch(url)
         console.log('📡 [loadUserTotal] Response status:', response.status)
