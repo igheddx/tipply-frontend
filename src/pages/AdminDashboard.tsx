@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Row, Col, Statistic, Table, Button, Input, Modal, message, Spin, Card, Tag, Select, DatePicker, Space, Divider, Alert } from 'antd';
+import { Row, Col, Statistic, Table, Button, Input, Modal, message, Spin, Card, Tag, Select, DatePicker, Space, Divider, Alert, Tabs } from 'antd';
 import { 
   UserOutlined, 
   DesktopOutlined, 
@@ -15,6 +15,7 @@ import {
   SearchOutlined
 } from '@ant-design/icons';
 import { apiService } from '../services/api';
+import AggregatedChargesTable from '../components/AggregatedChargesTable';
 import dayjs from 'dayjs';
 
 const { Search } = Input;
@@ -124,6 +125,7 @@ const AdminDashboard: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [minAmount, setMinAmount] = useState<number | undefined>(undefined);
   const [maxAmount, setMaxAmount] = useState<number | undefined>(undefined);
+  const [activeTab, setActiveTab] = useState('overview');
 
   useEffect(() => {
     // Verify admin access via profile to avoid JWT decode issues
@@ -862,9 +864,12 @@ const AdminDashboard: React.FC = () => {
           </Col>
         </Row>
 
-        {/* Tips Management */}
-        <div className="bg-white p-6 rounded-lg shadow-sm border mb-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Tips Management</h3>
+        {/* Main Content Tabs */}
+        <Tabs activeKey={activeTab} onChange={setActiveTab}>
+          <Tabs.TabPane tab="Overview" key="overview">
+            {/* Tips Management */}
+            <div className="bg-white p-6 rounded-lg shadow-sm border mb-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Tips Management</h3>
           
           {/* Filters */}
           <div className="space-y-4 mb-4">
@@ -1040,6 +1045,12 @@ const AdminDashboard: React.FC = () => {
             scroll={{ x: 800 }}
           />
         </div>
+          </Tabs.TabPane>
+
+          <Tabs.TabPane tab="Aggregated Charges" key="aggregated-charges">
+            <AggregatedChargesTable />
+          </Tabs.TabPane>
+        </Tabs>
 
         {/* Update Fee Modal */}
         <Modal
