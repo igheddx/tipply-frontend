@@ -76,10 +76,11 @@ const PhotoUpload: React.FC<PhotoUploadProps> = ({
       }
 
       // Success - update profile photo URL
-      if (response.data?.profilePhotoUrl) {
-        setPreview(response.data.profilePhotoUrl)
+      const newUrl = response.data?.imageUrl || response.data?.profilePhotoUrl
+      if (newUrl) {
+        setPreview(newUrl)
         if (onPhotoChange) {
-          onPhotoChange(response.data.profilePhotoUrl)
+          onPhotoChange(newUrl)
         }
       }
     } catch (err) {

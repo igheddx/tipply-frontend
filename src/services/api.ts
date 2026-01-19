@@ -481,70 +481,101 @@ class ApiService {
   }
 
   async uploadPerformerProfilePhoto(file: File): Promise<ApiResponse<any>> {
-    const url = `${API_BASE_URL}/api/profiles/profile-photo`
     const token = localStorage.getItem('token')
+    const refreshToken = localStorage.getItem('refreshToken')
+    const authHeaders = token ? { Authorization: `Bearer ${token}` } : {}
 
-    const formData = new FormData()
-    formData.append('file', file)
+    const refreshAuth = async (): Promise<string | null> => {
+      if (!refreshToken) return null
+      try {
+        const refreshResponse = await fetch(`${API_BASE_URL}/api/auth/refresh`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ refreshToken }),
+        })
+        if (!refreshResponse.ok) return null
+        const refreshData = await refreshResponse.json()
+        localStorage.setItem('token', refreshData.token)
+        if (refreshData.refreshToken) {
+          localStorage.setItem('refreshToken', refreshData.refreshToken)
+        }
+        return refreshData.token as string
+      } catch (err) {
+        console.error('Token refresh failed:', err)
+        return null
+      }
+    }
 
-    try {
-      const response = await fetch(url, {
+    const performAuthedJsonPost = async (endpoint: string, body: any, customToken?: string) => {
+      const resp = await fetch(`${API_BASE_URL}${endpoint}`, {
         method: 'POST',
         headers: {
-          ...(token && { Authorization: `Bearer ${token}` }),
+          'Content-Type': 'application/json',
+          ...(customToken ? { Authorization: `Bearer ${customToken}` } : authHeaders),
         },
-        body: formData,
+        body: JSON.stringify(body),
+      })
+      if (resp.status === 401) {
+        const newToken = await refreshAuth()
+        if (!newToken) return resp
+        return await fetch(`${API_BASE_URL}${endpoint}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${newToken}`,
+          },
+          body: JSON.stringify(body),
+        })
+      }
+      return resp
+    }
+
+    try {
+      const extension = file.name.split('.').pop() || 'jpg'
+
+      // 1) Get presigned URL
+      const presignResponse = await performAuthedJsonPost('/api/profiles/profile-photo/presigned-url', {
+        fileExtension: extension,
       })
 
-      if (response.status === 401) {
-        const refreshToken = localStorage.getItem('refreshToken')
-        if (refreshToken) {
-          try {
-            const refreshResponse = await fetch(`${API_BASE_URL}/api/auth/refresh`, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({ refreshToken }),
-            })
-
-            if (refreshResponse.ok) {
-              const refreshData = await refreshResponse.json()
-              localStorage.setItem('token', refreshData.token)
-              if (refreshData.refreshToken) {
-                localStorage.setItem('refreshToken', refreshData.refreshToken)
-              }
-
-              // Retry the original request
-              const retryResponse = await fetch(url, {
-                method: 'POST',
-                headers: {
-                  Authorization: `Bearer ${refreshData.token}`,
-                },
-                body: formData,
-              })
-
-              if (retryResponse.ok) {
-                return { data: await retryResponse.json() }
-              }
-              return { error: 'Failed to upload photo' }
-            }
-          } catch (refreshError) {
-            console.error('Token refresh failed:', refreshError)
-            return { error: 'Authentication failed' }
-          }
-        }
-        return { error: 'Unauthorized' }
+      if (!presignResponse.ok) {
+        const errorData = await presignResponse.json().catch(() => ({}))
+        return { error: errorData.error || 'Failed to get upload URL', status: presignResponse.status }
       }
 
-      if (response.ok) {
-        return { data: await response.json() }
+      const { presignedUrl } = await presignResponse.json()
+      if (!presignedUrl) {
+        return { error: 'Upload URL missing from response' }
       }
 
-      const errorData = await response.json()
-      return { error: errorData.error || 'Failed to upload photo', status: response.status }
+      // 2) Upload directly to S3 using presigned URL
+      const s3UploadResponse = await fetch(presignedUrl, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': file.type || 'application/octet-stream',
+        },
+        body: file,
+      })
+
+      if (!s3UploadResponse.ok) {
+        return { error: 'Failed to upload file to storage', status: s3UploadResponse.status }
+      }
+
+      // 3) Confirm upload with backend
+      const imageUrl = presignedUrl.split('?')[0]
+      const confirmResponse = await performAuthedJsonPost('/api/profiles/profile-photo/confirm-upload', {
+        imageUrl,
+      })
+
+      if (!confirmResponse.ok) {
+        const errorData = await confirmResponse.json().catch(() => ({}))
+        return { error: errorData.error || 'Failed to confirm upload', status: confirmResponse.status }
+      }
+
+      const confirmData = await confirmResponse.json()
+      return { data: confirmData }
     } catch (error) {
-      console.error('Error uploading photo:', error)
+      console.error('Error uploading photo via presigned URL:', error)
       return { error: 'Upload failed' }
     }
   }
