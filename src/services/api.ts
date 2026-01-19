@@ -555,7 +555,6 @@ class ApiService {
         method: 'PUT',
         headers: {
           'Content-Type': file.type || 'application/octet-stream',
-          'x-amz-acl': 'public-read',
         },
         body: file,
       })
