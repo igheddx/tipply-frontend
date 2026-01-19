@@ -154,7 +154,7 @@ const SongCatalogSearch: React.FC<SongCatalogSearchProps> = ({
 
                 {dailyTotal && (
                   <div className="text-right">
-                    <div className="text-sm text-gray-500">Your Tips</div>
+                    <div className="text-sm text-gray-500">Total tips</div>
                     <div className="font-semibold text-green-600">
                       ${dailyTotal.totalAmount.toFixed(2)} ({dailyTotal.tipCount})
                     </div>
