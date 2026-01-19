@@ -802,11 +802,13 @@ const TippingInterface: React.FC = () => {
         // Refresh payment method session on successful tip (extends 30-day memory)
         refreshPaymentMethodSession()
       } else {
-        toast.error('Failed to submit tip. Please try again.')
+        const errorMsg = response.raw?.error || response.error || 'Failed to submit tip. Please try again.'
+        console.error('❌ Tip submission failed:', response.raw)
+        toast.error(errorMsg)
       }
     } catch (error) {
-      console.error('Error submitting tip:', error)
-      toast.error('Failed to submit tip. Please try again.')
+      console.error('❌ Error submitting tip:', error)
+      toast.error(error instanceof Error ? error.message : 'Failed to submit tip. Please try again.')
     }
 
     setLoading(false)
@@ -869,11 +871,13 @@ const TippingInterface: React.FC = () => {
         // Refresh payment method session on successful tip (extends 30-day memory)
         refreshPaymentMethodSession()
       } else {
-        toast.error('Failed to submit tip. Please try again.')
+        const errorMsg = response.raw?.error || response.error || 'Failed to submit tip. Please try again.'
+        console.error('❌ Tip submission failed:', response.raw)
+        toast.error(errorMsg)
       }
     } catch (error) {
-      console.error('Error submitting tip with song:', error)
-      toast.error('Failed to submit tip. Please try again.')
+      console.error('❌ Error submitting tip with song:', error)
+      toast.error(error instanceof Error ? error.message : 'Failed to submit tip. Please try again.')
     }
 
     setLoading(false)

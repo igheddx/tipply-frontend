@@ -351,6 +351,10 @@ class ApiService {
     effect: string
     duration: number
     paymentMethodId?: string
+    stripeCustomerId?: string
+    songId?: string
+    requestorName?: string
+    note?: string
   }): Promise<ApiResponse<any>> {
     console.log('🎰 API SERVICE - Submitting tip with data:', tipData)
     const response = await this.request('/api/tips', {
