@@ -161,8 +161,9 @@ const Dashboard: React.FC = () => {
         console.log(`⏱️ [PERF] getDashboardStats() alone took ${(performance.now() - statsTime).toFixed(0)}ms`)
 
         let metricsTime = performance.now()
-        const metricsResp = await apiService.getDashboardMetrics(profileId)
-        console.log(`⏱️ [PERF] getDashboardMetrics() alone took ${(performance.now() - metricsTime).toFixed(0)}ms`)
+        // Fast path: skip Stripe metrics on initial load to avoid blocking UI
+        const metricsResp = await apiService.getDashboardMetrics(profileId, { skipStripe: true })
+        console.log(`⏱️ [PERF] getDashboardMetrics(skipStripe=true) took ${(performance.now() - metricsTime).toFixed(0)}ms`)
 
         if (statsResp.data) {
           setStats(statsResp.data)
@@ -171,7 +172,7 @@ const Dashboard: React.FC = () => {
 
         if (metricsResp.data) {
           setMetrics(metricsResp.data)
-          console.log('✅ [PERF] Metrics set')
+          console.log('✅ [PERF] Metrics set (without Stripe)')
         }
 
         // Check song catalog alert in background
@@ -224,6 +225,26 @@ const Dashboard: React.FC = () => {
 
         setLoading(false)
         console.log(`🎉 [PERF] Dashboard init complete in ${(performance.now() - startTime).toFixed(0)}ms`)
+
+        // Background fetch: load Stripe metrics and merge into state when ready
+        try {
+          const stripeStart = performance.now()
+          const fullMetrics = await apiService.getDashboardMetrics(profileId, { skipStripe: false })
+          if (fullMetrics.data) {
+            setMetrics(prev => prev ? {
+              ...prev,
+              stripeAvailableBalance: fullMetrics.data.stripeAvailableBalance ?? prev.stripeAvailableBalance,
+              stripeFuturePayouts: fullMetrics.data.stripeFuturePayouts ?? prev.stripeFuturePayouts,
+              stripeInTransit: fullMetrics.data.stripeInTransit ?? prev.stripeInTransit,
+              stripeLifetimeVolume: fullMetrics.data.stripeLifetimeVolume ?? prev.stripeLifetimeVolume,
+              totalEarnings: fullMetrics.data.totalEarnings ?? prev.totalEarnings,
+              pendingPayouts: fullMetrics.data.pendingPayouts ?? prev.pendingPayouts,
+            } : fullMetrics.data)
+            console.log(`⏱️ [PERF] Background Stripe metrics loaded in ${(performance.now() - stripeStart).toFixed(0)}ms`)
+          }
+        } catch (e) {
+          console.warn('Skipping Stripe metrics due to error:', e)
+        }
       } catch (error) {
         console.error('Error initializing dashboard:', error)
         setLoading(false)

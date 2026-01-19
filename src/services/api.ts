@@ -362,8 +362,9 @@ class ApiService {
   }
 
   // Dashboard metrics endpoints
-  async getDashboardMetrics(profileId: string): Promise<ApiResponse<any>> {
-    return this.request(`/api/tips/dashboard-metrics/${profileId}`)
+  async getDashboardMetrics(profileId: string, options?: { skipStripe?: boolean }): Promise<ApiResponse<any>> {
+    const qs = options?.skipStripe ? `?skipStripe=true` : ''
+    return this.request(`/api/tips/dashboard-metrics/${profileId}${qs}`)
   }
 
   async getRecentTips(profileId: string): Promise<ApiResponse<any>> {
