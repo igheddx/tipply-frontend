@@ -178,11 +178,11 @@ const TippingInterface: React.FC = () => {
       try {
         const response = await fetch(`${getApiBaseUrl()}/api/songcatalog/user/${tempUserId}`)
         if (response.ok) {
-          const userData = await response.json()
-          setUserId(userData.userId)
-        } else {
-          setUserId(tempUserId)
+          // We deliberately keep using the temp user ID so totals and tips align
+          await response.json() // consume body (not used)
         }
+        // Always set the temp ID for tip submission and totals
+        setUserId(tempUserId)
       } catch (error) {
         setUserId(tempUserId)
       }
