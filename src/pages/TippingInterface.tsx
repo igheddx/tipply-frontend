@@ -198,16 +198,25 @@ const TippingInterface: React.FC = () => {
     const loadUserTotal = async (userTempId?: string) => {
       try {
         const tempUserId = userTempId || localStorage.getItem('tipply_user_id')
-        if (!tempUserId) return false
+        console.log('🔍 [loadUserTotal] Fetching totals for userId:', tempUserId)
+        if (!tempUserId) {
+          console.error('❌ [loadUserTotal] No tempUserId found')
+          return false
+        }
       
-        const response = await fetch(`${getApiBaseUrl()}/api/songcatalog/user-total/${tempUserId}`)
+        const url = `${getApiBaseUrl()}/api/songcatalog/user-total/${tempUserId}`
+        console.log('📡 [loadUserTotal] Request URL:', url)
+        const response = await fetch(url)
+        console.log('📡 [loadUserTotal] Response status:', response.status)
         if (response.ok) {
           const data = await response.json()
-          console.log('✅ [loadUserTotal] Updated total tips:', data.totalAmount)
+          console.log('✅ [loadUserTotal] Backend returned:', data)
+          console.log('✅ [loadUserTotal] Setting totalTipped to:', data.totalAmount)
           setTotalTipped(data.totalAmount)
           return true
         } else {
-          console.error('[loadUserTotal] Failed response:', response.status, response.statusText)
+          const errorText = await response.text()
+          console.error('[loadUserTotal] Failed response:', response.status, response.statusText, errorText)
           return false
         }
       } catch (error) {
