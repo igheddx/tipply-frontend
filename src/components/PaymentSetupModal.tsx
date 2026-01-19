@@ -91,6 +91,25 @@ function PaymentForm({
   const [paymentRequest, setPaymentRequest] = useState<any>(null)
   const [isApplePay, setIsApplePay] = useState(false)
 
+  // Persist payment details to backend so ownership verification passes
+  const storePaymentInfo = async (persistedUserId: string, paymentMethodId?: string, stripeCustomerId?: string) => {
+    if (!paymentMethodId || !stripeCustomerId) return
+
+    try {
+      await fetch(`${getApiBaseUrl()}/api/stripe/store-payment-info`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: persistedUserId,
+          paymentMethodId,
+          stripeCustomerId,
+        }),
+      })
+    } catch (err) {
+      console.error('Failed to persist payment info to backend', err)
+    }
+  }
+
   useEffect(() => {
     if (stripe) {
       const pr = stripe.paymentRequest({
@@ -183,6 +202,8 @@ function PaymentForm({
                 console.log('💾 Stored payment method ID:', paymentMethodId)
               }
             }
+            // Persist payment info to backend so security checks pass
+            await storePaymentInfo(tempUserId!, paymentMethodId, customerId)
             
             // Payment method is automatically attached to customer by Stripe during SetupIntent confirmation
             event.complete('success')
@@ -289,6 +310,8 @@ function PaymentForm({
             console.log('💾 Stored payment method ID:', paymentMethodId)
           }
         }
+        // Persist payment info to backend so security checks pass
+        await storePaymentInfo(tempUserId!, paymentMethodId, customerId)
         
         // Payment method is automatically attached to customer by Stripe during SetupIntent confirmation
         toast.success('Payment method added successfully!')
