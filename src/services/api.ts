@@ -483,7 +483,7 @@ class ApiService {
   async uploadPerformerProfilePhoto(file: File): Promise<ApiResponse<any>> {
     const token = localStorage.getItem('token')
     const refreshToken = localStorage.getItem('refreshToken')
-    const authHeaders = token ? { Authorization: `Bearer ${token}` } : {}
+    const authHeaders: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {}
 
     const refreshAuth = async (): Promise<string | null> => {
       if (!refreshToken) return null
@@ -507,12 +507,14 @@ class ApiService {
     }
 
     const performAuthedJsonPost = async (endpoint: string, body: any, customToken?: string) => {
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        ...(customToken ? { Authorization: `Bearer ${customToken}` } : authHeaders),
+      }
+
       const resp = await fetch(`${API_BASE_URL}${endpoint}`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(customToken ? { Authorization: `Bearer ${customToken}` } : authHeaders),
-        },
+        headers,
         body: JSON.stringify(body),
       })
       if (resp.status === 401) {
