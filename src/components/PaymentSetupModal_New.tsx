@@ -185,7 +185,6 @@ function PaymentForm({
       })
       
       if (!res.ok) {
-        const errorText = await res.text()
         setError(`Setup failed: ${res.status}`)
         setLoading(false)
         return
