@@ -8,6 +8,8 @@ interface ApiResponse<T> {
 }
 
 class ApiService {
+  private refreshPromise: Promise<string | null> | null = null
+
   private async request<T>(
     endpoint: string,
     options: RequestInit = {},
@@ -39,46 +41,78 @@ class ApiService {
       const response = await fetch(url, config)
       
       if (response.status === 401) {
-        // Try to refresh token
-        const refreshToken = localStorage.getItem('refreshToken')
+        // Try to refresh token (with guard against parallel refreshes)
+        const refreshToken = localStorage.getItem('token')
         if (refreshToken) {
           try {
-            const refreshResponse = await fetch(`${API_BASE_URL}/api/auth/refresh`, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({ refreshToken }),
-            })
-
-            if (refreshResponse.ok) {
-              const refreshData = await refreshResponse.json()
-              localStorage.setItem('token', refreshData.accessToken)
-              if (refreshData.refreshToken) {
-                localStorage.setItem('refreshToken', refreshData.refreshToken)
+            // If a refresh is already in progress, wait for it
+            if (this.refreshPromise) {
+              const newToken = await this.refreshPromise
+              if (newToken) {
+                // Retry with the refreshed token
+                const newConfig: RequestInit = {
+                  ...config,
+                  headers: {
+                    ...config.headers,
+                    Authorization: `Bearer ${newToken}`,
+                  },
+                }
+                const retryResponse = await fetch(url, newConfig)
+                if (retryResponse.ok) {
+                  const data = await retryResponse.json()
+                  return { data }
+                }
               }
+            } else {
+              // Start a new refresh
+              this.refreshPromise = (async () => {
+                try {
+                  const refreshResponse = await fetch(`${API_BASE_URL}/api/auth/refresh`, {
+                    method: 'POST',
+                    headers: {
+                      'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ refreshToken: localStorage.getItem('refreshToken') }),
+                  })
 
-              // Retry the original request with new token
-              const newConfig: RequestInit = {
-                ...config,
-                headers: {
-                  ...config.headers,
-                  Authorization: `Bearer ${refreshData.accessToken}`,
-                },
+                  if (refreshResponse.ok) {
+                    const refreshData = await refreshResponse.json()
+                    const newToken = refreshData.accessToken
+                    localStorage.setItem('token', newToken)
+                    if (refreshData.refreshToken) {
+                      localStorage.setItem('refreshToken', refreshData.refreshToken)
+                    }
+                    return newToken
+                  }
+                  return null
+                } finally {
+                  this.refreshPromise = null
+                }
+              })()
+
+              const newToken = await this.refreshPromise
+              if (newToken) {
+                // Retry the original request with new token
+                const newConfig: RequestInit = {
+                  ...config,
+                  headers: {
+                    ...config.headers,
+                    Authorization: `Bearer ${newToken}`,
+                  },
+                }
+
+                const retryResponse = await fetch(url, newConfig)
+                if (!retryResponse.ok) {
+                  const errorData = await retryResponse.json().catch(() => ({}))
+                  throw new Error(errorData.error || `HTTP ${retryResponse.status}: ${retryResponse.statusText}`)
+                }
+
+                const data = await retryResponse.json()
+                return { data }
               }
-
-              const retryResponse = await fetch(url, newConfig)
-              if (!retryResponse.ok) {
-                const errorData = await retryResponse.json().catch(() => ({}))
-                throw new Error(errorData.error || `HTTP ${retryResponse.status}: ${retryResponse.statusText}`)
-              }
-
-              const data = await retryResponse.json()
-              return { data }
             }
           } catch (refreshError) {
             console.error('Token refresh failed:', refreshError)
-            // Surface the error and status so caller can decide (do not redirect)
             return { error: 'Authentication failed while refreshing token.', status: 401, raw: refreshError }
           }
         }
