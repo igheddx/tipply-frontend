@@ -170,15 +170,27 @@ const TippingInterface: React.FC = () => {
   // Initialize user
   useEffect(() => {
     const initializeUser = async () => {
-      // Prefer cookie to survive cache clears; fallback to localStorage; last resort generate new
+      // Prefer cookie to survive cache clears; fallback to localStorage
       let tempUserId = getCookie('tipply_user_id') || localStorage.getItem('tipply_user_id')
+      
+      // If no stored userId, create one based on device UUID for persistence
+      // This ensures the same device/user combo gets the same userId even after cache clear
       if (!tempUserId) {
-        tempUserId = `user_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`
+        // Use device UUID as part of the fingerprint for better persistence
+        const deviceUuid = deviceId || 'unknown'
+        const timestamp = Math.floor(Date.now() / (1000 * 60 * 60 * 24)) // Daily bucket
+        const fingerprint = `${deviceUuid}_${timestamp}`
+        const hash = Math.abs(fingerprint.split('').reduce((a, b) => {a = ((a << 5) - a) + b.charCodeAt(0); return a & a}, 0)).toString(36)
+        tempUserId = `user_${timestamp}_${hash}`
+        console.log('📱 [Init] Generated userId based on device:', { deviceUuid, timestamp, tempUserId })
+      } else {
+        console.log('✅ [Init] Reusing existing userId:', tempUserId)
       }
 
       // Persist to both cookie and localStorage to keep them in sync
       setCookie('tipply_user_id', tempUserId, 60)
       localStorage.setItem('tipply_user_id', tempUserId)
+      console.log('💾 [Init] Stored userId in cookie and localStorage:', tempUserId)
 
       try {
         const response = await fetch(`${getApiBaseUrl()}/api/songcatalog/user/${tempUserId}`)
@@ -186,8 +198,10 @@ const TippingInterface: React.FC = () => {
           await response.json() // consume body (not used)
         }
         setUserId(tempUserId)
+        console.log('👤 [Init] User initialized with ID:', tempUserId)
       } catch (error) {
         setUserId(tempUserId)
+        console.log('👤 [Init] User initialized (with error) with ID:', tempUserId, error)
       }
       
       // Load user's total tips (last 24 hours)
