@@ -155,12 +155,14 @@ const Dashboard: React.FC = () => {
         console.log(`✅ [PERF] User profile set: ${profileId}`)
 
         // ONLY fetch overview data on init (stats, metrics)
-        let parallelTime = performance.now()
-        const [statsResp, metricsResp] = await Promise.all([
-          apiService.getDashboardStats(),
-          apiService.getDashboardMetrics(profileId)
-        ])
-        console.log(`⏱️ [PERF] getDashboardStats() + getDashboardMetrics() took ${(performance.now() - parallelTime).toFixed(0)}ms`)
+        // Time them individually to find the real bottleneck
+        let statsTime = performance.now()
+        const statsResp = await apiService.getDashboardStats()
+        console.log(`⏱️ [PERF] getDashboardStats() alone took ${(performance.now() - statsTime).toFixed(0)}ms`)
+
+        let metricsTime = performance.now()
+        const metricsResp = await apiService.getDashboardMetrics(profileId)
+        console.log(`⏱️ [PERF] getDashboardMetrics() alone took ${(performance.now() - metricsTime).toFixed(0)}ms`)
 
         if (statsResp.data) {
           setStats(statsResp.data)
