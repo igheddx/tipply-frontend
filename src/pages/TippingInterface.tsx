@@ -186,10 +186,29 @@ const TippingInterface: React.FC = () => {
       } catch (error) {
         setUserId(tempUserId)
       }
+      
+        // Load user's total tips (last 24 hours)
+        loadUserTotal(tempUserId)
     }
 
     initializeUser()
   }, [])
+
+    // Load user's total tips from backend (last 24 hours)
+    const loadUserTotal = async (userTempId?: string) => {
+      try {
+        const tempUserId = userTempId || localStorage.getItem('tipply_user_id')
+        if (!tempUserId) return
+      
+        const response = await fetch(`${getApiBaseUrl()}/api/songcatalog/user-total/${tempUserId}`)
+        if (response.ok) {
+          const data = await response.json()
+          setTotalTipped(data.totalAmount)
+        }
+      } catch (error) {
+        console.error('Error loading user total:', error)
+      }
+    }
 
   // Enable audio
   const enableAudio = async () => {
@@ -707,9 +726,6 @@ const TippingInterface: React.FC = () => {
     if (!skipConfetti) {
       triggerCanvasConfetti(amount)
     }
-    
-    // Update total
-    setTotalTipped(prev => prev + amount)
 
     // Play sound
     if (audioRef.current) {
@@ -760,19 +776,19 @@ const TippingInterface: React.FC = () => {
           setSelectedSong(null)
           setShowSongSearch(false)
           setTipsRefreshKey(prev => prev + 1)
+            loadUserTotal()
         } else {
           toast.success(`$${amount} tip sent!`, { duration: 800 })
+            loadUserTotal()
         }
         // Refresh payment method session on successful tip (extends 30-day memory)
         refreshPaymentMethodSession()
       } else {
         toast.error('Failed to submit tip. Please try again.')
-        setTotalTipped(prev => prev - amount)
       }
     } catch (error) {
       console.error('Error submitting tip:', error)
       toast.error('Failed to submit tip. Please try again.')
-      setTotalTipped(prev => prev - amount)
     }
 
     setLoading(false)
@@ -784,7 +800,6 @@ const TippingInterface: React.FC = () => {
     setLoading(true)
     setClickedAmount(amount)
     triggerCanvasConfetti(amount)
-    setTotalTipped(prev => prev + amount)
 
     // Play sound
     if (audioRef.current) {
@@ -829,6 +844,7 @@ const TippingInterface: React.FC = () => {
         } else {
           toast.success(`$${amount} tip submitted!`)
         }
+          loadUserTotal()
         setSelectedSong(null)
         setShowSongSearch(false)
         setTipsRefreshKey(prev => prev + 1)
@@ -836,12 +852,10 @@ const TippingInterface: React.FC = () => {
         refreshPaymentMethodSession()
       } else {
         toast.error('Failed to submit tip. Please try again.')
-        setTotalTipped(prev => prev - amount)
       }
     } catch (error) {
       console.error('Error submitting tip with song:', error)
       toast.error('Failed to submit tip. Please try again.')
-      setTotalTipped(prev => prev - amount)
     }
 
     setLoading(false)
