@@ -303,8 +303,11 @@ const AdminDashboard: React.FC = () => {
       const result = await apiService.post('/api/admin/batch-process');
       const successMsg = result.data?.message || 'Batch processing completed successfully';
       setBatchResultMessage({ type: 'success', text: successMsg });
-      loadDashboardData(); // Reload to get updated stats
-      loadBatchStatus(); // Reload batch status
+      // Wait a moment for DB to commit, then reload stats
+      setTimeout(() => {
+        loadDashboardData();
+        loadBatchStatus();
+      }, 1000);
     } catch (error) {
       console.error('Error running batch processing:', error);
       setBatchResultMessage({ type: 'error', text: 'Failed to run batch processing' });
@@ -653,7 +656,10 @@ const AdminDashboard: React.FC = () => {
                 <Button 
                   type="primary" 
                   icon={batchProcessing ? <ReloadOutlined spin /> : <PlayCircleOutlined />}
-                  onClick={runBatchProcessing}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    runBatchProcessing();
+                  }}
                   loading={batchProcessing}
                   disabled={batchProcessing}
                   className="w-full"
