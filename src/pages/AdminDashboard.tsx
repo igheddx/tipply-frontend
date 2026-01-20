@@ -647,8 +647,14 @@ const AdminDashboard: React.FC = () => {
           <Col xs={24} lg={8}>
             <div className="bg-white p-6 rounded-lg shadow-sm border h-full">
               {batchResultMessage && (
-                <div className={`mb-4 p-3 rounded ${batchResultMessage.type === 'success' ? 'bg-green-50 text-green-800 border border-green-200' : 'bg-red-50 text-red-800 border border-red-200'}`}>
-                  {batchResultMessage.text}
+                <div className={`mb-4 p-3 rounded flex justify-between items-start ${batchResultMessage.type === 'success' ? 'bg-green-50 text-green-800 border border-green-200' : 'bg-red-50 text-red-800 border border-red-200'}`}>
+                  <span>{batchResultMessage.text}</span>
+                  <button 
+                    onClick={() => setBatchResultMessage(null)}
+                    className="ml-2 text-current opacity-50 hover:opacity-100 font-bold"
+                  >
+                    ×
+                  </button>
                 </div>
               )}
               <h3 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h3>
@@ -668,7 +674,10 @@ const AdminDashboard: React.FC = () => {
                 </Button>
                 <Button 
                   icon={<ReloadOutlined />}
-                  onClick={loadDashboardData}
+                  onClick={() => {
+                    setBatchResultMessage(null);
+                    loadDashboardData();
+                  }}
                   className="w-full"
                 >
                   Refresh Data
