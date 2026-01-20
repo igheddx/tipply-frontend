@@ -69,6 +69,7 @@ interface BatchStatus {
   errorMessage?: string;
   failureDetails?: string[];
   durationSeconds?: number;
+  isManual: boolean;
 }
 
 interface TipDetail {
