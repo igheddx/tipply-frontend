@@ -113,6 +113,8 @@ const AdminDashboard: React.FC = () => {
   const [batchStatus, setBatchStatus] = useState<BatchStatus | null>(null);
   const [batchHistory, setBatchHistory] = useState<BatchStatus[]>([]);
   const [batchHistoryModal, setBatchHistoryModal] = useState(false);
+  const [batchProcessing, setBatchProcessing] = useState(false);
+  const [batchResultMessage, setBatchResultMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
 
   // Tips management state
   const [tips, setTips] = useState<TipDetail[]>([]);
@@ -295,18 +297,19 @@ const AdminDashboard: React.FC = () => {
 
 
   const runBatchProcessing = async () => {
+    setBatchProcessing(true);
+    setBatchResultMessage(null);
     try {
       const result = await apiService.post('/api/admin/batch-process');
-      if (result.data?.message) {
-        message.success(result.data.message);
-      } else {
-        message.success('Batch processing completed');
-      }
+      const successMsg = result.data?.message || 'Batch processing completed successfully';
+      setBatchResultMessage({ type: 'success', text: successMsg });
       loadDashboardData(); // Reload to get updated stats
       loadBatchStatus(); // Reload batch status
     } catch (error) {
       console.error('Error running batch processing:', error);
-      message.error('Failed to run batch processing');
+      setBatchResultMessage({ type: 'error', text: 'Failed to run batch processing' });
+    } finally {
+      setBatchProcessing(false);
     }
   };
 
@@ -640,15 +643,22 @@ const AdminDashboard: React.FC = () => {
           </Col>
           <Col xs={24} lg={8}>
             <div className="bg-white p-6 rounded-lg shadow-sm border h-full">
+              {batchResultMessage && (
+                <div className={`mb-4 p-3 rounded ${batchResultMessage.type === 'success' ? 'bg-green-50 text-green-800 border border-green-200' : 'bg-red-50 text-red-800 border border-red-200'}`}>
+                  {batchResultMessage.text}
+                </div>
+              )}
               <h3 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h3>
               <div className="space-y-3">
                 <Button 
                   type="primary" 
-                  icon={<PlayCircleOutlined />}
+                  icon={batchProcessing ? <ReloadOutlined spin /> : <PlayCircleOutlined />}
                   onClick={runBatchProcessing}
+                  loading={batchProcessing}
+                  disabled={batchProcessing}
                   className="w-full"
                 >
-                  Run Batch Processing
+                  {batchProcessing ? 'Running...' : 'Run Batch Processing'}
                 </Button>
                 <Button 
                   icon={<ReloadOutlined />}
