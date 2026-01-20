@@ -605,15 +605,9 @@ const AdminDashboard: React.FC = () => {
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-600">Platform Fees (10%):</span>
+                  <span className="text-gray-600">Platform Fees (6.80%):</span>
                   <span className="font-semibold text-blue-600">
                     ${stats?.totalPlatformFees?.toFixed(2) || '0.00'}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Performer Payouts:</span>
-                  <span className="font-semibold text-green-600">
-                    ${stats?.totalPerformerPayouts?.toFixed(2) || '0.00'}
                   </span>
                 </div>
               </div>
@@ -624,19 +618,19 @@ const AdminDashboard: React.FC = () => {
               <h3 className="text-lg font-semibold text-gray-900 mb-4">Platform Earnings</h3>
               <div className="space-y-4">
                 <div className="flex justify-between">
-                  <span className="text-gray-600">Platform Fees:</span>
+                  <span className="text-gray-600">Total Platform Fee (YTD):</span>
                   <span className="font-semibold text-blue-600">
                     ${platformEarnings?.totalPlatformFees?.toFixed(2) || '0.00'}
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-600">Payment Partner (30%):</span>
+                  <span className="text-gray-600">Payment Partner Cost (3.2%):</span>
                   <span className="font-semibold text-orange-600">
                     ${platformEarnings?.totalPaymentPartnerFees?.toFixed(2) || '0.00'}
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-600">Net Earnings (70%):</span>
+                  <span className="text-gray-600">Net Earnings (6.80%):</span>
                   <span className="font-semibold text-green-600">
                     ${platformEarnings?.netPlatformEarnings?.toFixed(2) || '0.00'}
                   </span>
@@ -647,15 +641,14 @@ const AdminDashboard: React.FC = () => {
           <Col xs={24} lg={8}>
             <div className="bg-white p-6 rounded-lg shadow-sm border h-full">
               {batchResultMessage && (
-                <div className={`mb-4 p-3 rounded flex justify-between items-start ${batchResultMessage.type === 'success' ? 'bg-green-50 text-green-800 border border-green-200' : 'bg-red-50 text-red-800 border border-red-200'}`}>
-                  <span>{batchResultMessage.text}</span>
-                  <button 
-                    onClick={() => setBatchResultMessage(null)}
-                    className="ml-2 text-current opacity-50 hover:opacity-100 font-bold"
-                  >
-                    ×
-                  </button>
-                </div>
+                <Alert
+                  className="mb-4"
+                  type={batchResultMessage.type === 'success' ? 'success' : 'error'}
+                  message={batchResultMessage.text}
+                  showIcon
+                  closable
+                  onClose={() => setBatchResultMessage(null)}
+                />
               )}
               <h3 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h3>
               <div className="space-y-3">
