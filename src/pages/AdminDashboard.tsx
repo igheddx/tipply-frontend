@@ -790,6 +790,12 @@ const AdminDashboard: React.FC = () => {
               {batchStatus ? (
                 <div className="space-y-3">
                   <div className="flex justify-between items-center">
+                    <span className="text-gray-600">Type:</span>
+                    <Tag color={batchStatus.isManual ? 'blue' : 'purple'}>
+                      {batchStatus.isManual ? 'MANUAL' : 'AUTOMATED'}
+                    </Tag>
+                  </div>
+                  <div className="flex justify-between items-center">
                     <span className="text-gray-600">Status:</span>
                     <Tag color={getBatchStatusColor()}>{batchStatus.status?.toUpperCase() || 'UNKNOWN'}</Tag>
                   </div>
