@@ -170,39 +170,24 @@ const TippingInterface: React.FC = () => {
   // Initialize user
   useEffect(() => {
     const initializeUser = async () => {
-      // Detect fresh session - if cookie is gone but localStorage persists, likely a cache clear
-      const hasCookie = !!getCookie('tipply_user_id')
-      const hasLocalStorage = !!localStorage.getItem('tipply_user_id')
-      const isFreshSession = !hasCookie && hasLocalStorage
+      // Use cookie as primary source - if it exists, reuse it
+      // If gone (cache clear), generate fresh userId
+      let tempUserId = getCookie('tipply_user_id')
       
-      console.log('🔍 [Init] Session detection:', { hasCookie, hasLocalStorage, isFreshSession })
-      
-      let tempUserId = getCookie('tipply_user_id') || localStorage.getItem('tipply_user_id')
-      
-      // If fresh session detected (cache cleared but localStorage persists), regenerate userId
-      if (isFreshSession) {
-        console.log('🔄 [Init] Fresh session detected - regenerating userId')
-        tempUserId = null
-      }
-      
-      // If no stored userId, create one based on device UUID for persistence
-      // This ensures the same device/user combo gets the same userId even after cache clear
       if (!tempUserId) {
-        // Use device UUID as part of the fingerprint for better persistence
-        const deviceUuid = deviceId || 'unknown'
-        const timestamp = Math.floor(Date.now() / (1000 * 60 * 60 * 24)) // Daily bucket
-        const fingerprint = `${deviceUuid}_${timestamp}`
-        const hash = Math.abs(fingerprint.split('').reduce((a, b) => {a = ((a << 5) - a) + b.charCodeAt(0); return a & a}, 0)).toString(36)
-        tempUserId = `user_${timestamp}_${hash}`
-        console.log('📱 [Init] Generated userId based on device:', { deviceUuid, timestamp, tempUserId })
+        // No cookie = fresh session (cache cleared)
+        tempUserId = `user_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`
+        console.log('📱 [Init] Fresh session - generated new userId:', tempUserId)
       } else {
-        console.log('✅ [Init] Reusing existing userId:', tempUserId)
+        console.log('✅ [Init] Reusing existing userId from cookie:', tempUserId)
       }
 
-      // Persist to both cookie and localStorage to keep them in sync
+      // Always set/refresh the cookie (survives cache clear better than localStorage alone)
       setCookie('tipply_user_id', tempUserId, 60)
+      
+      // Also persist to localStorage as backup
       localStorage.setItem('tipply_user_id', tempUserId)
-      console.log('💾 [Init] Stored userId in cookie and localStorage:', tempUserId)
+      console.log('💾 [Init] Persisted userId:', tempUserId)
 
       try {
         const response = await fetch(`${getApiBaseUrl()}/api/songcatalog/user/${tempUserId}`)
@@ -235,7 +220,13 @@ const TippingInterface: React.FC = () => {
       
         const url = `${getApiBaseUrl()}/api/tips/user-total/${tempUserId}`
         console.log('📡 [loadUserTotal] Request URL:', url)
-        const response = await fetch(url)
+        const response = await fetch(url, {
+          cache: 'no-store',
+          headers: {
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache'
+          }
+        })
         console.log('📡 [loadUserTotal] Response status:', response.status)
         if (response.ok) {
           const data = await response.json()

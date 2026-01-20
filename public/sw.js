@@ -1,4 +1,4 @@
-const CACHE_NAME = "tipply-v4";
+const CACHE_NAME = "tipply-v5";
 const IS_DEV = self.location.hostname === 'localhost' || self.location.hostname === '127.0.0.1';
 const urlsToCache = [
   "/",
@@ -70,8 +70,16 @@ self.addEventListener("fetch", (event) => {
     return;
   }
   
-  // Network first strategy for device setup page and API calls
-  if (url.pathname === '/device-setup' || url.pathname.startsWith('/api/')) {
+  // Never cache API calls - always fetch fresh from network
+  if (url.pathname.startsWith('/api/') || url.href.includes('/api/')) {
+    event.respondWith(
+      fetch(event.request).catch(() => caches.match(event.request))
+    );
+    return;
+  }
+  
+  // Network first strategy for device setup page
+  if (url.pathname === '/device-setup') {
     event.respondWith(
       fetch(event.request)
         .then((response) => {
