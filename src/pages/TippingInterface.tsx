@@ -7,7 +7,6 @@ import PaymentSetupModal from '../components/PaymentSetupModal'
 import SongCatalogSearch from '../components/SongCatalogSearch'
 import apiService from '../services/api'
 import { getApiBaseUrl } from '../utils/config'
-import { getCookie, setCookie } from '../utils/cookies'
 import { getUniqueDeviceId, detectPlatform } from '../utils/deviceId'
 
 interface DeviceInfo {
@@ -189,11 +188,11 @@ const TippingInterface: React.FC = () => {
         console.log('👤 [Init] User initialized with ID:', uniqueDeviceId)
       } catch (error) {
         console.log('Song catalog initialization error:', error)
-        console.log('👤 [Init] User initialized (with error) with ID:', tempUserId, error)
+        console.log('👤 [Init] User initialized (with error) with ID:', uniqueDeviceId, error)
       }
       
       // Load user's total tips (last 24 hours)
-      loadUserTotal(tempUserId)
+      await loadUserTotal(uniqueDeviceId)
     }
 
     initializeUser()
@@ -202,7 +201,7 @@ const TippingInterface: React.FC = () => {
     // Load user's total tips from backend (last 24 hours)
     const loadUserTotal = async (userTempId?: string) => {
       try {
-        const tempUserId = userTempId || localStorage.getItem('tipply_user_id')
+        const tempUserId = userTempId || localStorage.getItem('unique_device_id')
         console.log('🔍 [loadUserTotal] Fetching totals for userId:', tempUserId)
         if (!tempUserId) {
           console.error('❌ [loadUserTotal] No tempUserId found')
