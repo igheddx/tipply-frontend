@@ -4,6 +4,7 @@ import { Elements, CardElement, useStripe, useElements } from '@stripe/react-str
 import { toast } from 'sonner'
 import { getApiBaseUrl } from '../utils/config'
 import { setCookie } from '../utils/cookies'
+import { getUniqueDeviceId, detectPlatform } from '../utils/deviceId'
 
 // Initialize Stripe
 const stripePromise = loadStripe((import.meta as any).env.VITE_STRIPE_PUBLISHABLE_KEY || 'pk_test_placeholder')
@@ -92,8 +93,8 @@ function PaymentForm({
   const [isApplePay, setIsApplePay] = useState(false)
 
   // Persist payment details to backend so ownership verification passes
-  const storePaymentInfo = async (persistedUserId: string, paymentMethodId?: string, stripeCustomerId?: string) => {
-    console.log('💾 [storePaymentInfo] Called with:', { persistedUserId, paymentMethodId, stripeCustomerId })
+  const storePaymentInfo = async (persistedUserId: string, paymentMethodId?: string, stripeCustomerId?: string, platform?: string) => {
+    console.log('💾 [storePaymentInfo] Called with:', { persistedUserId, paymentMethodId, stripeCustomerId, platform })
     
     if (!paymentMethodId || !stripeCustomerId) {
       console.warn('⚠️ [storePaymentInfo] Missing paymentMethodId or stripeCustomerId, skipping storage')
@@ -109,6 +110,7 @@ function PaymentForm({
           userId: persistedUserId,
           paymentMethodId,
           stripeCustomerId,
+          platform: platform || detectPlatform()
         }),
       })
       
@@ -183,32 +185,32 @@ function PaymentForm({
             const paymentMethodId = setupIntent?.payment_method as string
             console.log('💳 Payment method ID from wallet:', paymentMethodId)
             
-            // Use userId from props (already initialized by parent)
-            const tempUserId = userId
+            // Get unique device ID
+            const uniqueDeviceId = getUniqueDeviceId()
+            const platform = detectPlatform()
             const customerId = data.customerId
-            console.log('🔍 [ApplePay] Using userId from props:', tempUserId, 'customerId:', customerId)
+            console.log('🔍 [ApplePay] Using uniqueDeviceId:', uniqueDeviceId, 'customerId:', customerId, 'platform:', platform)
             if (customerId) {
-              localStorage.setItem(`stripe_customer_id_${tempUserId}`, customerId)
-              setCookie('tipply_user_id', tempUserId, 60)
-              setCookie(`stripe_customer_id_${tempUserId}`, customerId, 60)
+              localStorage.setItem(`stripe_customer_id_${uniqueDeviceId}`, customerId)
+              setCookie(`stripe_customer_id_${uniqueDeviceId}`, customerId, 60)
               console.log('💾 Stored Stripe customer ID:', customerId)
-              localStorage.setItem(`payment_status_${tempUserId}_${deviceUuid}`, JSON.stringify({
+              localStorage.setItem(`payment_status_${uniqueDeviceId}_${deviceUuid}`, JSON.stringify({
                 hasPaymentMethods: true,
                 paymentMethodType: 'card'
               }))
-              localStorage.setItem(`payment_status_timestamp_${tempUserId}_${deviceUuid}`, Date.now().toString())
+              localStorage.setItem(`payment_status_timestamp_${uniqueDeviceId}_${deviceUuid}`, Date.now().toString())
               
               // Store payment method ID directly here too
               if (paymentMethodId) {
-                localStorage.setItem(`payment_method_id_${tempUserId}`, paymentMethodId)
-                localStorage.setItem(`payment_method_timestamp_${tempUserId}`, Date.now().toString())
+                localStorage.setItem(`payment_method_id_${uniqueDeviceId}`, paymentMethodId)
+                localStorage.setItem(`payment_method_timestamp_${uniqueDeviceId}`, Date.now().toString())
                 // Keep payment method id cookie for resilience (non-sensitive, still scoped to app domain)
-                setCookie(`payment_method_id_${tempUserId}`, paymentMethodId, 60)
+                setCookie(`payment_method_id_${uniqueDeviceId}`, paymentMethodId, 60)
                 console.log('💾 Stored payment method ID:', paymentMethodId)
               }
             }
             // Persist payment info to backend so security checks pass
-            await storePaymentInfo(tempUserId!, paymentMethodId, customerId)
+            await storePaymentInfo(uniqueDeviceId!, paymentMethodId, customerId, platform)
             
             // Payment method is automatically attached to customer by Stripe during SetupIntent confirmation
             event.complete('success')
@@ -285,31 +287,31 @@ function PaymentForm({
         const paymentMethodId = result.setupIntent?.payment_method as string | undefined
         console.log('💳 Payment method ID from card:', paymentMethodId)
         
-        // Use userId from props (already initialized by parent)
-        const tempUserId = userId
+        // Get unique device ID
+        const uniqueDeviceId = getUniqueDeviceId()
+        const platform = detectPlatform()
         const customerId = data.customerId
-        console.log('🔍 [CardSubmit] Using userId from props:', tempUserId, 'customerId:', customerId)
+        console.log('🔍 [CardSubmit] Using uniqueDeviceId:', uniqueDeviceId, 'customerId:', customerId, 'platform:', platform)
         if (customerId) {
-          localStorage.setItem(`stripe_customer_id_${tempUserId}`, customerId)
-                setCookie('tipply_user_id', tempUserId, 60)
-                setCookie(`stripe_customer_id_${tempUserId}`, customerId, 60)
+          localStorage.setItem(`stripe_customer_id_${uniqueDeviceId}`, customerId)
+          setCookie(`stripe_customer_id_${uniqueDeviceId}`, customerId, 60)
           console.log('💾 Stored Stripe customer ID:', customerId)
-          localStorage.setItem(`payment_status_${tempUserId}_${deviceUuid}`, JSON.stringify({
+          localStorage.setItem(`payment_status_${uniqueDeviceId}_${deviceUuid}`, JSON.stringify({
             hasPaymentMethods: true,
             paymentMethodType: 'card'
           }))
-          localStorage.setItem(`payment_status_timestamp_${tempUserId}_${deviceUuid}`, Date.now().toString())
+          localStorage.setItem(`payment_status_timestamp_${uniqueDeviceId}_${deviceUuid}`, Date.now().toString())
           
           // Store payment method ID directly here too
           if (paymentMethodId) {
-            localStorage.setItem(`payment_method_id_${tempUserId}`, paymentMethodId)
-            localStorage.setItem(`payment_method_timestamp_${tempUserId}`, Date.now().toString())
-                  setCookie(`payment_method_id_${tempUserId}`, paymentMethodId, 60)
+            localStorage.setItem(`payment_method_id_${uniqueDeviceId}`, paymentMethodId)
+            localStorage.setItem(`payment_method_timestamp_${uniqueDeviceId}`, Date.now().toString())
+            setCookie(`payment_method_id_${uniqueDeviceId}`, paymentMethodId, 60)
             console.log('💾 Stored payment method ID:', paymentMethodId)
           }
         }
         // Persist payment info to backend so security checks pass
-        await storePaymentInfo(tempUserId!, paymentMethodId, customerId)
+        await storePaymentInfo(uniqueDeviceId!, paymentMethodId, customerId, platform)
         
         // Payment method is automatically attached to customer by Stripe during SetupIntent confirmation
         toast.success('Payment method added successfully!')

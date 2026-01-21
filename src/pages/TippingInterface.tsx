@@ -8,6 +8,7 @@ import SongCatalogSearch from '../components/SongCatalogSearch'
 import apiService from '../services/api'
 import { getApiBaseUrl } from '../utils/config'
 import { getCookie, setCookie } from '../utils/cookies'
+import { getUniqueDeviceId, detectPlatform } from '../utils/deviceId'
 
 interface DeviceInfo {
   id: string
@@ -170,34 +171,24 @@ const TippingInterface: React.FC = () => {
   // Initialize user
   useEffect(() => {
     const initializeUser = async () => {
-      // Use cookie as primary source - if it exists, reuse it
-      // If gone (cache clear), generate fresh userId
-      let tempUserId = getCookie('tipply_user_id')
+      // Get unique device ID (deterministic and reproducible)
+      const uniqueDeviceId = getUniqueDeviceId()
+      console.log('🔐 [Init] Unique device ID:', uniqueDeviceId)
       
-      if (!tempUserId) {
-        // No cookie = fresh session (cache cleared)
-        tempUserId = `user_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`
-        console.log('📱 [Init] Fresh session - generated new userId:', tempUserId)
-      } else {
-        console.log('✅ [Init] Reusing existing userId from cookie:', tempUserId)
-      }
-
-      // Always set/refresh the cookie (survives cache clear better than localStorage alone)
-      setCookie('tipply_user_id', tempUserId, 60)
+      // Detect platform (iOS, Android, Desktop)
+      const platform = detectPlatform()
+      console.log('📱 [Init] Platform detected:', platform)
       
-      // Also persist to localStorage as backup
-      localStorage.setItem('tipply_user_id', tempUserId)
-      console.log('💾 [Init] Persisted userId:', tempUserId)
+      setUserId(uniqueDeviceId)
 
       try {
-        const response = await fetch(`${getApiBaseUrl()}/api/songcatalog/user/${tempUserId}`)
+        const response = await fetch(`${getApiBaseUrl()}/api/songcatalog/user/${uniqueDeviceId}`)
         if (response.ok) {
           await response.json() // consume body (not used)
         }
-        setUserId(tempUserId)
-        console.log('👤 [Init] User initialized with ID:', tempUserId)
+        console.log('👤 [Init] User initialized with ID:', uniqueDeviceId)
       } catch (error) {
-        setUserId(tempUserId)
+        console.log('Song catalog initialization error:', error)
         console.log('👤 [Init] User initialized (with error) with ID:', tempUserId, error)
       }
       
@@ -321,6 +312,9 @@ const TippingInterface: React.FC = () => {
         // Check payment methods using the device UUID
         const paymentCheck = await checkPaymentMethods(deviceInfoData)
         setIsPaymentSetup(paymentCheck.hasPaymentMethods)
+        if (!paymentCheck.hasPaymentMethods) {
+          setShowPaymentModal(true)
+        }
         setCheckingPaymentMethods(false)
 
       } catch (error) {
@@ -334,11 +328,11 @@ const TippingInterface: React.FC = () => {
   }, [deviceId])
 
   const checkPaymentMethods = async (deviceInfo?: DeviceInfo | null): Promise<PaymentMethodsCheckResult> => {
-    const tempUserId = localStorage.getItem('tipply_user_id')
-    console.log('🔍 [Payment Check] Starting check - UserId:', tempUserId, 'DeviceId:', deviceId)
+    const uniqueDeviceId = getUniqueDeviceId()
+    console.log('🔍 [Payment Check] Starting check - UniqueDeviceId:', uniqueDeviceId, 'DeviceId:', deviceId)
     
-    if (!tempUserId || !deviceId) {
-      console.log('❌ [Payment Check] Missing userId or deviceId')
+    if (!uniqueDeviceId || !deviceId) {
+      console.log('❌ [Payment Check] Missing uniqueDeviceId or deviceId')
       return { hasPaymentMethods: false }
     }
 
@@ -348,8 +342,8 @@ const TippingInterface: React.FC = () => {
 
     // Check cached payment status first (valid for 7 days) - only if no stored payment method ID
     if (!storedPaymentMethodId) {
-      const cachedPaymentStatus = localStorage.getItem(`payment_status_${tempUserId}_${deviceId}`)
-      const cachedTimestamp = localStorage.getItem(`payment_status_timestamp_${tempUserId}_${deviceId}`)
+      const cachedPaymentStatus = localStorage.getItem(`payment_status_${uniqueDeviceId}_${deviceId}`)
+      const cachedTimestamp = localStorage.getItem(`payment_status_timestamp_${uniqueDeviceId}_${deviceId}`)
       
       if (cachedPaymentStatus && cachedTimestamp) {
         const now = Date.now()
@@ -367,7 +361,7 @@ const TippingInterface: React.FC = () => {
     try {
       const requestBody = {
         deviceUuid: deviceInfo?.uuid || deviceId,
-        userId: tempUserId,
+        userId: uniqueDeviceId,
         paymentMethodId: storedPaymentMethodId || undefined
       }
       console.log('📡 [Payment Check] API request:', requestBody)
@@ -400,8 +394,8 @@ const TippingInterface: React.FC = () => {
         }
         
         // Cache the successful result with device-specific key (7 days)
-        localStorage.setItem(`payment_status_${tempUserId}_${deviceId}`, JSON.stringify(result))
-        localStorage.setItem(`payment_status_timestamp_${tempUserId}_${deviceId}`, Date.now().toString())
+        localStorage.setItem(`payment_status_${uniqueDeviceId}_${deviceId}`, JSON.stringify(result))
+        localStorage.setItem(`payment_status_timestamp_${uniqueDeviceId}_${deviceId}`, Date.now().toString())
         
         return result
       } else if (storedPaymentMethodId) {
@@ -415,7 +409,7 @@ const TippingInterface: React.FC = () => {
       console.log('Payment method check failed:', error)
       
       // If we have a cached result (even if expired), use it on network error
-      const cachedPaymentStatus = localStorage.getItem(`payment_status_${tempUserId}_${deviceId}`)
+      const cachedPaymentStatus = localStorage.getItem(`payment_status_${uniqueDeviceId}_${deviceId}`)
       if (cachedPaymentStatus) {
         console.log('Network error - using stale cache as fallback')
         return JSON.parse(cachedPaymentStatus)
@@ -426,22 +420,22 @@ const TippingInterface: React.FC = () => {
   }
 
   const clearPaymentCache = () => {
-    const tempUserId = localStorage.getItem('tipply_user_id')
-    if (tempUserId && deviceId) {
-      localStorage.removeItem(`payment_status_${tempUserId}_${deviceId}`)
-      localStorage.removeItem(`payment_status_timestamp_${tempUserId}_${deviceId}`)
+    const uniqueDeviceId = getUniqueDeviceId()
+    if (uniqueDeviceId && deviceId) {
+      localStorage.removeItem(`payment_status_${uniqueDeviceId}_${deviceId}`)
+      localStorage.removeItem(`payment_status_timestamp_${uniqueDeviceId}_${deviceId}`)
     }
   }
 
   // Store payment method ID with 30-day expiration
   const storePaymentMethodId = (paymentMethodId: string) => {
-    const tempUserId = localStorage.getItem('tipply_user_id')
+    const uniqueDeviceId = getUniqueDeviceId()
     console.log('💾 [Store] Attempting to store payment method ID:', paymentMethodId)
-    console.log('💾 [Store] UserId:', tempUserId)
+    console.log('💾 [Store] UniqueDeviceId:', uniqueDeviceId)
     
-    if (tempUserId) {
-      const key = `payment_method_id_${tempUserId}`
-      const timestampKey = `payment_method_timestamp_${tempUserId}`
+    if (uniqueDeviceId) {
+      const key = `payment_method_id_${uniqueDeviceId}`
+      const timestampKey = `payment_method_timestamp_${uniqueDeviceId}`
       localStorage.setItem(key, paymentMethodId)
       localStorage.setItem(timestampKey, Date.now().toString())
       console.log('✅ [Store] Payment method ID stored with keys:', key, timestampKey)
@@ -456,17 +450,17 @@ const TippingInterface: React.FC = () => {
 
   // Retrieve and validate stored payment method ID (checks 30-day expiration)
   const getStoredPaymentMethodId = (): string | null => {
-    const tempUserId = localStorage.getItem('tipply_user_id')
-    console.log('🔍 [Retrieve] Getting stored payment method - UserId:', tempUserId)
+    const uniqueDeviceId = getUniqueDeviceId()
+    console.log('🔍 [Retrieve] Getting stored payment method - UniqueDeviceId:', uniqueDeviceId)
     
-    // Try with current user ID first
-    if (tempUserId) {
-      const key = `payment_method_id_${tempUserId}`
-      const timestampKey = `payment_method_timestamp_${tempUserId}`
+    // Try with current unique device ID first
+    if (uniqueDeviceId) {
+      const key = `payment_method_id_${uniqueDeviceId}`
+      const timestampKey = `payment_method_timestamp_${uniqueDeviceId}`
       const paymentMethodId = localStorage.getItem(key)
       const timestamp = localStorage.getItem(timestampKey)
 
-      console.log('💾 [Retrieve] LocalStorage values with current userId:', { paymentMethodId, timestamp })
+      console.log('💾 [Retrieve] LocalStorage values with current uniqueDeviceId:', { paymentMethodId, timestamp })
 
       if (paymentMethodId && timestamp) {
         const storedTime = parseInt(timestamp)
@@ -478,7 +472,7 @@ const TippingInterface: React.FC = () => {
         console.log('📅 [Retrieve] Payment method age:', daysOld.toFixed(2), 'days')
 
         if (age <= thirtyDaysMs) {
-          console.log('✅ [Retrieve] Valid payment method ID found with current userId:', paymentMethodId)
+          console.log('✅ [Retrieve] Valid payment method ID found with current uniqueDeviceId:', paymentMethodId)
           return paymentMethodId
         } else {
           localStorage.removeItem(key)
@@ -520,18 +514,18 @@ const TippingInterface: React.FC = () => {
 
   // Retrieve stored Stripe customer ID with fallback search
   const getStoredCustomerId = (): string | null => {
-    const tempUserId = localStorage.getItem('tipply_user_id')
-    console.log('🔍 [Retrieve Customer] Getting stored customer ID - UserId:', tempUserId)
+    const uniqueDeviceId = getUniqueDeviceId()
+    console.log('🔍 [Retrieve Customer] Getting stored customer ID - UniqueDeviceId:', uniqueDeviceId)
     
-    // Try with current user ID first
-    if (tempUserId) {
-      const key = `stripe_customer_id_${tempUserId}`
+    // Try with current unique device ID first
+    if (uniqueDeviceId) {
+      const key = `stripe_customer_id_${uniqueDeviceId}`
       const customerId = localStorage.getItem(key)
       
-      console.log('💾 [Retrieve Customer] LocalStorage value with current userId:', customerId)
+      console.log('💾 [Retrieve Customer] LocalStorage value with current uniqueDeviceId:', customerId)
       
       if (customerId) {
-        console.log('✅ [Retrieve Customer] Found customer ID with current userId:', customerId)
+        console.log('✅ [Retrieve Customer] Found customer ID with current uniqueDeviceId:', customerId)
         return customerId
       }
     }
@@ -576,10 +570,10 @@ const TippingInterface: React.FC = () => {
 
   // Clear stored payment method ID
   const clearPaymentMethodId = () => {
-    const tempUserId = localStorage.getItem('tipply_user_id')
-    if (tempUserId) {
-      localStorage.removeItem(`payment_method_id_${tempUserId}`)
-      localStorage.removeItem(`payment_method_timestamp_${tempUserId}`)
+    const uniqueDeviceId = getUniqueDeviceId()
+    if (uniqueDeviceId) {
+      localStorage.removeItem(`payment_method_id_${uniqueDeviceId}`)
+      localStorage.removeItem(`payment_method_timestamp_${uniqueDeviceId}`)
     }
   }
 
@@ -852,6 +846,9 @@ const TippingInterface: React.FC = () => {
       // Get stored payment method ID and customer ID using fallback search
       const paymentMethodId = getStoredPaymentMethodId()
       const stripeCustomerId = getStoredCustomerId()
+      
+      console.log('💳 Retrieved payment method ID:', paymentMethodId)
+      console.log('💳 Retrieved Stripe customer ID:', stripeCustomerId)
       
       console.log('🎵 [processTipWithSong] Before payload construction - selectedSong:', selectedSong)
       const tipPayload = {
