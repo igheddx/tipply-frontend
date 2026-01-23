@@ -293,6 +293,39 @@ const Profile: React.FC = () => {
     }
   }
 
+  const handleStartOnboarding = async () => {
+    try {
+      setLoading(true)
+      setError('')
+
+      console.log('🚀 Starting Stripe onboarding from profile...')
+
+      const response = await apiService.post('/api/stripe/profile-onboarding-link', {})
+
+      if (response.error) {
+        setError(response.error)
+        setLoading(false)
+        return
+      }
+
+      if (response.data?.onboardingUrl) {
+        console.log('✅ Onboarding URL received, redirecting...')
+        if (top) {
+          top.location.href = response.data.onboardingUrl
+        } else {
+          window.location.href = response.data.onboardingUrl
+        }
+      } else {
+        setError('Failed to create onboarding link')
+        setLoading(false)
+      }
+    } catch (err) {
+      console.error('Error starting onboarding:', err)
+      setError('Failed to start onboarding process')
+      setLoading(false)
+    }
+  }
+
   const handleLogout = () => {
     localStorage.removeItem('token')
     localStorage.removeItem('refreshToken')
@@ -454,12 +487,21 @@ const Profile: React.FC = () => {
                   </svg>
                   <span className="text-sm font-medium text-red-800">KYC Not Verified</span>
                 </div>
-                <button
-                  onClick={handleStartVerification}
-                  className="w-full sm:w-auto px-6 py-2.5 bg-gradient-to-r from-primary-600 to-primary-700 text-white font-medium rounded-lg hover:from-primary-700 hover:to-primary-800 focus:ring-4 focus:ring-primary-200 transition-all duration-200"
-                >
-                  Start Stripe Verification
-                </button>
+                {profile?.stripeAccountId ? (
+                  <button
+                    onClick={handleStartVerification}
+                    className="w-full sm:w-auto px-6 py-2.5 bg-gradient-to-r from-primary-600 to-primary-700 text-white font-medium rounded-lg hover:from-primary-700 hover:to-primary-800 focus:ring-4 focus:ring-primary-200 transition-all duration-200"
+                  >
+                    Start Stripe Verification
+                  </button>
+                ) : (
+                  <button
+                    onClick={handleStartOnboarding}
+                    className="w-full sm:w-auto px-6 py-2.5 bg-gradient-to-r from-primary-600 to-primary-700 text-white font-medium rounded-lg hover:from-primary-700 hover:to-primary-800 focus:ring-4 focus:ring-primary-200 transition-all duration-200"
+                  >
+                    Start Stripe Onboarding
+                  </button>
+                )}
               </div>
             )}
           </div>
