@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - master
+      - dev
 
 jobs:
   build-and-deploy:
@@ -18,25 +19,37 @@ jobs:
           npm install
           npm run build:production
         env:
-          VITE_API_URL: https://uhxejjh8s1.execute-api.us-east-1.amazonaws.com/dev
+          VITE_API_URL: ${{ github.ref == 'refs/heads/dev' && 'https://uhxejjh8s1.execute-api.us-east-1.amazonaws.com/dev' || 'https://uhxejjh8s1.execute-api.us-east-1.amazonaws.com/prod' }}
 
       - name: Sync to S3
-        uses: jakejarvis/s3-sync-action@master
-        with:
-          args: --delete
+        run: |
+          echo "🚀 Deploying to branch: ${{ github.ref }}"
+          if [ "${{ github.ref }}" = "refs/heads/dev" ]; then
+            echo "📝 Syncing to dev: s3://tipwave-sites-bucket/test"
+            aws s3 sync dist/ s3://tipwave-sites-bucket/test/ --delete
+          else
+            echo "📝 Syncing to prod: s3://tipwave-sites-bucket/app"
+            aws s3 sync dist/ s3://tipwave-sites-bucket/app/ --delete
+          fi
         env:
-          AWS_S3_BUCKET: tipwave-sites-bucket
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_REGION: ${{ secrets.AWS_REGION }}
-          SOURCE_DIR: dist
-          DEST_DIR: app
 
       - name: Invalidate CloudFront cache
         run: |
-          aws cloudfront create-invalidation \
-            --distribution-id E2XIM4NN5SEMR7 \
-            --paths "/*"
+          echo "🌐 Invalidating CloudFront cache for branch: ${{ github.ref }}"
+          if [ "${{ github.ref }}" = "refs/heads/dev" ]; then
+            echo "🌐 Invalidating dev CloudFront (E2IU847MNWNNCH)"
+            aws cloudfront create-invalidation \
+              --distribution-id E2IU847MNWNNCH \
+              --paths "/*"
+          else
+            echo "🌐 Invalidating prod CloudFront (E2XIM4NN5SEMR7)"
+            aws cloudfront create-invalidation \
+              --distribution-id E2XIM4NN5SEMR7 \
+              --paths "/*"
+          fi
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
