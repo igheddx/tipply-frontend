@@ -1,4 +1,3 @@
-import logger from "../utils/logger";
 import React, { useState, useRef, useEffect } from 'react'
 import apiService from '../services/api'
 

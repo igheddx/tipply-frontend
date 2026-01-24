@@ -1,4 +1,3 @@
-import logger from "../utils/logger";
 import { useState } from 'react';
 import { Button, Modal } from 'antd';
 import { DownloadOutlined, CloseOutlined, ShareAltOutlined, PlusOutlined } from '@ant-design/icons';

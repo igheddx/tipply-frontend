@@ -1,4 +1,4 @@
-import logger from "./utils/logger";
+import logger from "./logger";
 import CryptoJS from 'crypto-js';
 
 export const getEncryptDecryptNoUserName = async (): Promise<string> => {

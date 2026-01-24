@@ -1,4 +1,3 @@
-import logger from "../utils/logger";
 import { useState } from 'react'
 
 interface PerformerHeaderProps {

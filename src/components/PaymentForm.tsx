@@ -1,4 +1,3 @@
-import logger from "../utils/logger";
 import React, { useState } from 'react'
 import { useStripe, useElements, CardElement } from '@stripe/react-stripe-js'
 

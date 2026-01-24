@@ -1,4 +1,3 @@
-import logger from "../utils/logger";
 import React, { useState, useRef } from 'react'
 
 interface TipAmountProps {
