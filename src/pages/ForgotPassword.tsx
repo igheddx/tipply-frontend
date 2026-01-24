@@ -150,8 +150,8 @@ const ForgotPassword: React.FC = () => {
         <div className="text-center mb-8">
           <div className="mx-auto w-32 h-32 overflow-visible rounded-2xl mb-4">
             <img 
-              src="/images/tipply_logo.png" 
-              alt="Tipply Logo" 
+              src="/images/logo/tipwave-logo2.png" 
+              alt="Tipwave Logo" 
               className="w-full h-full object-contain"
               style={{ transform: 'scale(1.25)', objectPosition: 'center' }}
             />
