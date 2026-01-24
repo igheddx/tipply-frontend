@@ -820,20 +820,27 @@ const Dashboard: React.FC = () => {
       // Draw footer with environment indicator
       ctx.fillStyle = '#6B7280'
       ctx.font = '28px Arial, sans-serif'
-      const isProd = window.location.hostname.includes('app.tipwave.live')
+      const isProd = window.location.hostname.includes('app.tipwave.live') || window.location.hostname.includes('tipwave.live')
       
       // Draw the base text
       ctx.textAlign = 'center'
       const baseText = 'Printed 4x6" QR Card · '
       const brandText = 'Tipwave'
+      const spacer = '  ' // Two spaces for better padding
       
       // Measure text to position elements correctly
       const baseTextWidth = ctx.measureText(baseText).width
       const brandTextWidth = ctx.measureText(brandText).width
+      const spacerWidth = ctx.measureText(spacer).width
+      
+      // Measure Live! in bold font
+      ctx.font = 'bold 28px Arial, sans-serif'
+      const liveTextWidth = ctx.measureText('Live!').width
+      ctx.font = '28px Arial, sans-serif' // Reset to regular
       
       // Calculate starting position for centered text
       const totalWidth = isProd 
-        ? baseTextWidth + brandTextWidth + ctx.measureText(' ').width + ctx.measureText('Live!').width
+        ? baseTextWidth + brandTextWidth + spacerWidth + liveTextWidth
         : baseTextWidth + brandTextWidth
       
       let xPosition = (width / 2) - (totalWidth / 2)
@@ -847,10 +854,9 @@ const Dashboard: React.FC = () => {
       ctx.fillText(brandText, xPosition, 1650)
       xPosition += brandTextWidth
       
-      // Add " Live!" in bold for production
+      // Add "  Live!" in bold for production with proper spacing
       if (isProd) {
-        ctx.fillText(' ', xPosition, 1650)
-        xPosition += ctx.measureText(' ').width
+        xPosition += spacerWidth
         
         ctx.font = 'bold 28px Arial, sans-serif'
         ctx.fillText('Live!', xPosition, 1650)
