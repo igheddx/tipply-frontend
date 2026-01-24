@@ -680,26 +680,31 @@ const TippingInterface: React.FC = () => {
   // Trigger haptic feedback (Web Vibration API)
   const triggerHaptic = () => {
     if ('vibrate' in navigator) {
-      navigator.vibrate(50) // 50ms subtle vibration
+      navigator.vibrate(100) // 100ms - 2x intensity for enhanced feedback
     }
   }
 
-  // Canvas confetti with gradual intensity per denomination
+  // Canvas confetti with remapped intensity per denomination
   const triggerCanvasConfetti = (amount: number) => {
-    // Confetti configuration based on denomination
+    // Confetti configuration based on denomination with remapped intensities
     const getConfettiConfig = (amt: number) => {
+      // $100 and $50: New intensity - 2x burst of original
       if (amt >= 100) {
-        return { particleCount: 150, spread: 100, startVelocity: 50, duration: 500 }
+        return { particleCount: 300, spread: 200, startVelocity: 100, duration: 1000 }
       } else if (amt >= 50) {
+        return { particleCount: 300, spread: 200, startVelocity: 100, duration: 1000 }
+      }
+      // $10 and $20: Use original $100 and $50 intensity
+      else if (amt >= 20) {
         return { particleCount: 100, spread: 90, startVelocity: 45, duration: 450 }
-      } else if (amt >= 20) {
-        return { particleCount: 70, spread: 80, startVelocity: 40, duration: 400 }
       } else if (amt >= 10) {
-        return { particleCount: 60, spread: 75, startVelocity: 38, duration: 375 }
-      } else if (amt >= 5) {
-        return { particleCount: 60, spread: 75, startVelocity: 38, duration: 375 }
+        return { particleCount: 100, spread: 90, startVelocity: 45, duration: 450 }
+      }
+      // $1 and $5: Use original $10 and $20 intensity
+      else if (amt >= 5) {
+        return { particleCount: 70, spread: 80, startVelocity: 40, duration: 400 }
       } else {
-        return { particleCount: 60, spread: 75, startVelocity: 38, duration: 375 }
+        return { particleCount: 70, spread: 80, startVelocity: 40, duration: 400 }
       }
     }
 
