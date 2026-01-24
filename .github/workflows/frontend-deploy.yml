@@ -3,7 +3,8 @@ name: Deploy Tipply Frontend to AWS S3
 on:
   push:
     branches:
-      - master # Or 'main' if that's your working branch
+      - master
+      - dev
     paths:
       - "frontend/**"
 
@@ -11,6 +12,12 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     environment: test
+    env:
+      S3_BUCKET: tipwave-sites-bucket
+      PROD_CLOUDFRONT_ID: E2XIM4NN5SEMR7
+      TEST_CLOUDFRONT_ID: E2IU847MNWNNCH
+      DEPLOY_ENV: ${{ github.ref == 'refs/heads/master' && 'prod' || 'test' }}
+      S3_PATH: ${{ github.ref == 'refs/heads/master' && 'app' || 'test' }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -32,7 +39,6 @@ jobs:
           cd frontend
           npm run build
         env:
-          REACT_APP_API_URL: ${{ vars.test.REACT_APP_API_URL }}
           REACT_APP_STRIPE_PUBLISHABLE_KEY: ${{ secrets.STRIPE_PUBLISHABLE_KEY }}
 
       - name: Configure AWS credentials
@@ -44,9 +50,21 @@ jobs:
 
       - name: Deploy to S3
         run: |
-          aws s3 sync frontend/dist/ s3://${{ vars.test.S3_BUCKET_NAME }} --delete
-          aws s3 cp frontend/dist/index.html s3://${{ vars.test.S3_BUCKET_NAME }}/index.html --cache-control "no-cache, no-store, must-revalidate"
+          echo "🚀 Deploying to ${{ env.DEPLOY_ENV }} environment (s3://${{ env.S3_BUCKET }}/${{ env.S3_PATH }}/)"
+          aws s3 sync frontend/dist/ s3://${{ env.S3_BUCKET }}/${{ env.S3_PATH }}/ --delete
+          aws s3 cp frontend/dist/index.html s3://${{ env.S3_BUCKET }}/${{ env.S3_PATH }}/index.html --cache-control "no-cache, no-store, must-revalidate"
 
       - name: Invalidate CloudFront cache
         run: |
-          aws cloudfront create-invalidation --distribution-id ${{ vars.test.CLOUDFRONT_DISTRIBUTION_ID }} --paths "/*"
+          DISTRIBUTION_ID=${{ env.DEPLOY_ENV == 'prod' && env.PROD_CLOUDFRONT_ID || env.TEST_CLOUDFRONT_ID }}
+          echo "🔄 Invalidating CloudFront distribution: $DISTRIBUTION_ID"
+          aws cloudfront create-invalidation --distribution-id "$DISTRIBUTION_ID" --paths "/*"
+
+      - name: Deployment Summary
+        run: |
+          DISTRIBUTION_ID=${{ env.DEPLOY_ENV == 'prod' && env.PROD_CLOUDFRONT_ID || env.TEST_CLOUDFRONT_ID }}
+          echo "✅ Frontend deployment complete!"
+          echo "📦 S3 Path: s3://${{ env.S3_BUCKET }}/${{ env.S3_PATH }}/"
+          echo "🌐 CloudFront: $DISTRIBUTION_ID"
+          echo "🔗 Environment: ${{ env.DEPLOY_ENV }}"
+          echo "📍 Branch: ${{ github.ref }}"
