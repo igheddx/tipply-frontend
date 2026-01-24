@@ -51,8 +51,33 @@ jobs:
       - name: Deploy to S3
         run: |
           echo "🚀 Deploying to ${{ env.DEPLOY_ENV }} environment (s3://${{ env.S3_BUCKET }}/${{ env.S3_PATH }}/)"
-          aws s3 sync frontend/dist/ s3://${{ env.S3_BUCKET }}/${{ env.S3_PATH }}/ --delete
-          aws s3 cp frontend/dist/index.html s3://${{ env.S3_BUCKET }}/${{ env.S3_PATH }}/index.html --cache-control "no-cache, no-store, must-revalidate"
+          aws s3 sync frontend/dist/ s3://${{ env.S3_BUCKET }}/${{ env.S3_PATH }}/ \
+            --delete \
+            --exclude "*.html" \
+            --exclude "*.css" \
+            --exclude "*.js" \
+            --cache-control "max-age=31536000"
+          
+          # Upload HTML files with correct content-type
+          aws s3 sync frontend/dist/ s3://${{ env.S3_BUCKET }}/${{ env.S3_PATH }}/ \
+            --exclude "*" \
+            --include "*.html" \
+            --content-type "text/html" \
+            --cache-control "no-cache, no-store, must-revalidate"
+          
+          # Upload CSS files with correct content-type
+          aws s3 sync frontend/dist/ s3://${{ env.S3_BUCKET }}/${{ env.S3_PATH }}/ \
+            --exclude "*" \
+            --include "*.css" \
+            --content-type "text/css" \
+            --cache-control "max-age=31536000"
+          
+          # Upload JS files with correct content-type
+          aws s3 sync frontend/dist/ s3://${{ env.S3_BUCKET }}/${{ env.S3_PATH }}/ \
+            --exclude "*" \
+            --include "*.js" \
+            --content-type "application/javascript" \
+            --cache-control "max-age=31536000"
 
       - name: Invalidate CloudFront cache
         run: |
