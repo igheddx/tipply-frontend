@@ -1,3 +1,4 @@
+import logger from "../utils/logger";
 import React, { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { API_BASE_URL } from '../utils/config'
@@ -74,7 +75,7 @@ const SongCatalogSearch: React.FC<SongCatalogSearchProps> = ({
         setDailyTotal(data)
       }
     } catch (error) {
-      console.error('Error loading daily total:', error)
+      logger.error('Error loading daily total:', error)
     }
   }
 
@@ -102,7 +103,7 @@ const SongCatalogSearch: React.FC<SongCatalogSearchProps> = ({
         }
       }
     } catch (error) {
-      console.error('Error searching songs:', error)
+      logger.error('Error searching songs:', error)
     } finally {
       setLoading(false)
     }

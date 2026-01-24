@@ -1,3 +1,4 @@
+import logger from "../utils/logger";
 import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Device } from '../types'
@@ -45,7 +46,7 @@ const ManageDevices: React.FC = () => {
       document.body.removeChild(link)
       window.URL.revokeObjectURL(url)
     } catch (err) {
-      console.error('Failed to download QR code:', err)
+      logger.error('Failed to download QR code:', err)
     }
   }
 

@@ -1,3 +1,4 @@
+import logger from "../utils/logger";
 import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import apiService from '../services/api'
@@ -42,7 +43,7 @@ const Onboarding: React.FC = () => {
         await getEncryptDecryptNoUserName()
         setApiKeyGenerated(true)
       } catch (error) {
-        console.error('Failed to generate API key:', error)
+        logger.error('Failed to generate API key:', error)
       }
     }
     generateApiKey()
@@ -124,32 +125,32 @@ const Onboarding: React.FC = () => {
   }
 
   const sendVerificationCode = async () => {
-    console.log('sendVerificationCode called with email:', formData.email)
+    logger.log('sendVerificationCode called with email:', formData.email)
     
     if (!formData.email.trim()) {
-      console.log('sendVerificationCode: Email is empty')
+      logger.log('sendVerificationCode: Email is empty')
       setErrors(prev => ({ ...prev, email: 'Email is required to send verification code' }))
       return false
     }
     
     try {
       setIsLoading(true)
-      console.log('sendVerificationCode: Calling API...')
+      logger.log('sendVerificationCode: Calling API...')
       const result = await apiService.sendOnboardingVerification(formData.email)
-      console.log('sendVerificationCode: API result:', result)
+      logger.log('sendVerificationCode: API result:', result)
       
       if (result.error) {
-        console.log('sendVerificationCode: API returned error:', result.error)
+        logger.log('sendVerificationCode: API returned error:', result.error)
         setErrors(prev => ({ ...prev, email: result.error || 'Failed to send verification code' }))
         return false
       }
       
-      console.log('sendVerificationCode: Setting verificationSent to true')
+      logger.log('sendVerificationCode: Setting verificationSent to true')
       setVerificationSent(true)
-      console.log('sendVerificationCode: verificationSent is now:', true)
+      logger.log('sendVerificationCode: verificationSent is now:', true)
       return true
     } catch (err) {
-      console.log('sendVerificationCode: Exception occurred:', err)
+      logger.log('sendVerificationCode: Exception occurred:', err)
       setErrors(prev => ({ ...prev, email: 'Failed to send verification code. Please try again.' }))
       return false
     } finally {
@@ -305,40 +306,40 @@ const Onboarding: React.FC = () => {
           const created = await createProfile()
           if (!created) {
             // Profile creation failed, show error and stop
-            console.log('Step 2: Profile creation failed, stopping flow')
+            logger.log('Step 2: Profile creation failed, stopping flow')
             return
           }
           setProfileCreated(true)
         }
         
         // Send verification code immediately after profile creation
-        console.log('Step 2: Profile created, sending verification code...')
+        logger.log('Step 2: Profile created, sending verification code...')
         const sent = await sendVerificationCode()
         if (!sent) {
-          console.log('Step 2: Failed to send verification code')
+          logger.log('Step 2: Failed to send verification code')
           return
         }
-        console.log('Step 2: Verification code sent successfully, advancing to step 3')
+        logger.log('Step 2: Verification code sent successfully, advancing to step 3')
         setStep(step + 1)
       } else if (step === 3) {
         // Verify email code (verification code already sent in step 2)
-        console.log('Step 3: verificationSent =', verificationSent, 'verificationCode =', verificationCode)
+        logger.log('Step 3: verificationSent =', verificationSent, 'verificationCode =', verificationCode)
         
         if (!verificationCode.trim()) {
-          console.log('Step 3: No verification code entered')
+          logger.log('Step 3: No verification code entered')
           setErrors(prev => ({ ...prev, verificationCode: 'Please enter the verification code sent to your email' }))
           return
         }
         
         // Verify the entered code
-        console.log('Step 3: Verifying email code...')
+        logger.log('Step 3: Verifying email code...')
         const verified = await verifyEmail()
         if (!verified) {
-          console.log('Step 3: Failed to verify email code')
+          logger.log('Step 3: Failed to verify email code')
           return
         }
         
-        console.log('Step 3: Email verified successfully, advancing to next step')
+        logger.log('Step 3: Email verified successfully, advancing to next step')
         setStep(step + 1)
       } else if (step === 4) {
         // Register device using the created profile
@@ -371,7 +372,7 @@ const Onboarding: React.FC = () => {
           setStep(step + 1)
         } catch (err) {
           // Error already handled in registerDevice, just don't advance
-          console.error('Device registration failed, not advancing to next step')
+          logger.error('Device registration failed, not advancing to next step')
         }
       } else if (step === 5) {
         // Step 5 is the KYC Verification step - user clicks button to continue to Stripe
@@ -396,9 +397,9 @@ const Onboarding: React.FC = () => {
     try {
       // During onboarding, we don't need to update profile separately
       // The profile will be created when we set the password
-      console.log('Personal info saved for onboarding')
+      logger.log('Personal info saved for onboarding')
     } catch (err) {
-      console.error('Failed to save personal info:', err)
+      logger.error('Failed to save personal info:', err)
     } finally {
       setIsLoading(false)
     }
@@ -418,16 +419,16 @@ const Onboarding: React.FC = () => {
       
       if (result.error) {
         setErrors(prev => ({ ...prev, email: result.error || 'Failed to create profile. Email may already be in use.' }))
-        console.error('Failed to create profile:', result.error)
+        logger.error('Failed to create profile:', result.error)
         return false
       }
       
-      console.log('Profile created and password set successfully for onboarding')
+      logger.log('Profile created and password set successfully for onboarding')
       return true
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to create profile. Email may already be in use.'
       setErrors(prev => ({ ...prev, email: errorMessage }))
-      console.error('Failed to create profile:', err)
+      logger.error('Failed to create profile:', err)
       return false
     } finally {
       setIsLoading(false)
@@ -486,12 +487,12 @@ Please use a different serial number or contact support if this is your device.`
         throw new Error(result.error)
       }
       
-      console.log('Device registered successfully for onboarding')
+      logger.log('Device registered successfully for onboarding')
       
       // Clear any previous errors
       setErrors(prev => ({ ...prev, serialNumber: '' }))
     } catch (err) {
-      console.error('Failed to register device:', err)
+      logger.error('Failed to register device:', err)
       setErrors(prev => ({ 
         ...prev, 
         serialNumber: err instanceof Error ? err.message : 'Failed to register device. Please try again.' 
@@ -510,8 +511,8 @@ Please use a different serial number or contact support if this is your device.`
       sessionStorage.setItem('onboarding_email', formData.email)
       sessionStorage.setItem('onboarding_password', formData.password)
 
-      console.log('Starting KYC process with serial number:', formData.serialNumber)
-      console.log('Form data being sent:', {
+      logger.log('Starting KYC process with serial number:', formData.serialNumber)
+      logger.log('Form data being sent:', {
         serialNumber: formData.serialNumber,
         firstName: formData.firstName,
         lastName: formData.lastName,
@@ -535,11 +536,11 @@ Please use a different serial number or contact support if this is your device.`
         email: formData.email
       })
 
-      console.log('CreateConnectAccount response:', result)
+      logger.log('CreateConnectAccount response:', result)
 
       if (result.error) {
         // Log the full error details for debugging
-        console.error('CreateConnectAccount error details:', {
+        logger.error('CreateConnectAccount error details:', {
           error: result.error,
           data: result.data
         })
@@ -548,7 +549,7 @@ Please use a different serial number or contact support if this is your device.`
 
       // Check if we got the new async response format
       if (result.data?.status === 'processing') {
-        console.log('Received processing status, starting polling...')
+        logger.log('Received processing status, starting polling...')
         // Poll for status until we get the onboarding URL
         await pollForOnboardingUrl()
         return
@@ -556,7 +557,7 @@ Please use a different serial number or contact support if this is your device.`
 
       // Handle legacy immediate response format
       if (result.data?.onboardingUrl) {
-        console.log('Received immediate onboarding URL, performing full-page navigation...')
+        logger.log('Received immediate onboarding URL, performing full-page navigation...')
         // Use top.location.href to guarantee full-page navigation that escapes SPA context
         // This prevents iOS Safari ITP from blocking hCaptcha due to frame-ancestry restrictions
         if (isIOS) {
@@ -575,11 +576,11 @@ Please use a different serial number or contact support if this is your device.`
         }
         return
       } else {
-        console.error('Unexpected response format:', result.data)
+        logger.error('Unexpected response format:', result.data)
         throw new Error('No onboarding URL received from Stripe')
       }
     } catch (err) {
-      console.error('Failed to start KYC process:', err)
+      logger.error('Failed to start KYC process:', err)
       
       // Extract error message
       const errorMessage = err instanceof Error ? err.message : String(err)
@@ -621,29 +622,29 @@ Please use a different serial number or contact support if this is your device.`
     const maxAttempts = 180 // 3 minutes max (increased for Stripe Connect account creation)
     const pollInterval = 1000 // 1 second
     
-    console.log(`Starting polling for device: ${formData.serialNumber}`)
+    logger.log(`Starting polling for device: ${formData.serialNumber}`)
     
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       try {
-        console.log(`Polling for onboarding URL, attempt ${attempt}/${maxAttempts}`)
+        logger.log(`Polling for onboarding URL, attempt ${attempt}/${maxAttempts}`)
         
         const statusResult = await apiService.getConnectAccountStatus(formData.serialNumber)
         
-        console.log(`Status response for attempt ${attempt}:`, statusResult)
+        logger.log(`Status response for attempt ${attempt}:`, statusResult)
         
         if (statusResult.error) {
-          console.error('Error polling status:', statusResult.error)
+          logger.error('Error polling status:', statusResult.error)
           // If we get an error, wait a bit longer before retrying
           await new Promise(resolve => setTimeout(resolve, pollInterval * 2))
           continue
         }
         
         const status = statusResult.data
-        console.log('Status data:', status)
+        logger.log('Status data:', status)
         
         // Check if we have an onboarding URL
         if (status?.onboardingUrl) {
-          console.log('Onboarding URL received, performing full-page navigation...')
+          logger.log('Onboarding URL received, performing full-page navigation...')
           // Use top.location.href to guarantee full-page navigation that escapes SPA context
           if (isIOS) {
             // On iOS, show modal offering new-tab option to avoid WebView restrictions
@@ -682,21 +683,21 @@ Please use a different serial number or contact support if this is your device.`
         
         // Check if still processing
         if (status?.status === 'processing') {
-          console.log('Still processing, waiting...')
+          logger.log('Still processing, waiting...')
           
           // After 30 seconds of processing, show a more informative message
           if (attempt === 30) {
-            console.warn('Stripe account creation is taking longer than expected. This may be due to high load or network issues.')
+            logger.warn('Stripe account creation is taking longer than expected. This may be due to high load or network issues.')
           }
           
           // After 60 seconds, show that this is normal for Stripe Connect
           if (attempt === 60) {
-            console.log('Stripe Connect account creation typically takes 1-3 minutes. Please be patient...')
+            logger.log('Stripe Connect account creation typically takes 1-3 minutes. Please be patient...')
           }
           
           // After 120 seconds, show final warning
           if (attempt === 120) {
-            console.warn('Stripe Connect account creation is taking longer than usual. This may indicate an issue.')
+            logger.warn('Stripe Connect account creation is taking longer than usual. This may indicate an issue.')
           }
         }
         
@@ -704,7 +705,7 @@ Please use a different serial number or contact support if this is your device.`
         await new Promise(resolve => setTimeout(resolve, pollInterval))
         
       } catch (error) {
-        console.error(`Error during polling attempt ${attempt}:`, error)
+        logger.error(`Error during polling attempt ${attempt}:`, error)
         
         // Check if this is a retryable error
         const errorMessage = error instanceof Error ? error.message : String(error)
@@ -735,7 +736,7 @@ Please use a different serial number or contact support if this is your device.`
       // Navigate to dashboard
       navigate('/dashboard')
     } catch (err) {
-      console.error('Onboarding failed:', err)
+      logger.error('Onboarding failed:', err)
     } finally {
       setIsLoading(false)
     }

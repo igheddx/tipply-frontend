@@ -1,3 +1,4 @@
+import logger from "../utils/logger";
 import React, { useState, useEffect, useRef } from 'react'
 import { useParams } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -172,11 +173,11 @@ const TippingInterface: React.FC = () => {
     const initializeUser = async () => {
       // Get unique device ID (deterministic and reproducible)
       const uniqueDeviceId = getUniqueDeviceId()
-      console.log('🔐 [Init] Unique device ID:', uniqueDeviceId)
+      logger.log('🔐 [Init] Unique device ID:', uniqueDeviceId)
       
       // Detect platform (iOS, Android, Desktop)
       const platform = detectPlatform()
-      console.log('📱 [Init] Platform detected:', platform)
+      logger.log('📱 [Init] Platform detected:', platform)
       
       setUserId(uniqueDeviceId)
 
@@ -185,10 +186,10 @@ const TippingInterface: React.FC = () => {
         if (response.ok) {
           await response.json() // consume body (not used)
         }
-        console.log('👤 [Init] User initialized with ID:', uniqueDeviceId)
+        logger.log('👤 [Init] User initialized with ID:', uniqueDeviceId)
       } catch (error) {
-        console.log('Song catalog initialization error:', error)
-        console.log('👤 [Init] User initialized (with error) with ID:', uniqueDeviceId, error)
+        logger.log('Song catalog initialization error:', error)
+        logger.log('👤 [Init] User initialized (with error) with ID:', uniqueDeviceId, error)
       }
       
       // Load user's total tips (last 24 hours)
@@ -202,14 +203,14 @@ const TippingInterface: React.FC = () => {
     const loadUserTotal = async (userTempId?: string) => {
       try {
         const tempUserId = userTempId || localStorage.getItem('unique_device_id')
-        console.log('🔍 [loadUserTotal] Fetching totals for userId:', tempUserId)
+        logger.log('🔍 [loadUserTotal] Fetching totals for userId:', tempUserId)
         if (!tempUserId) {
-          console.error('❌ [loadUserTotal] No tempUserId found')
+          logger.error('❌ [loadUserTotal] No tempUserId found')
           return false
         }
       
         const url = `${getApiBaseUrl()}/api/tips/user-total/${tempUserId}`
-        console.log('📡 [loadUserTotal] Request URL:', url)
+        logger.log('📡 [loadUserTotal] Request URL:', url)
         const response = await fetch(url, {
           cache: 'no-store',
           headers: {
@@ -217,20 +218,20 @@ const TippingInterface: React.FC = () => {
             'Pragma': 'no-cache'
           }
         })
-        console.log('📡 [loadUserTotal] Response status:', response.status)
+        logger.log('📡 [loadUserTotal] Response status:', response.status)
         if (response.ok) {
           const data = await response.json()
-          console.log('✅ [loadUserTotal] Backend returned:', data)
-          console.log('✅ [loadUserTotal] Setting totalTipped to:', data.totalAmount)
+          logger.log('✅ [loadUserTotal] Backend returned:', data)
+          logger.log('✅ [loadUserTotal] Setting totalTipped to:', data.totalAmount)
           setTotalTipped(data.totalAmount)
           return true
         } else {
           const errorText = await response.text()
-          console.error('[loadUserTotal] Failed response:', response.status, response.statusText, errorText)
+          logger.error('[loadUserTotal] Failed response:', response.status, response.statusText, errorText)
           return false
         }
       } catch (error) {
-        console.error('❌ [loadUserTotal] Error:', error)
+        logger.error('❌ [loadUserTotal] Error:', error)
         return false
       }
     }
@@ -258,7 +259,7 @@ const TippingInterface: React.FC = () => {
         setAudioEnabled(true)
       }
     } catch (error) {
-      console.log('Audio enable failed:', error)
+      logger.log('Audio enable failed:', error)
     }
   }
 
@@ -303,9 +304,9 @@ const TippingInterface: React.FC = () => {
         // Check AWS IoT status
         try {
           const response = await apiService.getAwsIotStatus()
-          console.log('AWS IoT Status:', response)
+          logger.log('AWS IoT Status:', response)
         } catch (error) {
-          console.log('AWS IoT Status check failed:', error)
+          logger.log('AWS IoT Status check failed:', error)
         }
 
         // Check payment methods using the device UUID
@@ -317,7 +318,7 @@ const TippingInterface: React.FC = () => {
         setCheckingPaymentMethods(false)
 
       } catch (error) {
-        console.error('Error fetching device data:', error)
+        logger.error('Error fetching device data:', error)
         toast.error('Failed to load device information')
         setCheckingPaymentMethods(false)
       }
@@ -328,16 +329,16 @@ const TippingInterface: React.FC = () => {
 
   const checkPaymentMethods = async (deviceInfo?: DeviceInfo | null): Promise<PaymentMethodsCheckResult> => {
     const uniqueDeviceId = getUniqueDeviceId()
-    console.log('🔍 [Payment Check] Starting check - UniqueDeviceId:', uniqueDeviceId, 'DeviceId:', deviceId)
+    logger.log('🔍 [Payment Check] Starting check - UniqueDeviceId:', uniqueDeviceId, 'DeviceId:', deviceId)
     
     if (!uniqueDeviceId || !deviceId) {
-      console.log('❌ [Payment Check] Missing uniqueDeviceId or deviceId')
+      logger.log('❌ [Payment Check] Missing uniqueDeviceId or deviceId')
       return { hasPaymentMethods: false }
     }
 
     // First, check if we have a stored payment method ID (30-day memory)
     const storedPaymentMethodId = getStoredPaymentMethodId()
-    console.log('💾 [Payment Check] Stored payment method ID:', storedPaymentMethodId || 'None')
+    logger.log('💾 [Payment Check] Stored payment method ID:', storedPaymentMethodId || 'None')
 
     // Check cached payment status first (valid for 7 days) - only if no stored payment method ID
     if (!storedPaymentMethodId) {
@@ -351,7 +352,7 @@ const TippingInterface: React.FC = () => {
         
         if (cacheAge < sevenDays) {
           const cached = JSON.parse(cachedPaymentStatus)
-          console.log('Using cached payment status:', cached)
+          logger.log('Using cached payment status:', cached)
           return cached
         }
       }
@@ -363,7 +364,7 @@ const TippingInterface: React.FC = () => {
         userId: uniqueDeviceId,
         paymentMethodId: storedPaymentMethodId || undefined
       }
-      console.log('📡 [Payment Check] API request:', requestBody)
+      logger.log('📡 [Payment Check] API request:', requestBody)
       
       const response = await fetch(`${getApiBaseUrl()}/api/stripe/check-payment-methods`, {
         method: 'POST',
@@ -374,10 +375,10 @@ const TippingInterface: React.FC = () => {
       })
       
       const data = await response.json()
-      console.log('📥 [Payment Check] API response:', data)
+      logger.log('📥 [Payment Check] API response:', data)
       
       if (response.ok && data.hasPaymentMethods) {
-        console.log('✅ [Payment Check] Payment methods found!')
+        logger.log('✅ [Payment Check] Payment methods found!')
         const result = {
           hasPaymentMethods: true,
           paymentMethodType: data.paymentMethodType,
@@ -386,10 +387,10 @@ const TippingInterface: React.FC = () => {
         
         // Store the payment method ID for 30-day persistence
         if (data.paymentMethodId) {
-          console.log('💾 [Payment Check] Storing payment method ID:', data.paymentMethodId)
+          logger.log('💾 [Payment Check] Storing payment method ID:', data.paymentMethodId)
           storePaymentMethodId(data.paymentMethodId)
         } else {
-          console.log('⚠️ [Payment Check] No paymentMethodId in response!')
+          logger.log('⚠️ [Payment Check] No paymentMethodId in response!')
         }
         
         // Cache the successful result with device-specific key (7 days)
@@ -399,18 +400,18 @@ const TippingInterface: React.FC = () => {
         return result
       } else if (storedPaymentMethodId) {
         // If validation failed for the stored payment method ID, clear it
-        console.log('❌ [Payment Check] Stored payment method ID validation failed, clearing it')
+        logger.log('❌ [Payment Check] Stored payment method ID validation failed, clearing it')
         clearPaymentMethodId()
       } else {
-        console.log('❌ [Payment Check] No payment methods found')
+        logger.log('❌ [Payment Check] No payment methods found')
       }
     } catch (error) {
-      console.log('Payment method check failed:', error)
+      logger.log('Payment method check failed:', error)
       
       // If we have a cached result (even if expired), use it on network error
       const cachedPaymentStatus = localStorage.getItem(`payment_status_${uniqueDeviceId}_${deviceId}`)
       if (cachedPaymentStatus) {
-        console.log('Network error - using stale cache as fallback')
+        logger.log('Network error - using stale cache as fallback')
         return JSON.parse(cachedPaymentStatus)
       }
     }
@@ -429,28 +430,28 @@ const TippingInterface: React.FC = () => {
   // Store payment method ID with 30-day expiration
   const storePaymentMethodId = (paymentMethodId: string) => {
     const uniqueDeviceId = getUniqueDeviceId()
-    console.log('💾 [Store] Attempting to store payment method ID:', paymentMethodId)
-    console.log('💾 [Store] UniqueDeviceId:', uniqueDeviceId)
+    logger.log('💾 [Store] Attempting to store payment method ID:', paymentMethodId)
+    logger.log('💾 [Store] UniqueDeviceId:', uniqueDeviceId)
     
     if (uniqueDeviceId) {
       const key = `payment_method_id_${uniqueDeviceId}`
       const timestampKey = `payment_method_timestamp_${uniqueDeviceId}`
       localStorage.setItem(key, paymentMethodId)
       localStorage.setItem(timestampKey, Date.now().toString())
-      console.log('✅ [Store] Payment method ID stored with keys:', key, timestampKey)
-      console.log('💾 [Store] LocalStorage values:', {
+      logger.log('✅ [Store] Payment method ID stored with keys:', key, timestampKey)
+      logger.log('💾 [Store] LocalStorage values:', {
         paymentMethodId: localStorage.getItem(key),
         timestamp: localStorage.getItem(timestampKey)
       })
     } else {
-      console.log('❌ [Store] Cannot store - missing userId or deviceId')
+      logger.log('❌ [Store] Cannot store - missing userId or deviceId')
     }
   }
 
   // Retrieve and validate stored payment method ID (checks 30-day expiration)
   const getStoredPaymentMethodId = (): string | null => {
     const uniqueDeviceId = getUniqueDeviceId()
-    console.log('🔍 [Retrieve] Getting stored payment method - UniqueDeviceId:', uniqueDeviceId)
+    logger.log('🔍 [Retrieve] Getting stored payment method - UniqueDeviceId:', uniqueDeviceId)
     
     // Try with current unique device ID first
     if (uniqueDeviceId) {
@@ -459,7 +460,7 @@ const TippingInterface: React.FC = () => {
       const paymentMethodId = localStorage.getItem(key)
       const timestamp = localStorage.getItem(timestampKey)
 
-      console.log('💾 [Retrieve] LocalStorage values with current uniqueDeviceId:', { paymentMethodId, timestamp })
+      logger.log('💾 [Retrieve] LocalStorage values with current uniqueDeviceId:', { paymentMethodId, timestamp })
 
       if (paymentMethodId && timestamp) {
         const storedTime = parseInt(timestamp)
@@ -468,21 +469,21 @@ const TippingInterface: React.FC = () => {
         const age = now - storedTime
         const daysOld = age / (24 * 60 * 60 * 1000)
 
-        console.log('📅 [Retrieve] Payment method age:', daysOld.toFixed(2), 'days')
+        logger.log('📅 [Retrieve] Payment method age:', daysOld.toFixed(2), 'days')
 
         if (age <= thirtyDaysMs) {
-          console.log('✅ [Retrieve] Valid payment method ID found with current uniqueDeviceId:', paymentMethodId)
+          logger.log('✅ [Retrieve] Valid payment method ID found with current uniqueDeviceId:', paymentMethodId)
           return paymentMethodId
         } else {
           localStorage.removeItem(key)
           localStorage.removeItem(timestampKey)
-          console.log('⏰ [Retrieve] Stored payment method ID expired (>30 days)')
+          logger.log('⏰ [Retrieve] Stored payment method ID expired (>30 days)')
         }
       }
     }
     
     // Fallback: search for any payment_method_id_* key
-    console.log('🔍 [Retrieve] Searching for any payment_method_id_* key in localStorage')
+    logger.log('🔍 [Retrieve] Searching for any payment_method_id_* key in localStorage')
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i)
       if (key && key.startsWith('payment_method_id_')) {
@@ -497,59 +498,59 @@ const TippingInterface: React.FC = () => {
           const age = now - storedTime
           const daysOld = age / (24 * 60 * 60 * 1000)
 
-          console.log('📅 [Retrieve] Found payment method with age:', daysOld.toFixed(2), 'days')
+          logger.log('📅 [Retrieve] Found payment method with age:', daysOld.toFixed(2), 'days')
 
           if (age <= thirtyDaysMs) {
-            console.log('✅ [Retrieve] Found valid payment method ID via fallback search:', paymentMethodId)
+            logger.log('✅ [Retrieve] Found valid payment method ID via fallback search:', paymentMethodId)
             return paymentMethodId
           }
         }
       }
     }
 
-    console.log('❌ [Retrieve] No valid payment method found')
+    logger.log('❌ [Retrieve] No valid payment method found')
     return null
   }
 
   // Retrieve stored Stripe customer ID with fallback search
   const getStoredCustomerId = (): string | null => {
     const uniqueDeviceId = getUniqueDeviceId()
-    console.log('🔍 [Retrieve Customer] Getting stored customer ID - UniqueDeviceId:', uniqueDeviceId)
+    logger.log('🔍 [Retrieve Customer] Getting stored customer ID - UniqueDeviceId:', uniqueDeviceId)
     
     // Try with current unique device ID first
     if (uniqueDeviceId) {
       const key = `stripe_customer_id_${uniqueDeviceId}`
       const customerId = localStorage.getItem(key)
       
-      console.log('💾 [Retrieve Customer] LocalStorage value with current uniqueDeviceId:', customerId)
+      logger.log('💾 [Retrieve Customer] LocalStorage value with current uniqueDeviceId:', customerId)
       
       if (customerId) {
-        console.log('✅ [Retrieve Customer] Found customer ID with current uniqueDeviceId:', customerId)
+        logger.log('✅ [Retrieve Customer] Found customer ID with current uniqueDeviceId:', customerId)
         return customerId
       }
     }
     
     // Fallback: search for any stripe_customer_id_* key
-    console.log('🔍 [Retrieve Customer] Searching for any stripe_customer_id_* key in localStorage')
+    logger.log('🔍 [Retrieve Customer] Searching for any stripe_customer_id_* key in localStorage')
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i)
       if (key && key.startsWith('stripe_customer_id_')) {
         const customerId = localStorage.getItem(key)
         if (customerId) {
-          console.log('✅ [Retrieve Customer] Found customer ID via fallback search:', customerId)
+          logger.log('✅ [Retrieve Customer] Found customer ID via fallback search:', customerId)
           return customerId
         }
       }
     }
 
-    console.log('❌ [Retrieve Customer] No customer ID found')
+    logger.log('❌ [Retrieve Customer] No customer ID found')
     return null
   }
 
   // Refresh/extend the 30-day session for stored payment method
   const refreshPaymentMethodSession = () => {
     const tempUserId = localStorage.getItem('tipply_user_id')
-    console.log('🔄 [Refresh] Refreshing payment method session')
+    logger.log('🔄 [Refresh] Refreshing payment method session')
     
     if (tempUserId) {
       const key = `payment_method_id_${tempUserId}`
@@ -558,12 +559,12 @@ const TippingInterface: React.FC = () => {
       
       if (paymentMethodId) {
         localStorage.setItem(timestampKey, Date.now().toString())
-        console.log('✅ [Refresh] Payment method session refreshed for another 30 days:', paymentMethodId)
+        logger.log('✅ [Refresh] Payment method session refreshed for another 30 days:', paymentMethodId)
       } else {
-        console.log('⚠️ [Refresh] No payment method ID to refresh')
+        logger.log('⚠️ [Refresh] No payment method ID to refresh')
       }
     } else {
-      console.log('❌ [Refresh] Missing userId')
+      logger.log('❌ [Refresh] Missing userId')
     }
   }
 
@@ -719,7 +720,7 @@ const TippingInterface: React.FC = () => {
   const handleTipClick = async (amount: number) => {
     if (loading || !deviceInfo || !userId) return
 
-    console.log('🎯 [handleTipClick] Called with amount:', amount, 'selectedSong:', selectedSong)
+    logger.log('🎯 [handleTipClick] Called with amount:', amount, 'selectedSong:', selectedSong)
 
     // Trigger haptic feedback immediately
     triggerHaptic()
@@ -736,13 +737,13 @@ const TippingInterface: React.FC = () => {
 
     // If song is selected, this completes the song request
     if (selectedSong) {
-      console.log('🎵 [handleTipClick] Song is selected, calling processTipWithSong:', selectedSong.id)
+      logger.log('🎵 [handleTipClick] Song is selected, calling processTipWithSong:', selectedSong.id)
       await processTipWithSong(amount)
       return
     }
 
     // Regular tip
-    console.log('💰 [handleTipClick] No song selected, calling processTip')
+    logger.log('💰 [handleTipClick] No song selected, calling processTip')
     await processTip(amount)
   }
 
@@ -776,8 +777,8 @@ const TippingInterface: React.FC = () => {
       const paymentMethodId = getStoredPaymentMethodId()
       const stripeCustomerId = getStoredCustomerId()
       
-      console.log('💳 Retrieved payment method ID:', paymentMethodId)
-      console.log('💳 Retrieved Stripe customer ID:', stripeCustomerId)
+      logger.log('💳 Retrieved payment method ID:', paymentMethodId)
+      logger.log('💳 Retrieved Stripe customer ID:', stripeCustomerId)
       
       const tipPayload = {
         deviceId: deviceInfo!.uuid,
@@ -794,7 +795,7 @@ const TippingInterface: React.FC = () => {
           note: selectedSong.note
         })
       }
-      console.log('🎰 SUBMITTING TIP PAYLOAD TO BACKEND (Classic Mode):', tipPayload)
+      logger.log('🎰 SUBMITTING TIP PAYLOAD TO BACKEND (Classic Mode):', tipPayload)
 
       const response = await apiService.submitTip(tipPayload)
 
@@ -813,11 +814,11 @@ const TippingInterface: React.FC = () => {
         refreshPaymentMethodSession()
       } else {
         const errorMsg = response.raw?.error || response.error || 'Failed to submit tip. Please try again.'
-        console.error('❌ Tip submission failed:', response.raw)
+        logger.error('❌ Tip submission failed:', response.raw)
         toast.error(errorMsg)
       }
     } catch (error) {
-      console.error('❌ Error submitting tip:', error)
+      logger.error('❌ Error submitting tip:', error)
       toast.error(error instanceof Error ? error.message : 'Failed to submit tip. Please try again.')
     }
 
@@ -826,7 +827,7 @@ const TippingInterface: React.FC = () => {
   }
 
   const processTipWithSong = async (amount: number) => {
-    console.log('🎵 [processTipWithSong] Starting, selectedSong:', selectedSong)
+    logger.log('🎵 [processTipWithSong] Starting, selectedSong:', selectedSong)
     setLoading(true)
     setClickedAmount(amount)
     triggerCanvasConfetti(amount)
@@ -846,10 +847,10 @@ const TippingInterface: React.FC = () => {
       const paymentMethodId = getStoredPaymentMethodId()
       const stripeCustomerId = getStoredCustomerId()
       
-      console.log('💳 Retrieved payment method ID:', paymentMethodId)
-      console.log('💳 Retrieved Stripe customer ID:', stripeCustomerId)
+      logger.log('💳 Retrieved payment method ID:', paymentMethodId)
+      logger.log('💳 Retrieved Stripe customer ID:', stripeCustomerId)
       
-      console.log('🎵 [processTipWithSong] Before payload construction - selectedSong:', selectedSong)
+      logger.log('🎵 [processTipWithSong] Before payload construction - selectedSong:', selectedSong)
       const tipPayload = {
         deviceId: deviceInfo!.uuid,
         userId: userId,
@@ -865,8 +866,8 @@ const TippingInterface: React.FC = () => {
           note: selectedSong.note
         })
       }
-      console.log('🎰 SUBMITTING TIP PAYLOAD TO BACKEND (Cards Mode):', tipPayload)
-      console.log('🎵 [processTipWithSong] songId in payload:', tipPayload.songId, 'selectedSong.id was:', selectedSong?.id)
+      logger.log('🎰 SUBMITTING TIP PAYLOAD TO BACKEND (Cards Mode):', tipPayload)
+      logger.log('🎵 [processTipWithSong] songId in payload:', tipPayload.songId, 'selectedSong.id was:', selectedSong?.id)
 
       // Submit tip
       const response = await apiService.submitTip(tipPayload)
@@ -885,11 +886,11 @@ const TippingInterface: React.FC = () => {
         refreshPaymentMethodSession()
       } else {
         const errorMsg = response.raw?.error || response.error || 'Failed to submit tip. Please try again.'
-        console.error('❌ Tip submission failed:', response.raw)
+        logger.error('❌ Tip submission failed:', response.raw)
         toast.error(errorMsg)
       }
     } catch (error) {
-      console.error('❌ Error submitting tip with song:', error)
+      logger.error('❌ Error submitting tip with song:', error)
       toast.error(error instanceof Error ? error.message : 'Failed to submit tip. Please try again.')
     }
 
@@ -947,7 +948,7 @@ const TippingInterface: React.FC = () => {
         isOpen={true}
         onClose={() => setShowPaymentModal(false)}
         onComplete={(paymentMethodId) => {
-          console.log('🎉 Payment setup complete! Payment method ID:', paymentMethodId)
+          logger.log('🎉 Payment setup complete! Payment method ID:', paymentMethodId)
           if (paymentMethodId) {
             storePaymentMethodId(paymentMethodId)
           }
@@ -1341,7 +1342,7 @@ const TippingInterface: React.FC = () => {
         isOpen={showPaymentModal}
         onClose={() => setShowPaymentModal(false)}
         onComplete={(paymentMethodId) => {
-          console.log('🎉 Payment setup complete! Payment method ID:', paymentMethodId)
+          logger.log('🎉 Payment setup complete! Payment method ID:', paymentMethodId)
           if (paymentMethodId) {
             storePaymentMethodId(paymentMethodId)
           }

@@ -1,3 +1,4 @@
+import logger from "../utils/logger";
 import React, { useState, useEffect } from 'react'
 import { loadStripe } from '@stripe/stripe-js'
 import { Elements, CardElement, useStripe, useElements } from '@stripe/react-stripe-js'
@@ -94,15 +95,15 @@ function PaymentForm({
 
   // Persist payment details to backend so ownership verification passes
   const storePaymentInfo = async (persistedUserId: string, paymentMethodId?: string, stripeCustomerId?: string, platform?: string) => {
-    console.log('💾 [storePaymentInfo] Called with:', { persistedUserId, paymentMethodId, stripeCustomerId, platform })
+    logger.log('💾 [storePaymentInfo] Called with:', { persistedUserId, paymentMethodId, stripeCustomerId, platform })
     
     if (!paymentMethodId || !stripeCustomerId) {
-      console.warn('⚠️ [storePaymentInfo] Missing paymentMethodId or stripeCustomerId, skipping storage')
+      logger.warn('⚠️ [storePaymentInfo] Missing paymentMethodId or stripeCustomerId, skipping storage')
       return
     }
 
     try {
-      console.log('📤 [storePaymentInfo] Storing payment info to backend...')
+      logger.log('📤 [storePaymentInfo] Storing payment info to backend...')
       const response = await fetch(`${getApiBaseUrl()}/api/stripe/store-payment-info`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -115,12 +116,12 @@ function PaymentForm({
       })
       
       if (response.ok) {
-        console.log('✅ [storePaymentInfo] Payment info stored successfully')
+        logger.log('✅ [storePaymentInfo] Payment info stored successfully')
       } else {
-        console.error('❌ [storePaymentInfo] Backend returned error:', response.status, response.statusText)
+        logger.error('❌ [storePaymentInfo] Backend returned error:', response.status, response.statusText)
       }
     } catch (err) {
-      console.error('❌ [storePaymentInfo] Failed to persist payment info to backend', err)
+      logger.error('❌ [storePaymentInfo] Failed to persist payment info to backend', err)
     }
   }
 
@@ -136,19 +137,19 @@ function PaymentForm({
       })
       
       pr.canMakePayment().then((result) => {
-        console.log('Payment Request canMakePayment result:', result)
-        console.log('User Agent:', navigator.userAgent)
-        console.log('Platform:', navigator.platform)
+        logger.log('Payment Request canMakePayment result:', result)
+        logger.log('User Agent:', navigator.userAgent)
+        logger.log('Platform:', navigator.platform)
         if (result) {
           setPaymentRequest(pr)
           setIsApplePay(!!result.applePay)
-          console.log('Payment Request is available - Apple Pay:', result.applePay, 'Google Pay:', result.googlePay)
+          logger.log('Payment Request is available - Apple Pay:', result.applePay, 'Google Pay:', result.googlePay)
         }
       })
 
       // Handle payment request events
       pr.on('paymentmethod', async (event) => {
-        console.log('Payment Request paymentmethod event:', event)
+        logger.log('Payment Request paymentmethod event:', event)
         try {
           setLoading(true)
           setError(null)
@@ -168,7 +169,7 @@ function PaymentForm({
           }
           
           const data = await res.json()
-          console.log('📥 Setup intent response from /api/stripe/setup-intent:', data)
+          logger.log('📥 Setup intent response from /api/stripe/setup-intent:', data)
           
           // Confirm the setup intent with the payment method
           const { error, setupIntent } = await stripe.confirmCardSetup(data.clientSecret, {
@@ -176,24 +177,24 @@ function PaymentForm({
           })
           
           if (error) {
-            console.error('Payment Request setup error:', error)
+            logger.error('Payment Request setup error:', error)
             event.complete('fail')
             setError(error.message || 'Payment setup failed')
           } else {
-            console.log('Payment Request setup successful:', setupIntent)
+            logger.log('Payment Request setup successful:', setupIntent)
             // Extract payment method ID from the SetupIntent, NOT the event
             const paymentMethodId = setupIntent?.payment_method as string
-            console.log('💳 Payment method ID from wallet:', paymentMethodId)
+            logger.log('💳 Payment method ID from wallet:', paymentMethodId)
             
             // Get unique device ID
             const uniqueDeviceId = getUniqueDeviceId()
             const platform = detectPlatform()
             const customerId = data.customerId
-            console.log('🔍 [ApplePay] Using uniqueDeviceId:', uniqueDeviceId, 'customerId:', customerId, 'platform:', platform)
+            logger.log('🔍 [ApplePay] Using uniqueDeviceId:', uniqueDeviceId, 'customerId:', customerId, 'platform:', platform)
             if (customerId) {
               localStorage.setItem(`stripe_customer_id_${uniqueDeviceId}`, customerId)
               setCookie(`stripe_customer_id_${uniqueDeviceId}`, customerId, 60)
-              console.log('💾 Stored Stripe customer ID:', customerId)
+              logger.log('💾 Stored Stripe customer ID:', customerId)
               localStorage.setItem(`payment_status_${uniqueDeviceId}_${deviceUuid}`, JSON.stringify({
                 hasPaymentMethods: true,
                 paymentMethodType: 'card'
@@ -206,7 +207,7 @@ function PaymentForm({
                 localStorage.setItem(`payment_method_timestamp_${uniqueDeviceId}`, Date.now().toString())
                 // Keep payment method id cookie for resilience (non-sensitive, still scoped to app domain)
                 setCookie(`payment_method_id_${uniqueDeviceId}`, paymentMethodId, 60)
-                console.log('💾 Stored payment method ID:', paymentMethodId)
+                logger.log('💾 Stored payment method ID:', paymentMethodId)
               }
             }
             // Persist payment info to backend so security checks pass
@@ -218,7 +219,7 @@ function PaymentForm({
             onComplete(paymentMethodId)
           }
         } catch (error) {
-          console.error('Payment Request error:', error)
+          logger.error('Payment Request error:', error)
           event.complete('fail')
           setError('Payment setup failed')
         } finally {
@@ -227,7 +228,7 @@ function PaymentForm({
       })
 
       pr.on('cancel', () => {
-        console.log('Payment Request cancelled')
+        logger.log('Payment Request cancelled')
       })
     }
   }, [stripe, deviceUuid, userId, onComplete])
@@ -248,14 +249,14 @@ function PaymentForm({
       
       if (!res.ok) {
         const errorText = await res.text()
-        console.error('Setup intent error:', errorText)
+        logger.error('Setup intent error:', errorText)
         setError(`Server error: ${res.status} - ${errorText}`)
         setLoading(false)
         return
       }
       
       const data = await res.json()
-      console.log('Setup intent response:', data)
+      logger.log('Setup intent response:', data)
       
       if (!data.clientSecret) {
         setError('Failed to get setup intent - no client secret')
@@ -270,32 +271,32 @@ function PaymentForm({
         return
       }
 
-      console.log('Confirming card setup with client secret:', data.clientSecret)
+      logger.log('Confirming card setup with client secret:', data.clientSecret)
       const result = await stripe.confirmCardSetup(data.clientSecret, {
         payment_method: {
           card: cardElement,
         },
       })
 
-      console.log('Card setup result:', result)
-      console.log('📥 Setup intent response from /api/stripe/setup-intent (card path):', data)
+      logger.log('Card setup result:', result)
+      logger.log('📥 Setup intent response from /api/stripe/setup-intent (card path):', data)
       if (result.error) {
         setError(result.error.message || 'Card error')
       } else {
-        console.log('Payment method setup successful:', result.setupIntent)
+        logger.log('Payment method setup successful:', result.setupIntent)
         // Extract payment method ID from the setup intent
         const paymentMethodId = result.setupIntent?.payment_method as string | undefined
-        console.log('💳 Payment method ID from card:', paymentMethodId)
+        logger.log('💳 Payment method ID from card:', paymentMethodId)
         
         // Get unique device ID
         const uniqueDeviceId = getUniqueDeviceId()
         const platform = detectPlatform()
         const customerId = data.customerId
-        console.log('🔍 [CardSubmit] Using uniqueDeviceId:', uniqueDeviceId, 'customerId:', customerId, 'platform:', platform)
+        logger.log('🔍 [CardSubmit] Using uniqueDeviceId:', uniqueDeviceId, 'customerId:', customerId, 'platform:', platform)
         if (customerId) {
           localStorage.setItem(`stripe_customer_id_${uniqueDeviceId}`, customerId)
           setCookie(`stripe_customer_id_${uniqueDeviceId}`, customerId, 60)
-          console.log('💾 Stored Stripe customer ID:', customerId)
+          logger.log('💾 Stored Stripe customer ID:', customerId)
           localStorage.setItem(`payment_status_${uniqueDeviceId}_${deviceUuid}`, JSON.stringify({
             hasPaymentMethods: true,
             paymentMethodType: 'card'
@@ -307,7 +308,7 @@ function PaymentForm({
             localStorage.setItem(`payment_method_id_${uniqueDeviceId}`, paymentMethodId)
             localStorage.setItem(`payment_method_timestamp_${uniqueDeviceId}`, Date.now().toString())
             setCookie(`payment_method_id_${uniqueDeviceId}`, paymentMethodId, 60)
-            console.log('💾 Stored payment method ID:', paymentMethodId)
+            logger.log('💾 Stored payment method ID:', paymentMethodId)
           }
         }
         // Persist payment info to backend so security checks pass
@@ -318,7 +319,7 @@ function PaymentForm({
         onComplete(paymentMethodId)
       }
     } catch (error) {
-      console.error('Card submission error:', error)
+      logger.error('Card submission error:', error)
       setError(`Network error: ${error instanceof Error ? error.message : 'Unknown error'}`)
     } finally {
       setLoading(false)

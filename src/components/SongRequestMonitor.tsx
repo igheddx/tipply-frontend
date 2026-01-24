@@ -1,3 +1,4 @@
+import logger from "../utils/logger";
 import React, { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { API_BASE_URL } from '../utils/config'
@@ -80,10 +81,10 @@ const SongRequestMonitor: React.FC<SongRequestMonitorProps> = ({
         setSongRequests(data.songRequests || [])
       } else {
         const errorText = await response.text()
-        console.error(`🔴 [Monitor] Failed to load song requests: ${response.status} ${response.statusText}`, errorText)
+        logger.error(`🔴 [Monitor] Failed to load song requests: ${response.status} ${response.statusText}`, errorText)
       }
     } catch (error) {
-      console.error('🔴 [Monitor] Error loading song requests:', error)
+      logger.error('🔴 [Monitor] Error loading song requests:', error)
     } finally {
       setLoading(false)
     }
@@ -94,7 +95,7 @@ const SongRequestMonitor: React.FC<SongRequestMonitorProps> = ({
     setUpdatingStatus(requestKey)
     
     try {
-      console.log('Updating song status:', { 
+      logger.log('Updating song status:', { 
         songId: request.songId, 
         status: newStatus, 
         requestIds: request.requestIds,
@@ -116,11 +117,11 @@ const SongRequestMonitor: React.FC<SongRequestMonitorProps> = ({
         })
       })
 
-      console.log('Response status:', response.status, response.statusText)
+      logger.log('Response status:', response.status, response.statusText)
 
       if (response.ok) {
         const result = await response.json()
-        console.log('Update successful:', result)
+        logger.log('Update successful:', result)
         
         // Update local state immediately for responsive UI
         setSongRequests(prev => prev.map(r => 
@@ -135,10 +136,10 @@ const SongRequestMonitor: React.FC<SongRequestMonitorProps> = ({
         }, 1000)
       } else {
         const errorText = await response.text()
-        console.error('Failed to update status:', response.status, errorText)
+        logger.error('Failed to update status:', response.status, errorText)
       }
     } catch (error) {
-      console.error('Error updating song status:', error)
+      logger.error('Error updating song status:', error)
     } finally {
       setUpdatingStatus(null)
     }

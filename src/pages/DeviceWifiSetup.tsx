@@ -1,3 +1,4 @@
+import logger from "../utils/logger";
 /**
  * Tipwave Device WiFi Setup Component
  * 
@@ -133,7 +134,7 @@ const DeviceWifiSetup = () => {
       // This is just a pre-check
       return true;
     } catch (err) {
-      console.error('Bluetooth permission check failed:', err);
+      logger.error('Bluetooth permission check failed:', err);
       return false;
     }
   };
@@ -141,7 +142,7 @@ const DeviceWifiSetup = () => {
   // Request Notification permission (triggered after successful provisioning)
   const requestNotificationPermission = async (): Promise<boolean> => {
     if (!('Notification' in window)) {
-      console.log('Notifications not supported');
+      logger.log('Notifications not supported');
       return false;
     }
     
@@ -165,7 +166,7 @@ const DeviceWifiSetup = () => {
         return false;
       }
     } catch (err) {
-      console.error('Notification permission error:', err);
+      logger.error('Notification permission error:', err);
       return false;
     }
   };
@@ -268,7 +269,7 @@ const DeviceWifiSetup = () => {
         await connectToDevice(bluetoothDevice);
       }
     } catch (err: any) {
-      console.error('Bluetooth scan error:', err);
+      logger.error('Bluetooth scan error:', err);
       if (err.message.includes('User cancelled') || err.name === 'NotFoundError') {
         toast.error('Device selection cancelled. No Tipwave devices found nearby.');
         if (import.meta.env.DEV) {
@@ -319,7 +320,7 @@ const DeviceWifiSetup = () => {
       setCurrentStep(2);
       toast.info('Enter your WiFi network credentials');
     } catch (err: any) {
-      console.error('Connection error:', err);
+      logger.error('Connection error:', err);
       setError(`Failed to connect: ${err.message}`);
       toast.error('Failed to connect to device');
     } finally {
@@ -401,7 +402,7 @@ const DeviceWifiSetup = () => {
         
         try {
           const status = JSON.parse(statusJson);
-          console.log('Status update:', status);
+          logger.log('Status update:', status);
           
           if (status.state === 'connecting') {
             toast.info('Device is connecting to WiFi...');
@@ -429,7 +430,7 @@ const DeviceWifiSetup = () => {
             throw new Error(errorMsg);
           }
         } catch (parseErr) {
-          console.error('Failed to parse status JSON:', parseErr);
+          logger.error('Failed to parse status JSON:', parseErr);
         }
       });
       
@@ -444,7 +445,7 @@ const DeviceWifiSetup = () => {
       }, 30000); // 30 second timeout
       
     } catch (err: any) {
-      console.error('Wi-Fi configuration error:', err);
+      logger.error('Wi-Fi configuration error:', err);
       setError(`Failed to configure Wi-Fi: ${err.message}`);
       toast.error(`Failed to configure Wi-Fi: ${err.message}`);
       

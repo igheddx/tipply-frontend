@@ -1,3 +1,4 @@
+import logger from "../utils/logger";
 import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import apiService from '../services/api'
@@ -122,7 +123,7 @@ const Dashboard: React.FC = () => {
     // Check if user is authenticated
     const token = localStorage.getItem('token')
     if (!token) {
-      console.log('No authentication token found, redirecting to login')
+      logger.log('No authentication token found, redirecting to login')
       navigate('/login')
       return
     }
@@ -131,13 +132,13 @@ const Dashboard: React.FC = () => {
     const initDashboard = async () => {
       try {
         const startTime = performance.now()
-        console.log('🚀 [PERF] Dashboard init started')
+        logger.log('🚀 [PERF] Dashboard init started')
         setLoading(true)
         
         // Get profile first
         let profileTime = performance.now()
         const profileResp = await apiService.getProfile()
-        console.log(`⏱️ [PERF] getProfile() took ${(performance.now() - profileTime).toFixed(0)}ms`)
+        logger.log(`⏱️ [PERF] getProfile() took ${(performance.now() - profileTime).toFixed(0)}ms`)
         
         if (profileResp.error?.includes('401')) {
           localStorage.removeItem('token')
@@ -153,27 +154,27 @@ const Dashboard: React.FC = () => {
         
         setUserProfile(profileResp.data)
         const profileId = profileResp.data.id
-        console.log(`✅ [PERF] User profile set: ${profileId}`)
+        logger.log(`✅ [PERF] User profile set: ${profileId}`)
 
         // ONLY fetch overview data on init (stats, metrics)
         // Time them individually to find the real bottleneck
         let statsTime = performance.now()
         const statsResp = await apiService.getDashboardStats()
-        console.log(`⏱️ [PERF] getDashboardStats() alone took ${(performance.now() - statsTime).toFixed(0)}ms`)
+        logger.log(`⏱️ [PERF] getDashboardStats() alone took ${(performance.now() - statsTime).toFixed(0)}ms`)
 
         let metricsTime = performance.now()
         // Fast path: skip Stripe metrics on initial load to avoid blocking UI
         const metricsResp = await apiService.getDashboardMetrics(profileId, { skipStripe: true })
-        console.log(`⏱️ [PERF] getDashboardMetrics(skipStripe=true) took ${(performance.now() - metricsTime).toFixed(0)}ms`)
+        logger.log(`⏱️ [PERF] getDashboardMetrics(skipStripe=true) took ${(performance.now() - metricsTime).toFixed(0)}ms`)
 
         if (statsResp.data) {
           setStats(statsResp.data)
-          console.log(`✅ [PERF] Stats set: ${statsResp.data.devices?.length || 0} devices`)
+          logger.log(`✅ [PERF] Stats set: ${statsResp.data.devices?.length || 0} devices`)
         }
 
         if (metricsResp.data) {
           setMetrics(metricsResp.data)
-          console.log('✅ [PERF] Metrics set (without Stripe)')
+          logger.log('✅ [PERF] Metrics set (without Stripe)')
         }
 
         // Check song catalog alert in background
@@ -187,7 +188,7 @@ const Dashboard: React.FC = () => {
                 const catalogData = await catalogResp.json()
                 const count = catalogData.length || 0
                 setSongCatalogCount(count)
-                console.log(`⏱️ [PERF] Song catalog check took ${(performance.now() - catalogTime).toFixed(0)}ms`)
+                logger.log(`⏱️ [PERF] Song catalog check took ${(performance.now() - catalogTime).toFixed(0)}ms`)
                 
                 if (count === 0) {
                   const alertDismissed = localStorage.getItem(`songCatalogAlertDismissed_${profileId}`)
@@ -197,7 +198,7 @@ const Dashboard: React.FC = () => {
                 }
               }
             } catch (error) {
-              console.error('Error checking song catalog:', error)
+              logger.error('Error checking song catalog:', error)
             }
           }
         }
@@ -217,15 +218,15 @@ const Dashboard: React.FC = () => {
                         setStripeEnabledDevices(devicesResp.data.map((d: any) => d.uuid))
                       }
                     }
-                    console.log(`⏱️ [PERF] Background Stripe check took ${(performance.now() - stripeTime).toFixed(0)}ms`)
+                    logger.log(`⏱️ [PERF] Background Stripe check took ${(performance.now() - stripeTime).toFixed(0)}ms`)
                   })
               }
             })
-            .catch(error => console.error('Error checking Stripe status:', error))
+            .catch(error => logger.error('Error checking Stripe status:', error))
         }
 
         setLoading(false)
-        console.log(`🎉 [PERF] Dashboard init complete in ${(performance.now() - startTime).toFixed(0)}ms`)
+        logger.log(`🎉 [PERF] Dashboard init complete in ${(performance.now() - startTime).toFixed(0)}ms`)
 
         // Background fetch: load Stripe metrics and merge into state when ready
         try {
@@ -242,15 +243,15 @@ const Dashboard: React.FC = () => {
               totalEarnings: fullMetrics.data.totalEarnings ?? prev.totalEarnings,
               pendingPayouts: fullMetrics.data.pendingPayouts ?? prev.pendingPayouts,
             } : fullMetrics.data)
-            console.log(`⏱️ [PERF] Background Stripe metrics loaded in ${(performance.now() - stripeStart).toFixed(0)}ms`)
+            logger.log(`⏱️ [PERF] Background Stripe metrics loaded in ${(performance.now() - stripeStart).toFixed(0)}ms`)
           }
         } catch (e) {
-          console.warn('Skipping Stripe metrics due to error:', e)
+          logger.warn('Skipping Stripe metrics due to error:', e)
         } finally {
           setStripeMetricsLoading(false)
         }
       } catch (error) {
-        console.error('Error initializing dashboard:', error)
+        logger.error('Error initializing dashboard:', error)
         setLoading(false)
         setStripeMetricsLoading(false)
       }
@@ -338,7 +339,7 @@ const Dashboard: React.FC = () => {
       // Just refresh the volatile data: stats, metrics, tips, deleted devices, devices
       const profileId = userProfile?.id
       if (!profileId) {
-        console.warn('No profile ID available for refresh')
+        logger.warn('No profile ID available for refresh')
         return
       }
 
@@ -384,13 +385,13 @@ const Dashboard: React.FC = () => {
             }
           }
         } catch (error) {
-          console.error('Error checking Stripe status on refresh:', error)
+          logger.error('Error checking Stripe status on refresh:', error)
         }
       }
 
-      console.log('✅ Dashboard refresh complete')
+      logger.log('✅ Dashboard refresh complete')
     } catch (error) {
-      console.error('Error refreshing dashboard:', error)
+      logger.error('Error refreshing dashboard:', error)
     } finally {
       setLoading(false)
       setStripeMetricsLoading(false)
@@ -425,28 +426,28 @@ const Dashboard: React.FC = () => {
       return
     }
 
-    console.log('🔍 [DEBUG] Using validated device UUID for Stripe Connect:', validatedDeviceUuid)
-    console.log('🔍 [DEBUG] Using validated serial number for Stripe Connect:', validatedSerialNumber)
+    logger.log('🔍 [DEBUG] Using validated device UUID for Stripe Connect:', validatedDeviceUuid)
+    logger.log('🔍 [DEBUG] Using validated serial number for Stripe Connect:', validatedSerialNumber)
 
     setIsAddingDevice(true)
     try {
-      console.log('Starting Stripe Connect setup for authenticated user:', userProfile.email)
-      console.log('Using validated device UUID:', validatedDeviceUuid)
-      console.log('Using validated serial number:', validatedSerialNumber)
+      logger.log('Starting Stripe Connect setup for authenticated user:', userProfile.email)
+      logger.log('Using validated device UUID:', validatedDeviceUuid)
+      logger.log('Using validated serial number:', validatedSerialNumber)
       
       const token = localStorage.getItem('token')
-      console.log('Token exists:', !!token)
-      console.log('Token length:', token?.length || 0)
+      logger.log('Token exists:', !!token)
+      logger.log('Token length:', token?.length || 0)
       
       // Decode token to check role and expiry
       if (token) {
         try {
           const payload = JSON.parse(atob(token.split('.')[1]))
-          console.log('Token payload:', payload)
-          console.log('User role:', payload.role)
-          console.log('Token expires:', new Date(payload.exp * 1000))
+          logger.log('Token payload:', payload)
+          logger.log('User role:', payload.role)
+          logger.log('Token expires:', new Date(payload.exp * 1000))
         } catch (e) {
-          console.error('Error decoding token:', e)
+          logger.error('Error decoding token:', e)
         }
       }
       
@@ -454,7 +455,7 @@ const Dashboard: React.FC = () => {
       // The UUID comes from the device validation step
       const result = await apiService.createConnectAccountForUser(validatedDeviceUuid, validatedSerialNumber)
       
-      console.log('CreateConnectAccount response:', result)
+      logger.log('CreateConnectAccount response:', result)
 
       if (result.error) {
         throw new Error(result.error)
@@ -462,8 +463,8 @@ const Dashboard: React.FC = () => {
 
       // Check if device already has Stripe Connect account (inherited)
       if (result.data?.requiresOnboarding === false) {
-        console.log('Device already linked to existing Stripe account:', result.data.stripeAccountId)
-        console.log('Success:', result.data.message || 'Device successfully linked to existing Stripe account!')
+        logger.log('Device already linked to existing Stripe account:', result.data.stripeAccountId)
+        logger.log('Success:', result.data.message || 'Device successfully linked to existing Stripe account!')
         
         // Refresh the devices list to show the updated device
         await refreshDashboard()
@@ -473,15 +474,15 @@ const Dashboard: React.FC = () => {
 
       // Handle new Stripe account creation - requires onboarding
       if (result.data?.onboardingUrl && result.data?.requiresOnboarding !== false) {
-        console.log('Redirecting to Stripe onboarding URL:', result.data.onboardingUrl)
+        logger.log('Redirecting to Stripe onboarding URL:', result.data.onboardingUrl)
         window.location.href = result.data.onboardingUrl
         return // Exit early since we're redirecting
       } 
       
       // Check if we got an async processing response (fallback)
       if (result.data?.status === 'processing') {
-        console.log('Received processing status, but we need serial number for polling...')
-        console.log('This case might need additional handling for UUID-based polling')
+        logger.log('Received processing status, but we need serial number for polling...')
+        logger.log('This case might need additional handling for UUID-based polling')
         throw new Error('Async processing not yet supported for UUID-based requests')
       }
       
@@ -489,7 +490,7 @@ const Dashboard: React.FC = () => {
       throw new Error('Unexpected response from Stripe Connect setup')
 
     } catch (error) {
-      console.error('Error setting up Stripe Connect:', error)
+      logger.error('Error setting up Stripe Connect:', error)
       setAddDeviceErrors({ submit: `Failed to setup Stripe Connect: ${error instanceof Error ? error.message : 'Unknown error'}` })
     } finally {
       setIsAddingDevice(false)
@@ -624,7 +625,7 @@ const Dashboard: React.FC = () => {
       await addDeviceToUser()
       
     } catch (error) {
-      console.error('Error adding device:', error)
+      logger.error('Error adding device:', error)
       setAddDeviceErrors({ submit: 'Failed to add device. Please try again.' })
     } finally {
       setIsAddingDevice(false)
@@ -646,7 +647,7 @@ const Dashboard: React.FC = () => {
       // Check if Stripe setup is required
       if (response.data?.requiresStripeSetup) {
         // Device added but needs Stripe Connect setup
-        console.log('Device added, Stripe setup required:', response.data.stripeSetupMessage)
+        logger.log('Device added, Stripe setup required:', response.data.stripeSetupMessage)
         
         // Show the existing Stripe setup flow
         setShowStripeSetup(true)
@@ -654,7 +655,7 @@ const Dashboard: React.FC = () => {
       }
 
       // Success! Device added and ready (either inherited Stripe or no Stripe needed)
-      console.log('✅ Device added successfully:', response.data)
+      logger.log('✅ Device added successfully:', response.data)
       
       // Clear form first
       setShowAddDeviceForm(false)
@@ -666,16 +667,16 @@ const Dashboard: React.FC = () => {
       setValidatedSerialNumber('')
       
       // Force a complete refresh with single efficient call
-      console.log('🔄 Refreshing dashboard stats...')
+      logger.log('🔄 Refreshing dashboard stats...')
       await refreshDashboard()
       
       // Switch to devices tab to show the newly added device
       setActiveTab('devices')
       
-      console.log('✅ Refresh complete. Device should now be visible.')
+      logger.log('✅ Refresh complete. Device should now be visible.')
       
     } catch (error) {
-      console.error('Error adding device:', error)
+      logger.error('Error adding device:', error)
       setAddDeviceErrors({ submit: 'Failed to add device. Please try again.' })
     }
   }
@@ -711,7 +712,7 @@ const Dashboard: React.FC = () => {
             console.info('[QR] Detected base64 PNG response; converted to binary', { originalSize: qrBlob.size, binarySize: sourceBlob.size })
           }
         } catch (decodeErr) {
-          console.warn('[QR] Base64 normalization failed; using original blob', decodeErr)
+          logger.warn('[QR] Base64 normalization failed; using original blob', decodeErr)
         }
       }
 
@@ -728,7 +729,7 @@ const Dashboard: React.FC = () => {
         } catch (e) {
           snippet = '[unreadable]'
         }
-        console.error('[QR] Bitmap decode failed', { err, blobType: sourceBlob.type, blobSize, snippet })
+        logger.error('[QR] Bitmap decode failed', { err, blobType: sourceBlob.type, blobSize, snippet })
 
         // Fallback: download raw QR blob so user still gets the code
         const rawUrl = URL.createObjectURL(sourceBlob)
@@ -798,7 +799,7 @@ const Dashboard: React.FC = () => {
         const qrY = 600
         ctx.drawImage(qrBitmap, qrX, qrY, qrSize, qrSize)
       } catch (err) {
-        console.error('[QR] Draw failed, falling back to raw QR download', err)
+        logger.error('[QR] Draw failed, falling back to raw QR download', err)
         const rawUrl = URL.createObjectURL(qrBlob)
         const a = document.createElement('a')
         a.href = rawUrl
@@ -870,7 +871,7 @@ const Dashboard: React.FC = () => {
         }
       }, 'image/png')
     } catch (error) {
-      console.error('Error generating QR card:', error)
+      logger.error('Error generating QR card:', error)
       alert(`Could not generate the QR card. ${error instanceof Error ? error.message : 'Please try again.'}`)
     }
   }
@@ -882,7 +883,7 @@ const Dashboard: React.FC = () => {
         setDeletedDevices(response.data)
       }
     } catch (error) {
-      console.error('Error fetching deleted devices:', error)
+      logger.error('Error fetching deleted devices:', error)
     }
   }
 
@@ -906,7 +907,7 @@ const Dashboard: React.FC = () => {
         alert('Failed to delete device: ' + (response.error || 'Unknown error'))
       }
     } catch (error) {
-      console.error('Error deleting device:', error)
+      logger.error('Error deleting device:', error)
       alert('Error deleting device')
     } finally {
       setIsDeletingDevice(null)
@@ -929,7 +930,7 @@ const Dashboard: React.FC = () => {
         alert('Failed to restore device: ' + (response.error || 'Unknown error'))
       }
     } catch (error) {
-      console.error('Error restoring device:', error)
+      logger.error('Error restoring device:', error)
       alert('Error restoring device')
     } finally {
       setIsRestoringDevice(null)
@@ -967,7 +968,7 @@ const Dashboard: React.FC = () => {
         alert('Failed to update song request setting: ' + (response.error || 'Unknown error'))
       }
     } catch (error) {
-      console.error('Error updating song request setting:', error)
+      logger.error('Error updating song request setting:', error)
       alert('Error updating song request setting')
     } finally {
       setUpdatingSongRequest(null)
@@ -977,46 +978,46 @@ const Dashboard: React.FC = () => {
   const updateDeviceConfiguration = async (deviceId: string, isSoundEnabled: boolean, effectConfig: Record<string, string>) => {
     setUpdatingDeviceConfig(deviceId)
     try {
-      console.log('📤 Sending device configuration update:', { deviceId, isSoundEnabled, effectConfig })
+      logger.log('📤 Sending device configuration update:', { deviceId, isSoundEnabled, effectConfig })
       const response = await apiService.updateDeviceConfiguration(deviceId, {
         isSoundEnabled,
         effectConfiguration: JSON.stringify(effectConfig)
       })
 
-      console.log('📥 Device configuration response:', response)
+      logger.log('📥 Device configuration response:', response)
       if (response.data && response.data.success) {
-        console.log('✅ Device configuration updated successfully:', response.data)
+        logger.log('✅ Device configuration updated successfully:', response.data)
         // Update the device in the stats state immediately
         setStats(prevStats => {
           if (!prevStats) return prevStats
-          console.log('📝 Before state update - devices:', prevStats.devices.map(d => ({ id: d.id, sound: d.isSoundEnabled })))
+          logger.log('📝 Before state update - devices:', prevStats.devices.map(d => ({ id: d.id, sound: d.isSoundEnabled })))
           const newDevices = prevStats.devices.map(d => {
             if (d.id === deviceId) {
-              console.log(`✏️ Updating device ${d.id}: sound ${d.isSoundEnabled} → ${isSoundEnabled}`)
+              logger.log(`✏️ Updating device ${d.id}: sound ${d.isSoundEnabled} → ${isSoundEnabled}`)
               return { ...d, isSoundEnabled, effectConfiguration: JSON.stringify(effectConfig) }
             } else {
-              console.log(`⏭️ Skipping device ${d.id} (not matching ${deviceId})`)
+              logger.log(`⏭️ Skipping device ${d.id} (not matching ${deviceId})`)
               return d
             }
           })
-          console.log('📝 After state update - devices:', newDevices.map(d => ({ id: d.id, sound: d.isSoundEnabled })))
+          logger.log('📝 After state update - devices:', newDevices.map(d => ({ id: d.id, sound: d.isSoundEnabled })))
           return {
             ...prevStats,
             devices: newDevices
           }
         })
         // Don't refetch - trust the local state and the server response which confirmed the update
-        console.log('✅ Device configuration persisted in state. Skipping refetch to avoid race conditions.')
+        logger.log('✅ Device configuration persisted in state. Skipping refetch to avoid race conditions.')
       } else {
-        console.error('❌ Failed to update device configuration - response:', response)
-        console.error('Response data:', response.data)
-        console.error('Response error:', response.error)
-        console.error('Response status:', response.status)
+        logger.error('❌ Failed to update device configuration - response:', response)
+        logger.error('Response data:', response.data)
+        logger.error('Response error:', response.error)
+        logger.error('Response status:', response.status)
         alert('Failed to update device configuration: ' + (response.error || 'Unknown error'))
       }
     } catch (error) {
-      console.error('❌ Error updating device configuration:', error)
-      console.error('Error details:', error instanceof Error ? error.message : 'Unknown error')
+      logger.error('❌ Error updating device configuration:', error)
+      logger.error('Error details:', error instanceof Error ? error.message : 'Unknown error')
       alert('Error updating device configuration: ' + (error instanceof Error ? error.message : 'Unknown error'))
     } finally {
       setUpdatingDeviceConfig(null)
@@ -1024,18 +1025,18 @@ const Dashboard: React.FC = () => {
   }
 
   const getEffectConfig = (device: DeviceSummary): Record<string, string> => {
-    console.log(`🎨 Getting effect config for device ${device.id}:`, device.effectConfiguration)
+    logger.log(`🎨 Getting effect config for device ${device.id}:`, device.effectConfiguration)
     try {
       if (device.effectConfiguration) {
         const parsed = JSON.parse(device.effectConfiguration)
-        console.log(`✅ Parsed effect config:`, parsed)
+        logger.log(`✅ Parsed effect config:`, parsed)
         return parsed
       }
     } catch (e) {
-      console.error('❌ Error parsing effect configuration:', e, 'Raw value:', device.effectConfiguration)
+      logger.error('❌ Error parsing effect configuration:', e, 'Raw value:', device.effectConfiguration)
     }
     // Default configuration
-    console.log('⚠️ Using default effect config for device', device.id)
+    logger.log('⚠️ Using default effect config for device', device.id)
     return {
       "1": "effect1",
       "5": "effect1",
@@ -1067,10 +1068,10 @@ const Dashboard: React.FC = () => {
         setSongRequests(data.songRequests || [])
       } else {
         const errorText = await response.text()
-        console.error(`🔴 [Dashboard Monitor] Failed to load song requests: ${response.status} ${response.statusText}`, errorText)
+        logger.error(`🔴 [Dashboard Monitor] Failed to load song requests: ${response.status} ${response.statusText}`, errorText)
       }
     } catch (error) {
-      console.error('🔴 [Dashboard Monitor] Error loading song requests:', error)
+      logger.error('🔴 [Dashboard Monitor] Error loading song requests:', error)
     }
   }
 

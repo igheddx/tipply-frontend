@@ -1,3 +1,4 @@
+import logger from "../utils/logger";
 import React, { useState, useEffect } from 'react';
 import { Table, Card, Tag, Select, DatePicker, Space, Button, message, Statistic, Row, Col } from 'antd';
 import { ReloadOutlined, DollarOutlined, CheckCircleOutlined, CloseCircleOutlined, WarningOutlined } from '@ant-design/icons';
@@ -64,7 +65,7 @@ const AggregatedChargesTable: React.FC = () => {
         setTotalCount(response.data.totalCount);
       }
     } catch (error) {
-      console.error('Error loading aggregated charges:', error);
+      logger.error('Error loading aggregated charges:', error);
       message.error('Failed to load aggregated charges');
     } finally {
       setLoading(false);
@@ -81,7 +82,7 @@ const AggregatedChargesTable: React.FC = () => {
         setStats(response.data);
       }
     } catch (error) {
-      console.error('Error loading stats:', error);
+      logger.error('Error loading stats:', error);
     }
   };
 

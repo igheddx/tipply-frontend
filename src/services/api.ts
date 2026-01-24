@@ -1,4 +1,5 @@
 import { API_BASE_URL } from '../utils/config';
+import logger from '../utils/logger';
 
 interface ApiResponse<T> {
   data?: T
@@ -30,13 +31,13 @@ class ApiService {
     }
 
     try {
-      console.log(`Making API request to: ${url}`)
-      console.log(`Request config:`, { method: config.method, headers: config.headers })
-      console.log(`Current hostname: ${window.location.hostname}`)
-      console.log(`API_BASE_URL: ${API_BASE_URL}`)
-      console.log(`Token exists: ${!!token}`)
-      console.log(`UseApiKey: ${useApiKey}`)
-      console.log(`Authorization header: ${(config.headers as any)?.Authorization}`)
+      logger.log(`Making API request to: ${url}`)
+      logger.log(`Request config:`, { method: config.method, headers: config.headers })
+      logger.log(`Current hostname: ${window.location.hostname}`)
+      logger.log(`API_BASE_URL: ${API_BASE_URL}`)
+      logger.log(`Token exists: ${!!token}`)
+      logger.log(`UseApiKey: ${useApiKey}`)
+      logger.log(`Authorization header: ${(config.headers as any)?.Authorization}`)
       
       const response = await fetch(url, config)
       
@@ -112,7 +113,7 @@ class ApiService {
               }
             }
           } catch (refreshError) {
-            console.error('Token refresh failed:', refreshError)
+            logger.error('Token refresh failed:', refreshError)
             return { error: 'Authentication failed while refreshing token.', status: 401, raw: refreshError }
           }
         }
@@ -126,9 +127,9 @@ class ApiService {
       const data = await response.json()
       return { data, status: response.status }
     } catch (error) {
-      console.error('API request failed:', error)
-      console.error('Request URL was:', url)
-      console.error('Request config was:', config)
+      logger.error('API request failed:', error)
+      logger.error('Request URL was:', url)
+      logger.error('Request config was:', config)
       return { error: error instanceof Error ? error.message : 'Unknown error occurred' }
     }
   }
@@ -203,7 +204,7 @@ class ApiService {
 
       return await response.blob()
     } catch (error) {
-      console.error('Failed to download QR code:', error)
+      logger.error('Failed to download QR code:', error)
       return null
     }
   }
@@ -226,18 +227,18 @@ class ApiService {
   }
 
   async createConnectAccountForUser(deviceUuid: string, serialNumber: string): Promise<ApiResponse<any>> {
-    console.log('createConnectAccountForUser called with deviceUuid:', deviceUuid, 'serialNumber:', serialNumber)
+    logger.log('createConnectAccountForUser called with deviceUuid:', deviceUuid, 'serialNumber:', serialNumber)
     
     // Debug token state before making request
     const token = localStorage.getItem('token')
-    console.log('Token available for createConnectAccountForUser:', !!token)
-    console.log('Token length:', token?.length || 0)
+    logger.log('Token available for createConnectAccountForUser:', !!token)
+    logger.log('Token length:', token?.length || 0)
     
     const result = await this.request('/api/stripe/create-connect-account', {
       method: 'POST',
       body: JSON.stringify({ deviceUuid, serialNumber }),
     })
-    console.log('createConnectAccountForUser result:', result)
+    logger.log('createConnectAccountForUser result:', result)
     return result
   }
 
@@ -356,12 +357,12 @@ class ApiService {
     requestorName?: string
     note?: string
   }): Promise<ApiResponse<any>> {
-    console.log('🎰 API SERVICE - Submitting tip with data:', tipData)
+    logger.log('🎰 API SERVICE - Submitting tip with data:', tipData)
     const response = await this.request('/api/tips', {
       method: 'POST',
       body: JSON.stringify(tipData),
     })
-    console.log('🎰 API SERVICE - Tip submission response:', response)
+    logger.log('🎰 API SERVICE - Tip submission response:', response)
     return response
   }
 
@@ -500,7 +501,7 @@ class ApiService {
               return { error: 'Failed to upload photo' }
             }
           } catch (refreshError) {
-            console.error('Token refresh failed:', refreshError)
+            logger.error('Token refresh failed:', refreshError)
             return { error: 'Authentication failed' }
           }
         }
@@ -514,7 +515,7 @@ class ApiService {
       const errorData = await response.json()
       return { error: errorData.error || 'Failed to upload photo', status: response.status }
     } catch (error) {
-      console.error('Error uploading photo:', error)
+      logger.error('Error uploading photo:', error)
       return { error: 'Upload failed' }
     }
   }
@@ -540,7 +541,7 @@ class ApiService {
         }
         return refreshData.token as string
       } catch (err) {
-        console.error('Token refresh failed:', err)
+        logger.error('Token refresh failed:', err)
         return null
       }
     }
@@ -616,7 +617,7 @@ class ApiService {
       const confirmData = await confirmResponse.json()
       return { data: confirmData }
     } catch (error) {
-      console.error('Error uploading photo via presigned URL:', error)
+      logger.error('Error uploading photo via presigned URL:', error)
       return { error: 'Upload failed' }
     }
   }
@@ -642,7 +643,7 @@ class ApiService {
         }
         return refreshData.token as string
       } catch (err) {
-        console.error('Token refresh failed:', err)
+        logger.error('Token refresh failed:', err)
         return null
       }
     }
@@ -677,7 +678,7 @@ class ApiService {
 
       return { data: { success: true } }
     } catch (error) {
-      console.error('Error deleting profile photo:', error)
+      logger.error('Error deleting profile photo:', error)
       return { error: 'Failed to delete photo' }
     }
   }

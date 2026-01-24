@@ -1,3 +1,4 @@
+import logger from "../utils/logger";
 import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import apiService from '../services/api'
@@ -65,7 +66,7 @@ const Login: React.FC = () => {
           // Move KYC result to localStorage so dashboard can access it
           localStorage.setItem('kyc_result', pendingKycResult)
           sessionStorage.removeItem('kyc_result')
-          console.log('KYC result moved to localStorage for dashboard display')
+          logger.log('KYC result moved to localStorage for dashboard display')
         }
         
         // Check if user is admin and redirect accordingly

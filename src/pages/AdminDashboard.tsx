@@ -1,3 +1,4 @@
+import logger from "../utils/logger";
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Row, Col, Statistic, Table, Button, Input, Modal, message, Spin, Card, Tag, Select, DatePicker, Space, Divider, Alert, Tabs } from 'antd';
@@ -177,7 +178,7 @@ const AdminDashboard: React.FC = () => {
         setUserProfile(response.data);
       }
     } catch (error) {
-      console.error('Error fetching user profile:', error);
+      logger.error('Error fetching user profile:', error);
     }
   };
 
@@ -196,7 +197,7 @@ const AdminDashboard: React.FC = () => {
       if (performersResponse.data) setPerformers(performersResponse.data);
       if (earningsResponse.data) setPlatformEarnings(earningsResponse.data);
     } catch (error) {
-      console.error('Error loading admin dashboard data:', error);
+      logger.error('Error loading admin dashboard data:', error);
       message.error('Failed to load admin dashboard data');
     } finally {
       setLoading(false);
@@ -213,7 +214,7 @@ const AdminDashboard: React.FC = () => {
         if (allPerformers.data) setPerformers(allPerformers.data);
       }
     } catch (error) {
-      console.error('Error searching performers:', error);
+      logger.error('Error searching performers:', error);
       message.error('Failed to search performers');
     }
   };
@@ -223,14 +224,14 @@ const AdminDashboard: React.FC = () => {
 
     try {
       setUpdatingFee(true);
-      console.log('🔧 [DEBUG] Updating platform fee for performer:', selectedPerformer.id);
-      console.log('🔧 [DEBUG] New fee percentage:', newFeePercentage);
+      logger.log('🔧 [DEBUG] Updating platform fee for performer:', selectedPerformer.id);
+      logger.log('🔧 [DEBUG] New fee percentage:', newFeePercentage);
       
       const response = await apiService.put(`/api/admin/performers/${selectedPerformer.id}/platform-fee`, {
         platformFeePercentage: newFeePercentage
       });
       
-      console.log('🔧 [DEBUG] Update response:', response);
+      logger.log('🔧 [DEBUG] Update response:', response);
 
       message.success(`Platform fee updated to ${newFeePercentage}%`);
       setUpdateFeeModal(false);
@@ -238,11 +239,11 @@ const AdminDashboard: React.FC = () => {
       setNewFeePercentage(10);
       
       // Reload data to reflect changes
-      console.log('🔧 [DEBUG] Reloading dashboard data...');
+      logger.log('🔧 [DEBUG] Reloading dashboard data...');
       await loadDashboardData();
-      console.log('🔧 [DEBUG] Dashboard data reloaded');
+      logger.log('🔧 [DEBUG] Dashboard data reloaded');
     } catch (error) {
-      console.error('Error updating platform fee:', error);
+      logger.error('Error updating platform fee:', error);
       message.error('Failed to update platform fee');
     } finally {
       setUpdatingFee(false);
@@ -258,7 +259,7 @@ const AdminDashboard: React.FC = () => {
         setCanToggleStripe(response.data.canToggle);
       }
     } catch (error) {
-      console.error('Error loading Stripe mode:', error);
+      logger.error('Error loading Stripe mode:', error);
     }
   };
 
@@ -287,7 +288,7 @@ const AdminDashboard: React.FC = () => {
         setStripeModeConfirming(false);
       }
     } catch (error: any) {
-      console.error('Error toggling Stripe mode:', error);
+      logger.error('Error toggling Stripe mode:', error);
       const errorMsg = error?.response?.data?.error || error?.message || 'Failed to toggle Stripe mode';
       setStripeModeError(errorMsg);
     } finally {
@@ -310,7 +311,7 @@ const AdminDashboard: React.FC = () => {
         loadBatchStatus();
       }, 1000);
     } catch (error) {
-      console.error('Error running batch processing:', error);
+      logger.error('Error running batch processing:', error);
       setBatchResultMessage({ type: 'error', text: 'Failed to run batch processing' });
     } finally {
       setBatchProcessing(false);
@@ -324,7 +325,7 @@ const AdminDashboard: React.FC = () => {
         setBatchStatus(response.data);
       }
     } catch (error) {
-      console.error('Error loading batch status:', error);
+      logger.error('Error loading batch status:', error);
     }
   };
 
@@ -336,7 +337,7 @@ const AdminDashboard: React.FC = () => {
         setBatchHistoryModal(true);
       }
     } catch (error) {
-      console.error('Error loading batch history:', error);
+      logger.error('Error loading batch history:', error);
       message.error('Failed to load batch history');
     }
   };
@@ -360,7 +361,7 @@ const AdminDashboard: React.FC = () => {
         setTotalTips(response.data.totalCount);
       }
     } catch (error) {
-      console.error('Error loading tips:', error);
+      logger.error('Error loading tips:', error);
       message.error('Failed to load tips');
     } finally {
       setTipsLoading(false);
@@ -388,7 +389,7 @@ const AdminDashboard: React.FC = () => {
       link.click();
       message.success('Tips exported successfully');
     } catch (error) {
-      console.error('Error exporting tips:', error);
+      logger.error('Error exporting tips:', error);
       message.error('Failed to export tips');
     }
   };

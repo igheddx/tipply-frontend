@@ -1,3 +1,4 @@
+import logger from "../utils/logger";
 import React from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 
@@ -37,7 +38,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, requiredRole 
       return <Navigate to="/dashboard" replace />;
     }
   } catch (error) {
-    console.error('Error decoding token:', error);
+    logger.error('Error decoding token:', error);
     // Do not clear tokens or force logout due to decode issues; allow page to render
     return <>{children}</>;
   }

@@ -1,3 +1,4 @@
+import logger from "../utils/logger";
 import React, { useState, useEffect } from 'react'
 import { API_BASE_URL } from '../utils/config'
 
@@ -118,7 +119,7 @@ const SongManagement: React.FC<SongManagementProps> = ({ profileId }) => {
         setCatalogCount(totalCount)
       }
     } catch (error) {
-      console.error('Error refreshing catalog count:', error)
+      logger.error('Error refreshing catalog count:', error)
     }
   }
 
@@ -164,7 +165,7 @@ const SongManagement: React.FC<SongManagementProps> = ({ profileId }) => {
               totalCount = Array.isArray(allSongs) ? allSongs.length : 0
             }
           } catch (err) {
-            console.error('Error fetching full catalog for count:', err)
+            logger.error('Error fetching full catalog for count:', err)
             // If fallback fails, use the current page's songs length as minimum
             totalCount = Array.isArray(songs) ? songs.length : 0
           }
@@ -176,7 +177,7 @@ const SongManagement: React.FC<SongManagementProps> = ({ profileId }) => {
         showNotification('error', 'Failed to load your song catalog')
       }
     } catch (error) {
-      console.error('Error loading catalog:', error)
+      logger.error('Error loading catalog:', error)
       showNotification('error', 'Failed to load your song catalog')
     } finally {
       setIsLoadingCatalog(false)
@@ -207,7 +208,7 @@ const SongManagement: React.FC<SongManagementProps> = ({ profileId }) => {
         showNotification('error', 'Failed to search songs')
       }
     } catch (error) {
-      console.error('Error searching songs:', error)
+      logger.error('Error searching songs:', error)
       showNotification('error', 'Failed to search songs')
     } finally {
       setIsSearching(false)
@@ -248,7 +249,7 @@ const SongManagement: React.FC<SongManagementProps> = ({ profileId }) => {
         showNotification('error', error.error || 'Failed to add song')
       }
     } catch (error) {
-      console.error('Error adding song:', error)
+      logger.error('Error adding song:', error)
       showNotification('error', 'Failed to add song to catalog')
     } finally {
       setIsAddingSong(null)
@@ -311,7 +312,7 @@ const SongManagement: React.FC<SongManagementProps> = ({ profileId }) => {
         showNotification('error', 'Failed to remove song')
       }
     } catch (error) {
-      console.error('Error removing song:', error)
+      logger.error('Error removing song:', error)
       showNotification('error', 'Failed to remove song')
     } finally {
       setIsRemovingSong(null)
@@ -375,7 +376,7 @@ const SongManagement: React.FC<SongManagementProps> = ({ profileId }) => {
         showNotification('error', 'Failed to remove songs')
       }
     } catch (error) {
-      console.error('Error bulk removing songs:', error)
+      logger.error('Error bulk removing songs:', error)
       showNotification('error', 'Failed to remove songs')
     } finally {
       setIsBulkRemoving(false)
@@ -492,7 +493,7 @@ const SongManagement: React.FC<SongManagementProps> = ({ profileId }) => {
       setParsedSongs(songs)
       setShowPreviewModal(true)
     } catch (error) {
-      console.error('Error parsing file:', error)
+      logger.error('Error parsing file:', error)
       showNotification('error', 'Failed to parse file')
     }
   }
@@ -534,7 +535,7 @@ const SongManagement: React.FC<SongManagementProps> = ({ profileId }) => {
     try {
       const token = localStorage.getItem('token')
       
-      console.log('Starting upload...', {
+      logger.log('Starting upload...', {
         songCount: parsedSongs.length,
         endpoint: `${API_BASE_URL}/api/songcatalog/bulk-upload`
       })
@@ -555,11 +556,11 @@ const SongManagement: React.FC<SongManagementProps> = ({ profileId }) => {
         })
       })
 
-      console.log('Upload response status:', response.status)
+      logger.log('Upload response status:', response.status)
       
       if (response.ok) {
         const result: BulkUploadResponse = await response.json()
-        console.log('Upload result:', result)
+        logger.log('Upload result:', result)
         setUploadSummary(result)
         setShowSummaryModal(true)
         
@@ -574,11 +575,11 @@ const SongManagement: React.FC<SongManagementProps> = ({ profileId }) => {
         }
       } else {
         const errorText = await response.text()
-        console.error('Upload failed:', response.status, errorText)
+        logger.error('Upload failed:', response.status, errorText)
         showNotification('error', `Failed to upload songs: ${errorText}`)
       }
     } catch (error) {
-      console.error('Error uploading songs:', error)
+      logger.error('Error uploading songs:', error)
       showNotification('error', `Failed to upload songs: ${error instanceof Error ? error.message : 'Unknown error'}`)
     } finally {
       setIsUploading(false)

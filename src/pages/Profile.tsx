@@ -1,3 +1,4 @@
+import logger from "../utils/logger";
 import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import apiService from '../services/api'
@@ -265,7 +266,7 @@ const Profile: React.FC = () => {
       setLoading(true)
       setError('')
       
-      console.log('🚀 Starting Stripe verification from profile...')
+      logger.log('🚀 Starting Stripe verification from profile...')
       
       // Call profile-level verification endpoint (no device needed)
       const response = await apiService.post('/api/stripe/profile-verification-link', {})
@@ -277,7 +278,7 @@ const Profile: React.FC = () => {
       }
       
       if (response.data?.onboardingUrl) {
-        console.log('✅ Verification URL received, performing full-page navigation...')
+        logger.log('✅ Verification URL received, performing full-page navigation...')
         // Use top.location.href to guarantee full-page navigation that escapes SPA context
         // This prevents iOS Safari ITP from blocking hCaptcha due to frame-ancestry restrictions
         // Fallback to window.location.href if top is unavailable (should never happen in normal contexts)
@@ -292,7 +293,7 @@ const Profile: React.FC = () => {
         setLoading(false)
       }
     } catch (err) {
-      console.error('Error starting verification:', err)
+      logger.error('Error starting verification:', err)
       setError('Failed to start verification process')
       setLoading(false)
     }
@@ -303,7 +304,7 @@ const Profile: React.FC = () => {
       setLoading(true)
       setError('')
 
-      console.log('🚀 Starting Stripe onboarding from profile...')
+      logger.log('🚀 Starting Stripe onboarding from profile...')
 
       const response = await apiService.post('/api/stripe/profile-onboarding-link', {})
 
@@ -314,7 +315,7 @@ const Profile: React.FC = () => {
       }
 
       if (response.data?.onboardingUrl) {
-        console.log('✅ Onboarding URL received, redirecting...')
+        logger.log('✅ Onboarding URL received, redirecting...')
         if (top) {
           top.location.href = response.data.onboardingUrl
         } else {
@@ -325,7 +326,7 @@ const Profile: React.FC = () => {
         setLoading(false)
       }
     } catch (err) {
-      console.error('Error starting onboarding:', err)
+      logger.error('Error starting onboarding:', err)
       setError('Failed to start onboarding process')
       setLoading(false)
     }
@@ -338,14 +339,14 @@ const Profile: React.FC = () => {
   }
 
   const checkStripeConnectStatus = async () => {
-    console.log('🔍 [Profile] checkStripeConnectStatus called')
+    logger.log('🔍 [Profile] checkStripeConnectStatus called')
     try {
       // Check the Stripe status endpoint for actual verification status
       // Don't just check if stripeAccountId exists - account must be enabled
-      console.log('🔍 [Profile] Getting profile Stripe status...')
+      logger.log('🔍 [Profile] Getting profile Stripe status...')
       try {
         const statusResponse = await apiService.get('/api/stripe/profile-stripe-status')
-        console.log('Status response received:', statusResponse)
+        logger.log('Status response received:', statusResponse)
         
         if (statusResponse && statusResponse.data) {
           const status = statusResponse.data
@@ -357,7 +358,7 @@ const Profile: React.FC = () => {
           // This is the ONLY way to determine if KYC is verified
           const isKycVerified = status.IsEnabled && status.ChargesEnabled && status.PayoutsEnabled
           
-          console.log('Stripe Connect Status Check:', {
+          logger.log('Stripe Connect Status Check:', {
             IsEnabled: status.IsEnabled,
             ChargesEnabled: status.ChargesEnabled,
             PayoutsEnabled: status.PayoutsEnabled,
@@ -387,15 +388,15 @@ const Profile: React.FC = () => {
           }
         } else {
           // No status data returned
-          console.log('No status data returned from profile-stripe-status')
+          logger.log('No status data returned from profile-stripe-status')
           setKycStatus('not_verified')
         }
       } catch (error) {
-        console.error('Error checking profile Stripe status:', error)
+        logger.error('Error checking profile Stripe status:', error)
         setKycStatus('not_verified')
       }
     } catch (error) {
-      console.error('Error checking Stripe Connect status:', error)
+      logger.error('Error checking Stripe Connect status:', error)
     }
   }
 

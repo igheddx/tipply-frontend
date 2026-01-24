@@ -1,3 +1,4 @@
+import logger from "./utils/logger";
 import CryptoJS from 'crypto-js';
 
 export const getEncryptDecryptNoUserName = async (): Promise<string> => {
@@ -19,7 +20,7 @@ export const getEncryptDecryptNoUserName = async (): Promise<string> => {
   sessionStorage.setItem("xapikeyNoAccessToken", final);
   localStorage.setItem("xapikeyNoAccessToken", final);
 
-  console.log("Generated API key:", final);
+  logger.log("Generated API key:", final);
   return final;
 };
 
