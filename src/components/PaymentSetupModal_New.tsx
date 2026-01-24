@@ -1,4 +1,4 @@
-
+import logger from "../utils/logger";
 import React, { useState, useEffect } from 'react'
 import { loadStripe } from '@stripe/stripe-js'
 import { Elements, CardElement, useStripe, useElements } from '@stripe/react-stripe-js'
@@ -102,9 +102,17 @@ function PaymentForm({
       })
       
       pr.canMakePayment().then((result) => {
+        logger.log('Payment Request canMakePayment result:', result)
+        logger.log('Is HTTPS:', window.location.protocol === 'https:')
+        
         if (result) {
           setPaymentRequest(pr)
+          logger.log('Payment Request available - Apple Pay:', result.applePay, 'Google Pay:', result.googlePay)
+        } else {
+          logger.log('Payment Request not available')
         }
+      }).catch((error) => {
+        logger.error('Payment Request canMakePayment error:', error)
       })
 
       pr.on('paymentmethod', async (event) => {

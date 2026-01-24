@@ -140,11 +140,17 @@ function PaymentForm({
         logger.log('Payment Request canMakePayment result:', result)
         logger.log('User Agent:', navigator.userAgent)
         logger.log('Platform:', navigator.platform)
+        logger.log('Is HTTPS:', window.location.protocol === 'https:')
+        
         if (result) {
           setPaymentRequest(pr)
           setIsApplePay(!!result.applePay)
           logger.log('Payment Request is available - Apple Pay:', result.applePay, 'Google Pay:', result.googlePay)
+        } else {
+          logger.log('Payment Request not available - likely not on supported browser or HTTPS')
         }
+      }).catch((error) => {
+        logger.error('Payment Request canMakePayment error:', error)
       })
 
       // Handle payment request events
