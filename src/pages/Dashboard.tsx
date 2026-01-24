@@ -820,20 +820,39 @@ const Dashboard: React.FC = () => {
       ctx.fillStyle = '#6B7280'
       ctx.font = '28px Arial, sans-serif'
       const isProd = window.location.hostname.includes('app.tipwave.live')
-      const footerText = isProd 
-        ? 'Printed 4x6" QR Card · Tipwave '
-        : 'Printed 4x6" QR Card · Tipwave'
       
-      // Draw the regular text
+      // Draw the base text
       ctx.textAlign = 'center'
-      ctx.fillText(footerText, width / 2, 1650)
+      const baseText = 'Printed 4x6" QR Card · '
+      const brandText = 'Tipwave'
       
-      // Add "Live!" in bold for production
+      // Measure text to position elements correctly
+      const baseTextWidth = ctx.measureText(baseText).width
+      const brandTextWidth = ctx.measureText(brandText).width
+      
+      // Calculate starting position for centered text
+      const totalWidth = isProd 
+        ? baseTextWidth + brandTextWidth + ctx.measureText(' ').width + ctx.measureText('Live!').width
+        : baseTextWidth + brandTextWidth
+      
+      let xPosition = (width / 2) - (totalWidth / 2)
+      
+      // Draw base text "Printed 4x6" QR Card · "
+      ctx.textAlign = 'left'
+      ctx.fillText(baseText, xPosition, 1650)
+      xPosition += baseTextWidth
+      
+      // Draw "Tipwave"
+      ctx.fillText(brandText, xPosition, 1650)
+      xPosition += brandTextWidth
+      
+      // Add " Live!" in bold for production
       if (isProd) {
+        ctx.fillText(' ', xPosition, 1650)
+        xPosition += ctx.measureText(' ').width
+        
         ctx.font = 'bold 28px Arial, sans-serif'
-        const textMetrics = ctx.measureText(footerText)
-        const liveXPosition = (width / 2) + (textMetrics.width / 2)
-        ctx.fillText('Live!', liveXPosition, 1650)
+        ctx.fillText('Live!', xPosition, 1650)
       }
 
       // Convert canvas to blob and download
