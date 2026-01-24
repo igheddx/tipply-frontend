@@ -816,10 +816,25 @@ const Dashboard: React.FC = () => {
       ctx.font = 'bold 56px Arial, sans-serif'
       ctx.fillText(stageName, width / 2, 1400)
 
-      // Draw footer
+      // Draw footer with environment indicator
       ctx.fillStyle = '#6B7280'
       ctx.font = '28px Arial, sans-serif'
-      ctx.fillText('Printed 4x6" QR card · Tipwave', width / 2, 1650)
+      const isProd = window.location.hostname.includes('app.tipwave.live')
+      const footerText = isProd 
+        ? 'Printed 4x6" QR Card · Tipwave '
+        : 'Printed 4x6" QR Card · Tipwave'
+      
+      // Draw the regular text
+      ctx.textAlign = 'center'
+      ctx.fillText(footerText, width / 2, 1650)
+      
+      // Add "Live!" in bold for production
+      if (isProd) {
+        ctx.font = 'bold 28px Arial, sans-serif'
+        const textMetrics = ctx.measureText(footerText)
+        const liveXPosition = (width / 2) + (textMetrics.width / 2)
+        ctx.fillText('Live!', liveXPosition, 1650)
+      }
 
       // Convert canvas to blob and download
       canvas.toBlob((blob) => {
