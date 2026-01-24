@@ -23,8 +23,8 @@ export const getApiBaseUrl = () => {
     return 'https://uhxejjh8s1.execute-api.us-east-1.amazonaws.com/dev';
   }
   
-  // Legacy app.tipply.live redirect (if still in use)
-  if (hostname.includes('app.tipply.live')) {
+  // Legacy app.tipwave.live redirect (if still in use)
+  if (hostname.includes('app.tipwave.live')) {
     console.log('Detected legacy deployed environment, using AWS API Gateway /dev URL');
     return 'https://uhxejjh8s1.execute-api.us-east-1.amazonaws.com/dev';
   }
@@ -46,7 +46,7 @@ export const getFrontendBaseUrl = () => {
   
   // Check if we're on the deployed site
   const hostname = window.location.hostname;
-  if (hostname.includes('app.tipply.live') || hostname.includes('tipply.live')) {
+  if (hostname.includes('app.tipwave.live') || hostname.includes('tipwave.live')) {
     console.log('Detected deployed environment, using production URL');
     return `https://${hostname}`;
   }
