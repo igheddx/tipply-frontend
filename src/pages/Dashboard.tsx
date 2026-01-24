@@ -826,7 +826,7 @@ const Dashboard: React.FC = () => {
       ctx.textAlign = 'center'
       const baseText = 'Printed 4x6" QR Card · '
       const brandText = 'Tipwave'
-      const spacer = '  ' // Two spaces for better padding
+      const spacer = '     ' // Five spaces for wider padding
       
       // Measure text to position elements correctly
       const baseTextWidth = ctx.measureText(baseText).width
@@ -854,7 +854,7 @@ const Dashboard: React.FC = () => {
       ctx.fillText(brandText, xPosition, 1650)
       xPosition += brandTextWidth
       
-      // Add "  Live!" in bold for production with proper spacing
+      // Add "     Live!" in bold for production with wider spacing
       if (isProd) {
         xPosition += spacerWidth
         
