@@ -8,7 +8,7 @@
  * localStorage.removeItem('ENABLE_LOGS')
  */
 
-const isProduction = window.location.hostname.includes('app.tipwave.live')
+const isProduction = window.location.hostname.includes('app.tipwave.live') || window.location.hostname.includes('tipwave.live')
 const isLoggingEnabled = () => {
   // Check localStorage override first
   const override = localStorage.getItem('ENABLE_LOGS')
