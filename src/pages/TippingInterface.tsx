@@ -1125,6 +1125,7 @@ const TippingInterface: React.FC = () => {
                       <div className="text-white text-xs font-semibold mb-1">🎵 Song Selected</div>
                       <div className="text-white/90 text-sm">{selectedSong?.title}</div>
                       <div className="text-white/70 text-xs">{selectedSong?.artist}</div>
+                      <div className="text-white/60 text-xs mt-2 mb-1">Select a tip amount above to send your song request</div>
                       <button
                         onClick={() => setSelectedSong(null)}
                         className="text-white/70 hover:text-white text-xs mt-1 underline"
@@ -1262,6 +1263,7 @@ const TippingInterface: React.FC = () => {
                     <div className="text-white text-xs font-semibold mb-2">🎵 Song Selected</div>
                     <div className="text-white/90 text-sm truncate">{selectedSong?.title}</div>
                     <div className="text-white/70 text-xs truncate">{selectedSong?.artist}</div>
+                    <div className="text-white/60 text-xs mt-2 mb-2">Select a tip amount above to send your song request</div>
                     <button
                       onClick={() => setSelectedSong(null)}
                       className="text-white/70 active:text-white text-xs mt-2 underline"
