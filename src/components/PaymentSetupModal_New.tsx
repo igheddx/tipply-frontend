@@ -4,6 +4,7 @@ import { loadStripe } from '@stripe/stripe-js'
 import { Elements, CardElement, useStripe, useElements } from '@stripe/react-stripe-js'
 import { toast } from 'sonner'
 import { getApiBaseUrl } from '../utils/config'
+import { AppleFilled, GoogleOutlined } from '@ant-design/icons'
 
 const stripePromise = loadStripe((import.meta as any).env.VITE_STRIPE_PUBLISHABLE_KEY || 'pk_test_placeholder')
 
@@ -263,11 +264,11 @@ function PaymentForm({
             disabled={loading}
             className="w-full bg-gradient-to-r from-purple-600 to-purple-700 text-white py-3 px-4 rounded-lg hover:from-purple-700 hover:to-purple-800 transition-all disabled:opacity-50 font-semibold shadow-sm flex items-center justify-center gap-2"
           >
-            <img 
-              src={isApplePay ? '/images/apple-pay-logo.svg' : '/images/google-pay-logo.svg'}
-              alt={isApplePay ? 'Apple Pay' : 'Google Pay'}
-              className="w-5 h-5"
-            />
+            {isApplePay ? (
+              <AppleFilled style={{ fontSize: '20px' }} />
+            ) : (
+              <GoogleOutlined style={{ fontSize: '20px' }} />
+            )}
             <span>{isApplePay ? 'Continue with Apple Pay' : 'Continue with Google Pay'}</span>
           </button>
           

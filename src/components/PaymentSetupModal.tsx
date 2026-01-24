@@ -6,6 +6,7 @@ import { toast } from 'sonner'
 import { getApiBaseUrl } from '../utils/config'
 import { setCookie } from '../utils/cookies'
 import { getUniqueDeviceId, detectPlatform } from '../utils/deviceId'
+import { AppleFilled, GoogleOutlined } from '@ant-design/icons'
 
 // Initialize Stripe
 const stripePromise = loadStripe((import.meta as any).env.VITE_STRIPE_PUBLISHABLE_KEY || 'pk_test_placeholder')
@@ -342,11 +343,11 @@ function PaymentForm({
             disabled={loading}
             className="w-full bg-black text-white py-4 px-4 rounded-xl hover:bg-gray-800 active:bg-gray-900 transition-all disabled:opacity-50 font-medium text-base flex items-center justify-center gap-2"
           >
-            <img 
-              src={isApplePay ? '/images/apple-pay-logo.svg' : '/images/google-pay-logo.svg'}
-              alt={isApplePay ? 'Apple Pay' : 'Google Pay'}
-              className="w-6 h-6"
-            />
+            {isApplePay ? (
+              <AppleFilled style={{ fontSize: '24px' }} />
+            ) : (
+              <GoogleOutlined style={{ fontSize: '24px' }} />
+            )}
             <span>
               {isApplePay ? 'Continue with Apple Pay' : 'Continue with Google Pay'}
             </span>
