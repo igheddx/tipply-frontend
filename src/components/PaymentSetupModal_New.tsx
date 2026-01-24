@@ -89,6 +89,7 @@ function PaymentForm({
   const [error, setError] = useState<string | null>(null)
   const [paymentRequest, setPaymentRequest] = useState<any>(null)
   const [showCardForm, setShowCardForm] = useState(false)
+  const [isApplePay, setIsApplePay] = useState(false)
 
   useEffect(() => {
     if (stripe) {
@@ -107,6 +108,7 @@ function PaymentForm({
         
         if (result) {
           setPaymentRequest(pr)
+          setIsApplePay(!!result.applePay)
           logger.log('Payment Request available - Apple Pay:', result.applePay, 'Google Pay:', result.googlePay)
         } else {
           logger.log('Payment Request not available')
@@ -259,9 +261,14 @@ function PaymentForm({
           <button
             onClick={() => paymentRequest.show()}
             disabled={loading}
-            className="w-full bg-gradient-to-r from-purple-600 to-purple-700 text-white py-3 px-4 rounded-lg hover:from-purple-700 hover:to-purple-800 transition-all disabled:opacity-50 font-semibold shadow-sm"
+            className="w-full bg-gradient-to-r from-purple-600 to-purple-700 text-white py-3 px-4 rounded-lg hover:from-purple-700 hover:to-purple-800 transition-all disabled:opacity-50 font-semibold shadow-sm flex items-center justify-center gap-2"
           >
-            ✓ Quick Pay (Apple/Google)
+            <img 
+              src={isApplePay ? '/images/apple-pay-logo.svg' : '/images/google-pay-logo.svg'}
+              alt={isApplePay ? 'Apple Pay' : 'Google Pay'}
+              className="w-5 h-5"
+            />
+            <span>{isApplePay ? 'Continue with Apple Pay' : 'Continue with Google Pay'}</span>
           </button>
           
           <div className="flex items-center gap-3 opacity-40">

@@ -342,7 +342,11 @@ function PaymentForm({
             disabled={loading}
             className="w-full bg-black text-white py-4 px-4 rounded-xl hover:bg-gray-800 active:bg-gray-900 transition-all disabled:opacity-50 font-medium text-base flex items-center justify-center gap-2"
           >
-            <span>{isApplePay ? '🍎' : '📱'}</span>
+            <img 
+              src={isApplePay ? '/images/apple-pay-logo.svg' : '/images/google-pay-logo.svg'}
+              alt={isApplePay ? 'Apple Pay' : 'Google Pay'}
+              className="w-6 h-6"
+            />
             <span>
               {isApplePay ? 'Continue with Apple Pay' : 'Continue with Google Pay'}
             </span>
