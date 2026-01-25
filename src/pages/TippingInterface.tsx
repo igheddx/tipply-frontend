@@ -126,6 +126,25 @@ const TippingInterface: React.FC = () => {
     const updateOrientation = () => {
       const portrait = window.matchMedia('(orientation: portrait)').matches || window.innerHeight >= window.innerWidth
       setIsPortrait(portrait)
+      
+      // Force CSS-based rotation on Android if in landscape
+      if (!portrait && window.innerWidth < 768) {
+        logger.log('📱 Landscape detected on mobile - applying CSS rotation lock')
+        document.body.style.transform = 'rotate(-90deg)'
+        document.body.style.transformOrigin = 'center center'
+        document.body.style.width = '100vh'
+        document.body.style.height = '100vw'
+        document.body.style.overflow = 'hidden'
+        document.body.style.position = 'fixed'
+      } else {
+        // Remove forced rotation
+        document.body.style.transform = ''
+        document.body.style.transformOrigin = ''
+        document.body.style.width = ''
+        document.body.style.height = ''
+        document.body.style.overflow = ''
+        document.body.style.position = ''
+      }
     }
 
     updateOrientation()
@@ -147,13 +166,39 @@ const TippingInterface: React.FC = () => {
   // Try to lock orientation to portrait where supported (Android Chrome/PWA)
   useEffect(() => {
     const attemptLock = async () => {
-      const ori: any = (window.screen as any).orientation
-      if (ori && typeof ori.lock === 'function') {
-        try {
-          await ori.lock('portrait-primary')
-        } catch (e) {
-          // Ignore if not supported or requires fullscreen/user gesture
+      try {
+        const ori: any = (window.screen as any).orientation
+        if (ori && typeof ori.lock === 'function') {
+          try {
+            await ori.lock('portrait-primary')
+            logger.log('✅ Screen orientation locked to portrait')
+          } catch (lockError: any) {
+            // On Android Chrome, we may need fullscreen first
+            logger.log('⚠️ Could not lock orientation without fullscreen:', lockError.message)
+            
+            // Try requesting fullscreen then locking
+            try {
+              const elem: any = document.documentElement
+              if (elem.requestFullscreen) {
+                await elem.requestFullscreen()
+              } else if (elem.webkitRequestFullscreen) {
+                elem.webkitRequestFullscreen()
+              } else if (elem.mozRequestFullScreen) {
+                elem.mozRequestFullScreen()
+              } else if (elem.msRequestFullscreen) {
+                elem.msRequestFullscreen()
+              }
+              
+              // Try lock again after fullscreen
+              await ori.lock('portrait-primary')
+              logger.log('✅ Fullscreen + orientation lock successful')
+            } catch (fullscreenError) {
+              logger.log('⚠️ Fullscreen request also failed:', fullscreenError)
+            }
+          }
         }
+      } catch (e) {
+        logger.log('ℹ️ Screen orientation lock not supported on this device')
       }
     }
 
