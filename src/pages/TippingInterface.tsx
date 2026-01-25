@@ -51,6 +51,7 @@ const TippingInterface: React.FC = () => {
   // Song request state
   const [showSongSearch, setShowSongSearch] = useState(false)
   const [selectedSong, setSelectedSong] = useState<{id: string, title: string, artist: string, requestorName?: string, note?: string} | null>(null)
+  const [shouldAnimateButtons, setShouldAnimateButtons] = useState(false)
   
   const audioRef = useRef<HTMLAudioElement>(null)
   const audioContextRef = useRef<AudioContext | null>(null)
@@ -951,6 +952,7 @@ const TippingInterface: React.FC = () => {
   const handleSongSelect = (song: {id: string, title: string, artist: string, requestorName?: string, note?: string}) => {
     setSelectedSong(song)
     setShowSongSearch(false)
+    setShouldAnimateButtons(true)
     toast.success(`Song selected: ${song.title} by ${song.artist}. Now select a tip amount!`)
   }
 
@@ -1284,8 +1286,34 @@ const TippingInterface: React.FC = () => {
                     transition-transform duration-150 disabled:opacity-50
                   `}
                   initial={{ opacity: 0, y: 50 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: index * 0.1 }}
+                  animate={
+                    shouldAnimateButtons
+                      ? {
+                          opacity: 1,
+                          y: 0,
+                          scale: [1, 1.08, 1],
+                          boxShadow: [
+                            '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+                            '0 25px 50px -12px rgba(255, 255, 255, 0.5)',
+                            '0 25px 50px -12px rgba(0, 0, 0, 0.25)'
+                          ]
+                        }
+                      : { opacity: 1, y: 0 }
+                  }
+                  transition={
+                    shouldAnimateButtons
+                      ? {
+                          delay: index * 0.1,
+                          scale: { duration: 0.6, times: [0, 0.5, 1] },
+                          boxShadow: { duration: 0.6, times: [0, 0.5, 1] }
+                        }
+                      : { delay: index * 0.1 }
+                  }
+                  onAnimationComplete={() => {
+                    if (shouldAnimateButtons && index === tipAmounts.length - 1) {
+                      setShouldAnimateButtons(false)
+                    }
+                  }}
                 >
                   {/* Shimmer effect */}
                   <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -skew-x-12 animate-pulse"></div>
