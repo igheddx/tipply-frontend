@@ -193,13 +193,26 @@
     max-width: 400px;
   }
   
-  /* Portrait orientation lock */
+  /* Portrait orientation lock for mobile devices */
   @media screen and (orientation: landscape) and (max-width: 768px) {
-    body {
-      transform: rotate(90deg);
+    /* Force rotate landscape back to portrait */
+    body, html {
+      transform: rotate(-90deg);
       transform-origin: center center;
       width: 100vh;
       height: 100vw;
+      overflow: hidden;
+      position: fixed;
+      top: 0;
+      left: 0;
+    }
+    
+    /* Ensure all content rotates with body */
+    #root {
+      transform: rotate(90deg);
+      transform-origin: center center;
+      width: 100vw;
+      height: 100vh;
       overflow: hidden;
     }
   }
