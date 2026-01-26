@@ -1,6 +1,6 @@
 import logger from "../utils/logger";
 import React, { useState, useEffect } from 'react'
-import { loadStripe } from '@stripe/stripe-js'
+import { loadStripe, type Stripe } from '@stripe/stripe-js'
 import { Elements, CardElement, useStripe, useElements } from '@stripe/react-stripe-js'
 import { toast } from 'sonner'
 import { getApiBaseUrl } from '../utils/config'
@@ -8,8 +8,7 @@ import { setCookie } from '../utils/cookies'
 import { getUniqueDeviceId, detectPlatform } from '../utils/deviceId'
 import { AppleFilled, GoogleOutlined } from '@ant-design/icons'
 
-// Initialize Stripe
-const stripePromise = loadStripe((import.meta as any).env.VITE_STRIPE_PUBLISHABLE_KEY || 'pk_test_placeholder')
+// Stripe will be initialized dynamically with the publishable key from backend
 
 interface PaymentSetupModalProps {
   isOpen: boolean
@@ -35,6 +34,48 @@ export default function PaymentSetupModal({
   performerPhotoUrl
 }: PaymentSetupModalProps) {
   if (!isOpen) return null
+  const [stripePromise, setStripePromise] = useState<Promise<Stripe | null> | null>(null)
+  const [initError, setInitError] = useState<string | null>(null)
+
+  useEffect(() => {
+    let isMounted = true
+    ;(async () => {
+      try {
+        // Fetch active publishable key from backend (respects live/test mode)
+        const res = await fetch(`${getApiBaseUrl()}/api/stripe-config/publishable-key`)
+        if (!res.ok) {
+          // Fallback to env var if endpoint fails
+          const fallbackKey = (import.meta as any).env.VITE_STRIPE_PUBLISHABLE_KEY
+          if (!fallbackKey) {
+            setInitError('Unable to initialize Stripe: missing publishable key')
+            return
+          }
+          const promise = loadStripe(fallbackKey)
+          if (isMounted) setStripePromise(promise)
+          return
+        }
+        const data = await res.json()
+        const key = data?.publishableKey || (import.meta as any).env.VITE_STRIPE_PUBLISHABLE_KEY
+        if (!key) {
+          setInitError('Unable to initialize Stripe: no publishable key available')
+          return
+        }
+        const promise = loadStripe(key)
+        if (isMounted) setStripePromise(promise)
+      } catch (e) {
+        const fallbackKey = (import.meta as any).env.VITE_STRIPE_PUBLISHABLE_KEY
+        if (fallbackKey) {
+          const promise = loadStripe(fallbackKey)
+          if (isMounted) setStripePromise(promise)
+        } else {
+          setInitError('Failed to initialize Stripe')
+        }
+      }
+    })()
+    return () => {
+      isMounted = false
+    }
+  }, [])
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
@@ -62,14 +103,24 @@ export default function PaymentSetupModal({
 
         {/* ========== FORM CONTENT ========== */}
         <div className="px-6 py-8">
-          <Elements stripe={stripePromise}>
-            <PaymentForm 
-              deviceUuid={deviceUuid}
-              userId={userId}
-              onComplete={onComplete}
-              onClose={onClose}
-            />
-          </Elements>
+          {!stripePromise && (
+            <div className="text-center py-8">
+              <p className="text-sm text-gray-600">Initializing secure payment...</p>
+              {initError && (
+                <p className="mt-2 text-sm text-red-600">{initError}</p>
+              )}
+            </div>
+          )}
+          {stripePromise && (
+            <Elements stripe={stripePromise}>
+              <PaymentForm 
+                deviceUuid={deviceUuid}
+                userId={userId}
+                onComplete={onComplete}
+                onClose={onClose}
+              />
+            </Elements>
+          )}
         </div>
       </div>
     </div>
