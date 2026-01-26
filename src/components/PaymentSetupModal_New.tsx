@@ -151,18 +151,21 @@ function PaymentForm({
         displayItems: [{ label: 'Tip Setup', amount: 100 }]
       })
       
-      pr.canMakePayment().then((result) => {
-        logger.log('Payment Request canMakePayment result:', result)
-        logger.log('Is HTTPS:', window.location.protocol === 'https:')
-        
-        if (result) {
-          setPaymentRequest(pr)
-          setIsApplePay(!!result.applePay)
-          logger.log('Payment Request available - Apple Pay:', result.applePay, 'Google Pay:', result.googlePay)
-        } else {
-          logger.log('Payment Request not available')
-        }
-      }).catch((error) => {
+          pr.canMakePayment().then((result) => {
+            logger.log('Payment Request canMakePayment result:', result)
+            logger.log('Is HTTPS:', window.location.protocol === 'https:')
+
+            const appleAvailable = !!(result && (result as any).applePay)
+            const googleAvailable = !!(result && (result as any).googlePay)
+
+            if (appleAvailable || googleAvailable) {
+              setPaymentRequest(pr)
+              setIsApplePay(appleAvailable)
+              logger.log('Payment Request is available - Apple Pay:', appleAvailable, 'Google Pay:', googleAvailable)
+            } else {
+              logger.log('Payment Request not available - no Apple Pay or Google Pay support detected')
+            }
+          }).catch((error) => {
         logger.error('Payment Request canMakePayment error:', error)
       })
 
