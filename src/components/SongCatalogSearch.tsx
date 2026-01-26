@@ -2,6 +2,7 @@ import logger from "../utils/logger";
 import React, { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { API_BASE_URL } from '../utils/config'
+import SongConfirmationModal from './SongConfirmationModal'
 
 interface Song {
   id: string
@@ -43,6 +44,10 @@ const SongCatalogSearch: React.FC<SongCatalogSearchProps> = ({
   const [requestorName, setRequestorName] = useState('')
   const [note, setNote] = useState('')
   const searchInputRef = useRef<HTMLInputElement>(null)
+  
+  // Modal state
+  const [showConfirmModal, setShowConfirmModal] = useState(false)
+  const [pendingSong, setPendingSong] = useState<Song | null>(null)
 
   // Auto-focus search input when component becomes visible
   useEffect(() => {
@@ -119,13 +124,27 @@ const SongCatalogSearch: React.FC<SongCatalogSearchProps> = ({
   }, [searchQuery])
 
   const handleSongRequest = (song: Song) => {
-    onSongSelect({
-      id: song.id,
-      title: song.songTitle,
-      artist: song.artist,
-      requestorName: requestorName.trim() || undefined,
-      note: note.trim() || undefined
-    })
+    setPendingSong(song)
+    setShowConfirmModal(true)
+  }
+
+  const handleConfirmSong = () => {
+    if (pendingSong) {
+      onSongSelect({
+        id: pendingSong.id,
+        title: pendingSong.songTitle,
+        artist: pendingSong.artist,
+        requestorName: requestorName.trim() || undefined,
+        note: note.trim() || undefined
+      })
+      setShowConfirmModal(false)
+      setPendingSong(null)
+    }
+  }
+
+  const handleCancelConfirm = () => {
+    setShowConfirmModal(false)
+    setPendingSong(null)
   }
 
   return (
@@ -333,6 +352,15 @@ const SongCatalogSearch: React.FC<SongCatalogSearchProps> = ({
           </motion.div>
         </motion.div>
       )}
+      
+      {/* Confirmation Modal */}
+      <SongConfirmationModal
+        isOpen={showConfirmModal}
+        songTitle={pendingSong?.songTitle || ''}
+        artist={pendingSong?.artist || ''}
+        onContinue={handleConfirmSong}
+        onCancel={handleCancelConfirm}
+      />
     </AnimatePresence>
   )
 }
