@@ -150,27 +150,36 @@ function PaymentForm({
     logger.log('💾 [storePaymentInfo] Called with:', { persistedUserId, paymentMethodId, stripeCustomerId, platform })
     
     if (!paymentMethodId || !stripeCustomerId) {
-      logger.warn('⚠️ [storePaymentInfo] Missing paymentMethodId or stripeCustomerId, skipping storage')
+      logger.warn('⚠️ [storePaymentInfo] Missing paymentMethodId or stripeCustomerId, skipping storage', { 
+        paymentMethodId: paymentMethodId ? '✓' : '✗',
+        stripeCustomerId: stripeCustomerId ? '✓' : '✗'
+      })
       return
     }
 
     try {
       logger.log('📤 [storePaymentInfo] Storing payment info to backend...')
+      const requestBody = {
+        userId: persistedUserId,
+        paymentMethodId,
+        stripeCustomerId,
+        platform: platform || detectPlatform()
+      }
+      logger.log('📤 [storePaymentInfo] Request body:', requestBody)
+      
       const response = await fetch(`${getApiBaseUrl()}/api/stripe/store-payment-info`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userId: persistedUserId,
-          paymentMethodId,
-          stripeCustomerId,
-          platform: platform || detectPlatform()
-        }),
+        body: JSON.stringify(requestBody),
       })
+      
+      const responseText = await response.text()
+      logger.log('📥 [storePaymentInfo] Response status:', response.status, 'Body:', responseText)
       
       if (response.ok) {
         logger.log('✅ [storePaymentInfo] Payment info stored successfully')
       } else {
-        logger.error('❌ [storePaymentInfo] Backend returned error:', response.status, response.statusText)
+        logger.error('❌ [storePaymentInfo] Backend returned error:', response.status, response.statusText, 'Body:', responseText)
       }
     } catch (err) {
       logger.error('❌ [storePaymentInfo] Failed to persist payment info to backend', err)
