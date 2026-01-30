@@ -8,7 +8,7 @@ import PaymentSetupModal from '../components/PaymentSetupModal'
 import SongCatalogSearch from '../components/SongCatalogSearch'
 import apiService from '../services/api'
 import { getApiBaseUrl } from '../utils/config'
-import { getUniqueDeviceId, detectPlatform } from '../utils/deviceId'
+import { getUniqueDeviceId, detectPlatform, restoreDeviceIdFromIndexedDB } from '../utils/deviceId'
 
 interface DeviceInfo {
   id: string
@@ -226,9 +226,12 @@ const TippingInterface: React.FC = () => {
   // Initialize user
   useEffect(() => {
     const initializeUser = async () => {
-      // Get unique device ID (deterministic and reproducible)
+      // Restore device ID from IndexedDB if localStorage was cleared
+      const restoredId = await restoreDeviceIdFromIndexedDB()
+      
+      // Get unique device ID (random UUID stored persistently)
       const uniqueDeviceId = getUniqueDeviceId()
-      logger.log('🔐 [Init] Unique device ID:', uniqueDeviceId)
+      logger.log('🔐 [Init] Unique device ID:', uniqueDeviceId, restoredId ? '(restored from IndexedDB)' : '(new)')
       
       // Detect platform (iOS, Android, Desktop)
       const platform = detectPlatform()

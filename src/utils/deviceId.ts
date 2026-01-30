@@ -1,8 +1,8 @@
 /**
  * Device ID Generation Utility
  * 
- * Generates a deterministic, reproducible unique device ID based on device characteristics.
- * The same device will generate the same ID consistently.
+ * Uses IndexedDB to store a persistent random UUID that survives cache clears
+ * and browser restarts, ensuring the same device always gets the same ID.
  */
 
 import CryptoJS from 'crypto-js'
@@ -23,86 +23,111 @@ export const detectPlatform = (): string => {
 }
 
 /**
- * Get device fingerprint characteristics
+ * Generate a random UUID v4
  */
-const getDeviceFingerprint = (): string => {
-  const components = {
-    // Screen characteristics
-    screenResolution: `${screen.width}x${screen.height}x${screen.colorDepth}`,
-    screenDimensions: `${screen.availWidth}x${screen.availHeight}`,
-    
-    // Browser characteristics
-    userAgent: navigator.userAgent,
-    language: navigator.language,
-    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-    
-    // Platform characteristics
-    platform: navigator.platform,
-    hardwareConcurrency: navigator.hardwareConcurrency?.toString() || 'unknown',
-    deviceMemory: (navigator as any).deviceMemory?.toString() || 'unknown',
-    
-    // Canvas fingerprint (web-specific)
-    canvasFingerprint: getCanvasFingerprint(),
-  }
-  
-  return JSON.stringify(components)
+const generateUUID = (): string => {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    const r = Math.random() * 16 | 0
+    const v = c === 'x' ? r : (r & 0x3 | 0x8)
+    return v.toString(16)
+  })
 }
 
 /**
- * Generate a canvas fingerprint to distinguish browsers
+ * Initialize IndexedDB and store device ID
  */
-const getCanvasFingerprint = (): string => {
-  try {
-    const canvas = document.createElement('canvas')
-    const ctx = canvas.getContext('2d')
-    if (!ctx) return 'canvas_failed'
-    
-    ctx.textBaseline = 'top'
-    ctx.font = '14px Arial'
-    ctx.textBaseline = 'alphabetic'
-    ctx.fillStyle = '#f60'
-    ctx.fillRect(125, 1, 62, 20)
-    ctx.fillStyle = '#069'
-    ctx.fillText('Browser Fingerprint 🔐', 2, 15)
-    ctx.fillStyle = 'rgba(102, 204, 0, 0.7)'
-    ctx.fillText('Browser Fingerprint 🔐', 4, 17)
-    
-    return canvas.toDataURL()
-  } catch {
-    return 'canvas_error'
-  }
+const initIndexedDB = async (): Promise<string | null> => {
+  return new Promise((resolve) => {
+    try {
+      const request = indexedDB.open('TipplyDB', 1)
+      
+      request.onerror = () => {
+        console.warn('IndexedDB open failed')
+        resolve(null)
+      }
+      
+      request.onupgradeneeded = (event: any) => {
+        const db = event.target.result
+        if (!db.objectStoreNames.contains('config')) {
+          db.createObjectStore('config', { keyPath: 'key' })
+        }
+      }
+      
+      request.onsuccess = (event: any) => {
+        const db = event.target.result
+        const transaction = db.transaction(['config'], 'readonly')
+        const store = transaction.objectStore('config')
+        const query = store.get('deviceId')
+        
+        query.onsuccess = () => {
+          resolve(query.result?.value || null)
+        }
+        
+        query.onerror = () => {
+          resolve(null)
+        }
+      }
+    } catch (e) {
+      console.warn('IndexedDB not available:', e)
+      resolve(null)
+    }
+  })
 }
 
 /**
- * Generate a SHA-256 hash of the device fingerprint
- * Returns a deterministic unique ID for this device
+ * Store device ID in IndexedDB
  */
-const generateHash = (data: string): string => {
-  return CryptoJS.SHA256(data).toString()
+const storeDeviceIdInIndexedDB = async (deviceId: string): Promise<void> => {
+  return new Promise((resolve) => {
+    try {
+      const request = indexedDB.open('TipplyDB', 1)
+      
+      request.onsuccess = (event: any) => {
+        const db = event.target.result
+        const transaction = db.transaction(['config'], 'readwrite')
+        const store = transaction.objectStore('config')
+        store.put({ key: 'deviceId', value: deviceId })
+        
+        transaction.oncomplete = () => {
+          console.log('✅ Device ID stored in IndexedDB:', deviceId)
+          resolve()
+        }
+        
+        transaction.onerror = () => {
+          resolve()
+        }
+      }
+      
+      request.onerror = () => {
+        resolve()
+      }
+    } catch (e) {
+      console.warn('Failed to store device ID in IndexedDB:', e)
+      resolve()
+    }
+  })
 }
 
 /**
  * Get or generate the unique device ID
- * Uses localStorage to cache the generated ID for consistency
+ * Uses IndexedDB for persistent storage that survives cache clears
  */
 export const getUniqueDeviceId = (): string => {
+  // Try to get from localStorage first (fast synchronous access)
   const STORAGE_KEY = 'unique_device_id'
-  
-  // Check if we already have a stored device ID
   let deviceId = localStorage.getItem(STORAGE_KEY)
   
   if (!deviceId) {
-    // Generate new device ID from fingerprint
-    const fingerprint = getDeviceFingerprint()
-    deviceId = generateHash(fingerprint)
-    
+    // Generate new random UUID
+    deviceId = generateUUID()
     console.log('🔐 Generated new device ID:', deviceId)
     
-    // Store it for future use
+    // Store in both localStorage and IndexedDB
     try {
       localStorage.setItem(STORAGE_KEY, deviceId)
+      storeDeviceIdInIndexedDB(deviceId).catch(e => console.warn('IndexedDB store failed:', e))
     } catch (e) {
-      console.warn('Failed to store device ID in localStorage:', e)
+      console.warn('Failed to store device ID:', e)
     }
   } else {
     console.log('🔐 Retrieved cached device ID:', deviceId)
@@ -112,21 +137,19 @@ export const getUniqueDeviceId = (): string => {
 }
 
 /**
- * Regenerate the device ID (useful for recovery after cache clear)
- * Will return the same ID if called on the same device
+ * Restore device ID from IndexedDB after cache clear
+ * Call this on app initialization to recover the ID
  */
-export const regenerateUniqueDeviceId = (): string => {
-  const fingerprint = getDeviceFingerprint()
-  const deviceId = generateHash(fingerprint)
-  
-  console.log('🔄 Regenerated device ID:', deviceId)
-  
-  // Store it for future use
+export const restoreDeviceIdFromIndexedDB = async (): Promise<string | null> => {
   try {
-    localStorage.setItem('unique_device_id', deviceId)
+    const storedId = await initIndexedDB()
+    if (storedId) {
+      console.log('🔐 Restored device ID from IndexedDB:', storedId)
+      localStorage.setItem('unique_device_id', storedId)
+      return storedId
+    }
   } catch (e) {
-    console.warn('Failed to store device ID in localStorage:', e)
+    console.warn('Failed to restore device ID from IndexedDB:', e)
   }
-  
-  return deviceId
+  return null
 }
