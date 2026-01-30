@@ -5,8 +5,6 @@
  * and browser restarts, ensuring the same device always gets the same ID.
  */
 
-import CryptoJS from 'crypto-js'
-
 /**
  * Detect the platform (iOS, Android, or Desktop)
  */
