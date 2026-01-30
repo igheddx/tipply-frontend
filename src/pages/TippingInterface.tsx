@@ -165,9 +165,18 @@ const TippingInterface: React.FC = () => {
   }, [])
 
   // Try to lock orientation to portrait where supported (Android Chrome/PWA)
+  // Only on actual mobile devices, not in desktop mobile emulation mode
   useEffect(() => {
     const attemptLock = async () => {
       try {
+        // Check if this is a real mobile device (not desktop emulation)
+        const isMobileDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
+        
+        if (!isMobileDevice) {
+          logger.log('ℹ️ Skipping orientation lock on desktop/emulated device')
+          return
+        }
+
         const ori: any = (window.screen as any).orientation
         if (ori && typeof ori.lock === 'function') {
           try {
