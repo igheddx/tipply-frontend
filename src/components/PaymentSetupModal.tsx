@@ -206,11 +206,15 @@ function PaymentForm({
 
         const appleAvailable = !!(result && (result as any).applePay)
         const googleAvailable = !!(result && (result as any).googlePay)
+        const platform = detectPlatform()
+        const preferredWallet = platform === 'iOS' && appleAvailable
+          ? 'apple'
+          : (googleAvailable ? 'google' : (appleAvailable ? 'apple' : null))
 
-        if (appleAvailable || googleAvailable) {
+        if (preferredWallet) {
           setPaymentRequest(pr)
-          setIsApplePay(appleAvailable)
-          logger.log('Payment Request is available - Apple Pay:', appleAvailable, 'Google Pay:', googleAvailable)
+          setIsApplePay(preferredWallet === 'apple')
+          logger.log('Payment Request is available - Apple Pay:', appleAvailable, 'Google Pay:', googleAvailable, 'Preferred:', preferredWallet)
         } else {
           logger.log('Payment Request not available - no Apple Pay or Google Pay support detected')
         }
