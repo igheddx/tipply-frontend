@@ -1,4 +1,4 @@
-const CACHE_NAME = "tipply-v5";
+const CACHE_NAME = "tipply-v6";
 const IS_DEV = self.location.hostname === 'localhost' || self.location.hostname === '127.0.0.1';
 const urlsToCache = [
   "/",
@@ -11,6 +11,7 @@ const urlsToCache = [
   "/images/20dollars.png",
   "/images/50dollars.png",
   "/images/100dollars.png",
+  "/images/plain-button-google-pay.png",
   "/sound/cashRegisterSound.mp3",
 ];
 
