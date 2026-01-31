@@ -313,7 +313,11 @@ function PaymentForm({
           <button
             onClick={() => paymentRequest.show()}
             disabled={loading}
-            className="w-full bg-black text-white py-3 px-6 rounded-full hover:bg-gray-800 active:bg-gray-900 transition-all disabled:opacity-50 font-semibold shadow-sm flex items-center justify-center gap-2"
+            className={`w-full transition-all disabled:opacity-50 font-semibold shadow-sm flex items-center justify-center ${
+              isApplePay
+                ? 'bg-black text-white py-3 px-6 rounded-full hover:bg-gray-800 active:bg-gray-900'
+                : 'bg-transparent p-0'
+            }`}
           >
             {isApplePay ? (
               <>
@@ -325,7 +329,7 @@ function PaymentForm({
               <img
                 src="/images/plain-button-google-pay.png"
                 alt="Google Pay"
-                className="h-6 w-auto"
+                className="h-12 w-auto"
               />
             )}
           </button>
