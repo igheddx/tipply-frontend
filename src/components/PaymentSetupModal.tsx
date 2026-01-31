@@ -406,17 +406,19 @@ function PaymentForm({
             disabled={loading}
             className="w-full bg-black text-white py-3 px-6 rounded-full hover:bg-gray-800 active:bg-gray-900 transition-all disabled:opacity-50 font-medium text-base flex items-center justify-center gap-2"
           >
-            <span>Pay with</span>
             {isApplePay ? (
-              <AppleFilled style={{ fontSize: '20px' }} />
+              <>
+                <span>Pay with</span>
+                <AppleFilled style={{ fontSize: '20px' }} />
+                <span>Pay</span>
+              </>
             ) : (
               <img
                 src="/images/plain-button-google-pay.png"
                 alt="Google Pay"
-                className="h-5 w-auto"
+                className="h-6 w-auto"
               />
             )}
-            <span>Pay</span>
           </button>
           
           {/* Subtle Divider */}
