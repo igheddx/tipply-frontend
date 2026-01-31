@@ -5,6 +5,7 @@ import { Elements, CardElement, useStripe, useElements } from '@stripe/react-str
 import { toast } from 'sonner'
 import { getApiBaseUrl } from '../utils/config'
 import { AppleFilled } from '@ant-design/icons'
+import googlePayButton from '../assets/plain-button-google-pay.png'
 
 // Stripe will be initialized dynamically using backend-provided publishable key
 
@@ -327,7 +328,7 @@ function PaymentForm({
               </>
             ) : (
               <img
-                src="/images/plain-button-google-pay.png"
+                src={googlePayButton}
                 alt="Google Pay"
                 className="h-12 w-auto"
               />

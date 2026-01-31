@@ -7,6 +7,7 @@ import { getApiBaseUrl } from '../utils/config'
 import { setCookie } from '../utils/cookies'
 import { getUniqueDeviceId, detectPlatform } from '../utils/deviceId'
 import { AppleFilled } from '@ant-design/icons'
+import googlePayButton from '../assets/plain-button-google-pay.png'
 
 // Stripe will be initialized dynamically with the publishable key from backend
 
@@ -418,7 +419,7 @@ function PaymentForm({
               </>
             ) : (
               <img
-                src="/images/plain-button-google-pay.png"
+                src={googlePayButton}
                 alt="Google Pay"
                 className="h-12 w-auto"
               />
