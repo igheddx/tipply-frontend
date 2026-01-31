@@ -116,7 +116,7 @@ const AdminDashboard: React.FC = () => {
   const [batchHistory, setBatchHistory] = useState<BatchStatus[]>([]);
   const [batchHistoryModal, setBatchHistoryModal] = useState(false);
   const [batchProcessing, setBatchProcessing] = useState(false);
-  const [batchResultMessage, setBatchResultMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
+  const [batchResultMessage, setBatchResultMessage] = useState<{ type: 'success' | 'warning' | 'error', text: string } | null>(null);
 
   // Tips management state
   const [tips, setTips] = useState<TipDetail[]>([]);
@@ -303,16 +303,32 @@ const AdminDashboard: React.FC = () => {
     setBatchResultMessage(null);
     try {
       const result = await apiService.post('/api/admin/batch-process');
-      const successMsg = result.data?.message || 'Batch processing completed successfully';
-      setBatchResultMessage({ type: 'success', text: successMsg });
+      const tipsProcessed = Number(result.data?.tipsProcessed ?? 0);
+      const success = Boolean(result.data?.success);
+      const responseMsg = result.data?.message || 'Batch processing completed';
+
+      // Determine message type based on response success flag and tips processed
+      if (success === true && tipsProcessed > 0) {
+        setBatchResultMessage({ type: 'success', text: responseMsg });
+      } else if (success === false && tipsProcessed === 0) {
+        // Warning: no tips processed (likely not pending yet)
+        setBatchResultMessage({ type: 'warning', text: responseMsg });
+      } else if (success === false) {
+        // Error: failure occurred
+        setBatchResultMessage({ type: 'error', text: responseMsg || 'Failed to run batch processing' });
+      } else {
+        // Fallback for unexpected state
+        setBatchResultMessage({ type: 'warning', text: responseMsg || 'Batch processing completed with unexpected result' });
+      }
       // Wait a moment for DB to commit, then reload stats
       setTimeout(() => {
         loadDashboardData();
         loadBatchStatus();
       }, 1000);
-    } catch (error) {
+    } catch (error: any) {
       logger.error('Error running batch processing:', error);
-      setBatchResultMessage({ type: 'error', text: 'Failed to run batch processing' });
+      const errorMsg = error?.response?.data?.error || error?.response?.data?.message || error?.message || 'Failed to run batch processing';
+      setBatchResultMessage({ type: 'error', text: errorMsg });
     } finally {
       setBatchProcessing(false);
     }
@@ -645,7 +661,7 @@ const AdminDashboard: React.FC = () => {
               {batchResultMessage && (
                 <Alert
                   className="mb-4"
-                  type={batchResultMessage.type === 'success' ? 'success' : 'error'}
+                  type={batchResultMessage.type}
                   message={batchResultMessage.text}
                   showIcon
                   closable
