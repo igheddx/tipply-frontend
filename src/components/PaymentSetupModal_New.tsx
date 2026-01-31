@@ -4,7 +4,7 @@ import { loadStripe, type Stripe } from '@stripe/stripe-js'
 import { Elements, CardElement, useStripe, useElements } from '@stripe/react-stripe-js'
 import { toast } from 'sonner'
 import { getApiBaseUrl } from '../utils/config'
-import { AppleFilled, GoogleOutlined } from '@ant-design/icons'
+import { AppleFilled } from '@ant-design/icons'
 
 // Stripe will be initialized dynamically using backend-provided publishable key
 

@@ -6,7 +6,7 @@ import { toast } from 'sonner'
 import { getApiBaseUrl } from '../utils/config'
 import { setCookie } from '../utils/cookies'
 import { getUniqueDeviceId, detectPlatform } from '../utils/deviceId'
-import { AppleFilled, GoogleOutlined } from '@ant-design/icons'
+import { AppleFilled } from '@ant-design/icons'
 
 // Stripe will be initialized dynamically with the publishable key from backend
 
