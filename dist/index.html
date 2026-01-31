@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/png" href="/images/logo/tipwave-logo.png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <title>Tipply - Smart Tipping Platform</title>
+    
+    <!-- PWA Meta Tags -->
+    <link rel="manifest" href="/manifest.json" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Tipply" />
+    <link rel="apple-touch-icon" href="/images/logo/tipwave-logo.png" />
+    <meta name="theme-color" content="#000000" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    
+    <!-- PWA Install Prompts -->
+    <link rel="icon" type="image/png" sizes="192x192" href="/images/1dollar.png" />
+    <link rel="icon" type="image/png" sizes="512x512" href="/images/5dollars.png" />
+    
+    <!-- Screen Orientation -->
+    <meta name="screen-orientation" content="portrait" />
+    <meta name="x5-orientation" content="portrait" />
+    <meta name="full-screen" content="yes" />
+    <meta name="x5-fullscreen" content="true" />
+    <meta name="360-fullscreen" content="true" />
+    
+    <!-- Additional PWA meta tags for better fullscreen experience -->
+    <meta name="apple-mobile-web-app-capable" content="standalone" />
+    <meta name="format-detection" content="telephone=no" />
+    <meta name="msapplication-tap-highlight" content="no" />
+    
+    <!-- PWA Installation hints -->
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="Tipply" />
+    <meta name="application-name" content="Tipply" />
+    <meta name="msapplication-TileColor" content="#000000" />
+    <meta name="msapplication-config" content="none" />
+    <script type="module" crossorigin src="/assets/index-CvBG7A18.js"></script>
+    <link rel="modulepreload" crossorigin href="/assets/vendor-D4X2AFeH.js">
+    <link rel="modulepreload" crossorigin href="/assets/stripe-BR9Np6T_.js">
+    <link rel="stylesheet" crossorigin href="/assets/index-C8uTzCTk.css">
+  </head>
+  <body>
+    <div id="root"></div>
+    <script>
+      // Register service worker for PWA
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js')
+            .then((registration) => {
+              console.log('SW registered: ', registration);
+            })
+            .catch((registrationError) => {
+              console.log('SW registration failed: ', registrationError);
+            });
+        });
+      }
+    </script>
+  </body>
+</html> 

@@ -1,0 +1,239 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    font-family: system-ui, sans-serif;
+  }
+  
+  body {
+    margin: 0;
+    padding: 0;
+    background-color: #f8fafc;
+    height: 100vh;
+    height: -webkit-fill-available;
+  }
+  
+  html {
+    height: 100vh;
+    height: -webkit-fill-available;
+  }
+  
+  /* Fullscreen styles for mobile */
+  @media screen and (display-mode: standalone) {
+    body {
+      -webkit-user-select: none;
+      -webkit-touch-callout: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+  }
+  
+  /* Hide browser UI elements when in fullscreen */
+  .fullscreen {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    min-height: -webkit-fill-available !important;
+    z-index: 9999 !important;
+    background: #000 !important;
+    padding-top: env(safe-area-inset-top) !important;
+    padding-bottom: env(safe-area-inset-bottom) !important;
+    padding-left: env(safe-area-inset-left) !important;
+    padding-right: env(safe-area-inset-right) !important;
+  }
+  
+  /* Enhanced fullscreen for PWA */
+  @media screen and (display-mode: standalone) {
+    .fullscreen {
+      position: fixed !important;
+      top: 0 !important;
+      left: 0 !important;
+      width: 100vw !important;
+      height: 100vh !important;
+      min-height: -webkit-fill-available !important;
+      z-index: 9999 !important;
+    }
+    
+    body {
+      margin: 0 !important;
+      padding: 0 !important;
+      overflow: hidden !important;
+      -webkit-user-select: none !important;
+      -webkit-touch-callout: none !important;
+      -webkit-tap-highlight-color: transparent !important;
+    }
+  }
+  
+  /* Fix for mobile fullscreen white space - ONLY for tipping interface */
+  @media screen and (max-width: 768px) {
+    /* Only apply fullscreen restrictions to the tipping interface route */
+    #root[data-route="tipping"] {
+      height: 100% !important;
+      width: 100% !important;
+      margin: 0 !important;
+      padding: 0 !important;
+      overflow: hidden !important;
+    }
+    
+    #root[data-route="tipping"] > div {
+      height: 100% !important;
+      width: 100% !important;
+      margin: 0 !important;
+      padding: 0 !important;
+      overflow: hidden !important;
+    }
+    
+    .tipping-interface-fullscreen {
+      position: fixed !important;
+      top: 0 !important;
+      left: 0 !important;
+      width: 100vw !important;
+      height: 100vh !important;
+      min-height: -webkit-fill-available !important;
+      margin: 0 !important;
+      padding: 0 !important;
+      background: transparent !important;
+      z-index: 9999 !important;
+    }
+    
+    /* Ensure no white space anywhere */
+    .tipping-interface-fullscreen * {
+      box-sizing: border-box !important;
+    }
+    
+    /* Force the currency image to fill the entire screen */
+    .tipping-interface-fullscreen img {
+      width: 100vw !important;
+      height: 100vh !important;
+      min-height: -webkit-fill-available !important;
+      object-fit: cover !important;
+      margin: 0 !important;
+      padding: 0 !important;
+    }
+    
+    /* Hide Safari/Chrome address bars in fullscreen */
+    .tipping-interface-fullscreen:fullscreen,
+    .tipping-interface-fullscreen:-webkit-full-screen,
+    .tipping-interface-fullscreen:-moz-full-screen {
+      width: 100vw !important;
+      height: 100vh !important;
+      min-height: -webkit-fill-available !important;
+    }
+    
+    /* Additional fullscreen optimizations for mobile browsers */
+    .tipping-interface-fullscreen:fullscreen *,
+    .tipping-interface-fullscreen:-webkit-full-screen *,
+    .tipping-interface-fullscreen:-moz-full-screen * {
+      -webkit-user-select: none !important;
+      -webkit-touch-callout: none !important;
+      -webkit-tap-highlight-color: transparent !important;
+    }
+  }
+  
+  /* Mobile fullscreen improvements */
+  @supports (-webkit-touch-callout: none) {
+    .fullscreen {
+      height: -webkit-fill-available !important;
+      min-height: -webkit-fill-available !important;
+    }
+    
+    .tipping-interface-fullscreen {
+      height: -webkit-fill-available !important;
+      min-height: -webkit-fill-available !important;
+    }
+  }
+  
+  /* Ensure swipe gestures work in fullscreen mode */
+  .tipping-interface-fullscreen {
+    touch-action: pan-x pan-y !important;
+    -webkit-overflow-scrolling: touch !important;
+  }
+  
+  .tipping-interface-fullscreen * {
+    touch-action: pan-x pan-y !important;
+  }
+  
+  /* Prevent zoom on mobile */
+  @media screen and (max-width: 768px) {
+    input, textarea, select {
+      font-size: 16px !important;
+    }
+  }
+  
+  /* Desktop warning overlay */
+  .desktop-warning {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 10000;
+    color: white;
+    text-align: center;
+    padding: 2rem;
+  }
+  
+  .desktop-warning h1 {
+    font-size: 2rem;
+    font-weight: bold;
+    margin-bottom: 1rem;
+  }
+  
+  .desktop-warning p {
+    font-size: 1.2rem;
+    opacity: 0.9;
+    max-width: 400px;
+  }
+  
+  /* Portrait orientation lock for mobile devices */
+  @media screen and (orientation: landscape) and (max-width: 768px) {
+    /* Force rotate landscape back to portrait */
+    body, html {
+      transform: rotate(-90deg);
+      transform-origin: center center;
+      width: 100vh;
+      height: 100vw;
+      overflow: hidden;
+      position: fixed;
+      top: 0;
+      left: 0;
+    }
+    
+    /* Ensure all content rotates with body */
+    #root {
+      transform: rotate(90deg);
+      transform-origin: center center;
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+    }
+  }
+}
+
+@layer components {
+  .btn-primary {
+    @apply bg-primary-600 hover:bg-primary-700 text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200;
+  }
+  
+  .btn-secondary {
+    @apply bg-gray-200 hover:bg-gray-300 text-gray-800 font-medium py-2 px-4 rounded-lg transition-colors duration-200;
+  }
+  
+  .card {
+    @apply bg-white rounded-lg shadow-md p-6;
+  }
+  
+  .input-field {
+    @apply w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent;
+  }
+}
+
+/* Force redeploy - PhotoUpload component */
