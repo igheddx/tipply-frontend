@@ -625,7 +625,7 @@ const AdminDashboard: React.FC = () => {
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-600">Platform Fees (6.80%):</span>
+                  <span className="text-gray-600">Platform Fees (actual):</span>
                   <span className="font-semibold text-blue-600">
                     ${stats?.totalPlatformFees?.toFixed(2) || '0.00'}
                   </span>
@@ -644,13 +644,13 @@ const AdminDashboard: React.FC = () => {
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-600">Payment Partner Cost (3.2%):</span>
+                  <span className="text-gray-600">Stripe Fees (actual):</span>
                   <span className="font-semibold text-orange-600">
                     ${platformEarnings?.totalPaymentPartnerFees?.toFixed(2) || '0.00'}
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-600">Net Earnings (6.80%):</span>
+                  <span className="text-gray-600">Net Earnings (platform fees - Stripe fees):</span>
                   <span className="font-semibold text-green-600">
                     ${platformEarnings?.netPlatformEarnings?.toFixed(2) || '0.00'}
                   </span>
