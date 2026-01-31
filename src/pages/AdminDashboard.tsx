@@ -628,17 +628,15 @@ const AdminDashboard: React.FC = () => {
               <h3 className="text-lg font-semibold text-gray-900 mb-4">Revenue Overview</h3>
               <div className="space-y-4">
                 <div className="flex justify-between">
-                  <span className="text-gray-600">Total Revenue:</span>
+                  <span className="text-gray-600">Total Revenue (processed):</span>
                   <span className="font-semibold text-lg text-green-600">
                     ${stats?.totalRevenue?.toFixed(2) || '0.00'}
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-600">
-                    Platform Fees ({(platformFeeConfig?.defaultPlatformFeePercentage ?? 7).toFixed(2)}%):
-                  </span>
+                  <span className="text-gray-600">Performer Payouts:</span>
                   <span className="font-semibold text-blue-600">
-                    ${stats?.totalPlatformFees?.toFixed(2) || '0.00'}
+                    ${stats?.totalPerformerPayouts?.toFixed(2) || '0.00'}
                   </span>
                 </div>
               </div>
