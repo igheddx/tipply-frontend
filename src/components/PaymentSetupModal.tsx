@@ -6,7 +6,7 @@ import { toast } from 'sonner'
 import { getApiBaseUrl } from '../utils/config'
 import { setCookie } from '../utils/cookies'
 import { getUniqueDeviceId, detectPlatform } from '../utils/deviceId'
-import { AppleFilled, GoogleOutlined } from '@ant-design/icons'
+import { AppleFilled } from '@ant-design/icons'
 
 // Stripe will be initialized dynamically with the publishable key from backend
 
@@ -150,27 +150,36 @@ function PaymentForm({
     logger.log('💾 [storePaymentInfo] Called with:', { persistedUserId, paymentMethodId, stripeCustomerId, platform })
     
     if (!paymentMethodId || !stripeCustomerId) {
-      logger.warn('⚠️ [storePaymentInfo] Missing paymentMethodId or stripeCustomerId, skipping storage')
+      logger.warn('⚠️ [storePaymentInfo] Missing paymentMethodId or stripeCustomerId, skipping storage', { 
+        paymentMethodId: paymentMethodId ? '✓' : '✗',
+        stripeCustomerId: stripeCustomerId ? '✓' : '✗'
+      })
       return
     }
 
     try {
       logger.log('📤 [storePaymentInfo] Storing payment info to backend...')
+      const requestBody = {
+        userId: persistedUserId,
+        paymentMethodId,
+        stripeCustomerId,
+        platform: platform || detectPlatform()
+      }
+      logger.log('📤 [storePaymentInfo] Request body:', requestBody)
+      
       const response = await fetch(`${getApiBaseUrl()}/api/stripe/store-payment-info`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userId: persistedUserId,
-          paymentMethodId,
-          stripeCustomerId,
-          platform: platform || detectPlatform()
-        }),
+        body: JSON.stringify(requestBody),
       })
+      
+      const responseText = await response.text()
+      logger.log('📥 [storePaymentInfo] Response status:', response.status, 'Body:', responseText)
       
       if (response.ok) {
         logger.log('✅ [storePaymentInfo] Payment info stored successfully')
       } else {
-        logger.error('❌ [storePaymentInfo] Backend returned error:', response.status, response.statusText)
+        logger.error('❌ [storePaymentInfo] Backend returned error:', response.status, response.statusText, 'Body:', responseText)
       }
     } catch (err) {
       logger.error('❌ [storePaymentInfo] Failed to persist payment info to backend', err)
@@ -395,16 +404,19 @@ function PaymentForm({
           <button
             onClick={() => paymentRequest.show()}
             disabled={loading}
-            className="w-full bg-black text-white py-4 px-4 rounded-xl hover:bg-gray-800 active:bg-gray-900 transition-all disabled:opacity-50 font-medium text-base flex items-center justify-center gap-2"
+            className="w-full bg-black text-white py-3 px-6 rounded-full hover:bg-gray-800 active:bg-gray-900 transition-all disabled:opacity-50 font-medium text-base flex items-center justify-center gap-2"
           >
+            <span>Tip with</span>
             {isApplePay ? (
-              <AppleFilled style={{ fontSize: '24px' }} />
+              <AppleFilled style={{ fontSize: '20px' }} />
             ) : (
-              <GoogleOutlined style={{ fontSize: '24px' }} />
+              <img
+                src="/images/google-pay-logo.svg"
+                alt="Google Pay"
+                className="h-5 w-auto"
+              />
             )}
-            <span>
-              {isApplePay ? 'Continue with Apple Pay' : 'Continue with Google Pay'}
-            </span>
+            <span>Pay</span>
           </button>
           
           {/* Subtle Divider */}

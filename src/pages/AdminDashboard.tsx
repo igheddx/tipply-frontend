@@ -58,6 +58,7 @@ interface PlatformEarningsSummary {
   monthlyBreakdown: Record<string, number>;
 }
 
+
 interface BatchStatus {
   id?: string;
   startedAt?: string;
@@ -116,7 +117,7 @@ const AdminDashboard: React.FC = () => {
   const [batchHistory, setBatchHistory] = useState<BatchStatus[]>([]);
   const [batchHistoryModal, setBatchHistoryModal] = useState(false);
   const [batchProcessing, setBatchProcessing] = useState(false);
-  const [batchResultMessage, setBatchResultMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
+  const [batchResultMessage, setBatchResultMessage] = useState<{ type: 'success' | 'warning' | 'error', text: string } | null>(null);
 
   // Tips management state
   const [tips, setTips] = useState<TipDetail[]>([]);
@@ -303,16 +304,34 @@ const AdminDashboard: React.FC = () => {
     setBatchResultMessage(null);
     try {
       const result = await apiService.post('/api/admin/batch-process');
-      const successMsg = result.data?.message || 'Batch processing completed successfully';
-      setBatchResultMessage({ type: 'success', text: successMsg });
+      const tipsProcessed = Number(result.data?.tipsProcessed ?? 0);
+      const success = Boolean(result.data?.success);
+      const responseMsg = result.data?.message || 'Batch processing completed';
+
+      // Determine message type based on response success flag and tips processed
+      if (success === true && tipsProcessed > 0) {
+        setBatchResultMessage({ type: 'success', text: responseMsg });
+      } else if (success === false && tipsProcessed === 0) {
+        // Warning: no tips processed (likely not pending yet)
+        setBatchResultMessage({ type: 'warning', text: responseMsg });
+      } else if (success === false) {
+        // Error: failure occurred
+        setBatchResultMessage({ type: 'error', text: responseMsg || 'Failed to run batch processing' });
+      } else {
+        // Fallback for unexpected state
+        setBatchResultMessage({ type: 'warning', text: responseMsg || 'Batch processing completed with unexpected result' });
+      }
       // Wait a moment for DB to commit, then reload stats
       setTimeout(() => {
         loadDashboardData();
         loadBatchStatus();
+        loadTips();
+        loadBatchHistory();
       }, 1000);
-    } catch (error) {
+    } catch (error: any) {
       logger.error('Error running batch processing:', error);
-      setBatchResultMessage({ type: 'error', text: 'Failed to run batch processing' });
+      const errorMsg = error?.response?.data?.error || error?.response?.data?.message || error?.message || 'Failed to run batch processing';
+      setBatchResultMessage({ type: 'error', text: errorMsg });
     } finally {
       setBatchProcessing(false);
     }
@@ -601,15 +620,15 @@ const AdminDashboard: React.FC = () => {
               <h3 className="text-lg font-semibold text-gray-900 mb-4">Revenue Overview</h3>
               <div className="space-y-4">
                 <div className="flex justify-between">
-                  <span className="text-gray-600">Total Revenue:</span>
+                  <span className="text-gray-600">Total Revenue (processed):</span>
                   <span className="font-semibold text-lg text-green-600">
                     ${stats?.totalRevenue?.toFixed(2) || '0.00'}
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-600">Platform Fees (6.80%):</span>
+                  <span className="text-gray-600">Performer Payouts:</span>
                   <span className="font-semibold text-blue-600">
-                    ${stats?.totalPlatformFees?.toFixed(2) || '0.00'}
+                    ${stats?.totalPerformerPayouts?.toFixed(2) || '0.00'}
                   </span>
                 </div>
               </div>
@@ -626,13 +645,13 @@ const AdminDashboard: React.FC = () => {
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-600">Payment Partner Cost (3.2%):</span>
+                  <span className="text-gray-600">Stripe Fees (actual):</span>
                   <span className="font-semibold text-orange-600">
                     ${platformEarnings?.totalPaymentPartnerFees?.toFixed(2) || '0.00'}
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-600">Net Earnings (6.80%):</span>
+                  <span className="text-gray-600">Net Earnings (platform fees - Stripe fees):</span>
                   <span className="font-semibold text-green-600">
                     ${platformEarnings?.netPlatformEarnings?.toFixed(2) || '0.00'}
                   </span>
@@ -645,7 +664,7 @@ const AdminDashboard: React.FC = () => {
               {batchResultMessage && (
                 <Alert
                   className="mb-4"
-                  type={batchResultMessage.type === 'success' ? 'success' : 'error'}
+                  type={batchResultMessage.type}
                   message={batchResultMessage.text}
                   showIcon
                   closable

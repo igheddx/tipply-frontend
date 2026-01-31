@@ -8,7 +8,7 @@ import PaymentSetupModal from '../components/PaymentSetupModal'
 import SongCatalogSearch from '../components/SongCatalogSearch'
 import apiService from '../services/api'
 import { getApiBaseUrl } from '../utils/config'
-import { getUniqueDeviceId, detectPlatform } from '../utils/deviceId'
+import { getUniqueDeviceId, detectPlatform, restoreDeviceIdFromIndexedDB } from '../utils/deviceId'
 
 interface DeviceInfo {
   id: string
@@ -165,9 +165,18 @@ const TippingInterface: React.FC = () => {
   }, [])
 
   // Try to lock orientation to portrait where supported (Android Chrome/PWA)
+  // Only on actual mobile devices, not in desktop mobile emulation mode
   useEffect(() => {
     const attemptLock = async () => {
       try {
+        // Check if this is a real mobile device (not desktop emulation)
+        const isMobileDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
+        
+        if (!isMobileDevice) {
+          logger.log('ℹ️ Skipping orientation lock on desktop/emulated device')
+          return
+        }
+
         const ori: any = (window.screen as any).orientation
         if (ori && typeof ori.lock === 'function') {
           try {
@@ -217,9 +226,12 @@ const TippingInterface: React.FC = () => {
   // Initialize user
   useEffect(() => {
     const initializeUser = async () => {
-      // Get unique device ID (deterministic and reproducible)
+      // Restore device ID from IndexedDB if localStorage was cleared
+      const restoredId = await restoreDeviceIdFromIndexedDB()
+      
+      // Get unique device ID (random UUID stored persistently)
       const uniqueDeviceId = getUniqueDeviceId()
-      logger.log('🔐 [Init] Unique device ID:', uniqueDeviceId)
+      logger.log('🔐 [Init] Unique device ID:', uniqueDeviceId, restoredId ? '(restored from IndexedDB)' : '(new)')
       
       // Detect platform (iOS, Android, Desktop)
       const platform = detectPlatform()
