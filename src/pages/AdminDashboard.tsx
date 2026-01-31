@@ -58,6 +58,12 @@ interface PlatformEarningsSummary {
   monthlyBreakdown: Record<string, number>;
 }
 
+interface PlatformFeeConfig {
+  defaultPlatformFeePercentage: number;
+  stripeFeePercentage: number;
+  stripeFlatFee: number;
+}
+
 interface BatchStatus {
   id?: string;
   startedAt?: string;
@@ -95,6 +101,7 @@ const AdminDashboard: React.FC = () => {
   const [stats, setStats] = useState<AdminDashboardStats | null>(null);
   const [performers, setPerformers] = useState<PerformerSummary[]>([]);
   const [platformEarnings, setPlatformEarnings] = useState<PlatformEarningsSummary | null>(null);
+  const [platformFeeConfig, setPlatformFeeConfig] = useState<PlatformFeeConfig | null>(null);
   const [loading, setLoading] = useState(true);
   const [userProfile, setUserProfile] = useState<any>(null);
 
@@ -187,15 +194,17 @@ const AdminDashboard: React.FC = () => {
       setLoading(true);
       // Add timestamp to prevent caching
       const timestamp = Date.now();
-      const [statsResponse, performersResponse, earningsResponse] = await Promise.all([
+      const [statsResponse, performersResponse, earningsResponse, platformFeeConfigResponse] = await Promise.all([
         apiService.get(`/api/admin/dashboard-stats?_t=${timestamp}`),
         apiService.get(`/api/admin/performers?_t=${timestamp}`),
-        apiService.get(`/api/admin/platform-earnings?_t=${timestamp}`)
+        apiService.get(`/api/admin/platform-earnings?_t=${timestamp}`),
+        apiService.get(`/api/admin/platform-fee-config?_t=${timestamp}`)
       ]);
 
       if (statsResponse.data) setStats(statsResponse.data);
       if (performersResponse.data) setPerformers(performersResponse.data);
       if (earningsResponse.data) setPlatformEarnings(earningsResponse.data);
+      if (platformFeeConfigResponse.data) setPlatformFeeConfig(platformFeeConfigResponse.data);
     } catch (error) {
       logger.error('Error loading admin dashboard data:', error);
       message.error('Failed to load admin dashboard data');
@@ -625,7 +634,9 @@ const AdminDashboard: React.FC = () => {
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-600">Platform Fees (actual):</span>
+                  <span className="text-gray-600">
+                    Platform Fees ({(platformFeeConfig?.defaultPlatformFeePercentage ?? 7).toFixed(2)}%):
+                  </span>
                   <span className="font-semibold text-blue-600">
                     ${stats?.totalPlatformFees?.toFixed(2) || '0.00'}
                   </span>
