@@ -324,6 +324,8 @@ const AdminDashboard: React.FC = () => {
       setTimeout(() => {
         loadDashboardData();
         loadBatchStatus();
+        loadTips();
+        loadBatchHistory();
       }, 1000);
     } catch (error: any) {
       logger.error('Error running batch processing:', error);
