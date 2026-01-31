@@ -1100,7 +1100,7 @@ const Dashboard: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-white flex items-center justify-center">
         <div className="text-center">
           <div className="w-8 h-8 border-4 border-primary-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
           <p className="text-gray-600">Loading dashboard...</p>
@@ -1111,7 +1111,7 @@ const Dashboard: React.FC = () => {
 
   if (!stats) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-white flex items-center justify-center">
         <div className="text-center">
           <p className="text-gray-600">Failed to load dashboard data</p>
           <button
@@ -1126,7 +1126,7 @@ const Dashboard: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-white text-gray-900">
       {/* KYC Result Alert */}
       {/* Removed KYC alert as per edit hint */}
 
@@ -1494,7 +1494,7 @@ const Dashboard: React.FC = () => {
         </div>
 
         {/* Tabs */}
-        <div className="bg-white rounded-xl shadow-sm mb-8">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 mb-8">
           <div className="border-b border-gray-200">
             <nav className="flex space-x-8 px-6">
               {!showAddDeviceForm ? (
@@ -1979,7 +1979,7 @@ const Dashboard: React.FC = () => {
                 {!showStripeSetup ? (
                   // Add Device Form
                   <div>
-                    <div className="bg-white rounded-xl shadow-sm p-6">
+                    <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
                       <div className="mb-6">
                         <h3 className="text-lg font-semibold text-gray-900 mb-2">Add New Device</h3>
                         <p className="text-gray-600">Enter your device details to add it to your account.</p>
