@@ -1354,7 +1354,7 @@ const Dashboard: React.FC = () => {
           </div>
 
           {/* In Transit to Bank */}
-          <div className="bg-gradient-to-br from-sky-50 to-blue-100 border border-sky-200 rounded-xl shadow-sm p-4 transform hover:scale-105 transition-all duration-200">
+          <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-4 transform hover:scale-105 transition-all duration-200">
             <div className="flex flex-col items-center text-center">
               <div className="flex-shrink-0 mb-3">
                 <div className="w-10 h-10 bg-sky-500 rounded-lg flex items-center justify-center">
@@ -1364,17 +1364,17 @@ const Dashboard: React.FC = () => {
                 </div>
               </div>
               <div>
-                <p className="text-xs font-medium text-sky-700 mb-1">In Transit</p>
-                <p className="text-lg font-bold text-sky-900 mb-1">
+                <p className="text-xs font-medium text-gray-700 mb-1">In Transit</p>
+                <p className="text-lg font-bold text-gray-900 mb-1">
                   {metrics ? formatCurrency(metrics.stripeInTransit) : '$0.00'}
                 </p>
-                <p className="text-xs text-sky-600">To bank</p>
+                <p className="text-xs text-gray-600">To bank</p>
               </div>
             </div>
           </div>
 
           {/* Lifetime Volume */}
-          <div className="bg-gradient-to-br from-purple-50 to-violet-100 border border-purple-200 rounded-xl shadow-sm p-4 transform hover:scale-105 transition-all duration-200">
+          <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-4 transform hover:scale-105 transition-all duration-200">
             <div className="flex flex-col items-center text-center">
               <div className="flex-shrink-0 mb-3">
                 <div className="w-10 h-10 bg-purple-500 rounded-lg flex items-center justify-center">
@@ -1384,17 +1384,17 @@ const Dashboard: React.FC = () => {
                 </div>
               </div>
               <div>
-                <p className="text-xs font-medium text-purple-700 mb-1">Lifetime Volume</p>
-                <p className="text-lg font-bold text-purple-900 mb-1">
+                <p className="text-xs font-medium text-gray-700 mb-1">Lifetime Volume</p>
+                <p className="text-lg font-bold text-gray-900 mb-1">
                   {metrics ? formatCurrency(metrics.stripeLifetimeVolume) : '$0.00'}
                 </p>
-                <p className="text-xs text-purple-600">All-time</p>
+                <p className="text-xs text-gray-600">All-time</p>
               </div>
             </div>
           </div>
 
           {/* Pending Tips Card */}
-          <div className="bg-gradient-to-br from-orange-50 to-amber-100 border border-orange-200 rounded-xl shadow-sm p-4 transform hover:scale-105 transition-all duration-200">
+          <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-4 transform hover:scale-105 transition-all duration-200">
             <div className="flex flex-col items-center text-center">
               <div className="flex-shrink-0 mb-3">
                 <div className="w-10 h-10 bg-orange-500 rounded-lg flex items-center justify-center">
@@ -1404,16 +1404,16 @@ const Dashboard: React.FC = () => {
                 </div>
               </div>
               <div>
-                <p className="text-xs font-medium text-orange-700 mb-1">Pending Tips</p>
-                <p className="text-lg font-bold text-orange-900 mb-1">
+                <p className="text-xs font-medium text-gray-700 mb-1">Pending Tips</p>
+                <p className="text-lg font-bold text-gray-900 mb-1">
                   {metrics ? formatCurrency(metrics.pendingTips) : '$0.00'}
                 </p>
-                <p className="text-xs text-orange-600">Awaiting processing</p>
+                <p className="text-xs text-gray-600">Awaiting processing</p>
               </div>
             </div>
           </div>
 
-          <div className="bg-gradient-to-br from-cyan-50 to-blue-100 border border-cyan-200 rounded-xl shadow-sm p-4 transform hover:scale-105 transition-all duration-200">
+          <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-4 transform hover:scale-105 transition-all duration-200">
             <div className="flex flex-col items-center text-center">
               <div className="flex-shrink-0 mb-3">
                 <div className="w-10 h-10 bg-cyan-500 rounded-lg flex items-center justify-center">
@@ -1423,18 +1423,18 @@ const Dashboard: React.FC = () => {
                 </div>
               </div>
               <div>
-                <p className="text-xs font-medium text-cyan-700 mb-1">Today's Tips</p>
-                <p className="text-lg font-bold text-cyan-900 mb-1">
+                <p className="text-xs font-medium text-gray-700 mb-1">Today's Tips</p>
+                <p className="text-lg font-bold text-gray-900 mb-1">
                   {metrics ? formatCurrency(metrics.todaysTips) : formatCurrency(stats.todayTipsReceived)}
                 </p>
-                <p className="text-xs text-cyan-600">
+                <p className="text-xs text-gray-600">
                   {metrics ? `${Math.round(metrics.todaysTips)} tips` : `${stats.todayTipsCount} tips`}
                 </p>
               </div>
             </div>
           </div>
 
-          <div className="bg-gradient-to-br from-fuchsia-50 to-purple-100 border border-fuchsia-200 rounded-xl shadow-sm p-4 transform hover:scale-105 transition-all duration-200">
+          <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-4 transform hover:scale-105 transition-all duration-200">
             <div className="flex flex-col items-center text-center">
               <div className="flex-shrink-0 mb-3">
                 <div className="w-10 h-10 bg-fuchsia-500 rounded-lg flex items-center justify-center">
@@ -1444,14 +1444,14 @@ const Dashboard: React.FC = () => {
                 </div>
               </div>
               <div>
-                <p className="text-xs font-medium text-fuchsia-700 mb-1">Active Devices</p>
-                <p className="text-lg font-bold text-fuchsia-900 mb-1">{stats.activeDevices}</p>
-                <p className="text-xs text-fuchsia-600">of {stats.totalDevices} total</p>
+                <p className="text-xs font-medium text-gray-700 mb-1">Active Devices</p>
+                <p className="text-lg font-bold text-gray-900 mb-1">{stats.activeDevices}</p>
+                <p className="text-xs text-gray-600">of {stats.totalDevices} total</p>
               </div>
             </div>
           </div>
 
-          <div className="bg-gradient-to-br from-yellow-50 to-amber-100 border border-yellow-200 rounded-xl shadow-sm p-4 transform hover:scale-105 transition-all duration-200">
+          <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-4 transform hover:scale-105 transition-all duration-200">
             <div className="flex flex-col items-center text-center">
               <div className="flex-shrink-0 mb-3">
                 <div className="w-10 h-10 bg-yellow-500 rounded-lg flex items-center justify-center">
@@ -1462,7 +1462,7 @@ const Dashboard: React.FC = () => {
               </div>
               <div>
                 <div className="flex items-center justify-center space-x-2 mb-1">
-                  <p className="text-xs font-medium text-yellow-700">This Month</p>
+                  <p className="text-xs font-medium text-gray-700">This Month</p>
                   {metrics && metrics.trendPercentage > 0 && (
                     <div className={`flex items-center space-x-1 ${
                       metrics.trendDirection === 'up' ? 'text-green-600' : 'text-red-600'
@@ -1482,10 +1482,10 @@ const Dashboard: React.FC = () => {
                     </div>
                   )}
                 </div>
-                <p className="text-lg font-bold text-yellow-900 mb-1">
+                <p className="text-lg font-bold text-gray-900 mb-1">
                   {metrics ? formatCurrency(metrics.thisMonthTips) : formatCurrency(stats.thisMonthTipsReceived)}
                 </p>
-                <p className="text-xs text-yellow-600">
+                <p className="text-xs text-gray-600">
                   {metrics ? `${Math.round(metrics.thisMonthTips)} tips` : `${stats.thisMonthTipsCount} tips`}
                 </p>
               </div>
