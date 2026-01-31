@@ -404,16 +404,19 @@ function PaymentForm({
           <button
             onClick={() => paymentRequest.show()}
             disabled={loading}
-            className="w-full bg-black text-white py-4 px-4 rounded-xl hover:bg-gray-800 active:bg-gray-900 transition-all disabled:opacity-50 font-medium text-base flex items-center justify-center gap-2"
+            className="w-full bg-black text-white py-3 px-6 rounded-full hover:bg-gray-800 active:bg-gray-900 transition-all disabled:opacity-50 font-medium text-base flex items-center justify-center gap-2"
           >
+            <span>Tip with</span>
             {isApplePay ? (
-              <AppleFilled style={{ fontSize: '24px' }} />
+              <AppleFilled style={{ fontSize: '20px' }} />
             ) : (
-              <GoogleOutlined style={{ fontSize: '24px' }} />
+              <img
+                src="/images/google-pay-logo.svg"
+                alt="Google Pay"
+                className="h-5 w-auto"
+              />
             )}
-            <span>
-              {isApplePay ? 'Continue with Apple Pay' : 'Continue with Google Pay'}
-            </span>
+            <span>Pay</span>
           </button>
           
           {/* Subtle Divider */}
