@@ -197,7 +197,16 @@ const SongCatalogSearch: React.FC<SongCatalogSearchProps> = ({
               <div className="relative">
                 <input
                   ref={searchInputRef}
-                  type="text"
+                  type="search"
+                  name="song_search"
+                  inputMode="search"
+                  enterKeyHint="search"
+                  autoComplete="off"
+                  autoCorrect="off"
+                  autoCapitalize="none"
+                  spellCheck={false}
+                  data-lpignore="true"
+                  data-form-type="other"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Search by song, artist, album, or genre..."
