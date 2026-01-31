@@ -1312,29 +1312,50 @@ const Dashboard: React.FC = () => {
 
         {/* Stats Overview */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 mb-8">
-          {/* New Stripe Financial Metrics - 4 Cards */}
-          {/* Total Balance / Available Balance */}
-          <div className="bg-gradient-to-br from-green-50 to-emerald-100 border border-green-200 rounded-xl shadow-sm p-4 transform hover:scale-105 transition-all duration-200">
+          {/* Pending Tips Card */}
+          <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-4 transform hover:scale-105 transition-all duration-200">
             <div className="flex flex-col items-center text-center">
               <div className="flex-shrink-0 mb-3">
-                <div className="w-10 h-10 bg-green-500 rounded-lg flex items-center justify-center">
+                <div className="w-10 h-10 bg-orange-500 rounded-lg flex items-center justify-center">
                   <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
                 </div>
               </div>
               <div>
-                <p className="text-xs font-medium text-green-700 mb-1">Total Balance</p>
-                <p className="text-lg font-bold text-green-900 mb-1">
-                  {metrics ? formatCurrency(metrics.stripeAvailableBalance) : '$0.00'}
+                <p className="text-xs font-medium text-gray-700 mb-1">Pending Tips</p>
+                <p className="text-lg font-bold text-gray-900 mb-1">
+                  {metrics ? formatCurrency(metrics.pendingTips) : '$0.00'}
                 </p>
-                <p className="text-xs text-green-600">Available now</p>
+                <p className="text-xs text-gray-600">Awaiting processing</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Today's Tips */}
+          <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-4 transform hover:scale-105 transition-all duration-200">
+            <div className="flex flex-col items-center text-center">
+              <div className="flex-shrink-0 mb-3">
+                <div className="w-10 h-10 bg-cyan-500 rounded-lg flex items-center justify-center">
+                  <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                  </svg>
+                </div>
+              </div>
+              <div>
+                <p className="text-xs font-medium text-gray-700 mb-1">Today's Tips</p>
+                <p className="text-lg font-bold text-gray-900 mb-1">
+                  {metrics ? formatCurrency(metrics.todaysTips) : formatCurrency(stats.todayTipsReceived)}
+                </p>
+                <p className="text-xs text-gray-600">
+                  {metrics ? `${Math.round(metrics.todaysTips)} tips` : `${stats.todayTipsCount} tips`}
+                </p>
               </div>
             </div>
           </div>
 
           {/* Future Payouts */}
-          <div className="bg-gradient-to-br from-amber-50 to-orange-100 border border-amber-200 rounded-xl shadow-sm p-4 transform hover:scale-105 transition-all duration-200">
+          <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-4 transform hover:scale-105 transition-all duration-200">
             <div className="flex flex-col items-center text-center">
               <div className="flex-shrink-0 mb-3">
                 <div className="w-10 h-10 bg-amber-500 rounded-lg flex items-center justify-center">
@@ -1344,11 +1365,11 @@ const Dashboard: React.FC = () => {
                 </div>
               </div>
               <div>
-                <p className="text-xs font-medium text-amber-700 mb-1">Future Payouts</p>
-                <p className="text-lg font-bold text-amber-900 mb-1">
+                <p className="text-xs font-medium text-gray-700 mb-1">Future Payouts</p>
+                <p className="text-lg font-bold text-gray-900 mb-1">
                   {metrics ? formatCurrency(metrics.stripeFuturePayouts) : '$0.00'}
                 </p>
-                <p className="text-xs text-amber-600">Scheduled</p>
+                <p className="text-xs text-gray-600">Scheduled</p>
               </div>
             </div>
           </div>
@@ -1373,6 +1394,26 @@ const Dashboard: React.FC = () => {
             </div>
           </div>
 
+          {/* Total Balance / Available Balance */}
+          <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-4 transform hover:scale-105 transition-all duration-200">
+            <div className="flex flex-col items-center text-center">
+              <div className="flex-shrink-0 mb-3">
+                <div className="w-10 h-10 bg-green-500 rounded-lg flex items-center justify-center">
+                  <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
+                  </svg>
+                </div>
+              </div>
+              <div>
+                <p className="text-xs font-medium text-gray-700 mb-1">Total Balance</p>
+                <p className="text-lg font-bold text-gray-900 mb-1">
+                  {metrics ? formatCurrency(metrics.stripeAvailableBalance) : '$0.00'}
+                </p>
+                <p className="text-xs text-gray-600">Available now</p>
+              </div>
+            </div>
+          </div>
+
           {/* Lifetime Volume */}
           <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-4 transform hover:scale-105 transition-all duration-200">
             <div className="flex flex-col items-center text-center">
@@ -1393,64 +1434,7 @@ const Dashboard: React.FC = () => {
             </div>
           </div>
 
-          {/* Pending Tips Card */}
-          <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-4 transform hover:scale-105 transition-all duration-200">
-            <div className="flex flex-col items-center text-center">
-              <div className="flex-shrink-0 mb-3">
-                <div className="w-10 h-10 bg-orange-500 rounded-lg flex items-center justify-center">
-                  <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                </div>
-              </div>
-              <div>
-                <p className="text-xs font-medium text-gray-700 mb-1">Pending Tips</p>
-                <p className="text-lg font-bold text-gray-900 mb-1">
-                  {metrics ? formatCurrency(metrics.pendingTips) : '$0.00'}
-                </p>
-                <p className="text-xs text-gray-600">Awaiting processing</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-4 transform hover:scale-105 transition-all duration-200">
-            <div className="flex flex-col items-center text-center">
-              <div className="flex-shrink-0 mb-3">
-                <div className="w-10 h-10 bg-cyan-500 rounded-lg flex items-center justify-center">
-                  <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                  </svg>
-                </div>
-              </div>
-              <div>
-                <p className="text-xs font-medium text-gray-700 mb-1">Today's Tips</p>
-                <p className="text-lg font-bold text-gray-900 mb-1">
-                  {metrics ? formatCurrency(metrics.todaysTips) : formatCurrency(stats.todayTipsReceived)}
-                </p>
-                <p className="text-xs text-gray-600">
-                  {metrics ? `${Math.round(metrics.todaysTips)} tips` : `${stats.todayTipsCount} tips`}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-4 transform hover:scale-105 transition-all duration-200">
-            <div className="flex flex-col items-center text-center">
-              <div className="flex-shrink-0 mb-3">
-                <div className="w-10 h-10 bg-fuchsia-500 rounded-lg flex items-center justify-center">
-                  <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-                  </svg>
-                </div>
-              </div>
-              <div>
-                <p className="text-xs font-medium text-gray-700 mb-1">Active Devices</p>
-                <p className="text-lg font-bold text-gray-900 mb-1">{stats.activeDevices}</p>
-                <p className="text-xs text-gray-600">of {stats.totalDevices} total</p>
-              </div>
-            </div>
-          </div>
-
+          {/* This Month */}
           <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-4 transform hover:scale-105 transition-all duration-200">
             <div className="flex flex-col items-center text-center">
               <div className="flex-shrink-0 mb-3">
@@ -1488,6 +1472,24 @@ const Dashboard: React.FC = () => {
                 <p className="text-xs text-gray-600">
                   {metrics ? `${Math.round(metrics.thisMonthTips)} tips` : `${stats.thisMonthTipsCount} tips`}
                 </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Active Devices */}
+          <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-4 transform hover:scale-105 transition-all duration-200">
+            <div className="flex flex-col items-center text-center">
+              <div className="flex-shrink-0 mb-3">
+                <div className="w-10 h-10 bg-fuchsia-500 rounded-lg flex items-center justify-center">
+                  <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                  </svg>
+                </div>
+              </div>
+              <div>
+                <p className="text-xs font-medium text-gray-700 mb-1">Active Devices</p>
+                <p className="text-lg font-bold text-gray-900 mb-1">{stats.activeDevices}</p>
+                <p className="text-xs text-gray-600">of {stats.totalDevices} total</p>
               </div>
             </div>
           </div>
