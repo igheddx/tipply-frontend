@@ -21,6 +21,8 @@ interface PaymentSetupModalProps {
   performerFirstName?: string
   performerLastName?: string
   performerPhotoUrl?: string
+  walletMode?: 'wallet' | 'card' | 'both'
+  isPayWalletActivation?: boolean
 }
 
 export default function PaymentSetupModal({ 
@@ -32,7 +34,9 @@ export default function PaymentSetupModal({
   performerStageName,
   performerFirstName,
   performerLastName,
-  performerPhotoUrl
+  performerPhotoUrl,
+  walletMode = 'both',
+  isPayWalletActivation = false
 }: PaymentSetupModalProps) {
   if (!isOpen) return null
   const [stripePromise, setStripePromise] = useState<Promise<Stripe | null> | null>(null)
@@ -147,7 +151,13 @@ function PaymentForm({
   const [isApplePay, setIsApplePay] = useState(false)
 
   // Persist payment details to backend so ownership verification passes
-  const storePaymentInfo = async (persistedUserId: string, paymentMethodId?: string, stripeCustomerId?: string, platform?: string) => {
+  const storePaymentInfo = async (
+    persistedUserId: string,
+    paymentMethodId?: string,
+    stripeCustomerId?: string,
+    platform?: string,
+    payWallet?: boolean
+  ) => {
     logger.log('💾 [storePaymentInfo] Called with:', { persistedUserId, paymentMethodId, stripeCustomerId, platform })
     
     if (!paymentMethodId || !stripeCustomerId) {
@@ -164,7 +174,8 @@ function PaymentForm({
         userId: persistedUserId,
         paymentMethodId,
         stripeCustomerId,
-        platform: platform || detectPlatform()
+        platform: platform || detectPlatform(),
+        isPayWallet: payWallet
       }
       logger.log('📤 [storePaymentInfo] Request body:', requestBody)
       
@@ -286,7 +297,7 @@ function PaymentForm({
               }
             }
             // Persist payment info to backend so security checks pass
-            await storePaymentInfo(uniqueDeviceId!, paymentMethodId, customerId, platform)
+            await storePaymentInfo(uniqueDeviceId!, paymentMethodId, customerId, platform, true)
             
             // Payment method is automatically attached to customer by Stripe during SetupIntent confirmation
             event.complete('success')
@@ -387,7 +398,7 @@ function PaymentForm({
           }
         }
         // Persist payment info to backend so security checks pass
-        await storePaymentInfo(uniqueDeviceId!, paymentMethodId, customerId, platform)
+        await storePaymentInfo(uniqueDeviceId!, paymentMethodId, customerId, platform, isPayWalletActivation)
         
         // Payment method is automatically attached to customer by Stripe during SetupIntent confirmation
         toast.success('Payment method added successfully!')
@@ -404,7 +415,7 @@ function PaymentForm({
   return (
     <form onSubmit={handleCardSubmit} className="space-y-0">
       {/* ========== SECTION 1: DIGITAL WALLETS ========== */}
-      {paymentRequest && (
+      {paymentRequest && walletMode !== 'card' && (
         <div className="pb-6 border-b border-gray-200">
           <button
             onClick={() => paymentRequest.show()}
@@ -440,6 +451,7 @@ function PaymentForm({
       )}
 
       {/* ========== SECTION 2: MANUAL CARD ENTRY ========== */}
+      {walletMode !== 'wallet' && (
       <div className="pb-6 border-b border-gray-200">
         <div className="flex items-center justify-between mb-4">
           <label className="text-sm font-semibold text-gray-900">Card Details</label>
@@ -475,6 +487,7 @@ function PaymentForm({
           />
         </div>
       </div>
+      )}
 
       {/* ========== ERROR MESSAGE ========== */}
       {error && (
