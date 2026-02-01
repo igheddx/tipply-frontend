@@ -123,6 +123,8 @@ export default function PaymentSetupModal({
                 userId={userId}
                 onComplete={onComplete}
                 onClose={onClose}
+                walletMode={walletMode}
+                isPayWalletActivation={isPayWalletActivation}
               />
             </Elements>
           )}
@@ -136,12 +138,16 @@ function PaymentForm({
   deviceUuid, 
   userId, 
   onComplete, 
-  onClose 
+  onClose,
+  walletMode,
+  isPayWalletActivation
 }: { 
   deviceUuid: string
   userId: string
   onComplete: (paymentMethodId?: string) => void
   onClose: () => void
+  walletMode: 'wallet' | 'card' | 'both'
+  isPayWalletActivation: boolean
 }) {
   const stripe = useStripe()
   const elements = useElements()
