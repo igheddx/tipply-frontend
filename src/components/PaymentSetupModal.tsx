@@ -206,13 +206,14 @@ function PaymentForm({
 
   useEffect(() => {
     if (stripe) {
+      const totalAmount = isPayWalletActivation ? 0 : 100
       const pr = stripe.paymentRequest({
         country: 'US',
         currency: 'usd',
-        total: { label: 'Tipply Tip', amount: 100 }, // $1 for setup
+        total: { label: isPayWalletActivation ? 'Activate Pay Wallet' : 'Tipply Tip', amount: totalAmount },
         requestPayerName: true,
         requestPayerEmail: true,
-        displayItems: [{ label: 'Tip Setup', amount: 100 }]
+        displayItems: totalAmount > 0 ? [{ label: 'Tip Setup', amount: totalAmount }] : []
       })
       
       pr.canMakePayment().then((result) => {

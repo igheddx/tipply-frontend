@@ -114,6 +114,7 @@ export default function PaymentSetupModal({
                 userId={userId}
                 onComplete={onComplete}
                 onClose={onClose}
+                isPayWalletActivation={isPayWalletActivation}
               />
             </Elements>
           )}
@@ -127,12 +128,14 @@ function PaymentForm({
   deviceUuid, 
   userId, 
   onComplete, 
-  onClose 
+  onClose,
+  isPayWalletActivation
 }: { 
   deviceUuid: string
   userId: string
   onComplete: (paymentMethodId?: string) => void
   onClose: () => void
+  isPayWalletActivation: boolean
 }) {
   const stripe = useStripe()
   const elements = useElements()
@@ -144,13 +147,14 @@ function PaymentForm({
 
   useEffect(() => {
     if (stripe) {
+      const totalAmount = isPayWalletActivation ? 0 : 100
       const pr = stripe.paymentRequest({
         country: 'US',
         currency: 'usd',
-        total: { label: 'Tipply Tip', amount: 100 },
+        total: { label: isPayWalletActivation ? 'Activate Pay Wallet' : 'Tipply Tip', amount: totalAmount },
         requestPayerName: true,
         requestPayerEmail: true,
-        displayItems: [{ label: 'Tip Setup', amount: 100 }]
+        displayItems: totalAmount > 0 ? [{ label: 'Tip Setup', amount: totalAmount }] : []
       })
       
           pr.canMakePayment().then((result) => {
