@@ -31,7 +31,9 @@ export default function PaymentSetupModal({
   performerStageName,
   performerFirstName,
   performerLastName,
-  performerPhotoUrl
+  performerPhotoUrl,
+  walletMode = 'both',
+  isPayWalletActivation = false
 }: PaymentSetupModalProps) {
   if (!isOpen) return null
   const [stripePromise, setStripePromise] = useState<Promise<Stripe | null> | null>(null)
