@@ -327,9 +327,9 @@ function PaymentForm({
           >
             {isApplePay ? (
               <>
-                <span>Pay with</span>
-                <AppleFilled style={{ fontSize: '20px' }} />
-                <span>Pay</span>
+                <span className="text-lg">Pay with</span>
+                <AppleFilled style={{ fontSize: '28px' }} />
+                <span className="text-lg">Pay</span>
               </>
             ) : (
               <img
