@@ -22,7 +22,6 @@ interface PaymentSetupModalProps {
   performerLastName?: string
   performerPhotoUrl?: string
   walletMode?: 'wallet' | 'card' | 'both'
-  isPayWalletActivation?: boolean
 }
 
 export default function PaymentSetupModal({ 
@@ -35,8 +34,7 @@ export default function PaymentSetupModal({
   performerFirstName,
   performerLastName,
   performerPhotoUrl,
-  walletMode = 'both',
-  isPayWalletActivation = false
+  walletMode = 'both'
 }: PaymentSetupModalProps) {
   if (!isOpen) return null
   const [stripePromise, setStripePromise] = useState<Promise<Stripe | null> | null>(null)
@@ -124,7 +122,6 @@ export default function PaymentSetupModal({
                 onComplete={onComplete}
                 onClose={onClose}
                 walletMode={walletMode}
-                isPayWalletActivation={isPayWalletActivation}
               />
             </Elements>
           )}
@@ -139,15 +136,13 @@ function PaymentForm({
   userId, 
   onComplete, 
   onClose,
-  walletMode,
-  isPayWalletActivation
+  walletMode
 }: { 
   deviceUuid: string
   userId: string
   onComplete: (paymentMethodId?: string) => void
   onClose: () => void
   walletMode: 'wallet' | 'card' | 'both'
-  isPayWalletActivation: boolean
 }) {
   const stripe = useStripe()
   const elements = useElements()
@@ -206,14 +201,14 @@ function PaymentForm({
 
   useEffect(() => {
     if (stripe) {
-      const totalAmount = isPayWalletActivation ? 0 : 100
+      const totalAmount = 0
       const pr = stripe.paymentRequest({
         country: 'US',
         currency: 'usd',
-        total: { label: isPayWalletActivation ? 'Activate Pay Wallet' : 'Tipply Tip', amount: totalAmount },
+        total: { label: 'Tipwave', amount: totalAmount },
         requestPayerName: true,
         requestPayerEmail: true,
-        displayItems: totalAmount > 0 ? [{ label: 'Tip Setup', amount: totalAmount }] : []
+        displayItems: []
       })
       
       pr.canMakePayment().then((result) => {
@@ -405,7 +400,7 @@ function PaymentForm({
           }
         }
         // Persist payment info to backend so security checks pass
-        await storePaymentInfo(uniqueDeviceId!, paymentMethodId, customerId, platform, isPayWalletActivation)
+        await storePaymentInfo(uniqueDeviceId!, paymentMethodId, customerId, platform, false)
         
         // Payment method is automatically attached to customer by Stripe during SetupIntent confirmation
         toast.success('Payment method added successfully!')
@@ -419,8 +414,10 @@ function PaymentForm({
     }
   }
 
+  const isWalletOnly = walletMode === 'wallet'
+
   return (
-    <form onSubmit={handleCardSubmit} className="space-y-0">
+    <form onSubmit={isWalletOnly ? undefined : handleCardSubmit} className="space-y-0">
       {/* ========== SECTION 1: DIGITAL WALLETS ========== */}
       {paymentRequest && walletMode !== 'card' && (
         <div className="pb-6 border-b border-gray-200">
@@ -506,8 +503,19 @@ function PaymentForm({
       {/* ========== SECTION 3: ACTION BUTTONS ========== */}
       <div className="pb-6 border-b border-gray-200 space-y-3">
         <button
-          type="submit"
-          disabled={loading || !stripe}
+          type={isWalletOnly ? 'button' : 'submit'}
+          onClick={
+            isWalletOnly
+              ? () => {
+                  if (paymentRequest) {
+                    paymentRequest.show()
+                  } else {
+                    setError('Apple Pay or Google Pay is not available on this device.')
+                  }
+                }
+              : undefined
+          }
+          disabled={loading || !stripe || (isWalletOnly && !paymentRequest)}
           className="w-full bg-blue-600 text-white py-4 px-4 rounded-xl hover:bg-blue-700 active:bg-blue-800 transition-all disabled:opacity-50 disabled:cursor-not-allowed font-semibold text-base"
         >
           {loading ? (
@@ -519,7 +527,7 @@ function PaymentForm({
               <span>Processing...</span>
             </span>
           ) : (
-            'Add Payment Method'
+            isWalletOnly ? 'Activate Pay Wallet' : 'Add Payment Method'
           )}
         </button>
         

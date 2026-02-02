@@ -35,7 +35,7 @@ const TippingInterface: React.FC = () => {
   const [deviceInfo, setDeviceInfo] = useState<DeviceInfo | null>(null)
   const [showPaymentModal, setShowPaymentModal] = useState(false)
   const [isPaymentSetup, setIsPaymentSetup] = useState(false)
-  const [paymentSetupMode, setPaymentSetupMode] = useState<'wallet' | 'card' | null>(null)
+  
   const [userId, setUserId] = useState<string>('')
   const [checkingPaymentMethods, setCheckingPaymentMethods] = useState(true)
   const [isDeviceVerified, setIsDeviceVerified] = useState<boolean | null>(null)
@@ -1008,33 +1008,6 @@ const TippingInterface: React.FC = () => {
   }
 
   if (!isPaymentSetup) {
-    if (!paymentSetupMode) {
-      return (
-        <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 flex items-center justify-center p-6">
-          <div className="bg-white/10 backdrop-blur-md rounded-2xl p-8 max-w-md w-full text-center border border-white/20">
-            <h2 className="text-2xl font-bold text-white mb-3">Activate Pay Wallet</h2>
-            <p className="text-white/80 mb-6">
-              Use Apple Pay or Google Pay for instant tips, or continue with a card for batch processing.
-            </p>
-            <div className="space-y-3">
-              <button
-                onClick={() => setPaymentSetupMode('wallet')}
-                className="w-full bg-white text-gray-900 py-3 rounded-xl font-semibold"
-              >
-                Activate Pay Wallet
-              </button>
-              <button
-                onClick={() => setPaymentSetupMode('card')}
-                className="w-full border border-white/30 text-white py-3 rounded-xl font-semibold"
-              >
-                Use Card Instead
-              </button>
-            </div>
-          </div>
-        </div>
-      )
-    }
-
     return (
       <PaymentSetupModal
         isOpen={true}
@@ -1046,7 +1019,6 @@ const TippingInterface: React.FC = () => {
           }
           setIsPaymentSetup(true)
           setShowPaymentModal(false)
-          setPaymentSetupMode(null)
           toast.success('Payment method added successfully!')
         }}
         deviceUuid={deviceInfo?.uuid || ''}
@@ -1055,8 +1027,7 @@ const TippingInterface: React.FC = () => {
         performerFirstName={deviceInfo?.ownerFirstName}
         performerLastName={deviceInfo?.ownerLastName}
         performerPhotoUrl={deviceInfo?.profilePhotoUrl}
-        walletMode={paymentSetupMode}
-        isPayWalletActivation={paymentSetupMode === 'wallet'}
+        walletMode="both"
       />
     )
   }
