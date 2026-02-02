@@ -32,12 +32,11 @@ class ApiService {
 
     try {
       logger.log(`Making API request to: ${url}`)
-      logger.log(`Request config:`, { method: config.method, headers: config.headers })
+      logger.log(`Request config:`, { method: config.method })
       logger.log(`Current hostname: ${window.location.hostname}`)
       logger.log(`API_BASE_URL: ${API_BASE_URL}`)
       logger.log(`Token exists: ${!!token}`)
       logger.log(`UseApiKey: ${useApiKey}`)
-      logger.log(`Authorization header: ${(config.headers as any)?.Authorization}`)
       
       const response = await fetch(url, config)
       
