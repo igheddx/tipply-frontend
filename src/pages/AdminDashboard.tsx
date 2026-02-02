@@ -16,6 +16,7 @@ import {
   SearchOutlined
 } from '@ant-design/icons';
 import { apiService } from '../services/api';
+import { isRefundEligible } from '../utils/refunds';
 import AggregatedChargesTable from '../components/AggregatedChargesTable';
 import dayjs from 'dayjs';
 
@@ -390,15 +391,6 @@ const AdminDashboard: React.FC = () => {
     } finally {
       setTipsLoading(false);
     }
-  };
-
-  const isRefundEligible = (tip: TipDetail) => {
-    if (tip.status !== 'processed') return false;
-    if (!tip.stripePaymentIntentId) return false;
-    const createdAt = new Date(tip.createdAt);
-    const sevenDaysAgo = new Date();
-    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-    return createdAt >= sevenDaysAgo;
   };
 
   const openRefundModal = (tip: TipDetail) => {
