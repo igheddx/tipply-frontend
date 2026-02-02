@@ -157,7 +157,8 @@ function PaymentForm({
     paymentMethodId?: string,
     stripeCustomerId?: string,
     platform?: string,
-    payWallet?: boolean
+    payWallet?: boolean,
+    setupIntentId?: string
   ) => {
     logger.log('💾 [storePaymentInfo] Called with:', { persistedUserId, paymentMethodId, stripeCustomerId, platform })
     
@@ -175,6 +176,8 @@ function PaymentForm({
         userId: persistedUserId,
         paymentMethodId,
         stripeCustomerId,
+        setupIntentId,
+        deviceUuid,
         platform: platform || detectPlatform(),
         isPayWallet: payWallet
       }
@@ -299,7 +302,7 @@ function PaymentForm({
               }
             }
             // Persist payment info to backend so security checks pass
-            await storePaymentInfo(uniqueDeviceId!, paymentMethodId, customerId, platform, true)
+            await storePaymentInfo(uniqueDeviceId!, paymentMethodId, customerId, platform, true, setupIntent?.id)
             
             // Payment method is automatically attached to customer by Stripe during SetupIntent confirmation
             event.complete('success')
@@ -400,7 +403,7 @@ function PaymentForm({
           }
         }
         // Persist payment info to backend so security checks pass
-        await storePaymentInfo(uniqueDeviceId!, paymentMethodId, customerId, platform, false)
+        await storePaymentInfo(uniqueDeviceId!, paymentMethodId, customerId, platform, false, result.setupIntent?.id)
         
         // Payment method is automatically attached to customer by Stripe during SetupIntent confirmation
         toast.success('Payment method added successfully!')
