@@ -1198,7 +1198,10 @@ const Dashboard: React.FC = () => {
                   title="Admin Dashboard"
                 >
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h7v7H3V3zm0 11h7v7H3v-7zm11-11h7v7h-7V3zm0 11h7v7h-7v-7z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a4 4 0 11-8 0 4 4 0 018 0z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 21a6 6 0 0112 0H6z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.5 14.5a2.5 2.5 0 00-1.6.6l-.9-.5a2.5 2.5 0 00-1.4.8l-.8-.1a2.5 2.5 0 000 1.6l.8-.1c.3.3.7.6 1.1.8l.9-.5a2.5 2.5 0 001.6.6l.4.9a2.5 2.5 0 001.6 0l.4-.9a2.5 2.5 0 001.6-.6l.9.5c.4-.2.8-.5 1.1-.8l.8.1a2.5 2.5 0 000-1.6l-.8.1a2.5 2.5 0 00-1.1-.8l-.9.5a2.5 2.5 0 00-1.6-.6l-.4-.9a2.5 2.5 0 00-1.6 0l-.4.9z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.5 16a1.5 1.5 0 110 3 1.5 1.5 0 010-3z" />
                   </svg>
                   <span className="text-sm font-medium">Admin</span>
                 </button>
