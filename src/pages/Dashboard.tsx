@@ -1198,7 +1198,10 @@ const Dashboard: React.FC = () => {
                   title="Admin Dashboard"
                 >
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a4 4 0 11-8 0 4 4 0 018 0z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 21a6 6 0 0112 0H6z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.5 14.5a2.5 2.5 0 00-1.6.6l-.9-.5a2.5 2.5 0 00-1.4.8l-.8-.1a2.5 2.5 0 000 1.6l.8-.1c.3.3.7.6 1.1.8l.9-.5a2.5 2.5 0 001.6.6l.4.9a2.5 2.5 0 001.6 0l.4-.9a2.5 2.5 0 001.6-.6l.9.5c.4-.2.8-.5 1.1-.8l.8.1a2.5 2.5 0 000-1.6l-.8.1a2.5 2.5 0 00-1.1-.8l-.9.5a2.5 2.5 0 00-1.6-.6l-.4-.9a2.5 2.5 0 00-1.6 0l-.4.9z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.5 16a1.5 1.5 0 110 3 1.5 1.5 0 010-3z" />
                   </svg>
                   <span className="text-sm font-medium">Admin</span>
                 </button>

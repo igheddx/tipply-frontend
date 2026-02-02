@@ -35,6 +35,7 @@ const TippingInterface: React.FC = () => {
   const [deviceInfo, setDeviceInfo] = useState<DeviceInfo | null>(null)
   const [showPaymentModal, setShowPaymentModal] = useState(false)
   const [isPaymentSetup, setIsPaymentSetup] = useState(false)
+  
   const [userId, setUserId] = useState<string>('')
   const [checkingPaymentMethods, setCheckingPaymentMethods] = useState(true)
   const [isDeviceVerified, setIsDeviceVerified] = useState<boolean | null>(null)
@@ -1026,6 +1027,7 @@ const TippingInterface: React.FC = () => {
         performerFirstName={deviceInfo?.ownerFirstName}
         performerLastName={deviceInfo?.ownerLastName}
         performerPhotoUrl={deviceInfo?.profilePhotoUrl}
+        walletMode="both"
       />
     )
   }

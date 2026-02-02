@@ -78,6 +78,7 @@ interface TipDetail {
   id: string;
   createdAt: string;
   processedAt?: string;
+  refundedAt?: string;
   amount: number;
   deviceNickname: string;
   performerFirstName: string;
@@ -85,6 +86,7 @@ interface TipDetail {
   performerEmail: string;
   status: string;
   stripePaymentIntentId?: string;
+  stripeRefundId?: string;
   effect: string;
   duration: number;
   platformFee: number;
@@ -131,6 +133,9 @@ const AdminDashboard: React.FC = () => {
   const [minAmount, setMinAmount] = useState<number | undefined>(undefined);
   const [maxAmount, setMaxAmount] = useState<number | undefined>(undefined);
   const [activeTab, setActiveTab] = useState('overview');
+  const [refundModalOpen, setRefundModalOpen] = useState(false);
+  const [refundTip, setRefundTip] = useState<TipDetail | null>(null);
+  const [refundLoading, setRefundLoading] = useState(false);
 
   useEffect(() => {
     // Verify admin access via profile to avoid JWT decode issues
@@ -384,6 +389,38 @@ const AdminDashboard: React.FC = () => {
       message.error('Failed to load tips');
     } finally {
       setTipsLoading(false);
+    }
+  };
+
+  const isRefundEligible = (tip: TipDetail) => {
+    if (tip.status !== 'processed') return false;
+    if (!tip.stripePaymentIntentId) return false;
+    const createdAt = new Date(tip.createdAt);
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    return createdAt >= sevenDaysAgo;
+  };
+
+  const openRefundModal = (tip: TipDetail) => {
+    setRefundTip(tip);
+    setRefundModalOpen(true);
+  };
+
+  const handleRefundConfirm = async () => {
+    if (!refundTip) return;
+    try {
+      setRefundLoading(true);
+      await apiService.post(`/api/admin/tips/${refundTip.id}/refund`);
+      message.success('Refund processed successfully');
+      setRefundModalOpen(false);
+      setRefundTip(null);
+      await loadTips();
+    } catch (error: any) {
+      const errorMsg = error?.response?.data?.error || error?.message || 'Failed to process refund';
+      logger.error('Error processing refund:', error);
+      message.error(errorMsg);
+    } finally {
+      setRefundLoading(false);
     }
   };
 
@@ -937,6 +974,7 @@ const AdminDashboard: React.FC = () => {
                   options={[
                     { label: 'Pending', value: 'pending' },
                     { label: 'Processed', value: 'processed' },
+                    { label: 'Refunded', value: 'refunded' },
                     { label: 'Failed', value: 'failed' },
                     { label: 'Error', value: 'error' }
                   ]}
@@ -982,6 +1020,19 @@ const AdminDashboard: React.FC = () => {
           <Spin spinning={tipsLoading}>
             <Table
               columns={[
+                {
+                  title: 'Refund',
+                  key: 'refund',
+                  width: 90,
+                  render: (_: unknown, record: TipDetail) =>
+                    isRefundEligible(record) ? (
+                      <Button type="link" danger onClick={() => openRefundModal(record)}>
+                        Refund
+                      </Button>
+                    ) : (
+                      '-'
+                    )
+                },
                 {
                   title: 'Created At',
                   dataIndex: 'createdAt',
@@ -1031,6 +1082,7 @@ const AdminDashboard: React.FC = () => {
                     if (status === 'processed') color = 'green';
                     if (status === 'failed' || status === 'error') color = 'red';
                     if (status === 'pending') color = 'orange';
+                    if (status === 'refunded') color = 'blue';
                     return <Tag color={color}>{status.toUpperCase()}</Tag>;
                   },
                   width: 100
@@ -1063,6 +1115,31 @@ const AdminDashboard: React.FC = () => {
               size="small"
             />
           </Spin>
+          <Modal
+            title="Confirm refund"
+            open={refundModalOpen}
+            onOk={handleRefundConfirm}
+            onCancel={() => {
+              if (!refundLoading) {
+                setRefundModalOpen(false);
+                setRefundTip(null);
+              }
+            }}
+            confirmLoading={refundLoading}
+            okText="Refund"
+            okButtonProps={{ danger: true }}
+          >
+            {refundTip && (
+              <div className="text-gray-700">
+                <p>
+                  Refund ${refundTip.amount.toFixed(2)} to {refundTip.performerFirstName} {refundTip.performerLastName}?
+                </p>
+                <p className="text-sm text-gray-500">
+                  Created: {new Date(refundTip.createdAt).toLocaleString()}
+                </p>
+              </div>
+            )}
+          </Modal>
         </div>
 
         {/* Performers Management */}
