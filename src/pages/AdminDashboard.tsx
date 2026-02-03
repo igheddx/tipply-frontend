@@ -109,6 +109,7 @@ const AdminDashboard: React.FC = () => {
   const [stripeModeLoading, setStripeModeLoading] = useState(false);
   const [stripeModeConfirming, setStripeModeConfirming] = useState(false);
   const [stripeModeError, setStripeModeError] = useState<string | null>(null);
+  const [stripeModeNotice, setStripeModeNotice] = useState<{ type: 'success' | 'warning' | 'error' | 'info'; text: string } | null>(null);
 
   const [updateFeeModal, setUpdateFeeModal] = useState(false);
   const [selectedPerformer, setSelectedPerformer] = useState<PerformerSummary | null>(null);
@@ -272,6 +273,7 @@ const AdminDashboard: React.FC = () => {
 
   const handleToggleStripeMode = () => {
     setStripeModeError(null);
+    setStripeModeNotice(null);
     setStripeModeConfirming(true);
   };
 
@@ -291,7 +293,10 @@ const AdminDashboard: React.FC = () => {
       if (response.data) {
         setStripeModeError(null);
         setStripeMode(newMode);
-        message.success(`Stripe mode switched to ${newMode.toUpperCase()}`);
+        setStripeModeNotice({
+          type: newMode === 'live' ? 'error' : 'success',
+          text: `Stripe mode switched to ${newMode.toUpperCase()}`
+        });
         setStripeModeConfirming(false);
       }
     } catch (error: any) {
@@ -743,6 +748,16 @@ const AdminDashboard: React.FC = () => {
                   ? 'bg-green-50 border-green-300'
                   : 'bg-gray-50 border-gray-300'
             }`}>
+              {stripeModeNotice && (
+                <Alert
+                  className="mb-4"
+                  type={stripeModeNotice.type}
+                  message={stripeModeNotice.text}
+                  closable
+                  onClose={() => setStripeModeNotice(null)}
+                  showIcon
+                />
+              )}
               <div className="flex items-center justify-between">
                 <div className="flex-1">
                   <div className="flex items-center space-x-3 mb-2">
