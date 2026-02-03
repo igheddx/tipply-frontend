@@ -1,4 +1,4 @@
-const CACHE_NAME = "tipply-v7";
+const CACHE_NAME = "tipply-v8";
 const IS_DEV = self.location.hostname === 'localhost' || self.location.hostname === '127.0.0.1';
 const urlsToCache = [
   "/",
