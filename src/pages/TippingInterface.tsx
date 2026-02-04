@@ -61,11 +61,11 @@ const TippingInterface: React.FC = () => {
   const [gridSelectedAmount, setGridSelectedAmount] = useState<number | null>(null)
   const [imagesReady, setImagesReady] = useState(false)
   // Tip amounts for the cards
-  const tipAmounts = [1, 5, 10, 20, 50, 100]
+  const tipAmounts = [2, 5, 10, 20, 50, 100]
 
   // Card colors - vibrant gradients
   const cardColors = [
-    'from-emerald-400 to-teal-600',     // $1 - Green
+    'from-emerald-400 to-teal-600',     // $2 - Green
     'from-blue-400 to-indigo-600',      // $5 - Blue
     'from-purple-400 to-violet-600',    // $10 - Purple
     'from-pink-400 to-rose-600',        // $20 - Pink
@@ -648,6 +648,7 @@ const TippingInterface: React.FC = () => {
   const getCurrencyImage = (amount: number): string => {
     const images: Record<number, string> = {
       1: '/images/1dollar.png',
+      2: '/images/1dollar.png',
       5: '/images/5dollars.png',
       10: '/images/10dollars.png',
       20: '/images/20dollars.png',
@@ -759,7 +760,7 @@ const TippingInterface: React.FC = () => {
       } else if (amt >= 10) {
         return { particleCount: 100, spread: 90, startVelocity: 45, duration: 450 }
       }
-      // $1 and $5: Use original $10 and $20 intensity
+      // $2 and $5: Use original $10 and $20 intensity
       else if (amt >= 5) {
         return { particleCount: 70, spread: 80, startVelocity: 40, duration: 400 }
       } else {
