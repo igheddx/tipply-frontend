@@ -31,7 +31,7 @@ const TippingInterface: React.FC = () => {
   const { deviceId } = useParams<{ deviceId: string }>()
   const [totalTipped, setTotalTipped] = useState<number>(0)
   const [tipsRefreshKey, setTipsRefreshKey] = useState(0)
-  const [loading, setLoading] = useState(false)
+  const [isDebouncing, setIsDebouncing] = useState(false)
   const [deviceInfo, setDeviceInfo] = useState<DeviceInfo | null>(null)
   const [showPaymentModal, setShowPaymentModal] = useState(false)
   const [isPaymentSetup, setIsPaymentSetup] = useState(false)
@@ -683,7 +683,7 @@ const TippingInterface: React.FC = () => {
   }, [])
 
   const cycleClassicIndex = (direction: -1 | 1) => {
-    if (isBillFlying) return
+    if (isBillFlying || isDebouncing) return
     setEnterSide(direction === -1 ? 'left' : 'right')
     setClassicIndex(prev => {
       const next = prev + direction
@@ -694,13 +694,13 @@ const TippingInterface: React.FC = () => {
   }
 
   const handleClassicTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
-    if (isBillFlying) return
+    if (isBillFlying || isDebouncing) return
     const touch = e.touches[0]
     swipeStart.current = { x: touch.clientX, y: touch.clientY }
   }
 
   const handleClassicTouchEnd = (e: React.TouchEvent<HTMLDivElement>) => {
-    if (!swipeStart.current || isBillFlying) return
+    if (!swipeStart.current || isBillFlying || isDebouncing) return
     const touch = e.changedTouches[0]
     const dx = touch.clientX - swipeStart.current.x
     const dy = touch.clientY - swipeStart.current.y
@@ -714,19 +714,46 @@ const TippingInterface: React.FC = () => {
     swipeStart.current = null
   }
 
+  const playTipSound = () => {
+    if (audioRef.current) {
+      try {
+        if (audioContextRef.current && audioContextRef.current.state === 'suspended') {
+          audioContextRef.current.resume().catch(() => {})
+        }
+        audioRef.current.currentTime = 0
+        audioRef.current.volume = 1
+        audioRef.current.play().catch(() => {})
+      } catch (error) {
+        // Ignore audio errors
+      }
+    }
+  }
+
   const handleClassicTip = () => {
-    if (isBillFlying || loading) return
+    if (isBillFlying || isDebouncing) return
     const amount = tipAmounts[classicIndex]
     const exitDuration = 800
 
     // Trigger haptic feedback immediately
     triggerHaptic()
+    playTipSound()
+
+    // Short debounce to prevent accidental double taps
+    setIsDebouncing(true)
+    setClickedAmount(amount)
+    setTimeout(() => {
+      setIsDebouncing(false)
+      setClickedAmount(null)
+    }, 150)
 
     // Trigger exit animation (don't change key yet - old bill stays and exits)
     setIsBillFlying(true)
 
-    // Submit tip WITHOUT confetti
-    processTip(amount, true).catch(() => {})
+    // Immediate user feedback (confetti handled after exit)
+    toast.success(`$${amount} Tip Sent!`, { duration: 800 })
+
+    // Submit tip WITHOUT confetti in the background
+    void processTip(amount)
 
     // After exit completes: fire confetti, THEN mount new bill with updated key
     setTimeout(() => {
@@ -782,60 +809,48 @@ const TippingInterface: React.FC = () => {
     })
   }
 
-  const handleTipClick = async (amount: number) => {
-    if (loading || !deviceInfo || !userId) return
+  const handleTipClick = (amount: number) => {
+    if (isDebouncing || !deviceInfo || !userId) return
 
     logger.log('🎯 [handleTipClick] Called with amount:', amount, 'selectedSong:', selectedSong)
 
     // Trigger haptic feedback immediately
     triggerHaptic()
 
-    // Trigger canvas confetti immediately (grid mode)
-    if (uiMode === 'cards') {
-      triggerCanvasConfetti(amount)
-    }
+    // Trigger canvas confetti immediately
+    triggerCanvasConfetti(amount)
 
     // Enable audio on first interaction
     if (!audioEnabled) {
-      await enableAudio()
+      void enableAudio()
     }
+    playTipSound()
+
+    // Short debounce to prevent accidental double taps
+    setIsDebouncing(true)
+    setClickedAmount(amount)
+    setTimeout(() => {
+      setIsDebouncing(false)
+      setClickedAmount(null)
+    }, 150)
+
+    // Immediate user feedback
+    toast.success(`$${amount} Tip Sent!`, { duration: 800 })
 
     // If song is selected, this completes the song request
     if (selectedSong) {
       logger.log('🎵 [handleTipClick] Song is selected, calling processTipWithSong:', selectedSong.id)
-      await processTipWithSong(amount)
+      const selectedSongSnapshot = selectedSong
+      void processTipWithSong(amount, selectedSongSnapshot)
       return
     }
 
     // Regular tip
     logger.log('💰 [handleTipClick] No song selected, calling processTip')
-    await processTip(amount)
+    void processTip(amount)
   }
 
-  const processTip = async (amount: number, skipConfetti = false) => {
-    setLoading(true)
-    setClickedAmount(amount)
-    
-    // Show confetti immediately (unless skipped for classic mode)
-    if (!skipConfetti) {
-      triggerCanvasConfetti(amount)
-    }
-
-    // Play sound
-    if (audioRef.current) {
-      try {
-        if (audioContextRef.current && audioContextRef.current.state === 'suspended') {
-          audioContextRef.current.resume().catch(() => {})
-        }
-        
-        audioRef.current.currentTime = 0
-        audioRef.current.volume = 1
-        audioRef.current.play().catch(() => {})
-      } catch (error) {
-        // Ignore audio errors
-      }
-    }
-
+  const processTip = async (amount: number) => {
     // Submit tip
     try {
       // Get stored payment method ID and customer ID using fallback search
@@ -865,16 +880,7 @@ const TippingInterface: React.FC = () => {
       const response = await apiService.submitTip(tipPayload)
 
       if (response.data) {
-        if (selectedSong) {
-          toast.success(`$${amount} tip with song request sent!`, { duration: 800 })
-          setSelectedSong(null)
-          setShowSongSearch(false)
-          setTipsRefreshKey(prev => prev + 1)
-          await loadUserTotal(userId)
-        } else {
-          toast.success(`$${amount} tip sent!`, { duration: 800 })
-          await loadUserTotal(userId)
-        }
+        await loadUserTotal(userId)
         // Refresh payment method session on successful tip (extends 30-day memory)
         refreshPaymentMethodSession()
       } else {
@@ -887,26 +893,13 @@ const TippingInterface: React.FC = () => {
       toast.error(error instanceof Error ? error.message : 'Failed to submit tip. Please try again.')
     }
 
-    setLoading(false)
-    setClickedAmount(null)
   }
 
-  const processTipWithSong = async (amount: number) => {
-    logger.log('🎵 [processTipWithSong] Starting, selectedSong:', selectedSong)
-    setLoading(true)
-    setClickedAmount(amount)
-    triggerCanvasConfetti(amount)
-
-    // Play sound
-    if (audioRef.current) {
-      try {
-        audioRef.current.currentTime = 0
-        audioRef.current.play().catch(() => {})
-      } catch (error) {
-        // Ignore audio errors
-      }
-    }
-
+  const processTipWithSong = async (
+    amount: number,
+    selectedSongSnapshot: { id: string; title: string; artist: string; requestorName?: string; note?: string }
+  ) => {
+    logger.log('🎵 [processTipWithSong] Starting, selectedSong:', selectedSongSnapshot)
     try {
       // Get stored payment method ID and customer ID using fallback search
       const paymentMethodId = getStoredPaymentMethodId()
@@ -915,7 +908,7 @@ const TippingInterface: React.FC = () => {
       logger.log('💳 Retrieved payment method ID:', paymentMethodId)
       logger.log('💳 Retrieved Stripe customer ID:', stripeCustomerId)
       
-      logger.log('🎵 [processTipWithSong] Before payload construction - selectedSong:', selectedSong)
+      logger.log('🎵 [processTipWithSong] Before payload construction - selectedSong:', selectedSongSnapshot)
       const tipPayload = {
         deviceId: deviceInfo!.uuid,
         userId: userId,
@@ -925,27 +918,24 @@ const TippingInterface: React.FC = () => {
         paymentMethodId: paymentMethodId || undefined,
         stripeCustomerId: stripeCustomerId || undefined,
         // Include song request fields if song is selected
-        ...(selectedSong && {
-          songId: selectedSong.id,
-          requestorName: selectedSong.requestorName,
-          note: selectedSong.note
+        ...(selectedSongSnapshot && {
+          songId: selectedSongSnapshot.id,
+          requestorName: selectedSongSnapshot.requestorName,
+          note: selectedSongSnapshot.note
         })
       }
       logger.log('🎰 SUBMITTING TIP PAYLOAD TO BACKEND (Cards Mode):', tipPayload)
-      logger.log('🎵 [processTipWithSong] songId in payload:', tipPayload.songId, 'selectedSong.id was:', selectedSong?.id)
+      logger.log('🎵 [processTipWithSong] songId in payload:', tipPayload.songId, 'selectedSong.id was:', selectedSongSnapshot?.id)
 
       // Submit tip
       const response = await apiService.submitTip(tipPayload)
 
       if (response.data) {
-        if (selectedSong) {
-          toast.success(`$${amount} tip with song request submitted!`)
-        } else {
-          toast.success(`$${amount} tip submitted!`)
-        }
         await loadUserTotal(userId)
-        setSelectedSong(null)
-        setShowSongSearch(false)
+        if (selectedSong?.id === selectedSongSnapshot.id) {
+          setSelectedSong(null)
+          setShowSongSearch(false)
+        }
         setTipsRefreshKey(prev => prev + 1)
         // Refresh payment method session on successful tip (extends 30-day memory)
         refreshPaymentMethodSession()
@@ -959,8 +949,6 @@ const TippingInterface: React.FC = () => {
       toast.error(error instanceof Error ? error.message : 'Failed to submit tip. Please try again.')
     }
 
-    setLoading(false)
-    setClickedAmount(null)
   }
 
   const handleSongSelect = (song: {id: string, title: string, artist: string, requestorName?: string, note?: string}) => {
@@ -1291,13 +1279,13 @@ const TippingInterface: React.FC = () => {
                     setGridSelectedAmount(amount)
                     handleTipClick(amount)
                   }}
-                  disabled={loading}
+                  disabled={isDebouncing}
                   className={`
                     relative min-h-[6.25rem] min-w-[8.25rem] flex-1 basis-[calc(50%-0.5rem)] max-w-[10.5rem]
                     rounded-2xl bg-gradient-to-br ${cardColors[index]}
                     flex items-center justify-center font-black text-white text-4xl
                     shadow-2xl border border-white/20 overflow-hidden
-                    ${loading && clickedAmount === amount ? 'scale-95' : 'active:scale-95'}
+                    ${isDebouncing && clickedAmount === amount ? 'scale-95' : 'active:scale-95'}
                     transition-transform duration-150 disabled:opacity-50
                   `}
                   initial={{ opacity: 0, y: 50 }}
