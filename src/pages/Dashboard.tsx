@@ -1045,7 +1045,7 @@ const Dashboard: React.FC = () => {
     // Default configuration
     logger.log('⚠️ Using default effect config for device', device.id)
     return {
-      "1": "effect1",
+      "2": "effect1",
       "5": "effect1",
       "10": "effect2",
       "20": "effect2",
@@ -1787,7 +1787,7 @@ const Dashboard: React.FC = () => {
                                 <h4 className="text-sm font-medium text-gray-700 mb-2">Light Effects by Amount</h4>
                                 {(() => {
                                   const effectConfig = getEffectConfig(device)
-                                  const amounts = [1, 5, 10, 20, 50, 100]
+                                  const amounts = [2, 5, 10, 20, 50, 100]
                                   const effects = ['effect1', 'effect2', 'effect3']
                                   
                                   return amounts.map(amount => (
