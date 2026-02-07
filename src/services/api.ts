@@ -282,6 +282,7 @@ class ApiService {
   async createProfileOnboarding(profileData: {
     firstName: string
     lastName: string
+    stageName?: string
     email: string
     phone?: string
     password: string
