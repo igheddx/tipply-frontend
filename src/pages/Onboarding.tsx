@@ -412,6 +412,7 @@ const Onboarding: React.FC = () => {
       const result = await apiService.createProfileOnboarding({
         firstName: formData.firstName,
         lastName: formData.lastName,
+        stageName: formData.stageName,
         email: formData.email,
         phone: formData.phone,
         password: formData.password
