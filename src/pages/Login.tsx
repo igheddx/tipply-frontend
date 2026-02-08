@@ -138,13 +138,16 @@ const Login: React.FC = () => {
 
         {/* Logo and Header */}
         <div className="text-center mb-8">
-          <div className="mx-auto w-32 h-32 overflow-visible rounded-2xl mb-4">
-            <img 
-              src="/images/logo/tipwave-logo2b.png"
-              alt="Tipwave Logo" 
-              className="w-full h-full object-contain"
-              style={{ transform: 'scale(1.25)', objectPosition: 'center' }}
-            />
+          <div className="mx-auto flex items-center justify-center space-x-4 mb-4">
+            <div className="w-24 h-24 overflow-visible rounded-2xl">
+              <img 
+                src="/images/logo/tipwave-logo2b.png"
+                alt="Tipwave Logo" 
+                className="w-full h-full object-contain"
+                style={{ transform: 'scale(1.25)', objectPosition: 'center' }}
+              />
+            </div>
+            <span className="text-3xl font-bold text-gray-900">Tipwave</span>
           </div>
           <h2 className="text-3xl font-bold text-gray-900 mb-2">
             Welcome back
@@ -220,6 +223,7 @@ const Login: React.FC = () => {
                   )}
                 </button>
               </div>
+              <p className="mt-2 text-xs text-gray-500">Your information is encrypted and secure.</p>
             </div>
 
             {/* Forgot Password Link */}
@@ -267,7 +271,7 @@ const Login: React.FC = () => {
                 <div className="w-full border-t border-gray-200" />
               </div>
               <div className="relative flex justify-center text-sm">
-                <span className="px-4 bg-white text-gray-500">New to Tipply?</span>
+                <span className="px-4 bg-white text-gray-500">New to Tipwave?</span>
               </div>
             </div>
           </div>
@@ -276,7 +280,7 @@ const Login: React.FC = () => {
           <div className="mt-6">
             <button
               onClick={handleGetStarted}
-              className="w-full bg-gradient-to-r from-green-600 to-emerald-600 text-white font-semibold py-3 px-4 rounded-lg hover:from-green-700 hover:to-emerald-700 focus:ring-4 focus:ring-green-200 transition-all duration-200"
+              className="w-full border border-gray-300 text-gray-700 font-semibold py-3 px-4 rounded-lg hover:bg-gray-50 focus:ring-4 focus:ring-primary-100 transition-all duration-200"
             >
               <div className="flex items-center justify-center space-x-2">
                 <span>Get Started</span>
@@ -291,7 +295,7 @@ const Login: React.FC = () => {
         {/* Footer */}
         <div className="mt-8 text-center">
           <p className="text-sm text-gray-500">
-            Secure • Fast • Reliable
+            Fast • Secure • Made for Performers
           </p>
         </div>
       </div>
