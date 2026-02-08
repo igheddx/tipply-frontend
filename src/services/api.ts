@@ -283,6 +283,7 @@ class ApiService {
     firstName: string
     lastName: string
     stageName?: string
+    bio?: string
     email: string
     phone?: string
     password: string
@@ -305,6 +306,8 @@ class ApiService {
     serialNumber: string // Changed from deviceUuid to serialNumber
     firstName: string
     lastName: string
+    stageName?: string
+    bio?: string
     email: string
     phone?: string
     nickname?: string

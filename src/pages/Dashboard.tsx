@@ -775,7 +775,7 @@ const Dashboard: React.FC = () => {
       ctx.fillStyle = '#111827'
       ctx.font = 'bold 48px Arial, sans-serif'
       ctx.textAlign = 'center'
-      ctx.fillText('Support the music you love', width / 2, 400)
+      ctx.fillText('Show your appreciation', width / 2, 400)
 
       // Draw CTA
       ctx.fillStyle = '#4B5563'
@@ -809,7 +809,7 @@ const Dashboard: React.FC = () => {
       ctx.fillStyle = '#374151'
       ctx.font = '30px Arial, sans-serif'
       ctx.textAlign = 'center'
-      ctx.fillText('Scan. Choose how to pay. Tap to tip.', width / 2, 1265)
+      ctx.fillText('Scan. Choose how to pay. Tap to tip.', width / 2, 1260)
 
       // Trust line with padlock icon
       const trustText = 'Secure payments powered by Stripe'
@@ -818,7 +818,7 @@ const Dashboard: React.FC = () => {
       const textWidth = ctx.measureText(trustText).width
       const lockSize = 18
       const lockGap = 10
-      const trustY = 1315
+      const trustY = 1335
       const lockX = (width / 2) - (textWidth / 2) - lockGap - lockSize
       const lockY = trustY - lockSize + 2
 
@@ -836,7 +836,7 @@ const Dashboard: React.FC = () => {
       // Draw performer name
       ctx.fillStyle = '#111827'
       ctx.font = 'bold 56px Arial, sans-serif'
-      ctx.fillText(stageName, width / 2, 1525)
+      ctx.fillText(stageName, width / 2, 1500)
 
       // Draw logo at bottom-right (aligned with footer region)
       if (logo.complete && logo.naturalHeight > 0) {
