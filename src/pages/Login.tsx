@@ -152,7 +152,7 @@ const Login: React.FC = () => {
             Welcome back
           </h2>
           <p className="text-gray-600">
-            Sign in to manage your tipping devices
+            Sign in to your performer dashboard
           </p>
         </div>
 
