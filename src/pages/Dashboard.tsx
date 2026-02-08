@@ -771,14 +771,6 @@ const Dashboard: React.FC = () => {
       await new Promise((resolve) => { logo.onload = resolve; logo.onerror = resolve })
       console.info('[QR] QR bitmap ready', { width: qrBitmap.width, height: qrBitmap.height })
 
-      // Draw logo at top left corner (150px tall)
-      if (logo.complete && logo.naturalHeight > 0) {
-        const logoHeight = 150
-        const logoWidth = (logo.naturalWidth / logo.naturalHeight) * logoHeight
-        const padding = 40
-        ctx.drawImage(logo, padding, padding, logoWidth, logoHeight)
-      }
-
       // Draw message text
       ctx.fillStyle = '#111827'
       ctx.font = 'bold 48px Arial, sans-serif'
@@ -813,54 +805,47 @@ const Dashboard: React.FC = () => {
         return
       }
 
+      // Instruction line under QR
+      ctx.fillStyle = '#374151'
+      ctx.font = '30px Arial, sans-serif'
+      ctx.textAlign = 'center'
+      ctx.fillText('Scan. Choose how to pay. Tap to tip.', width / 2, 1265)
+
+      // Trust line with padlock icon
+      const trustText = 'Secure payments powered by Stripe'
+      ctx.font = '24px Arial, sans-serif'
+      ctx.fillStyle = '#6B7280'
+      const textWidth = ctx.measureText(trustText).width
+      const lockSize = 18
+      const lockGap = 10
+      const trustY = 1315
+      const lockX = (width / 2) - (textWidth / 2) - lockGap - lockSize
+      const lockY = trustY - lockSize + 2
+
+      // Draw minimal padlock icon
+      ctx.strokeStyle = '#6B7280'
+      ctx.lineWidth = 2
+      ctx.beginPath()
+      ctx.roundRect(lockX, lockY + 6, lockSize, lockSize - 4, 3)
+      ctx.stroke()
+      ctx.beginPath()
+      ctx.arc(lockX + lockSize / 2, lockY + 6, lockSize / 3.2, Math.PI, 0)
+      ctx.stroke()
+      ctx.fillText(trustText, width / 2, trustY)
+
       // Draw performer name
       ctx.fillStyle = '#111827'
       ctx.font = 'bold 56px Arial, sans-serif'
-      ctx.fillText(stageName, width / 2, 1400)
+      ctx.fillText(stageName, width / 2, 1525)
 
-      // Draw footer with environment indicator
-      ctx.fillStyle = '#6B7280'
-      ctx.font = '28px Arial, sans-serif'
-      const isProd = window.location.hostname.includes('app.tipwave.live') || window.location.hostname.includes('tipwave.live')
-      
-      // Draw the base text
-      ctx.textAlign = 'center'
-      const baseText = 'Printed 4x6" QR Card · '
-      const brandText = 'Tipwave'
-      const spacer = '     ' // Five spaces for wider padding
-      
-      // Measure text to position elements correctly
-      const baseTextWidth = ctx.measureText(baseText).width
-      const brandTextWidth = ctx.measureText(brandText).width
-      const spacerWidth = ctx.measureText(spacer).width
-      
-      // Measure Live! in bold font
-      ctx.font = 'bold 28px Arial, sans-serif'
-      const liveTextWidth = ctx.measureText('Live!').width
-      ctx.font = '28px Arial, sans-serif' // Reset to regular
-      
-      // Calculate starting position for centered text
-      const totalWidth = isProd 
-        ? baseTextWidth + brandTextWidth + spacerWidth + liveTextWidth
-        : baseTextWidth + brandTextWidth
-      
-      let xPosition = (width / 2) - (totalWidth / 2)
-      
-      // Draw base text "Printed 4x6" QR Card · "
-      ctx.textAlign = 'left'
-      ctx.fillText(baseText, xPosition, 1650)
-      xPosition += baseTextWidth
-      
-      // Draw "Tipwave"
-      ctx.fillText(brandText, xPosition, 1650)
-      xPosition += brandTextWidth
-      
-      // Add "     Live!" in bold for production with wider spacing
-      if (isProd) {
-        xPosition += spacerWidth
-        
-        ctx.font = 'bold 28px Arial, sans-serif'
-        ctx.fillText('Live!', xPosition, 1650)
+      // Draw logo at bottom-right (aligned with footer region)
+      if (logo.complete && logo.naturalHeight > 0) {
+        const logoHeight = 120
+        const logoWidth = (logo.naturalWidth / logo.naturalHeight) * logoHeight
+        const padding = 40
+        const logoX = width - logoWidth - padding
+        const logoY = 1640
+        ctx.drawImage(logo, logoX, logoY, logoWidth, logoHeight)
       }
 
       // Convert canvas to blob and download
