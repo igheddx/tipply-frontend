@@ -765,7 +765,7 @@ const Dashboard: React.FC = () => {
       // Load Tipwave logo
       const logo = new Image()
       logo.crossOrigin = 'anonymous'
-      logo.src = '/images/logo/tipwave-logo.png'
+      logo.src = '/images/logo/tipwave-logo2b.png'
 
       // Wait for logo (optional)
       await new Promise((resolve) => { logo.onload = resolve; logo.onerror = resolve })
@@ -1166,7 +1166,7 @@ const Dashboard: React.FC = () => {
             <div className="flex items-center">
                             <div className="relative w-24 h-24 overflow-visible rounded-lg">
                 <img
-                  src="/images/logo/tipwave-logo.png"
+                  src="/images/logo/tipwave-logo2b.png"
                   alt="Tipwave Logo"
                   className="w-full h-full object-contain"
                   style={{ transform: 'scale(1.2)', objectPosition: 'center' }}
