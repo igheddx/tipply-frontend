@@ -271,7 +271,7 @@ const Onboarding: React.FC = () => {
       newErrors.lastName = 'Last name is required'
     }
     if (!formData.stageName.trim()) {
-      newErrors.stageName = 'Stage name is required'
+      newErrors.stageName = 'Public name is required'
     }
     if (!formData.email.trim()) {
       newErrors.email = 'Email is required'
@@ -414,6 +414,7 @@ const Onboarding: React.FC = () => {
         firstName: formData.firstName,
         lastName: formData.lastName,
         stageName: formData.stageName,
+        bio: formData.bio,
         email: formData.email,
         phone: formData.phone,
         password: formData.password
@@ -471,6 +472,8 @@ Please use a different serial number or contact support if this is your device.`
         serialNumber: formData.serialNumber, // Changed from deviceUuid to serialNumber
         firstName: formData.firstName,
         lastName: formData.lastName,
+        stageName: formData.stageName,
+        bio: formData.bio,
         email: formData.email,
         phone: formData.phone,
         nickname: formData.deviceNickname,
@@ -793,7 +796,7 @@ Please use a different serial number or contact support if this is your device.`
       
       <div className="space-y-2">
         <label htmlFor="stageName" className="block text-sm font-semibold text-gray-700">
-          Stage Name *
+          Public Name *
         </label>
         <input
           type="text"
@@ -801,7 +804,7 @@ Please use a different serial number or contact support if this is your device.`
           name="stageName"
           required
           className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all duration-200"
-          placeholder="Your stage name or artist name"
+          placeholder="Your public name or artist name"
           value={formData.stageName}
           onChange={handleInputChange}
         />
