@@ -21,6 +21,7 @@ const Onboarding: React.FC = () => {
 
   const [errors, setErrors] = useState<{[key: string]: string}>({})
   const [isLoading, setIsLoading] = useState(false)
+  const [showKycSupportActions, setShowKycSupportActions] = useState(false)
   const [step, setStep] = useState(1)
   const [apiKeyGenerated, setApiKeyGenerated] = useState(false)
   const [isValidatingDevice, setIsValidatingDevice] = useState(false)
@@ -507,6 +508,7 @@ Please use a different serial number or contact support if this is your device.`
 
   const startKYC = async () => {
     setIsLoading(true)
+    setShowKycSupportActions(false)
     try {
       // Store credentials temporarily for automatic login after KYC
       sessionStorage.setItem('onboarding_email', formData.email)
@@ -601,6 +603,7 @@ Please use a different serial number or contact support if this is your device.`
       }
       
       setErrors(prev => ({ ...prev, general: userMessage }))
+      setShowKycSupportActions(true)
       
       // Check if this is a retryable error
       if (errorMessage.includes('timeout') || errorMessage.includes('network') || errorMessage.includes('creation_error')) {
@@ -1234,6 +1237,20 @@ Please use a different serial number or contact support if this is your device.`
             <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
           </svg>
           <p className="text-red-800 text-sm font-medium">{errors.general}</p>
+        </div>
+      )}
+
+      {showKycSupportActions && (
+        <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 space-y-3">
+          <p className="text-amber-900 text-sm font-medium">
+            Please call Tipwave Support for help completing Stripe verification. You can return to the login page and continue later.
+          </p>
+          <button
+            onClick={() => navigate('/login')}
+            className="px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-colors"
+          >
+            Return to Login
+          </button>
         </div>
       )}
       
