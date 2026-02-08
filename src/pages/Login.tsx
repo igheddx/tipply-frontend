@@ -138,8 +138,8 @@ const Login: React.FC = () => {
 
         {/* Logo and Header */}
         <div className="text-center mb-8">
-          <div className="mx-auto flex items-center justify-center space-x-4 mb-4">
-            <div className="w-24 h-24 overflow-visible rounded-2xl">
+          <div className="mx-auto flex items-center justify-center mb-4">
+            <div className="w-28 h-28 overflow-visible rounded-2xl">
               <img 
                 src="/images/logo/tipwave-logo2b.png"
                 alt="Tipwave Logo" 
@@ -147,7 +147,6 @@ const Login: React.FC = () => {
                 style={{ transform: 'scale(1.25)', objectPosition: 'center' }}
               />
             </div>
-            <span className="text-3xl font-bold text-gray-900">Tipwave</span>
           </div>
           <h2 className="text-3xl font-bold text-gray-900 mb-2">
             Welcome back
