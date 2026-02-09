@@ -1,7 +1,7 @@
 import logger from "../utils/logger";
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Row, Col, Statistic, Table, Button, Input, Modal, message, Spin, Card, Tag, Select, DatePicker, Space, Divider, Alert, Tabs } from 'antd';
+import { Row, Col, Statistic, Table, Button, Input, Modal, message, Spin, Card, Tag, Select, DatePicker, Space, Divider, Alert, Tabs, Radio } from 'antd';
 import { 
   UserOutlined, 
   DesktopOutlined, 
@@ -171,6 +171,7 @@ const AdminDashboard: React.FC = () => {
     serialNumber: string;
   } | null>(null);
   const [deviceActionLoading, setDeviceActionLoading] = useState(false);
+  const [notifyPerformer, setNotifyPerformer] = useState(false);
 
   useEffect(() => {
     // Verify admin access via profile to avoid JWT decode issues
@@ -466,10 +467,12 @@ const AdminDashboard: React.FC = () => {
 
   const openAddDeviceModal = (performer: PerformerWithDevicesSummary, serialNumber: string) => {
     setPendingDeviceAction({ type: 'add', performer, serialNumber });
+    setNotifyPerformer(false);
   };
 
   const openDeleteDeviceModal = (performer: PerformerWithDevicesSummary, deviceId: string, serialNumber: string) => {
     setPendingDeviceAction({ type: 'delete', performer, deviceId, serialNumber });
+    setNotifyPerformer(false);
   };
 
   const runDeviceAction = async (sendEmail: boolean) => {
@@ -1478,31 +1481,15 @@ const AdminDashboard: React.FC = () => {
         <Modal
           title={pendingDeviceAction?.type === 'add' ? 'Confirm Device Add' : 'Confirm Device Deletion'}
           open={!!pendingDeviceAction}
+          okText="Continue"
+          cancelText="Cancel"
+          confirmLoading={deviceActionLoading}
+          onOk={() => runDeviceAction(notifyPerformer)}
           onCancel={() => {
             if (!deviceActionLoading) {
               setPendingDeviceAction(null);
             }
           }}
-          footer={[
-            <Button key="cancel" onClick={() => setPendingDeviceAction(null)} disabled={deviceActionLoading}>
-              Cancel
-            </Button>,
-            <Button
-              key="send-email"
-              type="primary"
-              loading={deviceActionLoading}
-              onClick={() => runDeviceAction(true)}
-            >
-              Continue and Send Email to Performer
-            </Button>,
-            <Button
-              key="no-email"
-              loading={deviceActionLoading}
-              onClick={() => runDeviceAction(false)}
-            >
-              Continue without Email to Performer
-            </Button>
-          ]}
         >
           {pendingDeviceAction && (
             <div className="text-gray-700">
@@ -1518,6 +1505,17 @@ const AdminDashboard: React.FC = () => {
               <p className="mt-3">
                 Device Serial Number: <strong>{pendingDeviceAction.serialNumber}</strong>
               </p>
+              <div className="mt-4">
+                <Radio.Group
+                  onChange={(e) => setNotifyPerformer(e.target.value === 'notify')}
+                  value={notifyPerformer ? 'notify' : 'no-notify'}
+                >
+                  <Space direction="vertical">
+                    <Radio value="notify">Notify performer</Radio>
+                    <Radio value="no-notify">Do not notify performer</Radio>
+                  </Space>
+                </Radio.Group>
+              </div>
             </div>
           )}
         </Modal>
