@@ -572,7 +572,7 @@ const AdminDashboard: React.FC = () => {
       }
     } catch (error) {
       logger.error('Error loading simulation devices:', error);
-      message.error('Failed to load devices');
+      setSimulationError('Failed to load devices.');
     } finally {
       setSimulationLoading(false);
     }
@@ -611,7 +611,7 @@ const AdminDashboard: React.FC = () => {
 
   const startSimulation = async () => {
     if (!selectedSimulationDevice) {
-      message.error('Select a device to simulate');
+      setSimulationError('Select a device to simulate.');
       return;
     }
 
@@ -630,7 +630,7 @@ const AdminDashboard: React.FC = () => {
         simulationTippersRef.current = response.data || null;
       } catch (error) {
         logger.error('Error selecting simulation tippers:', error);
-        message.error('Failed to select tippers');
+        setSimulationError('Failed to select tippers.');
         setSimulationLoading(false);
         return;
       } finally {
