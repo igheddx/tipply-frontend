@@ -844,7 +844,7 @@ const Dashboard: React.FC = () => {
         const logoWidth = (logo.naturalWidth / logo.naturalHeight) * logoHeight
         const padding = 40
         const logoX = width - logoWidth - padding
-        const logoY = 1640
+        const logoY = 1580
         ctx.drawImage(logo, logoX, logoY, logoWidth, logoHeight)
       }
 
