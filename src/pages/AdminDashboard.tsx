@@ -667,7 +667,7 @@ const AdminDashboard: React.FC = () => {
       {/* Header */}
       <div className="bg-white shadow-sm border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-1">{/* Left side - Logo */}
+          <div className="flex justify-between items-center py-[11px]">{/* Left side - Logo */}
             <div className="flex items-center">
               <div className="relative w-12 h-12 overflow-visible rounded-lg">
                 <img
