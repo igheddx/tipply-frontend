@@ -559,7 +559,7 @@ const AdminDashboard: React.FC = () => {
   };
 
   const isSimulationVisible = userProfile?.role === 'root_admin' &&
-    !['app.tipwave.live', 'www.app.tipwave.live'].includes(window.location.hostname);
+    /(^localhost$|^127\.0\.0\.1$|apptest)/i.test(window.location.hostname);
 
   const loadSimulationDevices = async (query: string) => {
     try {
@@ -892,7 +892,7 @@ const AdminDashboard: React.FC = () => {
             <div className="flex items-center">
               <div className="relative w-12 h-12 overflow-visible rounded-lg">
                 <img
-                  src="/images/logo/tipwave-logo2b.png"
+                  src="/images/logo/tipwave-logo2b.png?v=20260208"
                   alt="Tipwave Logo"
                   className="w-full h-full object-contain"
                   style={{ transform: 'scale(4)', objectPosition: 'center' }}

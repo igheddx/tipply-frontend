@@ -141,7 +141,7 @@ const Login: React.FC = () => {
           <div className="mx-auto flex items-center justify-center mb-4">
             <div className="w-12 h-12 overflow-visible rounded-2xl">
               <img 
-                src="/images/logo/tipwave-logo2b.png"
+                src="/images/logo/tipwave-logo2b.png?v=20260208"
                 alt="Tipwave Logo" 
                 className="w-full h-full object-contain"
                 style={{ transform: 'scale(4)', objectPosition: 'center' }}
