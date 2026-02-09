@@ -1,5 +1,5 @@
 import logger from "../utils/logger";
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Row, Col, Statistic, Table, Button, Input, Modal, message, Spin, Card, Tag, Select, DatePicker, Space, Divider, Alert, Tabs, Radio } from 'antd';
 import { 
@@ -112,6 +112,24 @@ interface PerformerWithDevicesSummary {
   devices: PerformerDeviceSummary[];
 }
 
+interface SimulationDevice {
+  serialNumber: string;
+  deviceUuid: string;
+  performerName: string;
+}
+
+interface SimulationTipper {
+  temporaryId: string;
+  paymentMethodId: string;
+  stripeCustomerId: string;
+  isPayWallet: boolean;
+}
+
+interface SimulationTipperSelection {
+  paywalletTipper?: SimulationTipper;
+  manualTipper?: SimulationTipper;
+}
+
 const AdminDashboard: React.FC = () => {
   const navigate = useNavigate();
   const [stats, setStats] = useState<AdminDashboardStats | null>(null);
@@ -172,6 +190,23 @@ const AdminDashboard: React.FC = () => {
   } | null>(null);
   const [deviceActionLoading, setDeviceActionLoading] = useState(false);
   const [notifyPerformer, setNotifyPerformer] = useState(false);
+
+  // Device tip simulation state
+  const [simulationDevices, setSimulationDevices] = useState<SimulationDevice[]>([]);
+  const [selectedSimulationDevice, setSelectedSimulationDevice] = useState<SimulationDevice | null>(null);
+  const [simulationFrequency, setSimulationFrequency] = useState<number>(4000);
+  const [simulationPaymentMode, setSimulationPaymentMode] = useState<'paywallet' | 'manual' | 'auto'>('manual');
+  const [simulationAmountMode, setSimulationAmountMode] = useState<'auto' | number>('auto');
+  const [simulationRunning, setSimulationRunning] = useState(false);
+  const [simulationElapsed, setSimulationElapsed] = useState(0);
+  const [simulationTipCount, setSimulationTipCount] = useState(0);
+  const [simulationLoading, setSimulationLoading] = useState(false);
+  const [simulationError, setSimulationError] = useState<string | null>(null);
+  const simulationIntervalRef = useRef<number | null>(null);
+  const simulationTimerRef = useRef<number | null>(null);
+  const simulationStartRef = useRef<number | null>(null);
+  const simulationInFlightRef = useRef(false);
+  const simulationTippersRef = useRef<SimulationTipperSelection | null>(null);
 
   useEffect(() => {
     // Verify admin access via profile to avoid JWT decode issues
@@ -432,6 +467,17 @@ const AdminDashboard: React.FC = () => {
     }
   };
 
+  useEffect(() => {
+    return () => {
+      if (simulationIntervalRef.current) {
+        window.clearInterval(simulationIntervalRef.current);
+      }
+      if (simulationTimerRef.current) {
+        window.clearInterval(simulationTimerRef.current);
+      }
+    };
+  }, []);
+
   const loadPerformerDevices = async (search: string) => {
     try {
       setDeviceSearchLoading(true);
@@ -510,6 +556,181 @@ const AdminDashboard: React.FC = () => {
       setDeviceActionLoading(false);
       setPendingDeviceAction(null);
     }
+  };
+
+  const isSimulationVisible = userProfile?.role === 'root_admin' &&
+    !['app.tipwave.live', 'www.app.tipwave.live'].includes(window.location.hostname);
+
+  const loadSimulationDevices = async (query: string) => {
+    try {
+      setSimulationLoading(true);
+      const response = await apiService.get(`/api/admin/device-tip-simulation/devices?q=${encodeURIComponent(query)}`);
+      if (Array.isArray(response.data)) {
+        setSimulationDevices(response.data);
+      } else {
+        setSimulationDevices([]);
+      }
+    } catch (error) {
+      logger.error('Error loading simulation devices:', error);
+      message.error('Failed to load devices');
+    } finally {
+      setSimulationLoading(false);
+    }
+  };
+
+  const getSimulationEffect = (amount: number) => {
+    if (amount >= 100) return 'rainbow';
+    if (amount >= 50) return 'gold';
+    if (amount >= 20) return 'purple';
+    if (amount >= 10) return 'blue';
+    return 'green';
+  };
+
+  const pickSimulationAmount = () => {
+    if (simulationAmountMode !== 'auto') {
+      return simulationAmountMode;
+    }
+    const options = [2, 5, 10, 20, 50, 100];
+    return options[Math.floor(Math.random() * options.length)];
+  };
+
+  const pickSimulationTipper = () => {
+    const tippers = simulationTippersRef.current;
+    if (!tippers) return null;
+
+    if (simulationPaymentMode === 'paywallet') {
+      return tippers.paywalletTipper ?? null;
+    }
+    if (simulationPaymentMode === 'manual') {
+      return tippers.manualTipper ?? null;
+    }
+
+    const usePaywallet = Math.random() < 0.5;
+    return usePaywallet ? (tippers.paywalletTipper ?? null) : (tippers.manualTipper ?? null);
+  };
+
+  const startSimulation = async () => {
+    if (!selectedSimulationDevice) {
+      message.error('Select a device to simulate');
+      return;
+    }
+
+    if (simulationRunning) {
+      return;
+    }
+
+    setSimulationError(null);
+
+    if (!simulationTippersRef.current) {
+      try {
+        setSimulationLoading(true);
+        const response = await apiService.post('/api/admin/device-tip-simulation/select-tippers', {
+          mode: simulationPaymentMode
+        });
+        simulationTippersRef.current = response.data || null;
+      } catch (error) {
+        logger.error('Error selecting simulation tippers:', error);
+        message.error('Failed to select tippers');
+        setSimulationLoading(false);
+        return;
+      } finally {
+        setSimulationLoading(false);
+      }
+    }
+
+    if (simulationPaymentMode === 'paywallet' && !simulationTippersRef.current?.paywalletTipper) {
+      setSimulationError('No eligible PayWallet tippers found.');
+      return;
+    }
+    if (simulationPaymentMode === 'manual' && !simulationTippersRef.current?.manualTipper) {
+      setSimulationError('No eligible manual tippers found.');
+      return;
+    }
+    if (simulationPaymentMode === 'auto' &&
+        (!simulationTippersRef.current?.paywalletTipper || !simulationTippersRef.current?.manualTipper)) {
+      setSimulationError('Both PayWallet and manual tippers are required for auto mode.');
+      return;
+    }
+
+    const startBase = Date.now() - (simulationElapsed * 1000);
+    simulationStartRef.current = startBase;
+
+    if (simulationTimerRef.current) {
+      window.clearInterval(simulationTimerRef.current);
+    }
+    simulationTimerRef.current = window.setInterval(() => {
+      if (simulationStartRef.current) {
+        setSimulationElapsed(Math.floor((Date.now() - simulationStartRef.current) / 1000));
+      }
+    }, 500);
+
+    if (simulationIntervalRef.current) {
+      window.clearInterval(simulationIntervalRef.current);
+    }
+
+    simulationIntervalRef.current = window.setInterval(async () => {
+      if (simulationInFlightRef.current) {
+        return;
+      }
+      const tipper = pickSimulationTipper();
+      if (!tipper) {
+        setSimulationError('Simulation stopped: no eligible tipper found.');
+        stopSimulation();
+        return;
+      }
+
+      const amount = pickSimulationAmount();
+      const effect = getSimulationEffect(amount);
+
+      try {
+        simulationInFlightRef.current = true;
+        await apiService.submitTip({
+          deviceId: selectedSimulationDevice.deviceUuid,
+          userId: tipper.temporaryId,
+          amount,
+          effect,
+          duration: 3000,
+          paymentMethodId: tipper.paymentMethodId,
+          stripeCustomerId: tipper.stripeCustomerId
+        });
+        setSimulationTipCount((prev) => prev + 1);
+      } catch (error) {
+        logger.error('Simulation tip failed:', error);
+        setSimulationError('Simulation stopped: tip submission failed.');
+        stopSimulation();
+      } finally {
+        simulationInFlightRef.current = false;
+      }
+    }, simulationFrequency);
+
+    setSimulationRunning(true);
+  };
+
+  const stopSimulation = () => {
+    if (simulationIntervalRef.current) {
+      window.clearInterval(simulationIntervalRef.current);
+      simulationIntervalRef.current = null;
+    }
+    if (simulationTimerRef.current) {
+      window.clearInterval(simulationTimerRef.current);
+      simulationTimerRef.current = null;
+    }
+    setSimulationRunning(false);
+  };
+
+  const cancelSimulation = () => {
+    stopSimulation();
+    simulationTippersRef.current = null;
+    simulationStartRef.current = null;
+    setSimulationElapsed(0);
+    setSimulationTipCount(0);
+    setSimulationError(null);
+  };
+
+  const formatSimulationTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
   const openRefundModal = (tip: TipDetail) => {
@@ -1429,6 +1650,123 @@ const AdminDashboard: React.FC = () => {
                   </div>
                 )}
               </Spin>
+              </div>
+            </Tabs.TabPane>
+          )}
+
+          {isSimulationVisible && (
+            <Tabs.TabPane tab="Device Tip Simulation" key="device-tip-simulation">
+              <div className="bg-white p-6 rounded-lg shadow-sm border">
+                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-4">
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900">Device Tip Simulation</h3>
+                    <p className="text-sm text-gray-500">
+                      Available only on local and apptest environments.
+                    </p>
+                  </div>
+                  <div className="text-sm text-gray-600">
+                    <span className="font-semibold">Elapsed:</span> {formatSimulationTime(simulationElapsed)} ·{' '}
+                    <span className="font-semibold">Tips:</span> {simulationTipCount}
+                  </div>
+                </div>
+
+                {simulationError && (
+                  <Alert type="error" showIcon message={simulationError} className="mb-4" />
+                )}
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Device Serial Number</label>
+                    <Select
+                      showSearch
+                      placeholder="Search device serial or performer..."
+                      value={selectedSimulationDevice?.serialNumber}
+                      onSearch={(value) => {
+                        loadSimulationDevices(value);
+                      }}
+                      onChange={(value) => {
+                        const device = simulationDevices.find((d) => d.serialNumber === value) || null;
+                        setSelectedSimulationDevice(device);
+                      }}
+                      filterOption={false}
+                      loading={simulationLoading}
+                      options={simulationDevices.map((device) => ({
+                        label: `${device.serialNumber} · ${device.performerName}`,
+                        value: device.serialNumber
+                      }))}
+                      className="w-full"
+                      disabled={simulationRunning}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Tip Frequency</label>
+                    <Select
+                      value={simulationFrequency}
+                      onChange={(value) => setSimulationFrequency(value)}
+                      className="w-full"
+                      disabled={simulationRunning}
+                      options={[
+                        { label: '2 seconds', value: 2000 },
+                        { label: '4 seconds', value: 4000 },
+                        { label: '6 seconds', value: 6000 },
+                        { label: '8 seconds', value: 8000 },
+                        { label: '10 seconds', value: 10000 },
+                        { label: '15 seconds', value: 15000 },
+                        { label: '20 seconds', value: 20000 }
+                      ]}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Tipper Mode</label>
+                    <Select
+                      value={simulationPaymentMode}
+                      onChange={(value) => {
+                        setSimulationPaymentMode(value);
+                        simulationTippersRef.current = null;
+                      }}
+                      className="w-full"
+                      disabled={simulationRunning}
+                      options={[
+                        { label: 'PayWallet', value: 'paywallet' },
+                        { label: 'Manual', value: 'manual' },
+                        { label: 'Auto', value: 'auto' }
+                      ]}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Denomination</label>
+                    <Select
+                      value={simulationAmountMode}
+                      onChange={(value) => setSimulationAmountMode(value)}
+                      className="w-full"
+                      disabled={simulationRunning}
+                      options={[
+                        { label: 'Auto', value: 'auto' },
+                        { label: '$2', value: 2 },
+                        { label: '$5', value: 5 },
+                        { label: '$10', value: 10 },
+                        { label: '$20', value: 20 },
+                        { label: '$50', value: 50 },
+                        { label: '$100', value: 100 }
+                      ]}
+                    />
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap gap-3">
+                  <Button type="primary" onClick={startSimulation} disabled={simulationRunning || simulationLoading}>
+                    Start
+                  </Button>
+                  <Button onClick={stopSimulation} disabled={!simulationRunning}>
+                    Stop
+                  </Button>
+                  <Button danger onClick={cancelSimulation} disabled={simulationRunning && simulationTipCount === 0}>
+                    Cancel
+                  </Button>
+                </div>
               </div>
             </Tabs.TabPane>
           )}
