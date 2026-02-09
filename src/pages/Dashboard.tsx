@@ -1164,12 +1164,12 @@ const Dashboard: React.FC = () => {
             <div className="flex justify-between items-center py-1">
             {/* Left side - Logo */}
             <div className="flex items-center">
-                            <div className="relative w-12 h-12 overflow-visible rounded-lg">
+              <div className="relative w-12 h-12 overflow-visible rounded-lg">
                 <img
                   src="/images/logo/tipwave-logo2b.png"
                   alt="Tipwave Logo"
                   className="w-full h-full object-contain"
-                  style={{ transform: 'scale(2.4)', objectPosition: 'center' }}
+                  style={{ transform: 'scale(4)', objectPosition: 'center' }}
                 />
               </div>
             </div>

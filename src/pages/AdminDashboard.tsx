@@ -674,7 +674,7 @@ const AdminDashboard: React.FC = () => {
                   src="/images/logo/tipwave-logo2b.png"
                   alt="Tipwave Logo"
                   className="w-full h-full object-contain"
-                  style={{ transform: 'scale(2.4)', objectPosition: 'center' }}
+                  style={{ transform: 'scale(4)', objectPosition: 'center' }}
                 />
               </div>
             </div>
