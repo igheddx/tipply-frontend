@@ -94,6 +94,24 @@ interface TipDetail {
   performerEarnings: number;
 }
 
+interface PerformerDeviceSummary {
+  id: string;
+  serialNumber?: string;
+  nickname?: string;
+  isDeleted: boolean;
+  createdAt: string;
+}
+
+interface PerformerWithDevicesSummary {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  stageName?: string;
+  isActive: boolean;
+  devices: PerformerDeviceSummary[];
+}
+
 const AdminDashboard: React.FC = () => {
   const navigate = useNavigate();
   const [stats, setStats] = useState<AdminDashboardStats | null>(null);
@@ -138,6 +156,21 @@ const AdminDashboard: React.FC = () => {
   const [refundModalOpen, setRefundModalOpen] = useState(false);
   const [refundTip, setRefundTip] = useState<TipDetail | null>(null);
   const [refundLoading, setRefundLoading] = useState(false);
+
+  // Performer devices management state
+  const [deviceSearchTerm, setDeviceSearchTerm] = useState('');
+  const [deviceSearchLoading, setDeviceSearchLoading] = useState(false);
+  const [deviceSearchResults, setDeviceSearchResults] = useState<PerformerWithDevicesSummary[]>([]);
+  const [availableSerials, setAvailableSerials] = useState<string[]>([]);
+  const [serialSearchLoading, setSerialSearchLoading] = useState(false);
+  const [selectedSerials, setSelectedSerials] = useState<Record<string, string | undefined>>({});
+  const [pendingDeviceAction, setPendingDeviceAction] = useState<{
+    type: 'add' | 'delete';
+    performer: PerformerWithDevicesSummary;
+    deviceId?: string;
+    serialNumber: string;
+  } | null>(null);
+  const [deviceActionLoading, setDeviceActionLoading] = useState(false);
 
   useEffect(() => {
     // Verify admin access via profile to avoid JWT decode issues
@@ -395,6 +428,82 @@ const AdminDashboard: React.FC = () => {
       message.error('Failed to load tips');
     } finally {
       setTipsLoading(false);
+    }
+  };
+
+  const loadPerformerDevices = async (search: string) => {
+    try {
+      setDeviceSearchLoading(true);
+      const response = await apiService.get(`/api/admin/performers/search-devices?q=${encodeURIComponent(search)}`);
+      if (response.data) {
+        setDeviceSearchResults(response.data);
+      }
+    } catch (error) {
+      logger.error('Error searching performers/devices:', error);
+      message.error('Failed to search performers/devices');
+    } finally {
+      setDeviceSearchLoading(false);
+    }
+  };
+
+  const loadAvailableSerials = async (search: string) => {
+    try {
+      if (!search?.trim()) {
+        setAvailableSerials([]);
+        return;
+      }
+      setSerialSearchLoading(true);
+      const response = await apiService.get(`/api/admin/devices/available?query=${encodeURIComponent(search)}`);
+      if (Array.isArray(response.data)) {
+        setAvailableSerials(response.data.map((item: { serialNumber: string }) => item.serialNumber));
+      }
+    } catch (error) {
+      logger.error('Error searching available devices:', error);
+    } finally {
+      setSerialSearchLoading(false);
+    }
+  };
+
+  const openAddDeviceModal = (performer: PerformerWithDevicesSummary, serialNumber: string) => {
+    setPendingDeviceAction({ type: 'add', performer, serialNumber });
+  };
+
+  const openDeleteDeviceModal = (performer: PerformerWithDevicesSummary, deviceId: string, serialNumber: string) => {
+    setPendingDeviceAction({ type: 'delete', performer, deviceId, serialNumber });
+  };
+
+  const runDeviceAction = async (sendEmail: boolean) => {
+    if (!pendingDeviceAction) return;
+
+    try {
+      setDeviceActionLoading(true);
+      if (pendingDeviceAction.type === 'add') {
+        await apiService.post(`/api/admin/performers/${pendingDeviceAction.performer.id}/devices/add`, {
+          serialNumber: pendingDeviceAction.serialNumber,
+          sendEmail
+        });
+        message.success('Device added successfully');
+        setSelectedSerials((prev) => ({
+          ...prev,
+          [pendingDeviceAction.performer.id]: undefined
+        }));
+      } else {
+        await apiService.post(`/api/admin/performers/${pendingDeviceAction.performer.id}/devices/${pendingDeviceAction.deviceId}/delete`, {
+          sendEmail
+        });
+        message.success('Device deleted successfully');
+      }
+
+      if (deviceSearchTerm.trim()) {
+        await loadPerformerDevices(deviceSearchTerm.trim());
+      }
+    } catch (error: any) {
+      const errorMsg = error?.response?.data?.error || error?.message || 'Device action failed';
+      logger.error('Error performing device action:', error);
+      message.error(errorMsg);
+    } finally {
+      setDeviceActionLoading(false);
+      setPendingDeviceAction(null);
     }
   };
 
@@ -1176,6 +1285,149 @@ const AdminDashboard: React.FC = () => {
         </div>
           </Tabs.TabPane>
 
+          {userProfile?.role === 'root_admin' && (
+            <Tabs.TabPane tab="Device Management" key="device-management">
+              <div className="bg-white p-6 rounded-lg shadow-sm border mb-6">
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-4">
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900">Performer Device Management</h3>
+                  <p className="text-sm text-gray-500">
+                    Search by first name, last name, public name, or device serial number.
+                  </p>
+                </div>
+                <Search
+                  placeholder="Search performers or devices..."
+                  value={deviceSearchTerm}
+                  onChange={(e) => setDeviceSearchTerm(e.target.value)}
+                  onSearch={(value) => {
+                    const trimmed = value.trim();
+                    if (!trimmed) return;
+                    loadPerformerDevices(trimmed);
+                  }}
+                  style={{ width: 320 }}
+                  allowClear
+                />
+              </div>
+
+              <Spin spinning={deviceSearchLoading}>
+                {deviceSearchResults.length === 0 ? (
+                  <p className="text-gray-500">
+                    {deviceSearchTerm.trim()
+                      ? 'No performers or devices found for that search.'
+                      : 'No results yet. Run a search to see devices.'}
+                  </p>
+                ) : (
+                  <div className="space-y-4">
+                    {deviceSearchResults.map((performer) => (
+                      <Card
+                        key={performer.id}
+                        className="shadow-sm"
+                        title={
+                          <div className="flex flex-col">
+                            <span className="font-semibold text-gray-900">
+                              {performer.firstName} {performer.lastName}
+                            </span>
+                            <span className="text-xs text-gray-500">
+                              {performer.stageName ? `Public Name: ${performer.stageName}` : 'Public Name: —'}
+                            </span>
+                          </div>
+                        }
+                      >
+                        <div className="text-sm text-gray-600 mb-4">
+                          Email: {performer.email}
+                        </div>
+
+                        <div className="flex flex-col md:flex-row md:items-center gap-3 mb-4">
+                          <Select
+                            showSearch
+                            placeholder="Search available serial number..."
+                            value={selectedSerials[performer.id]}
+                            onSearch={loadAvailableSerials}
+                            onChange={(value) =>
+                              setSelectedSerials((prev) => ({
+                                ...prev,
+                                [performer.id]: value
+                              }))
+                            }
+                            filterOption={false}
+                            notFoundContent={
+                              serialSearchLoading ? <Spin size="small" /> : 'No devices found'
+                            }
+                            options={availableSerials.map((serial) => ({
+                              label: serial,
+                              value: serial
+                            }))}
+                            className="w-full md:w-72"
+                          />
+                          <Button
+                            type="primary"
+                            onClick={() => {
+                              const serial = selectedSerials[performer.id];
+                              if (serial) {
+                                openAddDeviceModal(performer, serial);
+                              }
+                            }}
+                            disabled={!selectedSerials[performer.id]}
+                          >
+                            Add Device
+                          </Button>
+                        </div>
+
+                        <Table
+                          columns={[
+                            {
+                              title: 'Serial Number',
+                              dataIndex: 'serialNumber',
+                              key: 'serialNumber',
+                              render: (serial) => serial || '—'
+                            },
+                            {
+                              title: 'Nickname',
+                              dataIndex: 'nickname',
+                              key: 'nickname',
+                              render: (nickname) => nickname || '—'
+                            },
+                            {
+                              title: 'Added',
+                              dataIndex: 'createdAt',
+                              key: 'createdAt',
+                              render: (date) => new Date(date).toLocaleDateString()
+                            },
+                            {
+                              title: 'Actions',
+                              key: 'actions',
+                              render: (_: unknown, record: PerformerDeviceSummary) => (
+                                <Button
+                                  danger
+                                  size="small"
+                                  onClick={() =>
+                                    openDeleteDeviceModal(
+                                      performer,
+                                      record.id,
+                                      record.serialNumber || 'Unknown'
+                                    )
+                                  }
+                                >
+                                  Delete
+                                </Button>
+                              )
+                            }
+                          ]}
+                          dataSource={performer.devices}
+                          rowKey="id"
+                          pagination={false}
+                          size="small"
+                          locale={{ emptyText: 'No devices assigned' }}
+                        />
+                      </Card>
+                    ))}
+                  </div>
+                )}
+              </Spin>
+              </div>
+            </Tabs.TabPane>
+          )}
+
           <Tabs.TabPane tab="Aggregated Charges" key="aggregated-charges">
             <AggregatedChargesTable />
           </Tabs.TabPane>
@@ -1219,6 +1471,53 @@ const AdminDashboard: React.FC = () => {
                   Enter a value between 0.01% and 100%
                 </p>
               </div>
+            </div>
+          )}
+        </Modal>
+
+        <Modal
+          title={pendingDeviceAction?.type === 'add' ? 'Confirm Device Add' : 'Confirm Device Deletion'}
+          open={!!pendingDeviceAction}
+          onCancel={() => {
+            if (!deviceActionLoading) {
+              setPendingDeviceAction(null);
+            }
+          }}
+          footer={[
+            <Button key="cancel" onClick={() => setPendingDeviceAction(null)} disabled={deviceActionLoading}>
+              Cancel
+            </Button>,
+            <Button
+              key="send-email"
+              type="primary"
+              loading={deviceActionLoading}
+              onClick={() => runDeviceAction(true)}
+            >
+              Continue and Send Email to Performer
+            </Button>,
+            <Button
+              key="no-email"
+              loading={deviceActionLoading}
+              onClick={() => runDeviceAction(false)}
+            >
+              Continue without Email to Performer
+            </Button>
+          ]}
+        >
+          {pendingDeviceAction && (
+            <div className="text-gray-700">
+              <p className="mb-2">
+                {pendingDeviceAction.type === 'add'
+                  ? 'You are about to add a device to:'
+                  : 'You are about to delete a device from:'}
+              </p>
+              <p className="font-semibold">
+                {pendingDeviceAction.performer.firstName} {pendingDeviceAction.performer.lastName}
+              </p>
+              <p className="text-sm text-gray-500">{pendingDeviceAction.performer.email}</p>
+              <p className="mt-3">
+                Device Serial Number: <strong>{pendingDeviceAction.serialNumber}</strong>
+              </p>
             </div>
           )}
         </Modal>
