@@ -555,12 +555,12 @@ const AdminDashboard: React.FC = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-1">{/* Left side - Logo */}
             <div className="flex items-center">
-              <div className="relative w-24 h-24 overflow-visible rounded-lg">
+              <div className="relative w-12 h-12 overflow-visible rounded-lg">
                 <img
                   src="/images/logo/tipwave-logo2b.png"
                   alt="Tipwave Logo"
                   className="w-full h-full object-contain"
-                  style={{ transform: 'scale(1.2)', objectPosition: 'center' }}
+                  style={{ transform: 'scale(2.4)', objectPosition: 'center' }}
                 />
               </div>
             </div>
