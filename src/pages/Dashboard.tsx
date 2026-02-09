@@ -840,7 +840,7 @@ const Dashboard: React.FC = () => {
 
       // Draw logo at bottom-right (aligned with footer region)
       if (logo.complete && logo.naturalHeight > 0) {
-        const logoHeight = 120
+        const logoHeight = 360
         const logoWidth = (logo.naturalWidth / logo.naturalHeight) * logoHeight
         const padding = 40
         const logoX = width - logoWidth - padding
