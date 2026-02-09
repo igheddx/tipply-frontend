@@ -497,6 +497,8 @@ const AdminDashboard: React.FC = () => {
         message.success('Device deleted successfully');
       }
 
+      // Keep user on the same tab and preserve search context
+      setActiveTab('device-management');
       if (deviceSearchTerm.trim()) {
         await loadPerformerDevices(deviceSearchTerm.trim());
       }
