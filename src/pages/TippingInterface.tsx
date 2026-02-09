@@ -1251,8 +1251,8 @@ const TippingInterface: React.FC = () => {
             className="flex flex-col items-center w-full px-4 h-full"
             style={{ 
               paddingTop: isIOS 
-                ? 'calc(env(safe-area-inset-top) + 1.5rem)' 
-                : 'calc(env(safe-area-inset-top) + 0.75rem)',
+                ? 'calc(env(safe-area-inset-top) + 2rem)' 
+                : 'calc(env(safe-area-inset-top) + 1.25rem)',
               paddingBottom: 'calc(env(safe-area-inset-bottom) + 3.5rem)'
             }}
           >
@@ -1271,7 +1271,7 @@ const TippingInterface: React.FC = () => {
             </div>
 
             {/* Tip buttons grid - wraps naturally */}
-            <div className="flex flex-wrap justify-center gap-3 max-w-xl w-full -mt-1 mb-3">
+            <div className="flex flex-wrap justify-center gap-x-3 gap-y-5 max-w-xl w-full -mt-1 mb-3">
               {tipAmounts.map((amount, index) => (
                 <motion.button
                   key={amount}
@@ -1322,7 +1322,7 @@ const TippingInterface: React.FC = () => {
                   <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -skew-x-12 animate-pulse"></div>
                   
                   {/* Amount */}
-                  <span className="relative z-10">${amount}</span>
+                  <span className="relative z-10 px-1 py-1">${amount}</span>
                   
                   {/* Click ripple effect */}
                   {clickedAmount === amount && (
@@ -1356,7 +1356,7 @@ const TippingInterface: React.FC = () => {
                 ) : (
                   <button
                     onClick={() => setShowSongSearch(true)}
-                    className="w-full bg-white/10 backdrop-blur-md text-white px-4 py-3 rounded-2xl border border-white/20 active:bg-white/20 transition-colors flex items-center justify-center gap-2 text-sm font-semibold"
+                    className="w-full mt-2 bg-white/10 backdrop-blur-md text-white px-4 py-3 rounded-2xl border border-white/20 active:bg-white/20 transition-colors flex items-center justify-center gap-2 text-sm font-semibold"
                   >
                     <span>🎵</span>
                     <span>Request Song</span>
@@ -1367,7 +1367,7 @@ const TippingInterface: React.FC = () => {
 
             {/* Control block - naturally flows below everything */}
             <div className="w-full max-w-xl px-2 mt-auto mb-[2.25rem]">
-              <div className="relative bg-black/60 backdrop-blur-md rounded-3xl p-4 w-full border border-white/20 shadow-2xl text-center">
+              <div className="relative bg-black/60 backdrop-blur-md rounded-3xl p-[20px] w-full border border-white/20 shadow-2xl text-center">
                 {/* Amount display */}
                 <div className="text-center mb-2">
                   <span className="text-white/80 text-sm uppercase tracking-wider mr-2">Amount:</span>
