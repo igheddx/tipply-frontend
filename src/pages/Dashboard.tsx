@@ -80,6 +80,14 @@ const Dashboard: React.FC = () => {
   const [userProfile, setUserProfile] = useState<any>(null)
   const [stripeMetricsLoading, setStripeMetricsLoading] = useState(true)
   
+  const getDeviceSetupUrl = () => {
+    const host = window.location.hostname.toLowerCase()
+    if (host.includes('apptest')) {
+      return 'https://apptest.tipwave.live/device-setup'
+    }
+    return 'https://app.tipwave.live/device-setup'
+  }
+  
   // Add Device Form States
   const [showAddDeviceForm, setShowAddDeviceForm] = useState(false)
   const [addDeviceForm, setAddDeviceForm] = useState({
@@ -1645,7 +1653,7 @@ const Dashboard: React.FC = () => {
                       <span>Refresh Status</span>
                     </button>
                     <button
-                      onClick={() => window.open('https://app.tipply.live/device-setup', '_blank')}
+                      onClick={() => window.open(getDeviceSetupUrl(), '_blank')}
                       className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-semibold"
                     >
                       Connect Device To Wifi
