@@ -126,8 +126,8 @@ interface SimulationTipper {
 }
 
 interface SimulationTipperSelection {
-  paywalletTipper?: SimulationTipper;
-  manualTipper?: SimulationTipper;
+  paywalletTippers: SimulationTipper[];
+  manualTippers: SimulationTipper[];
 }
 
 const AdminDashboard: React.FC = () => {
@@ -207,6 +207,7 @@ const AdminDashboard: React.FC = () => {
   const simulationStartRef = useRef<number | null>(null);
   const simulationInFlightRef = useRef(false);
   const simulationTippersRef = useRef<SimulationTipperSelection | null>(null);
+  const simulationTipperIndexRef = useRef(0);
 
   useEffect(() => {
     // Verify admin access via profile to avoid JWT decode issues
@@ -598,15 +599,27 @@ const AdminDashboard: React.FC = () => {
     const tippers = simulationTippersRef.current;
     if (!tippers) return null;
 
+    const paywalletPool = tippers.paywalletTippers ?? [];
+    const manualPool = tippers.manualTippers ?? [];
+
     if (simulationPaymentMode === 'paywallet') {
-      return tippers.paywalletTipper ?? null;
+      if (!paywalletPool.length) return null;
+      const idx = simulationTipperIndexRef.current % paywalletPool.length;
+      simulationTipperIndexRef.current += 1;
+      return paywalletPool[idx];
     }
     if (simulationPaymentMode === 'manual') {
-      return tippers.manualTipper ?? null;
+      if (!manualPool.length) return null;
+      const idx = simulationTipperIndexRef.current % manualPool.length;
+      simulationTipperIndexRef.current += 1;
+      return manualPool[idx];
     }
 
-    const usePaywallet = Math.random() < 0.5;
-    return usePaywallet ? (tippers.paywalletTipper ?? null) : (tippers.manualTipper ?? null);
+    if (!paywalletPool.length || !manualPool.length) return null;
+    const pool = simulationTipperIndexRef.current % 2 === 0 ? paywalletPool : manualPool;
+    const idx = simulationTipperIndexRef.current % pool.length;
+    simulationTipperIndexRef.current += 1;
+    return pool[idx];
   };
 
   const startSimulation = async () => {
@@ -625,9 +638,11 @@ const AdminDashboard: React.FC = () => {
       try {
         setSimulationLoading(true);
         const response = await apiService.post('/api/admin/device-tip-simulation/select-tippers', {
-          mode: simulationPaymentMode
+          mode: simulationPaymentMode,
+          maxPerMode: 20
         });
         simulationTippersRef.current = response.data || null;
+        simulationTipperIndexRef.current = 0;
       } catch (error) {
         logger.error('Error selecting simulation tippers:', error);
         setSimulationError('Failed to select tippers.');
@@ -638,16 +653,16 @@ const AdminDashboard: React.FC = () => {
       }
     }
 
-    if (simulationPaymentMode === 'paywallet' && !simulationTippersRef.current?.paywalletTipper) {
+    if (simulationPaymentMode === 'paywallet' && !(simulationTippersRef.current?.paywalletTippers?.length)) {
       setSimulationError('No eligible PayWallet tippers found.');
       return;
     }
-    if (simulationPaymentMode === 'manual' && !simulationTippersRef.current?.manualTipper) {
+    if (simulationPaymentMode === 'manual' && !(simulationTippersRef.current?.manualTippers?.length)) {
       setSimulationError('No eligible manual tippers found.');
       return;
     }
     if (simulationPaymentMode === 'auto' &&
-        (!simulationTippersRef.current?.paywalletTipper || !simulationTippersRef.current?.manualTipper)) {
+        (!(simulationTippersRef.current?.paywalletTippers?.length) || !(simulationTippersRef.current?.manualTippers?.length))) {
       setSimulationError('Both PayWallet and manual tippers are required for auto mode.');
       return;
     }
@@ -691,7 +706,8 @@ const AdminDashboard: React.FC = () => {
           effect,
           duration: 3000,
           paymentMethodId: tipper.paymentMethodId,
-          stripeCustomerId: tipper.stripeCustomerId
+          stripeCustomerId: tipper.stripeCustomerId,
+          simulationBypassSecurity: true
         });
         setSimulationTipCount((prev) => prev + 1);
       } catch (error) {
@@ -721,6 +737,7 @@ const AdminDashboard: React.FC = () => {
   const cancelSimulation = () => {
     stopSimulation();
     simulationTippersRef.current = null;
+    simulationTipperIndexRef.current = 0;
     simulationStartRef.current = null;
     setSimulationElapsed(0);
     setSimulationTipCount(0);
