@@ -807,7 +807,7 @@ const Dashboard: React.FC = () => {
       const headerChars = headerText.split('')
       const headerWidths = headerChars.map((char) => ctx.measureText(char).width)
       const headerTextWidth = headerWidths.reduce((sum, w) => sum + w, 0) + headerSpacing * (headerChars.length - 1)
-      const iconSize = musicNote.complete && musicNote.naturalHeight > 0 ? 125 : 0
+      const iconSize = musicNote.complete && musicNote.naturalHeight > 0 ? 156 : 0
       const iconGap = iconSize ? 14 : 0
       const headerTotalWidth = headerTextWidth + iconSize + iconGap
       const headerStartX = (width - headerTotalWidth) / 2
