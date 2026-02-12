@@ -796,22 +796,22 @@ const Dashboard: React.FC = () => {
       }
 
       // Draw header
-      const headerBarHeight = 140
+      const headerBarHeight = 180
       ctx.fillStyle = '#111111'
       ctx.fillRect(0, 0, width, headerBarHeight)
       ctx.fillStyle = '#ffffff'
-      ctx.font = '600 68px Arial, sans-serif'
+      ctx.font = '600 92px Arial, sans-serif'
       ctx.textAlign = 'center'
       const headerText = 'TIP THE PERFORMER'
       const headerSpacing = 5
       const headerChars = headerText.split('')
       const headerWidths = headerChars.map((char) => ctx.measureText(char).width)
       const headerTextWidth = headerWidths.reduce((sum, w) => sum + w, 0) + headerSpacing * (headerChars.length - 1)
-      const iconSize = musicNote.complete && musicNote.naturalHeight > 0 ? 92 : 0
+      const iconSize = musicNote.complete && musicNote.naturalHeight > 0 ? 125 : 0
       const iconGap = iconSize ? 14 : 0
       const headerTotalWidth = headerTextWidth + iconSize + iconGap
       const headerStartX = (width - headerTotalWidth) / 2
-      const headerTextY = 92
+      const headerTextY = 118
       const iconY = (headerBarHeight - iconSize) / 2
       if (iconSize) {
         ctx.drawImage(musicNote, headerStartX, iconY, iconSize, iconSize)
