@@ -356,6 +356,7 @@ class ApiService {
     duration: number
     paymentMethodId?: string
     stripeCustomerId?: string
+    simulationBypassSecurity?: boolean
     songId?: string
     requestorName?: string
     note?: string

@@ -1,7 +1,7 @@
 import logger from "../utils/logger";
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Row, Col, Statistic, Table, Button, Input, Modal, message, Spin, Card, Tag, Select, DatePicker, Space, Divider, Alert, Tabs } from 'antd';
+import { Row, Col, Statistic, Table, Button, Input, Modal, message, Spin, Card, Tag, Select, DatePicker, Space, Divider, Alert, Tabs, Radio } from 'antd';
 import { 
   UserOutlined, 
   DesktopOutlined, 
@@ -94,6 +94,42 @@ interface TipDetail {
   performerEarnings: number;
 }
 
+interface PerformerDeviceSummary {
+  id: string;
+  serialNumber?: string;
+  nickname?: string;
+  isDeleted: boolean;
+  createdAt: string;
+}
+
+interface PerformerWithDevicesSummary {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  stageName?: string;
+  isActive: boolean;
+  devices: PerformerDeviceSummary[];
+}
+
+interface SimulationDevice {
+  serialNumber: string;
+  deviceUuid: string;
+  performerName: string;
+}
+
+interface SimulationTipper {
+  temporaryId: string;
+  paymentMethodId: string;
+  stripeCustomerId: string;
+  isPayWallet: boolean;
+}
+
+interface SimulationTipperSelection {
+  paywalletTippers: SimulationTipper[];
+  manualTippers: SimulationTipper[];
+}
+
 const AdminDashboard: React.FC = () => {
   const navigate = useNavigate();
   const [stats, setStats] = useState<AdminDashboardStats | null>(null);
@@ -138,6 +174,40 @@ const AdminDashboard: React.FC = () => {
   const [refundModalOpen, setRefundModalOpen] = useState(false);
   const [refundTip, setRefundTip] = useState<TipDetail | null>(null);
   const [refundLoading, setRefundLoading] = useState(false);
+
+  // Performer devices management state
+  const [deviceSearchTerm, setDeviceSearchTerm] = useState('');
+  const [deviceSearchLoading, setDeviceSearchLoading] = useState(false);
+  const [deviceSearchResults, setDeviceSearchResults] = useState<PerformerWithDevicesSummary[]>([]);
+  const [availableSerials, setAvailableSerials] = useState<string[]>([]);
+  const [serialSearchLoading, setSerialSearchLoading] = useState(false);
+  const [selectedSerials, setSelectedSerials] = useState<Record<string, string | undefined>>({});
+  const [pendingDeviceAction, setPendingDeviceAction] = useState<{
+    type: 'add' | 'delete';
+    performer: PerformerWithDevicesSummary;
+    deviceId?: string;
+    serialNumber: string;
+  } | null>(null);
+  const [deviceActionLoading, setDeviceActionLoading] = useState(false);
+  const [notifyPerformer, setNotifyPerformer] = useState(false);
+
+  // Device tip simulation state
+  const [simulationDevices, setSimulationDevices] = useState<SimulationDevice[]>([]);
+  const [selectedSimulationDevice, setSelectedSimulationDevice] = useState<SimulationDevice | null>(null);
+  const [simulationFrequency, setSimulationFrequency] = useState<number>(4000);
+  const [simulationPaymentMode, setSimulationPaymentMode] = useState<'paywallet' | 'manual' | 'auto'>('manual');
+  const [simulationAmountMode, setSimulationAmountMode] = useState<'auto' | number>('auto');
+  const [simulationRunning, setSimulationRunning] = useState(false);
+  const [simulationElapsed, setSimulationElapsed] = useState(0);
+  const [simulationTipCount, setSimulationTipCount] = useState(0);
+  const [simulationLoading, setSimulationLoading] = useState(false);
+  const [simulationError, setSimulationError] = useState<string | null>(null);
+  const simulationIntervalRef = useRef<number | null>(null);
+  const simulationTimerRef = useRef<number | null>(null);
+  const simulationStartRef = useRef<number | null>(null);
+  const simulationInFlightRef = useRef(false);
+  const simulationTippersRef = useRef<SimulationTipperSelection | null>(null);
+  const simulationTipperIndexRef = useRef(0);
 
   useEffect(() => {
     // Verify admin access via profile to avoid JWT decode issues
@@ -398,6 +468,288 @@ const AdminDashboard: React.FC = () => {
     }
   };
 
+  useEffect(() => {
+    return () => {
+      if (simulationIntervalRef.current) {
+        window.clearInterval(simulationIntervalRef.current);
+      }
+      if (simulationTimerRef.current) {
+        window.clearInterval(simulationTimerRef.current);
+      }
+    };
+  }, []);
+
+  const loadPerformerDevices = async (search: string) => {
+    try {
+      setDeviceSearchLoading(true);
+      const response = await apiService.get(`/api/admin/performers/search-devices?q=${encodeURIComponent(search)}`);
+      if (response.data) {
+        setDeviceSearchResults(response.data);
+      }
+    } catch (error) {
+      logger.error('Error searching performers/devices:', error);
+      message.error('Failed to search performers/devices');
+    } finally {
+      setDeviceSearchLoading(false);
+    }
+  };
+
+  const loadAvailableSerials = async (search: string) => {
+    try {
+      if (!search?.trim()) {
+        setAvailableSerials([]);
+        return;
+      }
+      setSerialSearchLoading(true);
+      const response = await apiService.get(`/api/admin/devices/available?query=${encodeURIComponent(search)}`);
+      if (Array.isArray(response.data)) {
+        setAvailableSerials(response.data.map((item: { serialNumber: string }) => item.serialNumber));
+      }
+    } catch (error) {
+      logger.error('Error searching available devices:', error);
+    } finally {
+      setSerialSearchLoading(false);
+    }
+  };
+
+  const openAddDeviceModal = (performer: PerformerWithDevicesSummary, serialNumber: string) => {
+    setPendingDeviceAction({ type: 'add', performer, serialNumber });
+    setNotifyPerformer(false);
+  };
+
+  const openDeleteDeviceModal = (performer: PerformerWithDevicesSummary, deviceId: string, serialNumber: string) => {
+    setPendingDeviceAction({ type: 'delete', performer, deviceId, serialNumber });
+    setNotifyPerformer(false);
+  };
+
+  const runDeviceAction = async (sendEmail: boolean) => {
+    if (!pendingDeviceAction) return;
+
+    try {
+      setDeviceActionLoading(true);
+      if (pendingDeviceAction.type === 'add') {
+        await apiService.post(`/api/admin/performers/${pendingDeviceAction.performer.id}/devices/add`, {
+          serialNumber: pendingDeviceAction.serialNumber,
+          sendEmail
+        });
+        message.success('Device added successfully');
+        setSelectedSerials((prev) => ({
+          ...prev,
+          [pendingDeviceAction.performer.id]: undefined
+        }));
+      } else {
+        await apiService.post(`/api/admin/performers/${pendingDeviceAction.performer.id}/devices/${pendingDeviceAction.deviceId}/delete`, {
+          sendEmail
+        });
+        message.success('Device deleted successfully');
+      }
+
+      // Keep user on the same tab and preserve search context
+      setActiveTab('device-management');
+      if (deviceSearchTerm.trim()) {
+        await loadPerformerDevices(deviceSearchTerm.trim());
+      }
+    } catch (error: any) {
+      const errorMsg = error?.response?.data?.error || error?.message || 'Device action failed';
+      logger.error('Error performing device action:', error);
+      message.error(errorMsg);
+    } finally {
+      setDeviceActionLoading(false);
+      setPendingDeviceAction(null);
+    }
+  };
+
+  const isSimulationVisible = userProfile?.role === 'root_admin' &&
+    /(^localhost$|^127\.0\.0\.1$|apptest)/i.test(window.location.hostname);
+
+  const loadSimulationDevices = async (query: string) => {
+    try {
+      setSimulationLoading(true);
+      const response = await apiService.get(`/api/admin/device-tip-simulation/devices?q=${encodeURIComponent(query)}`);
+      if (Array.isArray(response.data)) {
+        setSimulationDevices(response.data);
+      } else {
+        setSimulationDevices([]);
+      }
+    } catch (error) {
+      logger.error('Error loading simulation devices:', error);
+      setSimulationError('Failed to load devices.');
+    } finally {
+      setSimulationLoading(false);
+    }
+  };
+
+  const getSimulationEffect = (amount: number) => {
+    if (amount >= 100) return 'rainbow';
+    if (amount >= 50) return 'gold';
+    if (amount >= 20) return 'purple';
+    if (amount >= 10) return 'blue';
+    return 'green';
+  };
+
+  const pickSimulationAmount = () => {
+    if (simulationAmountMode !== 'auto') {
+      return simulationAmountMode;
+    }
+    const options = [2, 5, 10, 20, 50, 100];
+    return options[Math.floor(Math.random() * options.length)];
+  };
+
+  const pickSimulationTipper = () => {
+    const tippers = simulationTippersRef.current;
+    if (!tippers) return null;
+
+    const paywalletPool = tippers.paywalletTippers ?? [];
+    const manualPool = tippers.manualTippers ?? [];
+
+    if (simulationPaymentMode === 'paywallet') {
+      if (!paywalletPool.length) return null;
+      const idx = simulationTipperIndexRef.current % paywalletPool.length;
+      simulationTipperIndexRef.current += 1;
+      return paywalletPool[idx];
+    }
+    if (simulationPaymentMode === 'manual') {
+      if (!manualPool.length) return null;
+      const idx = simulationTipperIndexRef.current % manualPool.length;
+      simulationTipperIndexRef.current += 1;
+      return manualPool[idx];
+    }
+
+    if (!paywalletPool.length || !manualPool.length) return null;
+    const pool = simulationTipperIndexRef.current % 2 === 0 ? paywalletPool : manualPool;
+    const idx = simulationTipperIndexRef.current % pool.length;
+    simulationTipperIndexRef.current += 1;
+    return pool[idx];
+  };
+
+  const startSimulation = async () => {
+    if (!selectedSimulationDevice) {
+      setSimulationError('Select a device to simulate.');
+      return;
+    }
+
+    if (simulationRunning) {
+      return;
+    }
+
+    setSimulationError(null);
+
+    if (!simulationTippersRef.current) {
+      try {
+        setSimulationLoading(true);
+        const response = await apiService.post('/api/admin/device-tip-simulation/select-tippers', {
+          mode: simulationPaymentMode,
+          maxPerMode: 20
+        });
+        simulationTippersRef.current = response.data || null;
+        simulationTipperIndexRef.current = 0;
+      } catch (error) {
+        logger.error('Error selecting simulation tippers:', error);
+        setSimulationError('Failed to select tippers.');
+        setSimulationLoading(false);
+        return;
+      } finally {
+        setSimulationLoading(false);
+      }
+    }
+
+    if (simulationPaymentMode === 'paywallet' && !(simulationTippersRef.current?.paywalletTippers?.length)) {
+      setSimulationError('No eligible PayWallet tippers found.');
+      return;
+    }
+    if (simulationPaymentMode === 'manual' && !(simulationTippersRef.current?.manualTippers?.length)) {
+      setSimulationError('No eligible manual tippers found.');
+      return;
+    }
+    if (simulationPaymentMode === 'auto' &&
+        (!(simulationTippersRef.current?.paywalletTippers?.length) || !(simulationTippersRef.current?.manualTippers?.length))) {
+      setSimulationError('Both PayWallet and manual tippers are required for auto mode.');
+      return;
+    }
+
+    const startBase = Date.now() - (simulationElapsed * 1000);
+    simulationStartRef.current = startBase;
+
+    if (simulationTimerRef.current) {
+      window.clearInterval(simulationTimerRef.current);
+    }
+    simulationTimerRef.current = window.setInterval(() => {
+      if (simulationStartRef.current) {
+        setSimulationElapsed(Math.floor((Date.now() - simulationStartRef.current) / 1000));
+      }
+    }, 500);
+
+    if (simulationIntervalRef.current) {
+      window.clearInterval(simulationIntervalRef.current);
+    }
+
+    simulationIntervalRef.current = window.setInterval(async () => {
+      if (simulationInFlightRef.current) {
+        return;
+      }
+      const tipper = pickSimulationTipper();
+      if (!tipper) {
+        setSimulationError('Simulation stopped: no eligible tipper found.');
+        stopSimulation();
+        return;
+      }
+
+      const amount = pickSimulationAmount();
+      const effect = getSimulationEffect(amount);
+
+      try {
+        simulationInFlightRef.current = true;
+        await apiService.submitTip({
+          deviceId: selectedSimulationDevice.deviceUuid,
+          userId: tipper.temporaryId,
+          amount,
+          effect,
+          duration: 3000,
+          paymentMethodId: tipper.paymentMethodId,
+          stripeCustomerId: tipper.stripeCustomerId,
+          simulationBypassSecurity: true
+        });
+        setSimulationTipCount((prev) => prev + 1);
+      } catch (error) {
+        logger.error('Simulation tip failed:', error);
+        setSimulationError('Simulation stopped: tip submission failed.');
+        stopSimulation();
+      } finally {
+        simulationInFlightRef.current = false;
+      }
+    }, simulationFrequency);
+
+    setSimulationRunning(true);
+  };
+
+  const stopSimulation = () => {
+    if (simulationIntervalRef.current) {
+      window.clearInterval(simulationIntervalRef.current);
+      simulationIntervalRef.current = null;
+    }
+    if (simulationTimerRef.current) {
+      window.clearInterval(simulationTimerRef.current);
+      simulationTimerRef.current = null;
+    }
+    setSimulationRunning(false);
+  };
+
+  const cancelSimulation = () => {
+    stopSimulation();
+    simulationTippersRef.current = null;
+    simulationTipperIndexRef.current = 0;
+    simulationStartRef.current = null;
+    setSimulationElapsed(0);
+    setSimulationTipCount(0);
+    setSimulationError(null);
+  };
+
+  const formatSimulationTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
   const openRefundModal = (tip: TipDetail) => {
     setRefundTip(tip);
     setRefundModalOpen(true);
@@ -553,14 +905,14 @@ const AdminDashboard: React.FC = () => {
       {/* Header */}
       <div className="bg-white shadow-sm border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-1">{/* Left side - Logo */}
+          <div className="flex justify-between items-center py-[14px]">{/* Left side - Logo */}
             <div className="flex items-center">
               <div className="relative w-12 h-12 overflow-visible rounded-lg">
                 <img
-                  src="/images/logo/tipwave-logo2b.png"
+                  src="/images/logo/tipwave-logo2b.png?v=20260208"
                   alt="Tipwave Logo"
                   className="w-full h-full object-contain"
-                  style={{ transform: 'scale(2.4)', objectPosition: 'center' }}
+                  style={{ transform: 'scale(4)', objectPosition: 'center' }}
                 />
               </div>
             </div>
@@ -1176,6 +1528,266 @@ const AdminDashboard: React.FC = () => {
         </div>
           </Tabs.TabPane>
 
+          {userProfile?.role === 'root_admin' && (
+            <Tabs.TabPane tab="Device Management" key="device-management">
+              <div className="bg-white p-6 rounded-lg shadow-sm border mb-6">
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-4">
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900">Performer Device Management</h3>
+                  <p className="text-sm text-gray-500">
+                    Search by first name, last name, public name, or device serial number.
+                  </p>
+                </div>
+                <Search
+                  placeholder="Search performers or devices..."
+                  value={deviceSearchTerm}
+                  onChange={(e) => setDeviceSearchTerm(e.target.value)}
+                  onSearch={(value) => {
+                    const trimmed = value.trim();
+                    if (!trimmed) return;
+                    loadPerformerDevices(trimmed);
+                  }}
+                  style={{ width: 320 }}
+                  allowClear
+                />
+              </div>
+
+              <Spin spinning={deviceSearchLoading}>
+                {deviceSearchResults.length === 0 ? (
+                  <p className="text-gray-500">
+                    {deviceSearchTerm.trim()
+                      ? 'No performers or devices found for that search.'
+                      : 'No results yet. Run a search to see devices.'}
+                  </p>
+                ) : (
+                  <div className="space-y-4">
+                    {deviceSearchResults.map((performer) => (
+                      <Card
+                        key={performer.id}
+                        className="shadow-sm"
+                        title={
+                          <div className="flex flex-col">
+                            <span className="font-semibold text-gray-900">
+                              {performer.firstName} {performer.lastName}
+                            </span>
+                            <span className="text-xs text-gray-500">
+                              {performer.stageName ? `Public Name: ${performer.stageName}` : 'Public Name: —'}
+                            </span>
+                          </div>
+                        }
+                      >
+                        <div className="text-sm text-gray-600 mb-4">
+                          Email: {performer.email}
+                        </div>
+
+                        <div className="flex flex-col md:flex-row md:items-center gap-3 mb-4">
+                          <Select
+                            showSearch
+                            placeholder="Search available serial number..."
+                            value={selectedSerials[performer.id]}
+                            onSearch={loadAvailableSerials}
+                            onChange={(value) =>
+                              setSelectedSerials((prev) => ({
+                                ...prev,
+                                [performer.id]: value
+                              }))
+                            }
+                            filterOption={false}
+                            notFoundContent={
+                              serialSearchLoading ? <Spin size="small" /> : 'No devices found'
+                            }
+                            options={availableSerials.map((serial) => ({
+                              label: serial,
+                              value: serial
+                            }))}
+                            className="w-full md:w-72"
+                          />
+                          <Button
+                            type="primary"
+                            onClick={() => {
+                              const serial = selectedSerials[performer.id];
+                              if (serial) {
+                                openAddDeviceModal(performer, serial);
+                              }
+                            }}
+                            disabled={!selectedSerials[performer.id]}
+                          >
+                            Add Device
+                          </Button>
+                        </div>
+
+                        <Table
+                          columns={[
+                            {
+                              title: 'Serial Number',
+                              dataIndex: 'serialNumber',
+                              key: 'serialNumber',
+                              render: (serial) => serial || '—'
+                            },
+                            {
+                              title: 'Nickname',
+                              dataIndex: 'nickname',
+                              key: 'nickname',
+                              render: (nickname) => nickname || '—'
+                            },
+                            {
+                              title: 'Added',
+                              dataIndex: 'createdAt',
+                              key: 'createdAt',
+                              render: (date) => new Date(date).toLocaleDateString()
+                            },
+                            {
+                              title: 'Actions',
+                              key: 'actions',
+                              render: (_: unknown, record: PerformerDeviceSummary) => (
+                                <Button
+                                  danger
+                                  size="small"
+                                  onClick={() =>
+                                    openDeleteDeviceModal(
+                                      performer,
+                                      record.id,
+                                      record.serialNumber || 'Unknown'
+                                    )
+                                  }
+                                >
+                                  Delete
+                                </Button>
+                              )
+                            }
+                          ]}
+                          dataSource={performer.devices}
+                          rowKey="id"
+                          pagination={false}
+                          size="small"
+                          locale={{ emptyText: 'No devices assigned' }}
+                        />
+                      </Card>
+                    ))}
+                  </div>
+                )}
+              </Spin>
+              </div>
+            </Tabs.TabPane>
+          )}
+
+          {isSimulationVisible && (
+            <Tabs.TabPane tab="Device Tip Simulation" key="device-tip-simulation">
+              <div className="bg-white p-6 rounded-lg shadow-sm border">
+                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-4">
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900">Device Tip Simulation</h3>
+                    <p className="text-sm text-gray-500">
+                      Available only on local and apptest environments.
+                    </p>
+                  </div>
+                  <div className="text-sm text-gray-600">
+                    <span className="font-semibold">Elapsed:</span> {formatSimulationTime(simulationElapsed)} ·{' '}
+                    <span className="font-semibold">Tips:</span> {simulationTipCount}
+                  </div>
+                </div>
+
+                {simulationError && (
+                  <Alert type="error" showIcon message={simulationError} className="mb-4" />
+                )}
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Device Serial Number</label>
+                    <Select
+                      showSearch
+                      placeholder="Search device serial or performer..."
+                      value={selectedSimulationDevice?.serialNumber}
+                      onSearch={(value) => {
+                        loadSimulationDevices(value);
+                      }}
+                      onChange={(value) => {
+                        const device = simulationDevices.find((d) => d.serialNumber === value) || null;
+                        setSelectedSimulationDevice(device);
+                      }}
+                      filterOption={false}
+                      loading={simulationLoading}
+                      options={simulationDevices.map((device) => ({
+                        label: `${device.serialNumber} · ${device.performerName}`,
+                        value: device.serialNumber
+                      }))}
+                      className="w-full"
+                      disabled={simulationRunning}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Tip Frequency</label>
+                    <Select
+                      value={simulationFrequency}
+                      onChange={(value) => setSimulationFrequency(value)}
+                      className="w-full"
+                      disabled={simulationRunning}
+                      options={[
+                        { label: '2 seconds', value: 2000 },
+                        { label: '4 seconds', value: 4000 },
+                        { label: '6 seconds', value: 6000 },
+                        { label: '8 seconds', value: 8000 },
+                        { label: '10 seconds', value: 10000 },
+                        { label: '15 seconds', value: 15000 },
+                        { label: '20 seconds', value: 20000 }
+                      ]}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Tipper Mode</label>
+                    <Select
+                      value={simulationPaymentMode}
+                      onChange={(value) => {
+                        setSimulationPaymentMode(value);
+                        simulationTippersRef.current = null;
+                      }}
+                      className="w-full"
+                      disabled={simulationRunning}
+                      options={[
+                        { label: 'PayWallet', value: 'paywallet' },
+                        { label: 'Manual', value: 'manual' },
+                        { label: 'Auto', value: 'auto' }
+                      ]}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Denomination</label>
+                    <Select
+                      value={simulationAmountMode}
+                      onChange={(value) => setSimulationAmountMode(value)}
+                      className="w-full"
+                      disabled={simulationRunning}
+                      options={[
+                        { label: 'Auto', value: 'auto' },
+                        { label: '$2', value: 2 },
+                        { label: '$5', value: 5 },
+                        { label: '$10', value: 10 },
+                        { label: '$20', value: 20 },
+                        { label: '$50', value: 50 },
+                        { label: '$100', value: 100 }
+                      ]}
+                    />
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap gap-3">
+                  <Button type="primary" onClick={startSimulation} disabled={simulationRunning || simulationLoading}>
+                    Start
+                  </Button>
+                  <Button onClick={stopSimulation} disabled={!simulationRunning}>
+                    Stop
+                  </Button>
+                  <Button danger onClick={cancelSimulation} disabled={simulationRunning && simulationTipCount === 0}>
+                    Cancel
+                  </Button>
+                </div>
+              </div>
+            </Tabs.TabPane>
+          )}
+
           <Tabs.TabPane tab="Aggregated Charges" key="aggregated-charges">
             <AggregatedChargesTable />
           </Tabs.TabPane>
@@ -1218,6 +1830,48 @@ const AdminDashboard: React.FC = () => {
                 <p className="text-xs text-gray-500 mt-1">
                   Enter a value between 0.01% and 100%
                 </p>
+              </div>
+            </div>
+          )}
+        </Modal>
+
+        <Modal
+          title={pendingDeviceAction?.type === 'add' ? 'Confirm Device Add' : 'Confirm Device Deletion'}
+          open={!!pendingDeviceAction}
+          okText="Continue"
+          cancelText="Cancel"
+          confirmLoading={deviceActionLoading}
+          onOk={() => runDeviceAction(notifyPerformer)}
+          onCancel={() => {
+            if (!deviceActionLoading) {
+              setPendingDeviceAction(null);
+            }
+          }}
+        >
+          {pendingDeviceAction && (
+            <div className="text-gray-700">
+              <p className="mb-2">
+                {pendingDeviceAction.type === 'add'
+                  ? 'You are about to add a device to:'
+                  : 'You are about to delete a device from:'}
+              </p>
+              <p className="font-semibold">
+                {pendingDeviceAction.performer.firstName} {pendingDeviceAction.performer.lastName}
+              </p>
+              <p className="text-sm text-gray-500">{pendingDeviceAction.performer.email}</p>
+              <p className="mt-3">
+                Device Serial Number: <strong>{pendingDeviceAction.serialNumber}</strong>
+              </p>
+              <div className="mt-4">
+                <Radio.Group
+                  onChange={(e) => setNotifyPerformer(e.target.value === 'notify')}
+                  value={notifyPerformer ? 'notify' : 'no-notify'}
+                >
+                  <Space direction="vertical">
+                    <Radio value="notify">Notify performer</Radio>
+                    <Radio value="no-notify">Do not notify performer</Radio>
+                  </Space>
+                </Radio.Group>
               </div>
             </div>
           )}

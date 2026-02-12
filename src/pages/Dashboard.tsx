@@ -80,6 +80,14 @@ const Dashboard: React.FC = () => {
   const [userProfile, setUserProfile] = useState<any>(null)
   const [stripeMetricsLoading, setStripeMetricsLoading] = useState(true)
   
+  const getDeviceSetupUrl = () => {
+    const host = window.location.hostname.toLowerCase()
+    if (host.includes('apptest')) {
+      return 'https://apptest.tipwave.live/device-setup'
+    }
+    return 'https://app.tipwave.live/device-setup'
+  }
+  
   // Add Device Form States
   const [showAddDeviceForm, setShowAddDeviceForm] = useState(false)
   const [addDeviceForm, setAddDeviceForm] = useState({
@@ -758,38 +766,47 @@ const Dashboard: React.FC = () => {
       canvas.width = width
       canvas.height = height
 
-      // White background
-      ctx.fillStyle = '#ffffff'
+      // Dark background for high-contrast visibility
+      ctx.fillStyle = '#0b0b0b'
       ctx.fillRect(0, 0, width, height)
 
       // Load Tipwave logo
       const logo = new Image()
       logo.crossOrigin = 'anonymous'
-      logo.src = '/images/logo/tipwave-logo2b.png'
+      logo.src = '/images/logo/tipwave-logo2b.png?v=20260208'
 
       // Wait for logo (optional)
       await new Promise((resolve) => { logo.onload = resolve; logo.onerror = resolve })
       console.info('[QR] QR bitmap ready', { width: qrBitmap.width, height: qrBitmap.height })
 
-      // Draw message text
-      ctx.fillStyle = '#111827'
-      ctx.font = 'bold 48px Arial, sans-serif'
+      const drawSpacedText = (text: string, x: number, y: number, spacing: number) => {
+        const chars = text.split('')
+        const widths = chars.map((char) => ctx.measureText(char).width)
+        const totalWidth = widths.reduce((sum, w) => sum + w, 0) + spacing * (chars.length - 1)
+        let cursorX = x - totalWidth / 2
+        chars.forEach((char, idx) => {
+          ctx.fillText(char, cursorX + widths[idx] / 2, y)
+          cursorX += widths[idx] + spacing
+        })
+      }
+
+      // Draw header
+      ctx.fillStyle = '#ffffff'
+      ctx.font = '600 68px Arial, sans-serif'
       ctx.textAlign = 'center'
-      ctx.fillText('Show your appreciation', width / 2, 400)
+      drawSpacedText('🎵 TIP THE PERFORMER', width / 2, 220, 5)
 
-      // Draw CTA
-      ctx.fillStyle = '#4B5563'
-      ctx.font = '36px Arial, sans-serif'
-      ctx.fillText('Scan to tip instantly', width / 2, 480)
-
-      // Draw QR code (centered, 600x600)
+      // Draw QR code (centered, 12% larger) with thick white border
       try {
         if (!qrBitmap.width || !qrBitmap.height) {
           throw new Error('QR image is empty or failed to load')
         }
-        const qrSize = 600
+        const qrSize = 672
+        const borderSize = 42
         const qrX = (width - qrSize) / 2
-        const qrY = 600
+        const qrY = 520
+        ctx.fillStyle = '#ffffff'
+        ctx.fillRect(qrX - borderSize, qrY - borderSize, qrSize + borderSize * 2, qrSize + borderSize * 2)
         ctx.drawImage(qrBitmap, qrX, qrY, qrSize, qrSize)
       } catch (err) {
         logger.error('[QR] Draw failed, falling back to raw QR download', err)
@@ -805,25 +822,31 @@ const Dashboard: React.FC = () => {
         return
       }
 
-      // Instruction line under QR
-      ctx.fillStyle = '#374151'
-      ctx.font = '30px Arial, sans-serif'
+      // Tagline under QR (small and supportive)
+      ctx.fillStyle = '#e5e7eb'
+      ctx.font = '24px Arial, sans-serif'
       ctx.textAlign = 'center'
-      ctx.fillText('Scan. Choose how to pay. Tap to tip.', width / 2, 1260)
+      ctx.fillText('Scan to tip instantly', width / 2, 1240)
+
+      // Instruction line under QR
+      ctx.fillStyle = '#f9fafb'
+      ctx.font = '26px Arial, sans-serif'
+      ctx.textAlign = 'center'
+      ctx.fillText('Scan. Choose how to pay. Tap to tip.', width / 2, 1290)
 
       // Trust line with padlock icon
       const trustText = 'Secure payments powered by Stripe'
-      ctx.font = '24px Arial, sans-serif'
-      ctx.fillStyle = '#6B7280'
+      ctx.font = '22px Arial, sans-serif'
+      ctx.fillStyle = '#f9fafb'
       const textWidth = ctx.measureText(trustText).width
       const lockSize = 18
       const lockGap = 10
-      const trustY = 1335
+      const trustY = 1340
       const lockX = (width / 2) - (textWidth / 2) - lockGap - lockSize
       const lockY = trustY - lockSize + 2
 
       // Draw minimal padlock icon
-      ctx.strokeStyle = '#6B7280'
+      ctx.strokeStyle = '#f9fafb'
       ctx.lineWidth = 2
       ctx.beginPath()
       ctx.roundRect(lockX, lockY + 6, lockSize, lockSize - 4, 3)
@@ -834,17 +857,17 @@ const Dashboard: React.FC = () => {
       ctx.fillText(trustText, width / 2, trustY)
 
       // Draw performer name
-      ctx.fillStyle = '#111827'
-      ctx.font = 'bold 56px Arial, sans-serif'
-      ctx.fillText(stageName, width / 2, 1500)
+      ctx.fillStyle = '#ffffff'
+      ctx.font = 'italic 42px Arial, sans-serif'
+      ctx.fillText(stageName, width / 2, 1525)
 
       // Draw logo at bottom-right (aligned with footer region)
       if (logo.complete && logo.naturalHeight > 0) {
-        const logoHeight = 120
+        const logoHeight = 320
         const logoWidth = (logo.naturalWidth / logo.naturalHeight) * logoHeight
         const padding = 40
         const logoX = width - logoWidth - padding
-        const logoY = 1640
+        const logoY = 1540
         ctx.drawImage(logo, logoX, logoY, logoWidth, logoHeight)
       }
 
@@ -1161,15 +1184,15 @@ const Dashboard: React.FC = () => {
       {/* Header */}
               <div className="bg-white shadow-sm border-b">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex justify-between items-center py-1">
+            <div className="flex justify-between items-center py-[14px]">
             {/* Left side - Logo */}
             <div className="flex items-center">
-                            <div className="relative w-12 h-12 overflow-visible rounded-lg">
+              <div className="relative w-12 h-12 overflow-visible rounded-lg">
                 <img
-                  src="/images/logo/tipwave-logo2b.png"
+                  src="/images/logo/tipwave-logo2b.png?v=20260208"
                   alt="Tipwave Logo"
                   className="w-full h-full object-contain"
-                  style={{ transform: 'scale(2.4)', objectPosition: 'center' }}
+                  style={{ transform: 'scale(4)', objectPosition: 'center' }}
                 />
               </div>
             </div>
@@ -1645,7 +1668,7 @@ const Dashboard: React.FC = () => {
                       <span>Refresh Status</span>
                     </button>
                     <button
-                      onClick={() => window.open('https://app.tipply.live/device-setup', '_blank')}
+                      onClick={() => window.open(getDeviceSetupUrl(), '_blank')}
                       className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-semibold"
                     >
                       Connect Device To Wifi
