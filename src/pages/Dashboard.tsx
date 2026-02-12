@@ -766,8 +766,8 @@ const Dashboard: React.FC = () => {
       canvas.width = width
       canvas.height = height
 
-      // Dark background for high-contrast visibility
-      ctx.fillStyle = '#0b0b0b'
+      // White background for print efficiency
+      ctx.fillStyle = '#ffffff'
       ctx.fillRect(0, 0, width, height)
 
       // Load Tipwave logo
@@ -791,12 +791,15 @@ const Dashboard: React.FC = () => {
       }
 
       // Draw header
+      const headerBarHeight = 140
+      ctx.fillStyle = '#111111'
+      ctx.fillRect(0, 0, width, headerBarHeight)
       ctx.fillStyle = '#ffffff'
       ctx.font = '600 68px Arial, sans-serif'
       ctx.textAlign = 'center'
-      drawSpacedText('🎵 TIP THE PERFORMER', width / 2, 220, 5)
+      drawSpacedText('🎵 TIP THE PERFORMER', width / 2, 92, 5)
 
-      // Draw QR code (centered, 12% larger) with thick white border
+      // Draw QR code (centered, 12% larger) with thick black border
       try {
         if (!qrBitmap.width || !qrBitmap.height) {
           throw new Error('QR image is empty or failed to load')
@@ -805,7 +808,7 @@ const Dashboard: React.FC = () => {
         const borderSize = 42
         const qrX = (width - qrSize) / 2
         const qrY = 520
-        ctx.fillStyle = '#ffffff'
+        ctx.fillStyle = '#111111'
         ctx.fillRect(qrX - borderSize, qrY - borderSize, qrSize + borderSize * 2, qrSize + borderSize * 2)
         ctx.drawImage(qrBitmap, qrX, qrY, qrSize, qrSize)
       } catch (err) {
@@ -823,30 +826,30 @@ const Dashboard: React.FC = () => {
       }
 
       // Tagline under QR (small and supportive)
-      ctx.fillStyle = '#e5e7eb'
+      ctx.fillStyle = '#374151'
       ctx.font = '24px Arial, sans-serif'
       ctx.textAlign = 'center'
-      ctx.fillText('Scan to tip instantly', width / 2, 1240)
+      ctx.fillText('Scan to tip instantly', width / 2, 1280)
 
       // Instruction line under QR
-      ctx.fillStyle = '#f9fafb'
+      ctx.fillStyle = '#111827'
       ctx.font = '26px Arial, sans-serif'
       ctx.textAlign = 'center'
-      ctx.fillText('Scan. Choose how to pay. Tap to tip.', width / 2, 1290)
+      ctx.fillText('Scan. Choose how to pay. Tap to tip.', width / 2, 1320)
 
       // Trust line with padlock icon
       const trustText = 'Secure payments powered by Stripe'
       ctx.font = '22px Arial, sans-serif'
-      ctx.fillStyle = '#f9fafb'
+      ctx.fillStyle = '#4B5563'
       const textWidth = ctx.measureText(trustText).width
       const lockSize = 18
       const lockGap = 10
-      const trustY = 1340
+      const trustY = 1360
       const lockX = (width / 2) - (textWidth / 2) - lockGap - lockSize
       const lockY = trustY - lockSize + 2
 
       // Draw minimal padlock icon
-      ctx.strokeStyle = '#f9fafb'
+      ctx.strokeStyle = '#4B5563'
       ctx.lineWidth = 2
       ctx.beginPath()
       ctx.roundRect(lockX, lockY + 6, lockSize, lockSize - 4, 3)
@@ -857,7 +860,7 @@ const Dashboard: React.FC = () => {
       ctx.fillText(trustText, width / 2, trustY)
 
       // Draw performer name
-      ctx.fillStyle = '#ffffff'
+      ctx.fillStyle = '#111827'
       ctx.font = 'italic 42px Arial, sans-serif'
       ctx.fillText(stageName, width / 2, 1525)
 
