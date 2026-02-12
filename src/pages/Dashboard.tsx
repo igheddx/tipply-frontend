@@ -775,15 +775,20 @@ const Dashboard: React.FC = () => {
       logo.crossOrigin = 'anonymous'
       logo.src = '/images/logo/tipwave-logo2b.png?v=20260208'
 
+      // Load music note icon
+      const musicNote = new Image()
+      musicNote.crossOrigin = 'anonymous'
+      musicNote.src = '/images/icons8-music-note-90.png'
+
       // Wait for logo (optional)
       await new Promise((resolve) => { logo.onload = resolve; logo.onerror = resolve })
+      await new Promise((resolve) => { musicNote.onload = resolve; musicNote.onerror = resolve })
       console.info('[QR] QR bitmap ready', { width: qrBitmap.width, height: qrBitmap.height })
 
-      const drawSpacedText = (text: string, x: number, y: number, spacing: number) => {
+      const drawSpacedTextLeft = (text: string, x: number, y: number, spacing: number) => {
         const chars = text.split('')
         const widths = chars.map((char) => ctx.measureText(char).width)
-        const totalWidth = widths.reduce((sum, w) => sum + w, 0) + spacing * (chars.length - 1)
-        let cursorX = x - totalWidth / 2
+        let cursorX = x
         chars.forEach((char, idx) => {
           ctx.fillText(char, cursorX + widths[idx] / 2, y)
           cursorX += widths[idx] + spacing
@@ -797,7 +802,21 @@ const Dashboard: React.FC = () => {
       ctx.fillStyle = '#ffffff'
       ctx.font = '600 68px Arial, sans-serif'
       ctx.textAlign = 'center'
-      drawSpacedText('🎵 TIP THE PERFORMER', width / 2, 92, 5)
+      const headerText = 'TIP THE PERFORMER'
+      const headerSpacing = 5
+      const headerChars = headerText.split('')
+      const headerWidths = headerChars.map((char) => ctx.measureText(char).width)
+      const headerTextWidth = headerWidths.reduce((sum, w) => sum + w, 0) + headerSpacing * (headerChars.length - 1)
+      const iconSize = musicNote.complete && musicNote.naturalHeight > 0 ? 56 : 0
+      const iconGap = iconSize ? 14 : 0
+      const headerTotalWidth = headerTextWidth + iconSize + iconGap
+      const headerStartX = (width - headerTotalWidth) / 2
+      const headerTextY = 92
+      const iconY = (headerBarHeight - iconSize) / 2
+      if (iconSize) {
+        ctx.drawImage(musicNote, headerStartX, iconY, iconSize, iconSize)
+      }
+      drawSpacedTextLeft(headerText, headerStartX + iconSize + iconGap, headerTextY, headerSpacing)
 
       // Draw QR code (centered, 12% larger) with thick black border
       try {
