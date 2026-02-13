@@ -799,7 +799,8 @@ const Dashboard: React.FC = () => {
       const iconGap = iconSize ? 14 : 0
       const headerTextWidth = ctx.measureText(headerText).width
       const headerTotalWidth = headerTextWidth + iconSize + iconGap
-      const headerMaxWidth = width - 40
+      const headerSidePadding = 60
+      const headerMaxWidth = width - (headerSidePadding * 2)
       const headerScaleX = headerTotalWidth > headerMaxWidth ? headerMaxWidth / headerTotalWidth : 1
 
       ctx.save()
