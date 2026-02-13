@@ -776,25 +776,9 @@ const Dashboard: React.FC = () => {
       logo.crossOrigin = 'anonymous'
       logo.src = '/images/logo/tipwave-logo2b.png?v=20260208'
 
-      // Load music note icon
-      const musicNote = new Image()
-      musicNote.crossOrigin = 'anonymous'
-      musicNote.src = '/images/icons8-music-note-90.png'
-
       // Wait for logo (optional)
       await new Promise((resolve) => { logo.onload = resolve; logo.onerror = resolve })
-      await new Promise((resolve) => { musicNote.onload = resolve; musicNote.onerror = resolve })
       console.info('[QR] QR bitmap ready', { width: qrBitmap.width, height: qrBitmap.height })
-
-      const drawSpacedTextLeft = (text: string, x: number, y: number, spacing: number) => {
-        const chars = text.split('')
-        const widths = chars.map((char) => ctx.measureText(char).width)
-        let cursorX = x
-        chars.forEach((char, idx) => {
-          ctx.fillText(char, cursorX + widths[idx] / 2, y)
-          cursorX += widths[idx] + spacing
-        })
-      }
 
       // Draw header
       const headerBarHeight = 260
@@ -803,21 +787,16 @@ const Dashboard: React.FC = () => {
       ctx.fillStyle = '#ffffff'
       ctx.font = '600 118px Arial, sans-serif'
       ctx.textAlign = 'center'
-      const headerText = 'TIP THE PERFORMER'
-      const headerSpacing = 5
-      const headerChars = headerText.split('')
-      const headerWidths = headerChars.map((char) => ctx.measureText(char).width)
-      const headerTextWidth = headerWidths.reduce((sum, w) => sum + w, 0) + headerSpacing * (headerChars.length - 1)
-      const iconSize = musicNote.complete && musicNote.naturalHeight > 0 ? 200 : 0
-      const iconGap = iconSize ? 14 : 0
-      const headerTotalWidth = headerTextWidth + iconSize + iconGap
-      const headerStartX = (width - headerTotalWidth) / 2
       const headerTextY = 165
-      const iconY = (headerBarHeight - iconSize) / 2
-      if (iconSize) {
-        ctx.drawImage(musicNote, headerStartX, iconY, iconSize, iconSize)
-      }
-      drawSpacedTextLeft(headerText, headerStartX + iconSize + iconGap, headerTextY, headerSpacing)
+      const headerText = '🎵 TIP THE PERFORMER'
+      const headerMaxWidth = width - 40
+      const headerTextWidth = ctx.measureText(headerText).width
+      const headerScaleX = headerTextWidth > headerMaxWidth ? headerMaxWidth / headerTextWidth : 1
+      ctx.save()
+      ctx.translate(width / 2, 0)
+      ctx.scale(headerScaleX, 1)
+      ctx.fillText(headerText, 0, headerTextY)
+      ctx.restore()
 
       // Draw QR code (centered, 12% larger) with thick black border
       try {
