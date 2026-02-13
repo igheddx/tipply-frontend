@@ -418,12 +418,13 @@ function PaymentForm({
   }
 
   const isWalletOnly = walletMode === 'wallet'
+  const [showCardFields, setShowCardFields] = useState(false)
 
   return (
-    <form onSubmit={isWalletOnly ? undefined : handleCardSubmit} className="space-y-0">
+    <form onSubmit={isWalletOnly || !showCardFields ? undefined : handleCardSubmit} className="space-y-0">
       {/* ========== SECTION 1: DIGITAL WALLETS ========== */}
       {paymentRequest && walletMode !== 'card' && (
-        <div className="pb-6 border-b border-gray-200">
+        <div className="pb-4">
           <button
             onClick={() => paymentRequest.show()}
             disabled={loading}
@@ -447,53 +448,71 @@ function PaymentForm({
               />
             )}
           </button>
-          
-          {/* Subtle Divider */}
-          <div className="mt-6 mb-6 flex items-center gap-3">
-            <div className="flex-1 h-px bg-gray-200" />
-            <p className="text-xs text-gray-400 uppercase tracking-wide">Or</p>
-            <div className="flex-1 h-px bg-gray-200" />
-          </div>
+        </div>
+      )}
+
+      {/* Secondary card link */}
+      {walletMode !== 'wallet' && !showCardFields && (
+        <div className="pb-6">
+          <button
+            type="button"
+            onClick={() => setShowCardFields(true)}
+            className="text-sm text-gray-500 hover:text-gray-700 underline underline-offset-2"
+          >
+            Use a card instead
+          </button>
         </div>
       )}
 
       {/* ========== SECTION 2: MANUAL CARD ENTRY ========== */}
       {walletMode !== 'wallet' && (
-      <div className="pb-6 border-b border-gray-200">
-        <div className="flex items-center justify-between mb-4">
-          <label className="text-sm font-semibold text-gray-900">Card Details</label>
-          <a
-            href="#"
-            onClick={(e) => {
-              e.preventDefault()
-              // TODO: Implement autofill from browser
-            }}
-            className="text-xs text-blue-600 hover:text-blue-700 font-medium"
-          >
-            Autofill
-          </a>
-        </div>
-        
-        <div className="border-2 border-gray-200 rounded-lg p-4 bg-white hover:border-gray-300 focus-within:border-blue-500 transition-colors">
-          <CardElement 
-            options={{ 
-              style: { 
-                base: { 
-                  fontSize: '16px',
-                  color: '#1f2937',
-                  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-                  '::placeholder': {
-                    color: '#9ca3af',
+        <div
+          className={`pb-6 transition-all duration-200 ${
+            showCardFields ? 'opacity-100 max-h-[800px]' : 'opacity-0 max-h-0 overflow-hidden'
+          }`}
+        >
+          <div className="flex items-center justify-between mb-4">
+            <label className="text-sm font-semibold text-gray-900">Card Details</label>
+          </div>
+          
+          <div className="border-2 border-gray-200 rounded-lg p-4 bg-white hover:border-gray-300 focus-within:border-blue-500 transition-colors">
+            <CardElement 
+              options={{ 
+                style: { 
+                  base: { 
+                    fontSize: '16px',
+                    color: '#1f2937',
+                    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+                    '::placeholder': {
+                      color: '#9ca3af',
+                    },
+                  },
+                  invalid: {
+                    color: '#dc2626',
                   },
                 },
-                invalid: {
-                  color: '#dc2626',
-                },
-              },
-            }} 
-          />
+              }} 
+            />
+          </div>
+
+          <button
+            type="submit"
+            disabled={loading || !stripe || !showCardFields}
+            className="mt-4 w-full bg-blue-600 text-white py-4 px-4 rounded-xl hover:bg-blue-700 active:bg-blue-800 transition-all disabled:opacity-50 disabled:cursor-not-allowed font-semibold text-base"
+          >
+            {loading ? (
+              <span className="flex items-center justify-center gap-2">
+                <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                <span>Processing...</span>
+              </span>
+            ) : (
+              'Save card & continue'
+            )}
+          </button>
         </div>
-      </div>
       )}
 
       {/* ========== ERROR MESSAGE ========== */}
@@ -505,35 +524,33 @@ function PaymentForm({
 
       {/* ========== SECTION 3: ACTION BUTTONS ========== */}
       <div className="pb-6 border-b border-gray-200 space-y-3">
-        <button
-          type={isWalletOnly ? 'button' : 'submit'}
-          onClick={
-            isWalletOnly
-              ? () => {
-                  if (paymentRequest) {
-                    paymentRequest.show()
-                  } else {
-                    setError('Apple Pay or Google Pay is not available on this device.')
-                  }
-                }
-              : undefined
-          }
-          disabled={loading || !stripe || (isWalletOnly && !paymentRequest)}
-          className="w-full bg-blue-600 text-white py-4 px-4 rounded-xl hover:bg-blue-700 active:bg-blue-800 transition-all disabled:opacity-50 disabled:cursor-not-allowed font-semibold text-base"
-        >
-          {loading ? (
-            <span className="flex items-center justify-center gap-2">
-              <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-              </svg>
-              <span>Processing...</span>
-            </span>
-          ) : (
-            isWalletOnly ? 'Activate Pay Wallet' : 'Add Payment Method'
-          )}
-        </button>
-        
+        {isWalletOnly && (
+          <button
+            type="button"
+            onClick={() => {
+              if (paymentRequest) {
+                paymentRequest.show()
+              } else {
+                setError('Apple Pay or Google Pay is not available on this device.')
+              }
+            }}
+            disabled={loading || !stripe || !paymentRequest}
+            className="w-full bg-blue-600 text-white py-4 px-4 rounded-xl hover:bg-blue-700 active:bg-blue-800 transition-all disabled:opacity-50 disabled:cursor-not-allowed font-semibold text-base"
+          >
+            {loading ? (
+              <span className="flex items-center justify-center gap-2">
+                <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                <span>Processing...</span>
+              </span>
+            ) : (
+              'Activate Pay Wallet'
+            )}
+          </button>
+        )}
+
         <button
           type="button"
           onClick={onClose}
