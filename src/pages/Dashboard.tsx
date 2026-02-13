@@ -776,8 +776,14 @@ const Dashboard: React.FC = () => {
       logo.crossOrigin = 'anonymous'
       logo.src = '/images/logo/tipwave-logo2b.png?v=20260208'
 
+      // Load music note icon
+      const musicNote = new Image()
+      musicNote.crossOrigin = 'anonymous'
+      musicNote.src = '/images/icons8-music-note-90.png'
+
       // Wait for logo (optional)
       await new Promise((resolve) => { logo.onload = resolve; logo.onerror = resolve })
+      await new Promise((resolve) => { musicNote.onload = resolve; musicNote.onerror = resolve })
       console.info('[QR] QR bitmap ready', { width: qrBitmap.width, height: qrBitmap.height })
 
       // Draw header
@@ -788,14 +794,23 @@ const Dashboard: React.FC = () => {
       ctx.font = '600 118px Arial, sans-serif'
       ctx.textAlign = 'center'
       const headerTextY = 165
-      const headerText = '🎵 TIP THE PERFORMER'
-      const headerMaxWidth = width - 40
+      const headerText = 'TIP THE PERFORMER'
+      const iconSize = musicNote.complete && musicNote.naturalHeight > 0 ? 200 : 0
+      const iconGap = iconSize ? 14 : 0
       const headerTextWidth = ctx.measureText(headerText).width
-      const headerScaleX = headerTextWidth > headerMaxWidth ? headerMaxWidth / headerTextWidth : 1
+      const headerTotalWidth = headerTextWidth + iconSize + iconGap
+      const headerMaxWidth = width - 40
+      const headerScaleX = headerTotalWidth > headerMaxWidth ? headerMaxWidth / headerTotalWidth : 1
+
       ctx.save()
       ctx.translate(width / 2, 0)
       ctx.scale(headerScaleX, 1)
-      ctx.fillText(headerText, 0, headerTextY)
+      const headerStartX = -(headerTotalWidth / 2)
+      const iconY = (headerBarHeight - iconSize) / 2
+      if (iconSize) {
+        ctx.drawImage(musicNote, headerStartX, iconY, iconSize, iconSize)
+      }
+      ctx.fillText(headerText, headerStartX + iconSize + iconGap + headerTextWidth / 2, headerTextY)
       ctx.restore()
 
       // Draw QR code (centered, 12% larger) with thick black border
