@@ -50,6 +50,7 @@ interface DeviceSummary {
   qrCodeUrl: string
   isAllowSongRequest: boolean
   isSoundEnabled?: boolean
+  isRandomLightEffect?: boolean
   effectConfiguration?: string
 }
 
@@ -1012,12 +1013,18 @@ const Dashboard: React.FC = () => {
     }
   }
 
-  const updateDeviceConfiguration = async (deviceId: string, isSoundEnabled: boolean, effectConfig: Record<string, string>) => {
+  const updateDeviceConfiguration = async (
+    deviceId: string,
+    isSoundEnabled: boolean,
+    isRandomLightEffect: boolean,
+    effectConfig: Record<string, string>
+  ) => {
     setUpdatingDeviceConfig(deviceId)
     try {
-      logger.log('📤 Sending device configuration update:', { deviceId, isSoundEnabled, effectConfig })
+      logger.log('📤 Sending device configuration update:', { deviceId, isSoundEnabled, isRandomLightEffect, effectConfig })
       const response = await apiService.updateDeviceConfiguration(deviceId, {
         isSoundEnabled,
+        isRandomLightEffect,
         effectConfiguration: JSON.stringify(effectConfig)
       })
 
@@ -1027,17 +1034,17 @@ const Dashboard: React.FC = () => {
         // Update the device in the stats state immediately
         setStats(prevStats => {
           if (!prevStats) return prevStats
-          logger.log('📝 Before state update - devices:', prevStats.devices.map(d => ({ id: d.id, sound: d.isSoundEnabled })))
+          logger.log('📝 Before state update - devices:', prevStats.devices.map(d => ({ id: d.id, sound: d.isSoundEnabled, random: d.isRandomLightEffect })))
           const newDevices = prevStats.devices.map(d => {
             if (d.id === deviceId) {
-              logger.log(`✏️ Updating device ${d.id}: sound ${d.isSoundEnabled} → ${isSoundEnabled}`)
-              return { ...d, isSoundEnabled, effectConfiguration: JSON.stringify(effectConfig) }
+              logger.log(`✏️ Updating device ${d.id}: sound ${d.isSoundEnabled} → ${isSoundEnabled}, random ${d.isRandomLightEffect} → ${isRandomLightEffect}`)
+              return { ...d, isSoundEnabled, isRandomLightEffect, effectConfiguration: JSON.stringify(effectConfig) }
             } else {
               logger.log(`⏭️ Skipping device ${d.id} (not matching ${deviceId})`)
               return d
             }
           })
-          logger.log('📝 After state update - devices:', newDevices.map(d => ({ id: d.id, sound: d.isSoundEnabled })))
+          logger.log('📝 After state update - devices:', newDevices.map(d => ({ id: d.id, sound: d.isSoundEnabled, random: d.isRandomLightEffect })))
           return {
             ...prevStats,
             devices: newDevices
@@ -1803,7 +1810,25 @@ const Dashboard: React.FC = () => {
                                     checked={device.isSoundEnabled ?? false}
                                     onChange={(e) => {
                                       const effectConfig = getEffectConfig(device)
-                                      updateDeviceConfiguration(device.id, e.target.checked, effectConfig)
+                                      updateDeviceConfiguration(device.id, e.target.checked, device.isRandomLightEffect ?? false, effectConfig)
+                                    }}
+                                    disabled={updatingDeviceConfig === device.id}
+                                    className="sr-only peer"
+                                  />
+                                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-purple-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-600"></div>
+                                </label>
+                              </div>
+
+                              {/* Random Light Effect Toggle */}
+                              <div className="flex items-center justify-between">
+                                <span className="text-sm font-medium text-gray-700">Random Light Effect</span>
+                                <label className="relative inline-flex items-center cursor-pointer">
+                                  <input
+                                    type="checkbox"
+                                    checked={device.isRandomLightEffect ?? false}
+                                    onChange={(e) => {
+                                      const effectConfig = getEffectConfig(device)
+                                      updateDeviceConfiguration(device.id, device.isSoundEnabled ?? false, e.target.checked, effectConfig)
                                     }}
                                     disabled={updatingDeviceConfig === device.id}
                                     className="sr-only peer"
@@ -1827,7 +1852,7 @@ const Dashboard: React.FC = () => {
                                         value={effectConfig[amount.toString()] || 'effect1'}
                                         onChange={(e) => {
                                           const newConfig = { ...effectConfig, [amount.toString()]: e.target.value }
-                                          updateDeviceConfiguration(device.id, device.isSoundEnabled ?? false, newConfig)
+                                          updateDeviceConfiguration(device.id, device.isSoundEnabled ?? false, device.isRandomLightEffect ?? false, newConfig)
                                         }}
                                         disabled={updatingDeviceConfig === device.id}
                                         className="px-2 py-1 border border-gray-300 rounded text-xs focus:ring-2 focus:ring-purple-500 focus:border-transparent"
