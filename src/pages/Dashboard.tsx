@@ -797,22 +797,22 @@ const Dashboard: React.FC = () => {
       }
 
       // Draw header
-      const headerBarHeight = 180
+      const headerBarHeight = 260
       ctx.fillStyle = '#111111'
       ctx.fillRect(0, 0, width, headerBarHeight)
       ctx.fillStyle = '#ffffff'
-      ctx.font = '600 92px Arial, sans-serif'
+      ctx.font = '600 118px Arial, sans-serif'
       ctx.textAlign = 'center'
       const headerText = 'TIP THE PERFORMER'
       const headerSpacing = 5
       const headerChars = headerText.split('')
       const headerWidths = headerChars.map((char) => ctx.measureText(char).width)
       const headerTextWidth = headerWidths.reduce((sum, w) => sum + w, 0) + headerSpacing * (headerChars.length - 1)
-      const iconSize = musicNote.complete && musicNote.naturalHeight > 0 ? 156 : 0
+      const iconSize = musicNote.complete && musicNote.naturalHeight > 0 ? 200 : 0
       const iconGap = iconSize ? 14 : 0
       const headerTotalWidth = headerTextWidth + iconSize + iconGap
       const headerStartX = (width - headerTotalWidth) / 2
-      const headerTextY = 118
+      const headerTextY = 165
       const iconY = (headerBarHeight - iconSize) / 2
       if (iconSize) {
         ctx.drawImage(musicNote, headerStartX, iconY, iconSize, iconSize)
@@ -827,7 +827,7 @@ const Dashboard: React.FC = () => {
         const qrSize = 672
         const borderSize = 42
         const qrX = (width - qrSize) / 2
-        const qrY = 520
+        const qrY = 330
         ctx.fillStyle = '#111111'
         ctx.fillRect(qrX - borderSize, qrY - borderSize, qrSize + borderSize * 2, qrSize + borderSize * 2)
         ctx.drawImage(qrBitmap, qrX, qrY, qrSize, qrSize)
