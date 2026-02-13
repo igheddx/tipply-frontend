@@ -799,7 +799,7 @@ const Dashboard: React.FC = () => {
       const iconGap = iconSize ? 14 : 0
       const headerTextWidth = ctx.measureText(headerText).width
       const headerTotalWidth = headerTextWidth + iconSize + iconGap
-      const headerSidePadding = 60
+      const headerSidePadding = 70
       const headerMaxWidth = width - (headerSidePadding * 2)
       const headerScaleX = headerTotalWidth > headerMaxWidth ? headerMaxWidth / headerTotalWidth : 1
 
@@ -844,7 +844,7 @@ const Dashboard: React.FC = () => {
       ctx.fillStyle = '#374151'
       ctx.font = '24px Arial, sans-serif'
       ctx.textAlign = 'center'
-      ctx.fillText('Scan to tip instantly', width / 2, 1280)
+      ctx.fillText('Scan to tip instantly', width / 2, 1288)
 
       // Instruction line under QR
       ctx.fillStyle = '#111827'
