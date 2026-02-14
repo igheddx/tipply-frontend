@@ -457,9 +457,9 @@ function PaymentForm({
           <button
             type="button"
             onClick={() => setShowCardFields(true)}
-            className="text-sm text-gray-500 hover:text-gray-700 underline underline-offset-2"
+            className="text-base text-gray-500 hover:text-gray-700 underline underline-offset-2"
           >
-            Use a card instead
+            Pay with a card
           </button>
         </div>
       )}
@@ -509,7 +509,7 @@ function PaymentForm({
                 <span>Processing...</span>
               </span>
             ) : (
-              'Save card & continue'
+              'Continue with this card'
             )}
           </button>
         </div>
