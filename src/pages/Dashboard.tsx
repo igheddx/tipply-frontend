@@ -844,13 +844,13 @@ const Dashboard: React.FC = () => {
       ctx.fillStyle = '#374151'
       ctx.font = '24px Arial, sans-serif'
       ctx.textAlign = 'center'
-      ctx.fillText('Scan to tip instantly', width / 2, 1328)
+      ctx.fillText('Scan to tip instantly', width / 2, 1340)
 
       // Instruction line under QR
       ctx.fillStyle = '#111827'
       ctx.font = '26px Arial, sans-serif'
       ctx.textAlign = 'center'
-      ctx.fillText('Scan. Choose how to pay. Tap to tip.', width / 2, 1360)
+      ctx.fillText('Scan. Choose how to pay. Tap to tip.', width / 2, 1372)
 
       // Trust line with padlock icon
       const trustText = 'Secure payments powered by Stripe'
@@ -859,7 +859,7 @@ const Dashboard: React.FC = () => {
       const textWidth = ctx.measureText(trustText).width
       const lockSize = 18
       const lockGap = 10
-      const trustY = 1400
+      const trustY = 1412
       const lockX = (width / 2) - (textWidth / 2) - lockGap - lockSize
       const lockY = trustY - lockSize + 2
 
