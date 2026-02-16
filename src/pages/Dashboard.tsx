@@ -877,7 +877,7 @@ const Dashboard: React.FC = () => {
       // Draw performer name
       ctx.fillStyle = '#111827'
       ctx.font = 'italic 42px Arial, sans-serif'
-      ctx.fillText(stageName, width / 2, 1525)
+      ctx.fillText(stageName, width / 2, 1535)
 
       // Draw logo at bottom-right (aligned with footer region)
       if (logo.complete && logo.naturalHeight > 0) {
