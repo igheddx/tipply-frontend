@@ -822,7 +822,7 @@ const Dashboard: React.FC = () => {
         const qrSize = 900
         const borderSize = 42
         const qrX = (width - qrSize) / 2
-        const qrY = 325
+        const qrY = 360
         ctx.fillStyle = '#111111'
         ctx.fillRect(qrX - borderSize, qrY - borderSize, qrSize + borderSize * 2, qrSize + borderSize * 2)
         ctx.drawImage(qrBitmap, qrX, qrY, qrSize, qrSize)
@@ -844,13 +844,13 @@ const Dashboard: React.FC = () => {
       ctx.fillStyle = '#374151'
       ctx.font = '24px Arial, sans-serif'
       ctx.textAlign = 'center'
-      ctx.fillText('Scan to tip instantly', width / 2, 1278)
+      ctx.fillText('Scan to tip instantly', width / 2, 1328)
 
       // Instruction line under QR
       ctx.fillStyle = '#111827'
       ctx.font = '26px Arial, sans-serif'
       ctx.textAlign = 'center'
-      ctx.fillText('Scan. Choose how to pay. Tap to tip.', width / 2, 1310)
+      ctx.fillText('Scan. Choose how to pay. Tap to tip.', width / 2, 1360)
 
       // Trust line with padlock icon
       const trustText = 'Secure payments powered by Stripe'
@@ -859,7 +859,7 @@ const Dashboard: React.FC = () => {
       const textWidth = ctx.measureText(trustText).width
       const lockSize = 18
       const lockGap = 10
-      const trustY = 1350
+      const trustY = 1400
       const lockX = (width / 2) - (textWidth / 2) - lockGap - lockSize
       const lockY = trustY - lockSize + 2
 
