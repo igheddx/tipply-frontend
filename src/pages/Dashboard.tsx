@@ -814,15 +814,15 @@ const Dashboard: React.FC = () => {
       ctx.fillText(headerText, headerStartX + iconSize + iconGap + headerTextWidth / 2, headerTextY)
       ctx.restore()
 
-      // Draw QR code (centered, 12% larger) with thick black border
+      // Draw QR code (centered, larger) with thick black border
       try {
         if (!qrBitmap.width || !qrBitmap.height) {
           throw new Error('QR image is empty or failed to load')
         }
-        const qrSize = 672
+        const qrSize = 900
         const borderSize = 42
         const qrX = (width - qrSize) / 2
-        const qrY = 330
+        const qrY = 300
         ctx.fillStyle = '#111111'
         ctx.fillRect(qrX - borderSize, qrY - borderSize, qrSize + borderSize * 2, qrSize + borderSize * 2)
         ctx.drawImage(qrBitmap, qrX, qrY, qrSize, qrSize)
@@ -844,13 +844,13 @@ const Dashboard: React.FC = () => {
       ctx.fillStyle = '#374151'
       ctx.font = '24px Arial, sans-serif'
       ctx.textAlign = 'center'
-      ctx.fillText('Scan to tip instantly', width / 2, 1288)
+      ctx.fillText('Scan to tip instantly', width / 2, 1230)
 
       // Instruction line under QR
       ctx.fillStyle = '#111827'
       ctx.font = '26px Arial, sans-serif'
       ctx.textAlign = 'center'
-      ctx.fillText('Scan. Choose how to pay. Tap to tip.', width / 2, 1320)
+      ctx.fillText('Scan. Choose how to pay. Tap to tip.', width / 2, 1262)
 
       // Trust line with padlock icon
       const trustText = 'Secure payments powered by Stripe'
@@ -859,7 +859,7 @@ const Dashboard: React.FC = () => {
       const textWidth = ctx.measureText(trustText).width
       const lockSize = 18
       const lockGap = 10
-      const trustY = 1360
+      const trustY = 1300
       const lockX = (width / 2) - (textWidth / 2) - lockGap - lockSize
       const lockY = trustY - lockSize + 2
 
