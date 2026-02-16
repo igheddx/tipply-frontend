@@ -1007,26 +1007,42 @@ const TippingInterface: React.FC = () => {
 
   if (!isPaymentSetup) {
     return (
-      <PaymentSetupModal
-        isOpen={true}
-        onClose={() => setShowPaymentModal(false)}
-        onComplete={(paymentMethodId) => {
-          logger.log('🎉 Payment setup complete! Payment method ID:', paymentMethodId)
-          if (paymentMethodId) {
-            storePaymentMethodId(paymentMethodId)
-          }
-          setIsPaymentSetup(true)
-          setShowPaymentModal(false)
-          toast.success('Payment method added successfully!')
-        }}
-        deviceUuid={deviceInfo?.uuid || ''}
-        userId={userId}
-        performerStageName={deviceInfo?.stageName}
-        performerFirstName={deviceInfo?.ownerFirstName}
-        performerLastName={deviceInfo?.ownerLastName}
-        performerPhotoUrl={deviceInfo?.profilePhotoUrl}
-        walletMode="both"
-      />
+      <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 flex items-center justify-center p-6">
+        <div className="bg-white/10 backdrop-blur-md rounded-2xl p-8 max-w-md w-full text-center border border-white/20">
+          <div className="text-5xl mb-4">🔒</div>
+          <h2 className="text-2xl font-bold text-white mb-3">Payment Setup Required</h2>
+          <p className="text-white/80 mb-6">
+            Add a payment method to continue tipping.
+          </p>
+          <button
+            type="button"
+            onClick={() => setShowPaymentModal(true)}
+            className="w-full bg-blue-600 text-white py-4 px-4 rounded-xl hover:bg-blue-700 active:bg-blue-800 transition-all font-semibold text-base"
+          >
+            Set up payment
+          </button>
+        </div>
+        <PaymentSetupModal
+          isOpen={showPaymentModal}
+          onClose={() => setShowPaymentModal(false)}
+          onComplete={(paymentMethodId) => {
+            logger.log('🎉 Payment setup complete! Payment method ID:', paymentMethodId)
+            if (paymentMethodId) {
+              storePaymentMethodId(paymentMethodId)
+            }
+            setIsPaymentSetup(true)
+            setShowPaymentModal(false)
+            toast.success('Payment method added successfully!')
+          }}
+          deviceUuid={deviceInfo?.uuid || ''}
+          userId={userId}
+          performerStageName={deviceInfo?.stageName}
+          performerFirstName={deviceInfo?.ownerFirstName}
+          performerLastName={deviceInfo?.ownerLastName}
+          performerPhotoUrl={deviceInfo?.profilePhotoUrl}
+          walletMode="both"
+        />
+      </div>
     )
   }
 
