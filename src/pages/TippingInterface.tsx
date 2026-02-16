@@ -849,6 +849,11 @@ const TippingInterface: React.FC = () => {
         ...(trimmedName ? { requestorName: trimmedName } : {}),
         ...(trimmedNote ? { note: trimmedNote } : {})
       }
+      setSelectedSong(null)
+      setShowSongSearch(false)
+      setShowSongRequestFields(false)
+      setSongRequestName('')
+      setSongRequestNote('')
       logger.log('🎵 [handleTipClick] Song is selected, calling processTipWithSong:', selectedSongSnapshot.id)
       void processTipWithSong(amount, selectedSongSnapshot)
       return
