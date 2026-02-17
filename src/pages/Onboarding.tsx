@@ -125,6 +125,26 @@ const Onboarding: React.FC = () => {
     return null
   }
 
+  const handlePasswordFieldBlur = (field: string) => {
+    const newErrors = { ...errors }
+    
+    if (field === 'password') {
+      if (formData.password.length < 8) {
+        newErrors.password = 'Password must be at least 8 characters'
+      } else {
+        delete newErrors.password
+      }
+    } else if (field === 'confirmPassword') {
+      if (formData.password !== formData.confirmPassword) {
+        newErrors.confirmPassword = 'Passwords do not match'
+      } else {
+        delete newErrors.confirmPassword
+      }
+    }
+    
+    setErrors(newErrors)
+  }
+
   const sendVerificationCode = async () => {
     logger.log('sendVerificationCode called with email:', formData.email)
     
@@ -929,6 +949,7 @@ Please use a different serial number or contact support if this is your device.`
               placeholder="Enter your password"
               value={formData.password}
               onChange={handleInputChange}
+              onBlur={() => handlePasswordFieldBlur('password')}
             />
             <button
               type="button"
@@ -966,6 +987,7 @@ Please use a different serial number or contact support if this is your device.`
               placeholder="Confirm your password"
               value={formData.confirmPassword}
               onChange={handleInputChange}
+              onBlur={() => handlePasswordFieldBlur('confirmPassword')}
             />
             <button
               type="button"
