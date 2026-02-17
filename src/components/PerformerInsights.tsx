@@ -255,7 +255,9 @@ const PerformerInsights: React.FC = () => {
       const qrBlobUrl = URL.createObjectURL(sourceBlob)
       let qrBitmap: ImageBitmap
       try {
+        console.log('[QR] Creating bitmap from blob...')
         qrBitmap = await createImageBitmap(sourceBlob)
+        console.log('[QR] Bitmap created successfully:', { width: qrBitmap.width, height: qrBitmap.height })
       } catch (err) {
         logger.error('[QR] Bitmap decode failed', err)
         const rawUrl = URL.createObjectURL(sourceBlob)
@@ -271,10 +273,15 @@ const PerformerInsights: React.FC = () => {
       }
 
       const stageName = selectedPerformer?.stageName || `${selectedPerformer?.firstName || ''} ${selectedPerformer?.lastName || ''}`.trim() || 'Performer'
+      console.log('[QR] Stage name:', stageName)
 
       const canvas = document.createElement('canvas')
       const ctx = canvas.getContext('2d')
-      if (!ctx) return
+      if (!ctx) {
+        console.error('[QR] Failed to get canvas context')
+        return
+      }
+      console.log('[QR] Canvas created successfully')
 
       const width = 1200
       const height = 1800
@@ -294,6 +301,7 @@ const PerformerInsights: React.FC = () => {
 
       await new Promise((resolve) => { logo.onload = resolve; logo.onerror = resolve })
       await new Promise((resolve) => { musicNote.onload = resolve; musicNote.onerror = resolve })
+      console.log('[QR] Images loaded. Logo:', { complete: logo.complete, height: logo.naturalHeight }, 'MusicNote:', { complete: musicNote.complete, height: musicNote.naturalHeight })
 
       const headerBarHeight = 260
       ctx.fillStyle = '#111111'
@@ -389,17 +397,25 @@ const PerformerInsights: React.FC = () => {
         ctx.drawImage(logo, logoX, logoY, logoWidth, logoHeight)
       }
 
+      console.log('[QR] Canvas rendering complete, converting to blob...')
       canvas.toBlob((blob) => {
+        console.log('[QR] toBlob callback executed. Blob:', blob)
         if (blob) {
+          console.log('[QR] Blob size:', blob.size, 'type:', blob.type)
           const url = window.URL.createObjectURL(blob)
           const a = document.createElement('a')
           a.href = url
           a.download = `tipwave-card-${nickname || deviceId}.png`
           document.body.appendChild(a)
+          console.log('[QR] Triggering download...')
           a.click()
           window.URL.revokeObjectURL(url)
           window.URL.revokeObjectURL(qrBlobUrl)
           document.body.removeChild(a)
+          console.log('[QR] Download complete!')
+        } else {
+          console.error('[QR] Blob is null!')
+          alert('Failed to create download file')
         }
       }, 'image/png')
     } catch (error) {
@@ -770,33 +786,44 @@ const DeviceConfigModal: React.FC<{
   const handleSave = async () => {
     setIsSaving(true)
     try {
+      console.log('[Config] Starting save...', { deviceId: device.id, isSoundEnabled, isRandomEffect })
       const token = localStorage.getItem('token')
+      const requestBody = {
+        isSoundEnabled,
+        isRandomLightEffect: isRandomEffect,
+        effectConfiguration: JSON.stringify(effectConfig)
+      }
+      console.log('[Config] Request body:', requestBody)
+      
       const response = await fetch(`${API_BASE_URL}/api/admin/devices/${device.id}/configuration`, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({
-          isSoundEnabled,
-          isRandomLightEffect: isRandomEffect,
-          effectConfiguration: JSON.stringify(effectConfig)
-        })
+        body: JSON.stringify(requestBody)
       })
 
+      console.log('[Config] Response status:', response.status, response.statusText)
+      
       if (response.ok) {
         const data = await response.json()
+        console.log('[Config] Response data:', data)
         if (data.success) {
+          console.log('[Config] Save successful!')
           onSave()
         } else {
-          logger.error('Failed to save configuration')
+          logger.error('Failed to save configuration - no success flag')
           alert('Failed to update device configuration')
         }
       } else {
+        const errorText = await response.text()
+        console.error('[Config] Error response:', errorText)
         logger.error('Failed to save configuration')
         alert('Failed to update device configuration: ' + response.statusText)
       }
     } catch (error) {
+      console.error('[Config] Exception:', error)
       logger.error('Error saving configuration:', error)
       alert('Error updating device configuration: ' + (error instanceof Error ? error.message : 'Unknown error'))
     } finally {
