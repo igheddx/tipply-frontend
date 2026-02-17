@@ -4,6 +4,7 @@ import { AutoComplete } from 'antd'
 import type { BaseOptionType } from 'antd/es/select'
 import logger from '../utils/logger'
 import { API_BASE_URL } from '../utils/config'
+import { apiService } from '../services/api'
 
 interface PerformerDevice {
   id: string
@@ -206,26 +207,190 @@ const PerformerInsights: React.FC = () => {
 
   const downloadQRCode = async (deviceId: string, nickname: string) => {
     try {
-      const token = localStorage.getItem('token')
-      const response = await fetch(`${API_BASE_URL}/api/devices/${deviceId}/qr`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
+      console.info('[QR] Download clicked', { deviceId, nickname })
+
+      const qrBlob = await apiService.downloadQRCode(deviceId)
+      if (!qrBlob) {
+        alert('Could not download QR code. Please try again or check your connection.')
+        return
+      }
+
+      if (!qrBlob.type.startsWith('image/')) {
+        alert(`QR download returned a non-image content-type: ${qrBlob.type || 'unknown'}`)
+        return
+      }
+
+      let sourceBlob: Blob = qrBlob
+      if (qrBlob.size < 10000) {
+        try {
+          const possibleBase64 = (await qrBlob.text()).trim()
+          const isLikelyBase64Png = possibleBase64.startsWith('iVBORw0KGgo') && /^[A-Za-z0-9+/=\n\r]+$/.test(possibleBase64)
+          if (isLikelyBase64Png) {
+            const byteChars = atob(possibleBase64)
+            const byteNumbers = new Array(byteChars.length)
+            for (let i = 0; i < byteChars.length; i++) byteNumbers[i] = byteChars.charCodeAt(i)
+            const byteArray = new Uint8Array(byteNumbers)
+            sourceBlob = new Blob([byteArray], { type: 'image/png' })
+            console.info('[QR] Detected base64 PNG response; converted to binary')
+          }
+        } catch (decodeErr) {
+          logger.warn('[QR] Base64 normalization failed; using original blob', decodeErr)
         }
-      })
-      
-      if (response.ok) {
-        const blob = await response.blob()
-        const url = window.URL.createObjectURL(blob)
+      }
+
+      const qrBlobUrl = URL.createObjectURL(sourceBlob)
+      let qrBitmap: ImageBitmap
+      try {
+        qrBitmap = await createImageBitmap(sourceBlob)
+      } catch (err) {
+        logger.error('[QR] Bitmap decode failed', err)
+        const rawUrl = URL.createObjectURL(sourceBlob)
         const a = document.createElement('a')
-        a.href = url
+        a.href = rawUrl
         a.download = `tipwave-qr-${nickname || deviceId}.png`
         document.body.appendChild(a)
         a.click()
         document.body.removeChild(a)
-        window.URL.revokeObjectURL(url)
+        URL.revokeObjectURL(rawUrl)
+        alert('Could not generate the branded card. Downloaded the raw QR instead.')
+        return
       }
+
+      const stageName = selectedPerformer?.stageName || `${selectedPerformer?.firstName || ''} ${selectedPerformer?.lastName || ''}`.trim() || 'Performer'
+
+      const canvas = document.createElement('canvas')
+      const ctx = canvas.getContext('2d')
+      if (!ctx) return
+
+      const width = 1200
+      const height = 1800
+      canvas.width = width
+      canvas.height = height
+
+      ctx.fillStyle = '#ffffff'
+      ctx.fillRect(0, 0, width, height)
+
+      const logo = new Image()
+      logo.crossOrigin = 'anonymous'
+      logo.src = '/images/logo/tipwave-logo2b.png?v=20260208'
+
+      const musicNote = new Image()
+      musicNote.crossOrigin = 'anonymous'
+      musicNote.src = '/images/icons8-music-note-90.png'
+
+      await new Promise((resolve) => { logo.onload = resolve; logo.onerror = resolve })
+      await new Promise((resolve) => { musicNote.onload = resolve; musicNote.onerror = resolve })
+
+      const headerBarHeight = 260
+      ctx.fillStyle = '#111111'
+      ctx.fillRect(0, 0, width, headerBarHeight)
+      ctx.fillStyle = '#ffffff'
+      ctx.font = '600 118px Arial, sans-serif'
+      ctx.textAlign = 'center'
+      const headerTextY = 165
+      const headerText = 'TIP THE PERFORMER'
+      const iconSize = musicNote.complete && musicNote.naturalHeight > 0 ? 200 : 0
+      const iconGap = iconSize ? 14 : 0
+      const headerTextWidth = ctx.measureText(headerText).width
+      const headerTotalWidth = headerTextWidth + iconSize + iconGap
+      const headerSidePadding = 70
+      const headerMaxWidth = width - (headerSidePadding * 2)
+      const headerScaleX = headerTotalWidth > headerMaxWidth ? headerMaxWidth / headerTotalWidth : 1
+
+      ctx.save()
+      ctx.translate(width / 2, 0)
+      ctx.scale(headerScaleX, 1)
+      const headerStartX = -(headerTotalWidth / 2)
+      const iconY = (headerBarHeight - iconSize) / 2
+      if (iconSize) {
+        ctx.drawImage(musicNote, headerStartX, iconY, iconSize, iconSize)
+      }
+      ctx.fillText(headerText, headerStartX + iconSize + iconGap + headerTextWidth / 2, headerTextY)
+      ctx.restore()
+
+      try {
+        if (!qrBitmap.width || !qrBitmap.height) {
+          throw new Error('QR image is empty or failed to load')
+        }
+        const qrSize = 900
+        const borderSize = 42
+        const qrX = (width - qrSize) / 2
+        const qrY = 360
+        ctx.fillStyle = '#111111'
+        ctx.fillRect(qrX - borderSize, qrY - borderSize, qrSize + borderSize * 2, qrSize + borderSize * 2)
+        ctx.drawImage(qrBitmap, qrX, qrY, qrSize, qrSize)
+      } catch (err) {
+        logger.error('[QR] Draw failed', err)
+        const rawUrl = URL.createObjectURL(qrBlob)
+        const a = document.createElement('a')
+        a.href = rawUrl
+        a.download = `tipwave-qr-${nickname || deviceId}.png`
+        document.body.appendChild(a)
+        a.click()
+        document.body.removeChild(a)
+        URL.revokeObjectURL(rawUrl)
+        alert('Could not render the branded card. Downloaded the raw QR instead.')
+        return
+      }
+
+      ctx.fillStyle = '#374151'
+      ctx.font = '24px Arial, sans-serif'
+      ctx.textAlign = 'center'
+      ctx.fillText('Scan to tip instantly', width / 2, 1340)
+
+      ctx.fillStyle = '#111827'
+      ctx.font = '26px Arial, sans-serif'
+      ctx.fillText('Scan. Choose how to pay. Tap to tip.', width / 2, 1372)
+
+      const trustText = 'Secure payments powered by Stripe'
+      ctx.font = '22px Arial, sans-serif'
+      ctx.fillStyle = '#4B5563'
+      const textWidth = ctx.measureText(trustText).width
+      const lockSize = 18
+      const lockGap = 10
+      const trustY = 1412
+      const lockX = (width / 2) - (textWidth / 2) - lockGap - lockSize
+      const lockY = trustY - lockSize + 2
+
+      ctx.strokeStyle = '#4B5563'
+      ctx.lineWidth = 2
+      ctx.beginPath()
+      ctx.roundRect(lockX, lockY + 6, lockSize, lockSize - 4, 3)
+      ctx.stroke()
+      ctx.beginPath()
+      ctx.arc(lockX + lockSize / 2, lockY + 6, lockSize / 3.2, Math.PI, 0)
+      ctx.stroke()
+      ctx.fillText(trustText, width / 2, trustY)
+
+      ctx.fillStyle = '#111827'
+      ctx.font = 'italic 42px Arial, sans-serif'
+      ctx.fillText(stageName, width / 2, 1535)
+
+      if (logo.complete && logo.naturalHeight > 0) {
+        const logoHeight = 320
+        const logoWidth = (logo.naturalWidth / logo.naturalHeight) * logoHeight
+        const padding = 40
+        const logoX = width - logoWidth - padding
+        const logoY = 1540
+        ctx.drawImage(logo, logoX, logoY, logoWidth, logoHeight)
+      }
+
+      canvas.toBlob((blob) => {
+        if (blob) {
+          const url = window.URL.createObjectURL(blob)
+          const a = document.createElement('a')
+          a.href = url
+          a.download = `tipwave-card-${nickname || deviceId}.png`
+          document.body.appendChild(a)
+          a.click()
+          window.URL.revokeObjectURL(url)
+          window.URL.revokeObjectURL(qrBlobUrl)
+          document.body.removeChild(a)
+        }
+      }, 'image/png')
     } catch (error) {
-      logger.error('Error downloading QR code:', error)
+      logger.error('Error generating QR card:', error)
+      alert(`Could not generate the QR card. ${error instanceof Error ? error.message : 'Please try again.'}`)
     }
   }
 
@@ -560,11 +725,21 @@ const DeviceConfigModal: React.FC<{
 }> = ({ device, onClose, onSave }) => {
   const [isSoundEnabled, setIsSoundEnabled] = useState(device.isSoundEnabled || false)
   const [isRandomEffect, setIsRandomEffect] = useState(device.isRandomLightEffect || false)
-  const [effectConfig, setEffectConfig] = useState(() => {
+  const [effectConfig, setEffectConfig] = useState<Record<string, string>>(() => {
     try {
-      return device.effectConfiguration ? JSON.parse(device.effectConfiguration) : {}
-    } catch {
-      return {}
+      if (device.effectConfiguration) {
+        return JSON.parse(device.effectConfiguration)
+      }
+    } catch (e) {
+      logger.error('Error parsing effect configuration:', e)
+    }
+    return {
+      "2": "effect1",
+      "5": "effect1",
+      "10": "effect2",
+      "20": "effect2",
+      "50": "effect3",
+      "100": "effect3"
     }
   })
   const [isSaving, setIsSaving] = useState(false)
@@ -572,74 +747,113 @@ const DeviceConfigModal: React.FC<{
   const handleSave = async () => {
     setIsSaving(true)
     try {
-      const token = localStorage.getItem('token')
-      const response = await fetch(`${API_BASE_URL}/api/devices/${device.id}/configuration`, {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          isSoundEnabled,
-          isRandomLightEffect: isRandomEffect,
-          effectConfiguration: JSON.stringify(effectConfig)
-        })
+      const response = await apiService.updateDeviceConfiguration(device.id, {
+        isSoundEnabled,
+        isRandomLightEffect: isRandomEffect,
+        effectConfiguration: JSON.stringify(effectConfig)
       })
 
-      if (response.ok) {
+      if (response.data && response.data.success) {
         onSave()
       } else {
         logger.error('Failed to save configuration')
+        alert('Failed to update device configuration: ' + (response.error || 'Unknown error'))
       }
     } catch (error) {
       logger.error('Error saving configuration:', error)
+      alert('Error updating device configuration: ' + (error instanceof Error ? error.message : 'Unknown error'))
     } finally {
       setIsSaving(false)
     }
   }
 
+  const amounts = [2, 5, 10, 20, 50, 100]
+  const effects = ['effect1', 'effect2', 'effect3']
+  const effectNames: Record<string, string> = {
+    'effect1': 'Flash',
+    'effect2': 'Swirl',
+    'effect3': 'Breathing'
+  }
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 p-6">
+      <div className="bg-white rounded-lg shadow-xl max-w-lg w-full mx-4 p-6 max-h-[90vh] overflow-y-auto">
         <h3 className="text-xl font-bold text-gray-900 mb-4">
           Configure Device: {device.nickname || device.serialNumber}
         </h3>
         
-        <div className="space-y-4">
+        <div className="space-y-6">
+          {/* Sound Toggle */}
           <div className="flex items-center justify-between">
-            <label className="text-sm font-medium text-gray-700">Sound Enabled</label>
-            <input
-              type="checkbox"
-              checked={isSoundEnabled}
-              onChange={(e) => setIsSoundEnabled(e.target.checked)}
-              className="h-5 w-5 text-purple-600 rounded focus:ring-purple-500"
-            />
+            <span className="text-sm font-medium text-gray-700">Sound Enabled</span>
+            <label className="relative inline-flex items-center cursor-pointer">
+              <input
+                type="checkbox"
+                checked={isSoundEnabled}
+                onChange={(e) => setIsSoundEnabled(e.target.checked)}
+                disabled={isSaving}
+                className="sr-only peer"
+              />
+              <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-purple-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-600"></div>
+            </label>
           </div>
-          
+
+          {/* Random Light Effect Toggle */}
           <div className="flex items-center justify-between">
-            <label className="text-sm font-medium text-gray-700">Random Light Effects</label>
-            <input
-              type="checkbox"
-              checked={isRandomEffect}
-              onChange={(e) => setIsRandomEffect(e.target.checked)}
-              className="h-5 w-5 text-purple-600 rounded focus:ring-purple-500"
-            />
+            <span className="text-sm font-medium text-gray-700">Random Light Effect</span>
+            <label className="relative inline-flex items-center cursor-pointer">
+              <input
+                type="checkbox"
+                checked={isRandomEffect}
+                onChange={(e) => setIsRandomEffect(e.target.checked)}
+                disabled={isSaving}
+                className="sr-only peer"
+              />
+              <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-purple-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-600"></div>
+            </label>
+          </div>
+
+          {/* Effect Configuration */}
+          <div className="space-y-3">
+            <h4 className="text-sm font-medium text-gray-700">Light Effects by Amount</h4>
+            <div className="bg-gray-50 rounded-lg p-4 space-y-3">
+              {amounts.map(amount => (
+                <div key={amount} className="flex items-center justify-between">
+                  <span className="text-sm text-gray-600 font-medium">${amount}</span>
+                  <select
+                    value={effectConfig[amount.toString()] || 'effect1'}
+                    onChange={(e) => {
+                      setEffectConfig(prev => ({ ...prev, [amount.toString()]: e.target.value }))
+                    }}
+                    disabled={isSaving}
+                    className="px-3 py-1.5 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
+                  >
+                    {effects.map(effect => (
+                      <option key={effect} value={effect}>
+                        {effectNames[effect]}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
 
         <div className="mt-6 flex gap-3">
           <button
             onClick={onClose}
-            className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+            disabled={isSaving}
+            className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Cancel
           </button>
           <button
             onClick={handleSave}
             disabled={isSaving}
-            className="flex-1 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:bg-gray-400"
+            className="flex-1 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
           >
-            {isSaving ? 'Saving...' : 'Save'}
+            {isSaving ? 'Saving...' : 'Save Changes'}
           </button>
         </div>
       </div>
