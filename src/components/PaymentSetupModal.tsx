@@ -402,7 +402,12 @@ function PaymentForm({
       {paymentRequest && (
         <div className="pb-6 border-b border-gray-200">
           <button
-            onClick={() => paymentRequest.show()}
+            type="button"
+            onClick={(event) => {
+              event.preventDefault()
+              if (!paymentRequest) return
+              paymentRequest.show()
+            }}
             disabled={loading}
             className="w-full bg-black text-white py-4 px-4 rounded-xl hover:bg-gray-800 active:bg-gray-900 transition-all disabled:opacity-50 font-medium text-base flex items-center justify-center gap-2"
           >
