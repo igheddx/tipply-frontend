@@ -530,13 +530,32 @@ const Dashboard: React.FC = () => {
         return
       }
 
+      const token = localStorage.getItem('token')
+      const timezoneOffset = new Date().getTimezoneOffset()
+
       // Parallelize all refreshes at once
-      const [statsResp, metricsResp, tipsResp, deletedResp, devicesResp] = await Promise.all([
+      const [statsResp, metricsResp, tipsResp, deletedResp, devicesResp, insightsResp, timelineResp] = await Promise.all([
         apiService.getDashboardStats(),
         apiService.getDashboardMetrics(profileId),
         apiService.getRecentTips(profileId),
         apiService.getDeletedDevices(),
-        apiService.getDevices()
+        apiService.getDevices(),
+        fetch(`${API_BASE_URL}/api/tips/insights/${profileId}?timezoneOffsetMinutes=${timezoneOffset}`,
+          {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json'
+            }
+          }
+        ),
+        fetch(`${API_BASE_URL}/api/tips/tips-timeline/${profileId}?limit=2000`,
+          {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json'
+            }
+          }
+        )
       ])
 
       if (statsResp.data) {
@@ -559,6 +578,25 @@ const Dashboard: React.FC = () => {
 
       if (deletedResp.data) {
         setDeletedDevices(deletedResp.data)
+      }
+
+      if (insightsResp.ok) {
+        const insightsData = await insightsResp.json()
+        setInsights(insightsData)
+      }
+
+      if (timelineResp.ok) {
+        const timelineData = await timelineResp.json()
+        const points: TipPoint[] = timelineData.map((tip: any) => {
+          const timestamp = new Date(tip.createdAt).getTime()
+          return {
+            time: new Date(timestamp).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+            amount: tip.amount,
+            timestamp
+          }
+        })
+        points.sort((a, b) => a.timestamp - b.timestamp)
+        setTipTimelinePoints(points)
       }
 
       // Update Stripe status if we have devices
