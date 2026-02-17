@@ -34,6 +34,8 @@ const Onboarding: React.FC = () => {
     password: false,
     confirmPassword: false
   })
+  const [strengthScore, setStrengthScore] = useState(0)
+  const [strengthLevel, setStrengthLevel] = useState('')
   const navigate = useNavigate()
   const isIOS = typeof navigator !== 'undefined' && (/iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.userAgent.includes('Mac') && 'ontouchend' in (document as any)))
 
@@ -113,6 +115,47 @@ const Onboarding: React.FC = () => {
       setDeviceValidationComplete(false)
       setIsValidatingDevice(false)
     }
+  }
+
+  // Calculate password strength in real-time
+  const calculatePasswordStrength = (password: string) => {
+    if (!password) {
+      setStrengthScore(0)
+      setStrengthLevel('')
+      return
+    }
+
+    let score = 0
+    
+    // Length bonus (up to 25 points)
+    if (password.length >= 10) score += 25
+    else if (password.length >= 8) score += 15
+    else if (password.length >= 6) score += 10
+    
+    // Character variety bonus (up to 40 points)
+    if (/[a-z]/.test(password)) score += 10
+    if (/[A-Z]/.test(password)) score += 10
+    if (/[0-9]/.test(password)) score += 10
+    if (/[^A-Za-z0-9]/.test(password)) score += 10
+    
+    // Entropy bonus (up to 35 points)
+    const uniqueChars = new Set(password).size
+    score += Math.min(35, uniqueChars * 2)
+    
+    setStrengthScore(Math.min(100, score))
+    
+    if (score >= 80) setStrengthLevel('Very Strong')
+    else if (score >= 60) setStrengthLevel('Strong')
+    else if (score >= 40) setStrengthLevel('Medium')
+    else if (score >= 20) setStrengthLevel('Weak')
+    else setStrengthLevel('Very Weak')
+  }
+
+  const getStrengthColor = (score: number) => {
+    if (score >= 80) return 'text-green-600'
+    if (score >= 60) return 'text-yellow-600'
+    if (score >= 40) return 'text-orange-600'
+    return 'text-red-600'
   }
 
   const validatePassword = () => {
@@ -948,7 +991,10 @@ Please use a different serial number or contact support if this is your device.`
               }`}
               placeholder="Enter your password"
               value={formData.password}
-              onChange={handleInputChange}
+              onChange={(e) => {
+                handleInputChange(e)
+                calculatePasswordStrength(e.target.value)
+              }}
               onBlur={() => handlePasswordFieldBlur('password')}
             />
             <button
@@ -969,6 +1015,22 @@ Please use a different serial number or contact support if this is your device.`
               )}
             </button>
           </div>
+          {formData.password && (
+            <div className="mt-2">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-gray-500">Password Strength:</span>
+                <span className={`font-medium ${getStrengthColor(strengthScore)}`}>
+                  {strengthLevel}
+                </span>
+              </div>
+              <div className="mt-1 w-full bg-gray-200 rounded-full h-2">
+                <div
+                  className={`h-2 rounded-full transition-all duration-300 ${getStrengthColor(strengthScore).replace('text-', 'bg-')}`}
+                  style={{ width: `${strengthScore}%` }}
+                ></div>
+              </div>
+            </div>
+          )}
           {errors.password && <p className="text-red-500 text-xs mt-1">{errors.password}</p>}
           <p className="text-sm text-gray-500">Use at least 8 characters</p>
         </div>
