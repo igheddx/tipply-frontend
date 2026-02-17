@@ -116,8 +116,8 @@ const Onboarding: React.FC = () => {
   }
 
   const validatePassword = () => {
-    if (formData.password.length < 6) {
-      return 'Password must be at least 6 characters long'
+    if (formData.password.length < 8) {
+      return 'Password must be at least 8 characters'
     }
     if (formData.password !== formData.confirmPassword) {
       return 'Passwords do not match'
@@ -271,7 +271,7 @@ const Onboarding: React.FC = () => {
       newErrors.lastName = 'Last name is required'
     }
     if (!formData.stageName.trim()) {
-      newErrors.stageName = 'Stage name is required'
+      newErrors.stageName = 'Public name is required'
     }
     if (!formData.email.trim()) {
       newErrors.email = 'Email is required'
@@ -793,7 +793,7 @@ Please use a different serial number or contact support if this is your device.`
       
       <div className="space-y-2">
         <label htmlFor="stageName" className="block text-sm font-semibold text-gray-700">
-          Stage Name *
+          Public Name *
         </label>
         <input
           type="text"
@@ -801,7 +801,7 @@ Please use a different serial number or contact support if this is your device.`
           name="stageName"
           required
           className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all duration-200"
-          placeholder="Your stage name or artist name"
+          placeholder="Your public name or artist name"
           value={formData.stageName}
           onChange={handleInputChange}
         />
@@ -905,15 +905,7 @@ Please use a different serial number or contact support if this is your device.`
             <div className="space-y-3">
               <div className="flex items-center space-x-3">
                 <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                <span className="text-blue-800">At least 6 characters long</span>
-              </div>
-              <div className="flex items-center space-x-3">
-                <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                <span className="text-blue-800">Use a combination of letters, numbers, and symbols</span>
-              </div>
-              <div className="flex items-center space-x-3">
-                <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                <span className="text-blue-800">Avoid using personal information</span>
+                <span className="text-blue-800">Use at least 8 characters</span>
               </div>
             </div>
           </div>
@@ -957,7 +949,7 @@ Please use a different serial number or contact support if this is your device.`
             </button>
           </div>
           {errors.password && <p className="text-red-500 text-xs mt-1">{errors.password}</p>}
-          <p className="text-sm text-gray-500">Minimum 6 characters</p>
+          <p className="text-sm text-gray-500">Use at least 8 characters</p>
         </div>
         
         <div className="space-y-2">

@@ -96,8 +96,8 @@ const ForgotPassword: React.FC = () => {
       setError('Passwords do not match');
       return;
     }
-    if (newPassword.length < 10) {
-      setError('Password must be at least 10 characters long');
+    if (newPassword.length < 8) {
+      setError('Password must be at least 8 characters');
       return;
     }
 
