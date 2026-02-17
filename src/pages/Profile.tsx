@@ -216,8 +216,8 @@ const Profile: React.FC = () => {
     
     if (!passwordForm.newPassword) {
       errors.newPassword = 'New password is required'
-    } else if (passwordForm.newPassword.length < 10) {
-      errors.newPassword = 'Password must be at least 10 characters long'
+    } else if (passwordForm.newPassword.length < 8) {
+      errors.newPassword = 'Password must be at least 8 characters'
     }
     
     if (!passwordForm.confirmPassword) {
