@@ -969,7 +969,7 @@ const TippingInterface: React.FC = () => {
     setSongRequestName('')
     setSongRequestNote('')
     setShouldAnimateButtons(true)
-    toast.success(`Song selected: ${song.title} by ${song.artist}. Now select a tip amount!`)
+    toast.success(`Song selected: ${song.title} by ${song.artist}. Now select a tip amount!`, { duration: 1000 })
   }
 
   if (checkingPaymentMethods) {
@@ -1037,7 +1037,7 @@ const TippingInterface: React.FC = () => {
             }
             setIsPaymentSetup(true)
             setShowPaymentModal(false)
-            toast.success('Payment method added successfully!')
+            toast.success('Payment method added successfully!', { duration: 1000 })
           }}
           deviceUuid={deviceInfo?.uuid || ''}
           userId={userId}
@@ -1514,7 +1514,7 @@ const TippingInterface: React.FC = () => {
           clearPaymentCache() // Clear cache so next check will be fresh
           setIsPaymentSetup(true)
           setShowPaymentModal(false)
-          toast.success('Payment method added successfully!')
+          toast.success('Payment method added successfully!', { duration: 1000 })
         }}
         deviceUuid={deviceInfo?.uuid || ''}
         userId={userId}
