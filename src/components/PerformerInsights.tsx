@@ -91,6 +91,8 @@ const PerformerInsights: React.FC = () => {
   const [showConfigModal, setShowConfigModal] = useState(false)
   const [selectedDevice, setSelectedDevice] = useState<PerformerDevice | null>(null)
   const [allPerformers, setAllPerformers] = useState<PerformerSearchResult[]>([])
+  const [isDownloadingQR, setIsDownloadingQR] = useState(false)
+  const [tipTimelinePoints, setTipTimelinePoints] = useState<TipPoint[]>([])
   
   // Time window filter for hourly chart
   const [startDateTime, setStartDateTime] = useState('')
@@ -168,6 +170,10 @@ const PerformerInsights: React.FC = () => {
       console.log('Selected performer:', performer)
       console.log('Devices:', performer.devices)
       setSelectedPerformer(performer)
+      setStartDateTime('')
+      setEndDateTime('')
+      setFilteredTipPoints([])
+      setTipTimelinePoints([])
       loadPerformerInsights(performer.id)
     }
   }
@@ -193,6 +199,30 @@ const PerformerInsights: React.FC = () => {
       } else {
         logger.error('Failed to load insights')
       }
+
+      const timelineResp = await fetch(
+        `${API_BASE_URL}/api/admin/performers/${performerId}/tips-timeline?limit=2000`,
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        }
+      )
+
+      if (timelineResp.ok) {
+        const timelineData = await timelineResp.json()
+        const points: TipPoint[] = timelineData.map((tip: any) => {
+          const timestamp = new Date(tip.createdAt).getTime()
+          return {
+            time: new Date(timestamp).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+            amount: tip.amount,
+            timestamp
+          }
+        })
+        points.sort((a, b) => a.timestamp - b.timestamp)
+        setTipTimelinePoints(points)
+      }
     } catch (error) {
       logger.error('Error loading insights:', error)
     } finally {
@@ -208,10 +238,20 @@ const PerformerInsights: React.FC = () => {
   }
 
   const downloadQRCode = async (deviceId: string, nickname: string) => {
+    setIsDownloadingQR(true)
     try {
       console.info('[QR] Download clicked', { deviceId, nickname })
+      console.info('[QR] API URL:', `${API_BASE_URL}/api/admin/devices/${deviceId}/qr`)
 
       const token = localStorage.getItem('token')
+      if (!token) {
+        console.error('[QR] No token found')
+        alert('Authentication token not found. Please log in again.')
+        setIsDownloadingQR(false)
+        return
+      }
+
+      console.info('[QR] Fetching QR code from backend...')
       const response = await fetch(`${API_BASE_URL}/api/admin/devices/${deviceId}/qr`, {
         headers: {
           'Authorization': `Bearer ${token}`
@@ -219,18 +259,28 @@ const PerformerInsights: React.FC = () => {
         cache: 'no-cache'
       })
 
+      console.info('[QR] Response received:', { status: response.status, statusText: response.statusText, contentType: response.headers.get('content-type') })
+
       if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+        const errorText = await response.text()
+        console.error('[QR] Error response:', errorText)
+        throw new Error(`HTTP ${response.status}: ${response.statusText}${errorText ? ` - ${errorText}` : ''}`)
       }
 
+      console.info('[QR] Converting response to blob...')
       const qrBlob = await response.blob()
+      console.info('[QR] Blob received:', { size: qrBlob.size, type: qrBlob.type })
+      
       if (!qrBlob) {
+        console.error('[QR] Blob is null or undefined')
         alert('Could not download QR code. Please try again or check your connection.')
+        setIsDownloadingQR(false)
         return
       }
 
       if (!qrBlob.type.startsWith('image/')) {
         alert(`QR download returned a non-image content-type: ${qrBlob.type || 'unknown'}`)
+        setIsDownloadingQR(false)
         return
       }
 
@@ -269,6 +319,7 @@ const PerformerInsights: React.FC = () => {
         document.body.removeChild(a)
         URL.revokeObjectURL(rawUrl)
         alert('Could not generate the branded card. Downloaded the raw QR instead.')
+        setIsDownloadingQR(false)
         return
       }
 
@@ -279,6 +330,7 @@ const PerformerInsights: React.FC = () => {
       const ctx = canvas.getContext('2d')
       if (!ctx) {
         console.error('[QR] Failed to get canvas context')
+        setIsDownloadingQR(false)
         return
       }
       console.log('[QR] Canvas created successfully')
@@ -291,16 +343,18 @@ const PerformerInsights: React.FC = () => {
       ctx.fillStyle = '#ffffff'
       ctx.fillRect(0, 0, width, height)
 
-      const logo = new Image()
-      logo.crossOrigin = 'anonymous'
-      logo.src = '/images/logo/tipwave-logo2b.png?v=20260208'
+      const loadImage = (src: string) => new Promise<HTMLImageElement>((resolve) => {
+        const img = new Image()
+        img.crossOrigin = 'anonymous'
+        img.onload = () => resolve(img)
+        img.onerror = () => resolve(img)
+        img.src = src
+      })
 
-      const musicNote = new Image()
-      musicNote.crossOrigin = 'anonymous'
-      musicNote.src = '/images/icons8-music-note-90.png'
-
-      await new Promise((resolve) => { logo.onload = resolve; logo.onerror = resolve })
-      await new Promise((resolve) => { musicNote.onload = resolve; musicNote.onerror = resolve })
+      const [logo, musicNote] = await Promise.all([
+        loadImage('/images/logo/tipwave-logo2b.png?v=20260208'),
+        loadImage('/images/icons8-music-note-90.png')
+      ])
       console.log('[QR] Images loaded. Logo:', { complete: logo.complete, height: logo.naturalHeight }, 'MusicNote:', { complete: musicNote.complete, height: musicNote.naturalHeight })
 
       const headerBarHeight = 260
@@ -352,6 +406,7 @@ const PerformerInsights: React.FC = () => {
         document.body.removeChild(a)
         URL.revokeObjectURL(rawUrl)
         alert('Could not render the branded card. Downloaded the raw QR instead.')
+        setIsDownloadingQR(false)
         return
       }
 
@@ -413,14 +468,18 @@ const PerformerInsights: React.FC = () => {
           window.URL.revokeObjectURL(qrBlobUrl)
           document.body.removeChild(a)
           console.log('[QR] Download complete!')
+          setIsDownloadingQR(false)
         } else {
           console.error('[QR] Blob is null!')
           alert('Failed to create download file')
+          setIsDownloadingQR(false)
         }
       }, 'image/png')
     } catch (error) {
-      logger.error('Error generating QR card:', error)
-      alert(`Could not generate the QR card. ${error instanceof Error ? error.message : 'Please try again.'}`)
+      console.error('[QR] Download error:', error)
+      logger.error('[QR] Download error:', error)
+      alert(`QR code download failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
+      setIsDownloadingQR(false)
     }
   }
 
@@ -503,43 +562,47 @@ const PerformerInsights: React.FC = () => {
 
   const trendData = calculateTrendLine()
 
+  // Set default time window (last 10 hours)
+  useEffect(() => {
+    if (startDateTime || endDateTime) return
+
+    const now = new Date()
+    const tenHoursAgo = new Date(now.getTime() - 10 * 60 * 60 * 1000)
+
+    const formatDateTime = (date: Date) => {
+      const year = date.getFullYear()
+      const month = String(date.getMonth() + 1).padStart(2, '0')
+      const day = String(date.getDate()).padStart(2, '0')
+      const hours = String(date.getHours()).padStart(2, '0')
+      const minutes = String(date.getMinutes()).padStart(2, '0')
+      return `${year}-${month}-${day}T${hours}:${minutes}`
+    }
+
+    setStartDateTime(formatDateTime(tenHoursAgo))
+    setEndDateTime(formatDateTime(now))
+  }, [startDateTime, endDateTime])
+
   // Filter tips by time window
   useEffect(() => {
-    if (insights?.hourlyTips && startDateTime && endDateTime) {
-      const start = new Date(startDateTime).getTime()
-      const end = new Date(endDateTime).getTime()
-      
-      // Generate tip points from hourly data (simulated as 30-min intervals)
-      const points: TipPoint[] = []
-      insights.hourlyTips.forEach(hourData => {
-        // Create points within each hour at 30-min intervals
-        for (let i = 0; i < hourData.tipsCount; i++) {
-          const minuteOffset = Math.random() * 60 // Random within the hour
-          const timestamp = start + (hourData.hour * 60 + minuteOffset) * 60 * 1000
-          
-          if (timestamp >= start && timestamp <= end) {
-            points.push({
-              time: new Date(timestamp).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
-              amount: hourData.averageAmount,
-              timestamp
-            })
-          }
-        }
-      })
-      
-      setFilteredTipPoints(points.sort((a, b) => a.timestamp - b.timestamp))
+    if (!tipTimelinePoints.length) {
+      setFilteredTipPoints([])
+      return
     }
-  }, [insights, startDateTime, endDateTime])
 
-  // Set default time window (last event - 8 hours)
-  useEffect(() => {
-    if (!startDateTime && !endDateTime) {
-      const now = new Date()
-      const eightHoursAgo = new Date(now.getTime() - 8 * 60 * 60 * 1000)
-      setStartDateTime(eightHoursAgo.toISOString().slice(0, 16))
-      setEndDateTime(now.toISOString().slice(0, 16))
+    if (!startDateTime || !endDateTime) {
+      setFilteredTipPoints(tipTimelinePoints)
+      return
     }
-  }, [startDateTime, endDateTime])
+
+    const start = new Date(startDateTime).getTime()
+    const end = new Date(endDateTime).getTime()
+
+    const points = tipTimelinePoints.filter(point =>
+      point.timestamp >= start && point.timestamp <= end
+    )
+
+    setFilteredTipPoints(points)
+  }, [tipTimelinePoints, startDateTime, endDateTime])
 
   return (
     <div className="space-y-6">
@@ -588,9 +651,22 @@ const PerformerInsights: React.FC = () => {
                 <>
                   <button
                     onClick={() => downloadQRCode(selectedPerformer.devices[0].id, selectedPerformer.devices[0].nickname || '')}
-                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                    disabled={isDownloadingQR}
+                    className={`px-4 py-2 text-white rounded-lg transition-all ${
+                      isDownloadingQR 
+                        ? 'bg-blue-400 cursor-not-allowed' 
+                        : 'bg-blue-600 hover:bg-blue-700'
+                    }`}
                   >
-                    Download QR Code
+                    {isDownloadingQR ? (
+                      <span className="flex items-center gap-2">
+                        <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        Generating...
+                      </span>
+                    ) : 'Download QR Code'}
                   </button>
                   <button
                     onClick={() => openConfigureModal(selectedPerformer.devices[0])}
@@ -661,8 +737,8 @@ const PerformerInsights: React.FC = () => {
                   <LineChart data={weeklyChartData}>
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis dataKey="week" />
-                    <YAxis yAxisId="left" />
-                    <YAxis yAxisId="right" orientation="right" />
+                    <YAxis yAxisId="left" domain={[0, 'auto']} />
+                    <YAxis yAxisId="right" orientation="right" domain={[0, 'auto']} />
                     <Tooltip 
                       content={({ active, payload }) => {
                         if (active && payload && payload.length) {
