@@ -209,7 +209,19 @@ const PerformerInsights: React.FC = () => {
     try {
       console.info('[QR] Download clicked', { deviceId, nickname })
 
-      const qrBlob = await apiService.downloadQRCode(deviceId)
+      const token = localStorage.getItem('token')
+      const response = await fetch(`${API_BASE_URL}/api/admin/devices/${deviceId}/qr`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
+        cache: 'no-cache'
+      })
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+      }
+
+      const qrBlob = await response.blob()
       if (!qrBlob) {
         alert('Could not download QR code. Please try again or check your connection.')
         return
@@ -747,17 +759,31 @@ const DeviceConfigModal: React.FC<{
   const handleSave = async () => {
     setIsSaving(true)
     try {
-      const response = await apiService.updateDeviceConfiguration(device.id, {
-        isSoundEnabled,
-        isRandomLightEffect: isRandomEffect,
-        effectConfiguration: JSON.stringify(effectConfig)
+      const token = localStorage.getItem('token')
+      const response = await fetch(`${API_BASE_URL}/api/admin/devices/${device.id}/configuration`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          isSoundEnabled,
+          isRandomLightEffect: isRandomEffect,
+          effectConfiguration: JSON.stringify(effectConfig)
+        })
       })
 
-      if (response.data && response.data.success) {
-        onSave()
+      if (response.ok) {
+        const data = await response.json()
+        if (data.success) {
+          onSave()
+        } else {
+          logger.error('Failed to save configuration')
+          alert('Failed to update device configuration')
+        }
       } else {
         logger.error('Failed to save configuration')
-        alert('Failed to update device configuration: ' + (response.error || 'Unknown error'))
+        alert('Failed to update device configuration: ' + response.statusText)
       }
     } catch (error) {
       logger.error('Error saving configuration:', error)
