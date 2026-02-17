@@ -143,10 +143,6 @@ const Profile: React.FC = () => {
     if (!editForm.lastName.trim()) {
       errors.lastName = 'Last name is required'
     }
-
-    if (!editForm.stageName?.trim()) {
-      errors.stageName = 'Public name is required'
-    }
     
     if (!editForm.email.trim()) {
       errors.email = 'Email is required'
@@ -220,8 +216,8 @@ const Profile: React.FC = () => {
     
     if (!passwordForm.newPassword) {
       errors.newPassword = 'New password is required'
-    } else if (passwordForm.newPassword.length < 6) {
-      errors.newPassword = 'Password must be at least 6 characters'
+    } else if (passwordForm.newPassword.length < 10) {
+      errors.newPassword = 'Password must be at least 10 characters long'
     }
     
     if (!passwordForm.confirmPassword) {
@@ -586,20 +582,15 @@ const Profile: React.FC = () => {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Public Name *
+                  Stage Name
                 </label>
                 <input
                   type="text"
                   value={editForm.stageName}
                   onChange={(e) => handleProfileInputChange('stageName', e.target.value)}
-                  className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent ${
-                    profileErrors.stageName ? 'border-red-500' : 'border-gray-300'
-                  }`}
-                  placeholder="Your public name or artist name"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                  placeholder="Your stage name (optional)"
                 />
-                {profileErrors.stageName && (
-                  <p className="text-red-500 text-sm mt-1">{profileErrors.stageName}</p>
-                )}
               </div>
 
               <div>
@@ -675,7 +666,7 @@ const Profile: React.FC = () => {
               </div>
               
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Public Name</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Stage Name</label>
                 <p className="text-gray-900">{profile?.stageName || 'Not set'}</p>
               </div>
               

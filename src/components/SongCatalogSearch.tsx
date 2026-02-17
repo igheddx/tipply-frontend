@@ -21,7 +21,7 @@ interface DailyTipSummary {
 interface SongCatalogSearchProps {
   deviceUuid: string
   userTempId: string
-  onSongSelect: (song: {id: string, title: string, artist: string}) => void
+  onSongSelect: (song: {id: string, title: string, artist: string, requestorName?: string, note?: string}) => void
   onBackToTip: () => void
   isVisible: boolean
   refreshKey?: number
@@ -41,6 +41,8 @@ const SongCatalogSearch: React.FC<SongCatalogSearchProps> = ({
   const [performerName, setPerformerName] = useState('')
   const [dailyTotal, setDailyTotal] = useState<DailyTipSummary | null>(null)
   const [hasSearched, setHasSearched] = useState(false)
+  const [requestorName, setRequestorName] = useState('')
+  const [note, setNote] = useState('')
   const searchInputRef = useRef<HTMLInputElement>(null)
   
   // Modal state
@@ -131,7 +133,9 @@ const SongCatalogSearch: React.FC<SongCatalogSearchProps> = ({
       onSongSelect({
         id: pendingSong.id,
         title: pendingSong.songTitle,
-        artist: pendingSong.artist
+        artist: pendingSong.artist,
+        requestorName: requestorName.trim() || undefined,
+        note: note.trim() || undefined
       })
       setShowConfirmModal(false)
       setPendingSong(null)
@@ -193,16 +197,7 @@ const SongCatalogSearch: React.FC<SongCatalogSearchProps> = ({
               <div className="relative">
                 <input
                   ref={searchInputRef}
-                  type="search"
-                  name="song_search"
-                  inputMode="search"
-                  enterKeyHint="search"
-                  autoComplete="off"
-                  autoCorrect="off"
-                  autoCapitalize="none"
-                  spellCheck={false}
-                  data-lpignore="true"
-                  data-form-type="other"
+                  type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Search by song, artist, album, or genre..."
@@ -311,6 +306,50 @@ const SongCatalogSearch: React.FC<SongCatalogSearchProps> = ({
             </div>
           </div>
 
+          {/* Optional Fields - Bottom Section */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3 }}
+            className="bg-white/95 backdrop-blur-sm border-t border-gray-200 px-6 py-4"
+          >
+            <div className="mb-3">
+              <p className="text-xs text-gray-500 text-center mb-3">
+                ✨ Optional: Add your name or a note with your request
+              </p>
+              
+              <div className="space-y-3">
+                {/* Name Field */}
+                <div>
+                  <input
+                    type="text"
+                    value={requestorName}
+                    onChange={(e) => setRequestorName(e.target.value)}
+                    placeholder="Your name (optional)"
+                    className="w-full px-3 py-2 bg-white/80 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm placeholder-gray-400"
+                    maxLength={50}
+                  />
+                </div>
+
+                {/* Note Field */}
+                <div>
+                  <textarea
+                    value={note}
+                    onChange={(e) => setNote(e.target.value)}
+                    placeholder="Add a note or special message (optional)"
+                    rows={2}
+                    className="w-full px-3 py-2 bg-white/80 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm placeholder-gray-400 resize-none"
+                    maxLength={200}
+                  />
+                  {note.length > 0 && (
+                    <div className="text-xs text-gray-400 text-right mt-1">
+                      {note.length}/200
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </motion.div>
         </motion.div>
       )}
       

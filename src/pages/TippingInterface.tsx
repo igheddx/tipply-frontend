@@ -51,11 +51,8 @@ const TippingInterface: React.FC = () => {
   
   // Song request state
   const [showSongSearch, setShowSongSearch] = useState(false)
-  const [selectedSong, setSelectedSong] = useState<{id: string, title: string, artist: string} | null>(null)
+  const [selectedSong, setSelectedSong] = useState<{id: string, title: string, artist: string, requestorName?: string, note?: string} | null>(null)
   const [shouldAnimateButtons, setShouldAnimateButtons] = useState(false)
-  const [showSongRequestFields, setShowSongRequestFields] = useState(false)
-  const [songRequestName, setSongRequestName] = useState('')
-  const [songRequestNote, setSongRequestNote] = useState('')
   
   const audioRef = useRef<HTMLAudioElement>(null)
   const audioContextRef = useRef<AudioContext | null>(null)
@@ -842,19 +839,8 @@ const TippingInterface: React.FC = () => {
 
     // If song is selected, this completes the song request
     if (selectedSong) {
-      const trimmedName = songRequestName.trim()
-      const trimmedNote = songRequestNote.trim()
-      const selectedSongSnapshot = {
-        ...selectedSong,
-        ...(trimmedName ? { requestorName: trimmedName } : {}),
-        ...(trimmedNote ? { note: trimmedNote } : {})
-      }
-      setSelectedSong(null)
-      setShowSongSearch(false)
-      setShowSongRequestFields(false)
-      setSongRequestName('')
-      setSongRequestNote('')
-      logger.log('🎵 [handleTipClick] Song is selected, calling processTipWithSong:', selectedSongSnapshot.id)
+      logger.log('🎵 [handleTipClick] Song is selected, calling processTipWithSong:', selectedSong.id)
+      const selectedSongSnapshot = selectedSong
       void processTipWithSong(amount, selectedSongSnapshot)
       return
     }
@@ -881,7 +867,13 @@ const TippingInterface: React.FC = () => {
         effect: getLightEffect(amount),
         duration: 3000,
         paymentMethodId: paymentMethodId || undefined,
-        stripeCustomerId: stripeCustomerId || undefined
+        stripeCustomerId: stripeCustomerId || undefined,
+        // Include song request fields if song is selected
+        ...(selectedSong && {
+          songId: selectedSong.id,
+          requestorName: selectedSong.requestorName,
+          note: selectedSong.note
+        })
       }
       logger.log('🎰 SUBMITTING TIP PAYLOAD TO BACKEND (Classic Mode):', tipPayload)
 
@@ -928,8 +920,8 @@ const TippingInterface: React.FC = () => {
         // Include song request fields if song is selected
         ...(selectedSongSnapshot && {
           songId: selectedSongSnapshot.id,
-          ...(selectedSongSnapshot.requestorName ? { requestorName: selectedSongSnapshot.requestorName } : {}),
-          ...(selectedSongSnapshot.note ? { note: selectedSongSnapshot.note } : {})
+          requestorName: selectedSongSnapshot.requestorName,
+          note: selectedSongSnapshot.note
         })
       }
       logger.log('🎰 SUBMITTING TIP PAYLOAD TO BACKEND (Cards Mode):', tipPayload)
@@ -943,9 +935,6 @@ const TippingInterface: React.FC = () => {
         if (selectedSong?.id === selectedSongSnapshot.id) {
           setSelectedSong(null)
           setShowSongSearch(false)
-          setShowSongRequestFields(false)
-          setSongRequestName('')
-          setSongRequestNote('')
         }
         setTipsRefreshKey(prev => prev + 1)
         // Refresh payment method session on successful tip (extends 30-day memory)
@@ -962,12 +951,9 @@ const TippingInterface: React.FC = () => {
 
   }
 
-  const handleSongSelect = (song: {id: string, title: string, artist: string}) => {
+  const handleSongSelect = (song: {id: string, title: string, artist: string, requestorName?: string, note?: string}) => {
     setSelectedSong(song)
     setShowSongSearch(false)
-    setShowSongRequestFields(false)
-    setSongRequestName('')
-    setSongRequestNote('')
     setShouldAnimateButtons(true)
     toast.success(`Song selected: ${song.title} by ${song.artist}. Now select a tip amount!`)
   }
@@ -1012,42 +998,26 @@ const TippingInterface: React.FC = () => {
 
   if (!isPaymentSetup) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 flex items-center justify-center p-6">
-        <div className="bg-white/10 backdrop-blur-md rounded-2xl p-8 max-w-md w-full text-center border border-white/20">
-          <div className="text-5xl mb-4">🔒</div>
-          <h2 className="text-2xl font-bold text-white mb-3">Payment Setup Required</h2>
-          <p className="text-white/80 mb-6">
-            Add a payment method to continue tipping.
-          </p>
-          <button
-            type="button"
-            onClick={() => setShowPaymentModal(true)}
-            className="w-full bg-blue-600 text-white py-4 px-4 rounded-xl hover:bg-blue-700 active:bg-blue-800 transition-all font-semibold text-base"
-          >
-            Set up payment
-          </button>
-        </div>
-        <PaymentSetupModal
-          isOpen={showPaymentModal}
-          onClose={() => setShowPaymentModal(false)}
-          onComplete={(paymentMethodId) => {
-            logger.log('🎉 Payment setup complete! Payment method ID:', paymentMethodId)
-            if (paymentMethodId) {
-              storePaymentMethodId(paymentMethodId)
-            }
-            setIsPaymentSetup(true)
-            setShowPaymentModal(false)
-            toast.success('Payment method added successfully!')
-          }}
-          deviceUuid={deviceInfo?.uuid || ''}
-          userId={userId}
-          performerStageName={deviceInfo?.stageName}
-          performerFirstName={deviceInfo?.ownerFirstName}
-          performerLastName={deviceInfo?.ownerLastName}
-          performerPhotoUrl={deviceInfo?.profilePhotoUrl}
-          walletMode="both"
-        />
-      </div>
+      <PaymentSetupModal
+        isOpen={true}
+        onClose={() => setShowPaymentModal(false)}
+        onComplete={(paymentMethodId) => {
+          logger.log('🎉 Payment setup complete! Payment method ID:', paymentMethodId)
+          if (paymentMethodId) {
+            storePaymentMethodId(paymentMethodId)
+          }
+          setIsPaymentSetup(true)
+          setShowPaymentModal(false)
+          toast.success('Payment method added successfully!')
+        }}
+        deviceUuid={deviceInfo?.uuid || ''}
+        userId={userId}
+        performerStageName={deviceInfo?.stageName}
+        performerFirstName={deviceInfo?.ownerFirstName}
+        performerLastName={deviceInfo?.ownerLastName}
+        performerPhotoUrl={deviceInfo?.profilePhotoUrl}
+        walletMode="both"
+      />
     )
   }
 
@@ -1213,12 +1183,7 @@ const TippingInterface: React.FC = () => {
                       <div className="text-white/70 text-xs">{selectedSong?.artist}</div>
                       <div className="text-white/60 text-sm mt-2 mb-1 font-semibold">Select a tip amount above to send your song request</div>
                       <button
-                        onClick={() => {
-                          setSelectedSong(null)
-                          setShowSongRequestFields(false)
-                          setSongRequestName('')
-                          setSongRequestNote('')
-                        }}
+                        onClick={() => setSelectedSong(null)}
                         className="text-white/70 hover:text-white text-xs mt-1 underline"
                       >
                         Cancel
@@ -1305,50 +1270,6 @@ const TippingInterface: React.FC = () => {
               </h1>
             </div>
 
-            {selectedSong && (
-              <div className="w-full max-w-xl px-2 mb-3">
-                <div className="flex items-center justify-center">
-                  <button
-                    type="button"
-                    onClick={() => setShowSongRequestFields((prev) => !prev)}
-                    className="text-[15px] font-normal text-white/60 hover:text-white/80 underline-offset-2 hover:underline active:underline"
-                  >
-                    {showSongRequestFields ? 'Hide' : 'Add your name or a note (optional)'}
-                  </button>
-                </div>
-                <AnimatePresence initial={false}>
-                  {showSongRequestFields && (
-                    <motion.div
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: 'auto' }}
-                      exit={{ opacity: 0, height: 0 }}
-                      transition={{ duration: 0.22 }}
-                      className="overflow-hidden"
-                    >
-                      <div className="mt-3 space-y-2">
-                        <input
-                          type="text"
-                          value={songRequestName}
-                          onChange={(e) => setSongRequestName(e.target.value)}
-                          placeholder="Name (optional)"
-                          maxLength={50}
-                          className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-white/50 focus:ring-2 focus:ring-white/30 focus:border-transparent text-sm"
-                        />
-                        <textarea
-                          value={songRequestNote}
-                          onChange={(e) => setSongRequestNote(e.target.value)}
-                          placeholder="Note (optional)"
-                          rows={2}
-                          maxLength={200}
-                          className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-white/50 focus:ring-2 focus:ring-white/30 focus:border-transparent text-sm resize-none"
-                        />
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
-            )}
-
             {/* Tip buttons grid - wraps naturally */}
             <div className="flex flex-wrap justify-center gap-x-3 gap-y-5 max-w-xl w-full -mt-1 mb-3">
               {tipAmounts.map((amount, index) => (
@@ -1426,12 +1347,7 @@ const TippingInterface: React.FC = () => {
                     <div className="text-white/70 text-xs truncate">{selectedSong?.artist}</div>
                     <div className="text-white/60 text-sm mt-2 mb-2 font-semibold">Select a tip amount above to send your song request</div>
                     <button
-                      onClick={() => {
-                        setSelectedSong(null)
-                        setShowSongRequestFields(false)
-                        setSongRequestName('')
-                        setSongRequestNote('')
-                      }}
+                      onClick={() => setSelectedSong(null)}
                       className="text-white/70 active:text-white text-xs mt-2 underline"
                     >
                       Cancel

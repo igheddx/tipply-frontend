@@ -6,8 +6,7 @@ import { toast } from 'sonner'
 import { getApiBaseUrl } from '../utils/config'
 import { setCookie } from '../utils/cookies'
 import { getUniqueDeviceId, detectPlatform } from '../utils/deviceId'
-import { AppleFilled } from '@ant-design/icons'
-import googlePayButton from '../assets/plain-button-google-pay.png'
+import { AppleFilled, GoogleOutlined } from '@ant-design/icons'
 
 // Stripe will be initialized dynamically with the publishable key from backend
 
@@ -21,7 +20,6 @@ interface PaymentSetupModalProps {
   performerFirstName?: string
   performerLastName?: string
   performerPhotoUrl?: string
-  walletMode?: 'wallet' | 'card' | 'both'
 }
 
 export default function PaymentSetupModal({ 
@@ -33,8 +31,7 @@ export default function PaymentSetupModal({
   performerStageName,
   performerFirstName,
   performerLastName,
-  performerPhotoUrl,
-  walletMode = 'both'
+  performerPhotoUrl
 }: PaymentSetupModalProps) {
   if (!isOpen) return null
   const [stripePromise, setStripePromise] = useState<Promise<Stripe | null> | null>(null)
@@ -121,7 +118,6 @@ export default function PaymentSetupModal({
                 userId={userId}
                 onComplete={onComplete}
                 onClose={onClose}
-                walletMode={walletMode}
               />
             </Elements>
           )}
@@ -135,14 +131,12 @@ function PaymentForm({
   deviceUuid, 
   userId, 
   onComplete, 
-  onClose,
-  walletMode
+  onClose 
 }: { 
   deviceUuid: string
   userId: string
   onComplete: (paymentMethodId?: string) => void
   onClose: () => void
-  walletMode: 'wallet' | 'card' | 'both'
 }) {
   const stripe = useStripe()
   const elements = useElements()
@@ -152,14 +146,7 @@ function PaymentForm({
   const [isApplePay, setIsApplePay] = useState(false)
 
   // Persist payment details to backend so ownership verification passes
-  const storePaymentInfo = async (
-    persistedUserId: string,
-    paymentMethodId?: string,
-    stripeCustomerId?: string,
-    platform?: string,
-    payWallet?: boolean,
-    setupIntentId?: string
-  ) => {
+  const storePaymentInfo = async (persistedUserId: string, paymentMethodId?: string, stripeCustomerId?: string, platform?: string) => {
     logger.log('💾 [storePaymentInfo] Called with:', { persistedUserId, paymentMethodId, stripeCustomerId, platform })
     
     if (!paymentMethodId || !stripeCustomerId) {
@@ -176,10 +163,7 @@ function PaymentForm({
         userId: persistedUserId,
         paymentMethodId,
         stripeCustomerId,
-        setupIntentId,
-        deviceUuid,
-        platform: platform || detectPlatform(),
-        isPayWallet: payWallet
+        platform: platform || detectPlatform()
       }
       logger.log('📤 [storePaymentInfo] Request body:', requestBody)
       
@@ -204,14 +188,13 @@ function PaymentForm({
 
   useEffect(() => {
     if (stripe) {
-      const totalAmount = 0
       const pr = stripe.paymentRequest({
         country: 'US',
         currency: 'usd',
-        total: { label: 'Tipwave', amount: totalAmount },
+        total: { label: 'Tipply Tip', amount: 100 }, // $1 for setup
         requestPayerName: true,
         requestPayerEmail: true,
-        displayItems: []
+        displayItems: [{ label: 'Tip Setup', amount: 100 }]
       })
       
       pr.canMakePayment().then((result) => {
@@ -222,15 +205,11 @@ function PaymentForm({
 
         const appleAvailable = !!(result && (result as any).applePay)
         const googleAvailable = !!(result && (result as any).googlePay)
-        const platform = detectPlatform()
-        const preferredWallet = platform === 'iOS' && appleAvailable
-          ? 'apple'
-          : (googleAvailable ? 'google' : (appleAvailable ? 'apple' : null))
 
-        if (preferredWallet) {
+        if (appleAvailable || googleAvailable) {
           setPaymentRequest(pr)
-          setIsApplePay(preferredWallet === 'apple')
-          logger.log('Payment Request is available - Apple Pay:', appleAvailable, 'Google Pay:', googleAvailable, 'Preferred:', preferredWallet)
+          setIsApplePay(appleAvailable)
+          logger.log('Payment Request is available - Apple Pay:', appleAvailable, 'Google Pay:', googleAvailable)
         } else {
           logger.log('Payment Request not available - no Apple Pay or Google Pay support detected')
         }
@@ -302,7 +281,7 @@ function PaymentForm({
               }
             }
             // Persist payment info to backend so security checks pass
-            await storePaymentInfo(uniqueDeviceId!, paymentMethodId, customerId, platform, true, setupIntent?.id)
+            await storePaymentInfo(uniqueDeviceId!, paymentMethodId, customerId, platform)
             
             // Payment method is automatically attached to customer by Stripe during SetupIntent confirmation
             event.complete('success')
@@ -403,7 +382,7 @@ function PaymentForm({
           }
         }
         // Persist payment info to backend so security checks pass
-        await storePaymentInfo(uniqueDeviceId!, paymentMethodId, customerId, platform, false, result.setupIntent?.id)
+        await storePaymentInfo(uniqueDeviceId!, paymentMethodId, customerId, platform)
         
         // Payment method is automatically attached to customer by Stripe during SetupIntent confirmation
         toast.success('Payment method added successfully!')
@@ -417,103 +396,71 @@ function PaymentForm({
     }
   }
 
-  const isWalletOnly = walletMode === 'wallet'
-  const [showCardFields, setShowCardFields] = useState(false)
-
   return (
-    <form onSubmit={isWalletOnly || !showCardFields ? undefined : handleCardSubmit} className="space-y-0">
+    <form onSubmit={handleCardSubmit} className="space-y-0">
       {/* ========== SECTION 1: DIGITAL WALLETS ========== */}
-      {paymentRequest && walletMode !== 'card' && (
-        <div className="pb-4">
+      {paymentRequest && (
+        <div className="pb-6 border-b border-gray-200">
           <button
             onClick={() => paymentRequest.show()}
             disabled={loading}
-            className={`w-full transition-all disabled:opacity-50 font-medium text-base flex items-center justify-center ${
-              isApplePay
-                ? 'bg-black text-white py-3 px-6 rounded-full hover:bg-gray-800 active:bg-gray-900'
-                : 'bg-transparent p-0'
-            }`}
+            className="w-full bg-black text-white py-4 px-4 rounded-xl hover:bg-gray-800 active:bg-gray-900 transition-all disabled:opacity-50 font-medium text-base flex items-center justify-center gap-2"
           >
             {isApplePay ? (
-              <>
-                <span className="text-lg">Pay with</span>
-                <AppleFilled style={{ fontSize: '28px' }} />
-                <span className="text-lg">Pay</span>
-              </>
+              <AppleFilled style={{ fontSize: '24px' }} />
             ) : (
-              <img
-                src={googlePayButton}
-                alt="Google Pay"
-                className="h-12 w-auto"
-              />
+              <GoogleOutlined style={{ fontSize: '24px' }} />
             )}
+            <span>
+              {isApplePay ? 'Continue with Apple Pay' : 'Continue with Google Pay'}
+            </span>
           </button>
-        </div>
-      )}
-
-      {/* Secondary card link */}
-      {walletMode !== 'wallet' && !showCardFields && (
-        <div className="pb-6">
-          <button
-            type="button"
-            onClick={() => setShowCardFields(true)}
-            className="text-base text-gray-500 hover:text-gray-700 underline underline-offset-2"
-          >
-            Pay with a card
-          </button>
+          
+          {/* Subtle Divider */}
+          <div className="mt-6 mb-6 flex items-center gap-3">
+            <div className="flex-1 h-px bg-gray-200" />
+            <p className="text-xs text-gray-400 uppercase tracking-wide">Or</p>
+            <div className="flex-1 h-px bg-gray-200" />
+          </div>
         </div>
       )}
 
       {/* ========== SECTION 2: MANUAL CARD ENTRY ========== */}
-      {walletMode !== 'wallet' && (
-        <div
-          className={`pb-6 transition-all duration-200 ${
-            showCardFields ? 'opacity-100 max-h-[800px]' : 'opacity-0 max-h-0 overflow-hidden'
-          }`}
-        >
-          <div className="flex items-center justify-between mb-4">
-            <label className="text-sm font-semibold text-gray-900">Card Details</label>
-          </div>
-          
-          <div className="border-2 border-gray-200 rounded-lg p-4 bg-white hover:border-gray-300 focus-within:border-blue-500 transition-colors">
-            <CardElement 
-              options={{ 
-                style: { 
-                  base: { 
-                    fontSize: '16px',
-                    color: '#1f2937',
-                    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-                    '::placeholder': {
-                      color: '#9ca3af',
-                    },
-                  },
-                  invalid: {
-                    color: '#dc2626',
+      <div className="pb-6 border-b border-gray-200">
+        <div className="flex items-center justify-between mb-4">
+          <label className="text-sm font-semibold text-gray-900">Card Details</label>
+          <a
+            href="#"
+            onClick={(e) => {
+              e.preventDefault()
+              // TODO: Implement autofill from browser
+            }}
+            className="text-xs text-blue-600 hover:text-blue-700 font-medium"
+          >
+            Autofill
+          </a>
+        </div>
+        
+        <div className="border-2 border-gray-200 rounded-lg p-4 bg-white hover:border-gray-300 focus-within:border-blue-500 transition-colors">
+          <CardElement 
+            options={{ 
+              style: { 
+                base: { 
+                  fontSize: '16px',
+                  color: '#1f2937',
+                  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+                  '::placeholder': {
+                    color: '#9ca3af',
                   },
                 },
-              }} 
-            />
-          </div>
-
-          <button
-            type="submit"
-            disabled={loading || !stripe || !showCardFields}
-            className="mt-4 w-full bg-blue-600 text-white py-4 px-4 rounded-xl hover:bg-blue-700 active:bg-blue-800 transition-all disabled:opacity-50 disabled:cursor-not-allowed font-semibold text-base"
-          >
-            {loading ? (
-              <span className="flex items-center justify-center gap-2">
-                <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-                <span>Processing...</span>
-              </span>
-            ) : (
-              'Continue with this card'
-            )}
-          </button>
+                invalid: {
+                  color: '#dc2626',
+                },
+              },
+            }} 
+          />
         </div>
-      )}
+      </div>
 
       {/* ========== ERROR MESSAGE ========== */}
       {error && (
@@ -524,33 +471,24 @@ function PaymentForm({
 
       {/* ========== SECTION 3: ACTION BUTTONS ========== */}
       <div className="pb-6 border-b border-gray-200 space-y-3">
-        {isWalletOnly && (
-          <button
-            type="button"
-            onClick={() => {
-              if (paymentRequest) {
-                paymentRequest.show()
-              } else {
-                setError('Apple Pay or Google Pay is not available on this device.')
-              }
-            }}
-            disabled={loading || !stripe || !paymentRequest}
-            className="w-full bg-blue-600 text-white py-4 px-4 rounded-xl hover:bg-blue-700 active:bg-blue-800 transition-all disabled:opacity-50 disabled:cursor-not-allowed font-semibold text-base"
-          >
-            {loading ? (
-              <span className="flex items-center justify-center gap-2">
-                <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-                <span>Processing...</span>
-              </span>
-            ) : (
-              'Activate Pay Wallet'
-            )}
-          </button>
-        )}
-
+        <button
+          type="submit"
+          disabled={loading || !stripe}
+          className="w-full bg-blue-600 text-white py-4 px-4 rounded-xl hover:bg-blue-700 active:bg-blue-800 transition-all disabled:opacity-50 disabled:cursor-not-allowed font-semibold text-base"
+        >
+          {loading ? (
+            <span className="flex items-center justify-center gap-2">
+              <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+              <span>Processing...</span>
+            </span>
+          ) : (
+            'Add Payment Method'
+          )}
+        </button>
+        
         <button
           type="button"
           onClick={onClose}

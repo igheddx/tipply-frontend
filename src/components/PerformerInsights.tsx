@@ -1,5 +1,7 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { LineChart, Line, ScatterChart, Scatter, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
+import { AutoComplete } from 'antd'
+import type { BaseOptionType } from 'antd/es/select'
 import logger from '../utils/logger'
 import { API_BASE_URL } from '../utils/config'
 
@@ -67,35 +69,34 @@ interface TipPoint {
 
 const PerformerInsights: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('')
-  const [searchResults, setSearchResults] = useState<PerformerSearchResult[]>([])
+  const [searchOptions, setSearchOptions] = useState<BaseOptionType[]>([])
   const [isSearching, setIsSearching] = useState(false)
-  const [currentPage, setCurrentPage] = useState(1)
   const [selectedPerformer, setSelectedPerformer] = useState<PerformerSearchResult | null>(null)
   const [insights, setInsights] = useState<PerformerInsights | null>(null)
   const [isLoadingInsights, setIsLoadingInsights] = useState(false)
   const [showConfigModal, setShowConfigModal] = useState(false)
   const [selectedDevice, setSelectedDevice] = useState<PerformerDevice | null>(null)
+  const [allPerformers, setAllPerformers] = useState<PerformerSearchResult[]>([])
   
   // Time window filter for hourly chart
   const [startDateTime, setStartDateTime] = useState('')
   const [endDateTime, setEndDateTime] = useState('')
   const [filteredTipPoints, setFilteredTipPoints] = useState<TipPoint[]>([])
 
-  const resultsPerPage = 5
+  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
-  const handleSearch = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!searchTerm.trim()) return
+  const performSearch = useCallback(async (term: string) => {
+    if (!term || term.trim().length < 2) {
+      setSearchOptions([])
+      return
+    }
 
     setIsSearching(true)
-    setCurrentPage(1)
-    setSelectedPerformer(null)
-    setInsights(null)
 
     try {
       const token = localStorage.getItem('token')
       const response = await fetch(
-        `${API_BASE_URL}/api/admin/performers/search-with-devices?q=${encodeURIComponent(searchTerm)}`,
+        `${API_BASE_URL}/api/admin/performers/search-devices?q=${encodeURIComponent(term)}`,
         {
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -105,17 +106,53 @@ const PerformerInsights: React.FC = () => {
       )
 
       if (response.ok) {
-        const data = await response.json()
-        setSearchResults(data)
+        const data: PerformerSearchResult[] = await response.json()
+        setAllPerformers(data)
+        
+        const options = data.map(performer => ({
+          value: performer.id,
+          label: (
+            <div className="py-1">
+              <div className="font-medium text-gray-900">
+                {performer.firstName} {performer.lastName}
+                {performer.stageName && <span className="text-purple-600 ml-2">({performer.stageName})</span>}
+              </div>
+              <div className="text-sm text-gray-500">{performer.email}</div>
+            </div>
+          ),
+          searchText: `${performer.firstName} ${performer.lastName} ${performer.stageName || ''} ${performer.email}`.toLowerCase()
+        }))
+        
+        setSearchOptions(options)
       } else {
         logger.error('Failed to search performers')
-        setSearchResults([])
+        setSearchOptions([])
       }
     } catch (error) {
       logger.error('Error searching performers:', error)
-      setSearchResults([])
+      setSearchOptions([])
     } finally {
       setIsSearching(false)
+    }
+  }, [])
+
+  const handleSearch = (value: string) => {
+    setSearchTerm(value)
+    
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current)
+    }
+
+    searchTimeoutRef.current = setTimeout(() => {
+      performSearch(value)
+    }, 300) // 300ms debounce
+  }
+
+  const handleSelect = (value: string) => {
+    const performer = allPerformers.find(p => p.id === value)
+    if (performer) {
+      setSelectedPerformer(performer)
+      loadPerformerInsights(performer.id)
     }
   }
 
@@ -147,9 +184,11 @@ const PerformerInsights: React.FC = () => {
     }
   }
 
-  const handleViewPerformer = (performer: PerformerSearchResult) => {
-    setSelectedPerformer(performer)
-    loadPerformerInsights(performer.id)
+  const handleBack = () => {
+    setSelectedPerformer(null)
+    setInsights(null)
+    setSearchTerm('')
+    setSearchOptions([])
   }
 
   const downloadQRCode = async (deviceId: string, nickname: string) => {
@@ -190,12 +229,6 @@ const PerformerInsights: React.FC = () => {
     setShowConfigModal(false)
     setSelectedDevice(null)
   }
-
-  // Pagination
-  const totalPages = Math.ceil(searchResults.length / resultsPerPage)
-  const startIndex = (currentPage - 1) * resultsPerPage
-  const endIndex = startIndex + resultsPerPage
-  const currentResults = searchResults.slice(startIndex, endIndex)
 
   // Prepare weekly chart data
   const weeklyChartData = insights?.weeklyTips.map(week => ({
@@ -269,139 +302,58 @@ const PerformerInsights: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Search Bar */}
-      <div className="bg-white rounded-lg shadow-sm p-6">
-        <form onSubmit={handleSearch} className="flex gap-4">
-          <input
-            type="text"
+      {!selectedPerformer && (
+        <div className="bg-white rounded-lg shadow-sm p-6">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">Search Performers</h3>
+          <AutoComplete
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder="Search by name, stage name, or device serial number..."
-            className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+            options={searchOptions}
+            onSearch={handleSearch}
+            onSelect={handleSelect}
+            placeholder="Type performer name, stage name, or email..."
+            style={{ width: '100%' }}
+            size="large"
+            notFoundContent={isSearching ? 'Searching...' : searchTerm.length < 2 ? 'Type at least 2 characters' : 'No performers found'}
           />
-          <button
-            type="submit"
-            disabled={isSearching}
-            className="px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:bg-gray-400"
-          >
-            {isSearching ? 'Searching...' : 'Search'}
-          </button>
-        </form>
-      </div>
-
-      {/* Search Results Table */}
-      {searchResults.length > 0 && !selectedPerformer && (
-        <div className="bg-white rounded-lg shadow-sm overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    First Name
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Last Name
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Stage Name
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Email
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Device Serial
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {currentResults.map((performer) => (
-                  <tr key={performer.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {performer.firstName}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {performer.lastName}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {performer.stageName || '-'}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {performer.email}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {performer.devices.map(d => d.serialNumber).filter(Boolean).join(', ') || '-'}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm space-x-2">
-                      {performer.devices.length > 0 && (
-                        <>
-                          <button
-                            onClick={() => downloadQRCode(performer.devices[0].id, performer.devices[0].nickname || '')}
-                            className="text-blue-600 hover:text-blue-800"
-                          >
-                            Download QR
-                          </button>
-                          <button
-                            onClick={() => openConfigureModal(performer.devices[0])}
-                            className="text-yellow-600 hover:text-yellow-800"
-                          >
-                            Configure
-                          </button>
-                        </>
-                      )}
-                      <button
-                        onClick={() => handleViewPerformer(performer)}
-                        className="text-purple-600 hover:text-purple-800 font-medium"
-                      >
-                        View
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Pagination */}
-          {totalPages > 1 && (
-            <div className="bg-gray-50 px-6 py-3 flex items-center justify-between border-t border-gray-200">
-              <div className="text-sm text-gray-700">
-                Showing {startIndex + 1} to {Math.min(endIndex, searchResults.length)} of {searchResults.length} results
-              </div>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                  disabled={currentPage === 1}
-                  className="px-3 py-1 border border-gray-300 rounded-md disabled:opacity-50 hover:bg-gray-100"
-                >
-                  Previous
-                </button>
-                <span className="px-3 py-1">
-                  Page {currentPage} of {totalPages}
-                </span>
-                <button
-                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                  disabled={currentPage === totalPages}
-                  className="px-3 py-1 border border-gray-300 rounded-md disabled:opacity-50 hover:bg-gray-100"
-                >
-                  Next
-                </button>
-              </div>
-            </div>
-          )}
+          <p className="text-sm text-gray-500 mt-2">
+            Start typing to search by name, stage name, or email address
+          </p>
         </div>
       )}
 
       {/* Performer Insights Dashboard */}
       {selectedPerformer && (
         <div className="space-y-6">
-          {/* Header */}
+          {/* Header with Back Button */}
           <div className="bg-white rounded-lg shadow-sm p-6">
+            <button
+              onClick={handleBack}
+              className="mb-4 text-purple-600 hover:text-purple-800 flex items-center gap-2"
+            >
+              <span>←</span> Back to Search
+            </button>
             <h2 className="text-2xl font-bold text-gray-900">
               {selectedPerformer.stageName || `${selectedPerformer.firstName} ${selectedPerformer.lastName}`}
             </h2>
             <p className="text-sm text-gray-500">{selectedPerformer.email}</p>
+            
+            {/* Device Actions */}
+            {selectedPerformer.devices.length > 0 && (
+              <div className="mt-4 flex gap-3">
+                <button
+                  onClick={() => downloadQRCode(selectedPerformer.devices[0].id, selectedPerformer.devices[0].nickname || '')}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                >
+                  Download QR Code
+                </button>
+                <button
+                  onClick={() => openConfigureModal(selectedPerformer.devices[0])}
+                  className="px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700"
+                >
+                  Configure Device
+                </button>
+              </div>
+            )}
           </div>
 
           {isLoadingInsights ? (
