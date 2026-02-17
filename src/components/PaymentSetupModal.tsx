@@ -143,6 +143,7 @@ function PaymentForm({
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [paymentRequest, setPaymentRequest] = useState<any>(null)
+  const [showCardForm, setShowCardForm] = useState(false)
   const [isApplePay, setIsApplePay] = useState(false)
 
   // Persist payment details to backend so ownership verification passes
@@ -433,78 +434,95 @@ function PaymentForm({
       )}
 
       {/* ========== SECTION 2: MANUAL CARD ENTRY ========== */}
-      <div className="pb-6 border-b border-gray-200">
-        <div className="flex items-center justify-between mb-4">
-          <label className="text-sm font-semibold text-gray-900">Card Details</label>
-          <a
-            href="#"
-            onClick={(e) => {
-              e.preventDefault()
-              // TODO: Implement autofill from browser
-            }}
-            className="text-xs text-blue-600 hover:text-blue-700 font-medium"
+      {!showCardForm ? (
+        <div className="pb-6 border-b border-gray-200">
+          <button
+            type="button"
+            onClick={() => setShowCardForm(true)}
+            className="w-full text-purple-600 hover:text-purple-700 py-3 px-4 rounded-lg border border-purple-200 hover:border-purple-400 hover:bg-purple-50 transition-all font-medium text-sm"
           >
-            Autofill
-          </a>
+            Pay with card
+          </button>
         </div>
-        
-        <div className="border-2 border-gray-200 rounded-lg p-4 bg-white hover:border-gray-300 focus-within:border-blue-500 transition-colors">
-          <CardElement 
-            options={{ 
-              style: { 
-                base: { 
-                  fontSize: '16px',
-                  color: '#1f2937',
-                  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-                  '::placeholder': {
-                    color: '#9ca3af',
+      ) : (
+        <div className="pb-6 border-b border-gray-200 space-y-4">
+          <div className="flex items-center justify-between">
+            <label className="text-sm font-semibold text-gray-900">Card Details</label>
+            <a
+              href="#"
+              onClick={(e) => {
+                e.preventDefault()
+                // TODO: Implement autofill from browser
+              }}
+              className="text-xs text-blue-600 hover:text-blue-700 font-medium"
+            >
+              Autofill
+            </a>
+          </div>
+
+          <div className="border-2 border-gray-200 rounded-lg p-4 bg-white hover:border-gray-300 focus-within:border-blue-500 transition-colors">
+            <CardElement
+              options={{
+                style: {
+                  base: {
+                    fontSize: '16px',
+                    color: '#1f2937',
+                    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+                    '::placeholder': {
+                      color: '#9ca3af',
+                    },
+                  },
+                  invalid: {
+                    color: '#dc2626',
                   },
                 },
-                invalid: {
-                  color: '#dc2626',
-                },
-              },
-            }} 
-          />
-        </div>
-      </div>
+              }}
+            />
+          </div>
 
-      {/* ========== ERROR MESSAGE ========== */}
-      {error && (
+          {/* ========== ERROR MESSAGE ========== */}
+          {error && (
+            <div className="text-red-600 text-sm bg-red-50 p-4 rounded-lg border border-red-200">
+              {error}
+            </div>
+          )}
+
+          <div className="space-y-3">
+            <button
+              type="submit"
+              disabled={loading || !stripe}
+              className="w-full bg-blue-600 text-white py-4 px-4 rounded-xl hover:bg-blue-700 active:bg-blue-800 transition-all disabled:opacity-50 disabled:cursor-not-allowed font-semibold text-base"
+            >
+              {loading ? (
+                <span className="flex items-center justify-center gap-2">
+                  <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  <span>Processing...</span>
+                </span>
+              ) : (
+                'Add Card'
+              )}
+            </button>
+
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={loading}
+              className="w-full text-gray-600 py-3 px-4 rounded-xl hover:text-gray-900 hover:bg-gray-50 transition-all disabled:opacity-50 disabled:cursor-not-allowed font-medium text-base"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
+      {error && !showCardForm && (
         <div className="mb-6 text-red-600 text-sm bg-red-50 p-4 rounded-lg border border-red-200">
           {error}
         </div>
       )}
-
-      {/* ========== SECTION 3: ACTION BUTTONS ========== */}
-      <div className="pb-6 border-b border-gray-200 space-y-3">
-        <button
-          type="submit"
-          disabled={loading || !stripe}
-          className="w-full bg-blue-600 text-white py-4 px-4 rounded-xl hover:bg-blue-700 active:bg-blue-800 transition-all disabled:opacity-50 disabled:cursor-not-allowed font-semibold text-base"
-        >
-          {loading ? (
-            <span className="flex items-center justify-center gap-2">
-              <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-              </svg>
-              <span>Processing...</span>
-            </span>
-          ) : (
-            'Add Payment Method'
-          )}
-        </button>
-        
-        <button
-          type="button"
-          onClick={onClose}
-          disabled={loading}
-          className="w-full text-gray-600 py-3 px-4 rounded-xl hover:text-gray-900 hover:bg-gray-50 transition-all disabled:opacity-50 disabled:cursor-not-allowed font-medium text-base"
-        >
-          Cancel
-        </button>
-      </div>
 
       {/* ========== SECTION 4: SECURITY REASSURANCE ========== */}
       <div className="pt-4 text-center space-y-4">
@@ -530,6 +548,17 @@ function PaymentForm({
           Your card details are encrypted and never stored on your device.
         </p>
       </div>
+
+      {!showCardForm && (
+        <button
+          type="button"
+          onClick={onClose}
+          disabled={loading}
+          className="w-full mt-6 text-gray-600 py-3 px-4 rounded-xl hover:text-gray-900 hover:bg-gray-50 transition-all disabled:opacity-50 disabled:cursor-not-allowed font-medium text-base"
+        >
+          Cancel
+        </button>
+      )}
     </form>
   )
 } 
