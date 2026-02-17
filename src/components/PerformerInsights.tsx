@@ -430,12 +430,46 @@ const PerformerInsights: React.FC = () => {
   }
 
   const handleConfigSave = async () => {
-    // Reload insights after config save
-    if (selectedPerformer) {
-      await loadPerformerInsights(selectedPerformer.id)
-    }
     setShowConfigModal(false)
     setSelectedDevice(null)
+    
+    // Reload both insights and performer data to get updated device configuration
+    if (selectedPerformer) {
+      console.log('[Config] Reloading performer data after save...')
+      
+      // Reload insights
+      await loadPerformerInsights(selectedPerformer.id)
+      
+      // Re-fetch the performer with devices to get updated configuration
+      try {
+        const token = localStorage.getItem('token')
+        const response = await fetch(
+          `${API_BASE_URL}/api/admin/performers/search-devices?q=${encodeURIComponent(selectedPerformer.email)}`,
+          {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json'
+            }
+          }
+        )
+        
+        if (response.ok) {
+          const data: PerformerSearchResult[] = await response.json()
+          const updatedPerformer = data.find(p => p.id === selectedPerformer.id)
+          if (updatedPerformer) {
+            console.log('[Config] Performer data refreshed. Updated devices:', updatedPerformer.devices)
+            setSelectedPerformer(updatedPerformer)
+            
+            // Update the allPerformers array as well
+            setAllPerformers(prev => prev.map(p => 
+              p.id === updatedPerformer.id ? updatedPerformer : p
+            ))
+          }
+        }
+      } catch (error) {
+        logger.error('Error refreshing performer data:', error)
+      }
+    }
   }
 
   // Prepare weekly chart data
