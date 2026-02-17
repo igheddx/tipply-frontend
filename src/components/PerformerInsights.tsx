@@ -165,6 +165,8 @@ const PerformerInsights: React.FC = () => {
   const handleSelect = (value: string) => {
     const performer = allPerformers.find(p => p.id === value)
     if (performer) {
+      console.log('Selected performer:', performer)
+      console.log('Devices:', performer.devices)
       setSelectedPerformer(performer)
       loadPerformerInsights(performer.id)
     }
@@ -526,24 +528,33 @@ const PerformerInsights: React.FC = () => {
               {selectedPerformer.stageName || `${selectedPerformer.firstName} ${selectedPerformer.lastName}`}
             </h2>
             <p className="text-sm text-gray-500">{selectedPerformer.email}</p>
+            <p className="text-xs text-gray-400 mt-1">
+              {selectedPerformer.devices?.length || 0} device(s)
+            </p>
             
             {/* Device Actions */}
-            {selectedPerformer.devices.length > 0 && (
-              <div className="mt-4 flex gap-3">
-                <button
-                  onClick={() => downloadQRCode(selectedPerformer.devices[0].id, selectedPerformer.devices[0].nickname || '')}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-                >
-                  Download QR Code
-                </button>
-                <button
-                  onClick={() => openConfigureModal(selectedPerformer.devices[0])}
-                  className="px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700"
-                >
-                  Configure Device
-                </button>
-              </div>
-            )}
+            <div className="mt-4 flex gap-3">
+              {selectedPerformer.devices && selectedPerformer.devices.length > 0 ? (
+                <>
+                  <button
+                    onClick={() => downloadQRCode(selectedPerformer.devices[0].id, selectedPerformer.devices[0].nickname || '')}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                  >
+                    Download QR Code
+                  </button>
+                  <button
+                    onClick={() => openConfigureModal(selectedPerformer.devices[0])}
+                    className="px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700"
+                  >
+                    Configure Device
+                  </button>
+                </>
+              ) : (
+                <div className="text-sm text-gray-500 italic">
+                  No devices registered for this performer
+                </div>
+              )}
+            </div>
           </div>
 
           {isLoadingInsights ? (
