@@ -6,6 +6,7 @@ import SongManagement from '../components/SongManagement'
 import SongRequestMonitor from '../components/SongRequestMonitor'
 import { API_BASE_URL } from '../utils/config'
 import { CrownOutlined } from '@ant-design/icons'
+import { LineChart, Line, ScatterChart, Scatter, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 
 interface DashboardStats {
   totalDevices: number
@@ -37,6 +38,8 @@ interface DashboardMetrics {
   stripeFuturePayouts: number
   stripeInTransit: number
   stripeLifetimeVolume: number
+  uniqueTippersAllTime: number
+  mostTippedDenomination: number
 }
 
 interface DeviceSummary {
@@ -70,6 +73,43 @@ interface Device {
   deletedAt?: string
 }
 
+interface WeeklyTipsSummary {
+  weekStart: string
+  totalAmount: number
+  tipsCount: number
+  uniqueTippers: number
+  averageAmount: number
+  maxAmount: number
+}
+
+interface HourlyTipsSummary {
+  hour: number
+  totalAmount: number
+  tipsCount: number
+  uniqueTippers: number
+  averageAmount: number
+  maxAmount: number
+  denominationTotals: Record<string, number>
+}
+
+interface PerformerInsights {
+  metrics: DashboardMetrics
+  weeklyTips: WeeklyTipsSummary[]
+  hourlyTips: HourlyTipsSummary[]
+  timezoneLabel: string
+  totalBalance: number
+  futurePayouts: number
+  inTransit: number
+  uniqueTippersAllTime: number
+  mostTippedDenomination: number
+}
+
+interface TipPoint {
+  time: string
+  amount: number
+  timestamp: number
+}
+
 const Dashboard: React.FC = () => {
   const [stats, setStats] = useState<DashboardStats | null>(null)
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null)
@@ -80,6 +120,12 @@ const Dashboard: React.FC = () => {
   const [stripeEnabledDevices, setStripeEnabledDevices] = useState<string[]>([])
   const [userProfile, setUserProfile] = useState<any>(null)
   const [stripeMetricsLoading, setStripeMetricsLoading] = useState(true)
+  const [insights, setInsights] = useState<PerformerInsights | null>(null)
+  const [weeklyChartData, setWeeklyChartData] = useState<any[]>([])
+  const [trendData, setTrendData] = useState<any[]>([])
+  const [filteredTipPoints, setFilteredTipPoints] = useState<TipPoint[]>([])
+  const [startDateTime, setStartDateTime] = useState('')
+  const [endDateTime, setEndDateTime] = useState('')
   
   const getDeviceSetupUrl = () => {
     const host = window.location.hostname.toLowerCase()
@@ -252,6 +298,8 @@ const Dashboard: React.FC = () => {
               stripeLifetimeVolume: fullMetrics.data.stripeLifetimeVolume ?? prev.stripeLifetimeVolume,
               totalEarnings: fullMetrics.data.totalEarnings ?? prev.totalEarnings,
               pendingPayouts: fullMetrics.data.pendingPayouts ?? prev.pendingPayouts,
+              uniqueTippersAllTime: fullMetrics.data.uniqueTippersAllTime ?? prev.uniqueTippersAllTime,
+              mostTippedDenomination: fullMetrics.data.mostTippedDenomination ?? prev.mostTippedDenomination,
             } : fullMetrics.data)
             logger.log(`⏱️ [PERF] Background Stripe metrics loaded in ${(performance.now() - stripeStart).toFixed(0)}ms`)
           }
@@ -259,6 +307,29 @@ const Dashboard: React.FC = () => {
           logger.warn('Skipping Stripe metrics due to error:', e)
         } finally {
           setStripeMetricsLoading(false)
+        }
+
+        // Background fetch: load insights data for charts
+        try {
+          const insightsStart = performance.now()
+          const timezoneOffset = new Date().getTimezoneOffset()
+          const response = await fetch(
+            `${API_BASE_URL}/api/tips/insights/${profileId}?timezoneOffsetMinutes=${timezoneOffset}`,
+            {
+              headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+              }
+            }
+          )
+
+          if (response.ok) {
+            const data = await response.json()
+            setInsights(data)
+            logger.log(`⏱️ [PERF] Insights data loaded in ${(performance.now() - insightsStart).toFixed(0)}ms`)
+          }
+        } catch (e) {
+          logger.warn('Skipping insights data due to error:', e)
         }
       } catch (error) {
         logger.error('Error initializing dashboard:', error)
@@ -330,6 +401,108 @@ const Dashboard: React.FC = () => {
 
     refreshData()
   }, [activeTab, userProfile?.id, stats?.devices, recentTips.length, deletedDevices.length])
+
+  // Process weekly chart data when insights change
+  useEffect(() => {
+    if (!insights?.weeklyTips) return
+
+    const chartData = insights.weeklyTips.map(week => {
+      const weekDate = new Date(week.weekStart)
+      const formattedWeek = `${weekDate.getMonth() + 1}/${weekDate.getDate()}`
+      return {
+        week: formattedWeek,
+        totalTips: week.totalAmount,
+        uniqueAudience: week.uniqueTippers
+      }
+    })
+
+    setWeeklyChartData(chartData)
+
+    // Calculate trend line
+    const validDataPoints = chartData.filter(d => d.totalTips > 0)
+    if (validDataPoints.length >= 2) {
+      const n = validDataPoints.length
+      const sumX = validDataPoints.reduce((sum, _, i) => sum + i, 0)
+      const sumY = validDataPoints.reduce((sum, d) => sum + d.totalTips, 0)
+      const sumXY = validDataPoints.reduce((sum, d, i) => sum + i * d.totalTips, 0)
+      const sumX2 = validDataPoints.reduce((sum, _, i) => sum + i * i, 0)
+
+      const slope = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX)
+      const intercept = (sumY - slope * sumX) / n
+
+      const trend = chartData.map((d, i) => ({
+        week: d.week,
+        trend: slope * i + intercept
+      }))
+
+      setTrendData(trend)
+    }
+  }, [insights])
+
+  // Process time window tips when insights or date filters change
+  useEffect(() => {
+    if (!insights?.hourlyTips) return
+
+    // Convert hourly data to individual tip points for scatter plot
+    const tipPoints: TipPoint[] = []
+    const now = new Date()
+    
+    insights.hourlyTips.forEach(hourData => {
+      if (hourData.tipsCount > 0) {
+        // Create scatter points based on denomination totals
+        Object.entries(hourData.denominationTotals).forEach(([amount, total]) => {
+          if (total > 0) {
+            const count = Math.round(total / parseFloat(amount))
+            for (let i = 0; i < count; i++) {
+              const pointDate = new Date(now)
+              pointDate.setHours(hourData.hour, Math.floor(Math.random() * 60), 0, 0)
+              
+              tipPoints.push({
+                time: `${hourData.hour.toString().padStart(2, '0')}:00`,
+                amount: parseFloat(amount),
+                timestamp: pointDate.getTime()
+              })
+            }
+          }
+        })
+      }
+    })
+
+    tipPoints.sort((a, b) => a.timestamp - b.timestamp)
+    setFilteredTipPoints(tipPoints)
+
+    // Set default date/time range if not already set
+    if (!startDateTime && tipPoints.length > 0) {
+      const earliest = new Date(tipPoints[0].timestamp)
+      const latest = new Date(tipPoints[tipPoints.length - 1].timestamp)
+      
+      const formatDateTime = (date: Date) => {
+        const year = date.getFullYear()
+        const month = String(date.getMonth() + 1).padStart(2, '0')
+        const day = String(date.getDate()).padStart(2, '0')
+        const hours = String(date.getHours()).padStart(2, '0')
+        const minutes = String(date.getMinutes()).padStart(2, '0')
+        return `${year}-${month}-${day}T${hours}:${minutes}`
+      }
+
+      setStartDateTime(formatDateTime(earliest))
+      setEndDateTime(formatDateTime(latest))
+    }
+  }, [insights, startDateTime])
+
+  // Filter tip points by selected date/time window
+  useEffect(() => {
+    if (!insights?.hourlyTips || !startDateTime || !endDateTime) return
+
+    const start = new Date(startDateTime).getTime()
+    const end = new Date(endDateTime).getTime()
+
+    const filtered = filteredTipPoints.filter(point => 
+      point.timestamp >= start && point.timestamp <= end
+    )
+
+    setFilteredTipPoints(filtered)
+  }, [startDateTime, endDateTime])
 
   const handleLogout = () => {
     localStorage.removeItem('token')
@@ -1465,6 +1638,46 @@ const Dashboard: React.FC = () => {
             </div>
           </div>
 
+          {/* Audience Count */}
+          <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-4 transform hover:scale-105 transition-all duration-200">
+            <div className="flex flex-col items-center text-center">
+              <div className="flex-shrink-0 mb-3">
+                <div className="w-10 h-10 bg-indigo-500 rounded-lg flex items-center justify-center">
+                  <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                  </svg>
+                </div>
+              </div>
+              <div>
+                <p className="text-xs font-medium text-gray-700 mb-1">Audience</p>
+                <p className="text-lg font-bold text-gray-900 mb-1">
+                  {metrics ? (metrics.uniqueTippersAllTime || 0).toLocaleString() : '0'}
+                </p>
+                <p className="text-xs text-gray-600">Unique Tippers</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Most Tipped Denomination */}
+          <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-4 transform hover:scale-105 transition-all duration-200">
+            <div className="flex flex-col items-center text-center">
+              <div className="flex-shrink-0 mb-3">
+                <div className="w-10 h-10 bg-pink-500 rounded-lg flex items-center justify-center">
+                  <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
+                  </svg>
+                </div>
+              </div>
+              <div>
+                <p className="text-xs font-medium text-gray-700 mb-1">Most Tipped</p>
+                <p className="text-lg font-bold text-gray-900 mb-1">
+                  {metrics ? formatCurrency(metrics.mostTippedDenomination || 0) : '$0.00'}
+                </p>
+                <p className="text-xs text-gray-600">Denomination</p>
+              </div>
+            </div>
+          </div>
+
           {/* This Month */}
           <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-4 transform hover:scale-105 transition-all duration-200">
             <div className="flex flex-col items-center text-center">
@@ -1525,6 +1738,127 @@ const Dashboard: React.FC = () => {
             </div>
           </div>
         </div>
+
+        {/* Weekly Performance Chart */}
+        {weeklyChartData.length > 0 && (
+          <div className="bg-white rounded-lg shadow-sm p-6 mb-8">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Last 8 Weeks Performance</h3>
+            <ResponsiveContainer width="100%" height={300}>
+              <LineChart data={weeklyChartData}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="week" />
+                <YAxis yAxisId="left" />
+                <YAxis yAxisId="right" orientation="right" />
+                <Tooltip 
+                  content={({ active, payload }) => {
+                    if (active && payload && payload.length) {
+                      return (
+                        <div className="bg-white p-3 border border-gray-200 rounded shadow-lg">
+                          <p className="font-medium">{payload[0].payload.week}</p>
+                          <p className="text-sm text-blue-600">Total Tips: ${payload[0].value?.toFixed(2)}</p>
+                          <p className="text-sm text-green-600">Unique Audience: {payload[0].payload.uniqueAudience}</p>
+                        </div>
+                      )
+                    }
+                    return null
+                  }}
+                />
+                <Legend />
+                <Line 
+                  yAxisId="left"
+                  type="monotone" 
+                  dataKey="totalTips" 
+                  stroke="#8b5cf6" 
+                  strokeWidth={2}
+                  name="Total Tips ($)"
+                />
+                {trendData.length > 0 && (
+                  <Line
+                    yAxisId="left"
+                    type="monotone"
+                    data={trendData}
+                    dataKey="trend"
+                    stroke="#d1d5db"
+                    strokeWidth={2}
+                    strokeDasharray="0"
+                    name="Trend"
+                    dot={false}
+                  />
+                )}
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        )}
+
+        {/* Time Window Tips Chart */}
+        {filteredTipPoints.length > 0 && (
+          <div className="bg-white rounded-lg shadow-sm p-6 mb-8">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Tips by Time Window</h3>
+            
+            {/* Date/Time Range Selector */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Start Date/Time</label>
+                <input
+                  type="datetime-local"
+                  value={startDateTime}
+                  onChange={(e) => setStartDateTime(e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">End Date/Time</label>
+                <input
+                  type="datetime-local"
+                  value={endDateTime}
+                  onChange={(e) => setEndDateTime(e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+                />
+              </div>
+            </div>
+
+            <ResponsiveContainer width="100%" height={300}>
+              <ScatterChart>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis 
+                  dataKey="time" 
+                  name="Time"
+                  tick={{ fontSize: 12 }}
+                  angle={-45}
+                  textAnchor="end"
+                  height={80}
+                />
+                <YAxis 
+                  dataKey="amount" 
+                  name="Amount ($)"
+                />
+                <Tooltip 
+                  cursor={{ strokeDasharray: '3 3' }}
+                  content={({ active, payload }) => {
+                    if (active && payload && payload.length) {
+                      return (
+                        <div className="bg-white p-3 border border-gray-200 rounded shadow-lg">
+                          <p className="font-medium">{payload[0].payload.time}</p>
+                          <p className="text-sm text-green-600">Amount: ${payload[0].payload.amount.toFixed(2)}</p>
+                        </div>
+                      )
+                    }
+                    return null
+                  }}
+                />
+                <Scatter 
+                  name="Tips" 
+                  data={filteredTipPoints} 
+                  fill="#8b5cf6"
+                />
+              </ScatterChart>
+            </ResponsiveContainer>
+            
+            <p className="text-sm text-gray-500 mt-4">
+              Showing {filteredTipPoints.length} tips in the selected time window
+            </p>
+          </div>
+        )}
 
         {/* Tabs */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 mb-8">
