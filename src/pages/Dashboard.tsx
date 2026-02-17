@@ -1322,7 +1322,7 @@ const Dashboard: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-white flex items-center justify-center">
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <div className="w-8 h-8 border-4 border-primary-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
           <p className="text-gray-600">Loading dashboard...</p>
@@ -1333,7 +1333,7 @@ const Dashboard: React.FC = () => {
 
   if (!stats) {
     return (
-      <div className="min-h-screen bg-white flex items-center justify-center">
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <p className="text-gray-600">Failed to load dashboard data</p>
           <button
@@ -1350,7 +1350,7 @@ const Dashboard: React.FC = () => {
   const hasSongRequestEnabled = stats?.devices?.some(device => device.isAllowSongRequest) ?? false
 
   return (
-    <div className="min-h-screen bg-white text-gray-900">
+    <div className="min-h-screen bg-gray-50 text-gray-900">
       {/* KYC Result Alert */}
       {/* Removed KYC alert as per edit hint */}
 
