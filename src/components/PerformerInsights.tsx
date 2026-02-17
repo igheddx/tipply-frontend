@@ -4,6 +4,7 @@ import { AutoComplete } from 'antd'
 import type { BaseOptionType } from 'antd/es/select'
 import logger from '../utils/logger'
 import { API_BASE_URL } from '../utils/config'
+import apiService from '../services/api'
 
 interface PerformerDevice {
   id: string
@@ -240,35 +241,9 @@ const PerformerInsights: React.FC = () => {
     setIsDownloadingQR(true)
     try {
       console.info('[QR] Download clicked', { deviceId, nickname })
-      console.info('[QR] API URL:', `${API_BASE_URL}/api/admin/devices/${deviceId}/qr`)
-
-      const token = localStorage.getItem('token')
-      if (!token) {
-        console.error('[QR] No token found')
-        alert('Authentication token not found. Please log in again.')
-        setIsDownloadingQR(false)
-        return
-      }
-
+      console.info('[QR] API URL:', `${API_BASE_URL}/api/devices/${deviceId}/qr`)
       console.info('[QR] Fetching QR code from backend...')
-      const response = await fetch(`${API_BASE_URL}/api/admin/devices/${deviceId}/qr`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        },
-        cache: 'no-cache'
-      })
-
-      console.info('[QR] Response received:', { status: response.status, statusText: response.statusText, contentType: response.headers.get('content-type') })
-
-      if (!response.ok) {
-        const errorText = await response.text()
-        console.error('[QR] Error response:', errorText)
-        throw new Error(`HTTP ${response.status}: ${response.statusText}${errorText ? ` - ${errorText}` : ''}`)
-      }
-
-      console.info('[QR] Converting response to blob...')
-      const qrBlob = await response.blob()
-      console.info('[QR] Blob received:', { size: qrBlob.size, type: qrBlob.type })
+      const qrBlob = await apiService.downloadQRCode(deviceId)
       
       if (!qrBlob) {
         console.error('[QR] Blob is null or undefined')
@@ -276,6 +251,8 @@ const PerformerInsights: React.FC = () => {
         setIsDownloadingQR(false)
         return
       }
+
+      console.info('[QR] Blob received:', { size: qrBlob.size, type: qrBlob.type })
 
       if (!qrBlob.type.startsWith('image/')) {
         alert(`QR download returned a non-image content-type: ${qrBlob.type || 'unknown'}`)
