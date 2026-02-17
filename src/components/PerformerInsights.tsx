@@ -95,7 +95,7 @@ const PerformerInsights: React.FC = () => {
     try {
       const token = localStorage.getItem('token')
       const response = await fetch(
-        `${API_BASE_URL}/api/admin/performers-with-devices/search?q=${encodeURIComponent(searchTerm)}`,
+        `${API_BASE_URL}/api/admin/performers/search-with-devices?q=${encodeURIComponent(searchTerm)}`,
         {
           headers: {
             'Authorization': `Bearer ${token}`,
