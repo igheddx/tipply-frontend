@@ -961,7 +961,7 @@ const AdminDashboard: React.FC = () => {
           <Col xs={24} sm={12} lg={6}>
             <div className="bg-white p-6 rounded-lg shadow-sm border">
               <Statistic
-                title="Total Users"
+                title="Total Audience"
                 value={stats?.totalUsers || 0}
                 prefix={<UserOutlined />}
                 valueStyle={{ color: '#3f8600' }}
@@ -1009,13 +1009,13 @@ const AdminDashboard: React.FC = () => {
                 <div className="flex justify-between">
                   <span className="text-gray-600">Total Revenue (processed):</span>
                   <span className="font-semibold text-lg text-green-600">
-                    ${stats?.totalRevenue?.toFixed(2) || '0.00'}
+                    ${(stats?.totalRevenue || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">Performer Payouts:</span>
                   <span className="font-semibold text-blue-600">
-                    ${stats?.totalPerformerPayouts?.toFixed(2) || '0.00'}
+                    ${(stats?.totalPerformerPayouts || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </span>
                 </div>
               </div>
@@ -1028,19 +1028,19 @@ const AdminDashboard: React.FC = () => {
                 <div className="flex justify-between">
                   <span className="text-gray-600">Total Platform Fee (YTD):</span>
                   <span className="font-semibold text-blue-600">
-                    ${platformEarnings?.totalPlatformFees?.toFixed(2) || '0.00'}
+                    ${(platformEarnings?.totalPlatformFees || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">Stripe Fees (actual):</span>
                   <span className="font-semibold text-orange-600">
-                    ${platformEarnings?.totalPaymentPartnerFees?.toFixed(2) || '0.00'}
+                    ${(platformEarnings?.totalPaymentPartnerFees || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">Net Earnings (platform fees - Stripe fees):</span>
                   <span className="font-semibold text-green-600">
-                    ${platformEarnings?.netPlatformEarnings?.toFixed(2) || '0.00'}
+                    ${(platformEarnings?.netPlatformEarnings || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </span>
                 </div>
               </div>
