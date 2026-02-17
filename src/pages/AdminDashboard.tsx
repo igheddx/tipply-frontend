@@ -18,6 +18,7 @@ import {
 import { apiService } from '../services/api';
 import { isRefundEligible } from '../utils/refunds';
 import AggregatedChargesTable from '../components/AggregatedChargesTable';
+import PerformerInsights from '../components/PerformerInsights';
 import dayjs from 'dayjs';
 
 const { Search } = Input;
@@ -1526,6 +1527,11 @@ const AdminDashboard: React.FC = () => {
             scroll={{ x: 800 }}
           />
         </div>
+          </Tabs.TabPane>
+
+          {/* Performer Insights Tab */}
+          <Tabs.TabPane tab="Performer Insights" key="performer-insights">
+            <PerformerInsights />
           </Tabs.TabPane>
 
           {userProfile?.role === 'root_admin' && (
