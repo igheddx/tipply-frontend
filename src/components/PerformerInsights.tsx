@@ -4,7 +4,6 @@ import { AutoComplete } from 'antd'
 import type { BaseOptionType } from 'antd/es/select'
 import logger from '../utils/logger'
 import { API_BASE_URL } from '../utils/config'
-import { apiService } from '../services/api'
 
 interface PerformerDevice {
   id: string
@@ -99,7 +98,7 @@ const PerformerInsights: React.FC = () => {
   const [endDateTime, setEndDateTime] = useState('')
   const [filteredTipPoints, setFilteredTipPoints] = useState<TipPoint[]>([])
 
-  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const performSearch = useCallback(async (term: string) => {
     if (!term || term.trim().length < 2) {
