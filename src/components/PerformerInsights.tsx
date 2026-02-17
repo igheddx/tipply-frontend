@@ -45,12 +45,25 @@ interface HourlyTipsSummary {
   denominationTotals: Record<string, number>
 }
 
+interface DashboardMetricsResponse {
+  totalEarnings: number
+  pendingPayouts: number
+  pendingTips: number
+  todaysTips: number
+  thisWeekTips: number
+  thisWeekTipsCount: number
+  thisMonthTips: number
+  lastMonthTips: number
+  trendPercentage: number
+  trendDirection: string
+  stripeAvailableBalance: number
+  stripeFuturePayouts: number
+  stripeInTransit: number
+  stripeLifetimeVolume: number
+}
+
 interface PerformerInsights {
-  metrics: {
-    todayTips: number
-    totalTips: number
-    averageTip: number
-  }
+  metrics: DashboardMetricsResponse
   weeklyTips: WeeklyTipsSummary[]
   hourlyTips: HourlyTipsSummary[]
   timezoneLabel: string
@@ -367,38 +380,38 @@ const PerformerInsights: React.FC = () => {
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 <div className="bg-white rounded-lg shadow-sm p-6">
                   <div className="text-sm text-gray-500">Today's Tips</div>
-                  <div className="text-2xl font-bold text-gray-900">${insights.metrics.todayTips.toFixed(2)}</div>
+                  <div className="text-2xl font-bold text-gray-900">${(insights.metrics?.todaysTips || 0).toFixed(2)}</div>
                 </div>
                 
                 <div className="bg-white rounded-lg shadow-sm p-6">
                   <div className="text-sm text-gray-500">Future Payouts</div>
-                  <div className="text-2xl font-bold text-gray-900">${insights.futurePayouts.toFixed(2)}</div>
+                  <div className="text-2xl font-bold text-gray-900">${(insights.futurePayouts || 0).toFixed(2)}</div>
                 </div>
                 
                 <div className="bg-white rounded-lg shadow-sm p-6">
                   <div className="text-sm text-gray-500">In Transit</div>
-                  <div className="text-2xl font-bold text-gray-900">${insights.inTransit.toFixed(2)}</div>
+                  <div className="text-2xl font-bold text-gray-900">${(insights.inTransit || 0).toFixed(2)}</div>
                 </div>
                 
                 <div className="bg-white rounded-lg shadow-sm p-6">
                   <div className="text-sm text-gray-500">Total Balance</div>
-                  <div className="text-2xl font-bold text-gray-900">${insights.totalBalance.toFixed(2)}</div>
+                  <div className="text-2xl font-bold text-gray-900">${(insights.totalBalance || 0).toFixed(2)}</div>
                 </div>
                 
                 <div className="bg-white rounded-lg shadow-sm p-6">
                   <div className="text-sm text-gray-500">Lifetime Volume</div>
-                  <div className="text-2xl font-bold text-gray-900">${insights.metrics.totalTips.toFixed(2)}</div>
+                  <div className="text-2xl font-bold text-gray-900">${(insights.metrics?.stripeLifetimeVolume || 0).toFixed(2)}</div>
                 </div>
                 
                 <div className="bg-white rounded-lg shadow-sm p-6">
                   <div className="text-sm text-gray-500">Audience</div>
-                  <div className="text-2xl font-bold text-gray-900">{insights.uniqueTippersAllTime.toLocaleString()}</div>
+                  <div className="text-2xl font-bold text-gray-900">{(insights.uniqueTippersAllTime || 0).toLocaleString()}</div>
                   <div className="text-xs text-gray-400">Unique Tippers</div>
                 </div>
                 
                 <div className="bg-white rounded-lg shadow-sm p-6">
                   <div className="text-sm text-gray-500">Most Tipped</div>
-                  <div className="text-2xl font-bold text-gray-900">${insights.mostTippedDenomination}</div>
+                  <div className="text-2xl font-bold text-gray-900">${(insights.mostTippedDenomination || 0).toFixed(2)}</div>
                   <div className="text-xs text-gray-400">Denomination</div>
                 </div>
               </div>
