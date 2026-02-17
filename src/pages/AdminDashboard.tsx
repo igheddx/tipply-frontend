@@ -18,6 +18,7 @@ import {
 import { apiService } from '../services/api';
 import { isRefundEligible } from '../utils/refunds';
 import AggregatedChargesTable from '../components/AggregatedChargesTable';
+import PerformerInsights from '../components/PerformerInsights';
 import dayjs from 'dayjs';
 
 const { Search } = Input;
@@ -905,7 +906,7 @@ const AdminDashboard: React.FC = () => {
       {/* Header */}
       <div className="bg-white shadow-sm border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-[14px]">{/* Left side - Logo */}
+          <div className="flex justify-between items-center py-[21px]">{/* Left side - Logo */}
             <div className="flex items-center">
               <div className="relative w-12 h-12 overflow-visible rounded-lg">
                 <img
@@ -960,7 +961,7 @@ const AdminDashboard: React.FC = () => {
           <Col xs={24} sm={12} lg={6}>
             <div className="bg-white p-6 rounded-lg shadow-sm border">
               <Statistic
-                title="Total Users"
+                title="Total Audience"
                 value={stats?.totalUsers || 0}
                 prefix={<UserOutlined />}
                 valueStyle={{ color: '#3f8600' }}
@@ -1008,13 +1009,13 @@ const AdminDashboard: React.FC = () => {
                 <div className="flex justify-between">
                   <span className="text-gray-600">Total Revenue (processed):</span>
                   <span className="font-semibold text-lg text-green-600">
-                    ${stats?.totalRevenue?.toFixed(2) || '0.00'}
+                    ${(stats?.totalRevenue || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">Performer Payouts:</span>
                   <span className="font-semibold text-blue-600">
-                    ${stats?.totalPerformerPayouts?.toFixed(2) || '0.00'}
+                    ${(stats?.totalPerformerPayouts || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </span>
                 </div>
               </div>
@@ -1027,19 +1028,19 @@ const AdminDashboard: React.FC = () => {
                 <div className="flex justify-between">
                   <span className="text-gray-600">Total Platform Fee (YTD):</span>
                   <span className="font-semibold text-blue-600">
-                    ${platformEarnings?.totalPlatformFees?.toFixed(2) || '0.00'}
+                    ${(platformEarnings?.totalPlatformFees || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">Stripe Fees (actual):</span>
                   <span className="font-semibold text-orange-600">
-                    ${platformEarnings?.totalPaymentPartnerFees?.toFixed(2) || '0.00'}
+                    ${(platformEarnings?.totalPaymentPartnerFees || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">Net Earnings (platform fees - Stripe fees):</span>
                   <span className="font-semibold text-green-600">
-                    ${platformEarnings?.netPlatformEarnings?.toFixed(2) || '0.00'}
+                    ${(platformEarnings?.netPlatformEarnings || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </span>
                 </div>
               </div>
@@ -1526,6 +1527,11 @@ const AdminDashboard: React.FC = () => {
             scroll={{ x: 800 }}
           />
         </div>
+          </Tabs.TabPane>
+
+          {/* Performer Insights Tab */}
+          <Tabs.TabPane tab="Performer Insights" key="performer-insights">
+            <PerformerInsights />
           </Tabs.TabPane>
 
           {userProfile?.role === 'root_admin' && (

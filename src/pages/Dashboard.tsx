@@ -6,6 +6,7 @@ import SongManagement from '../components/SongManagement'
 import SongRequestMonitor from '../components/SongRequestMonitor'
 import { API_BASE_URL } from '../utils/config'
 import { CrownOutlined } from '@ant-design/icons'
+import { LineChart, Line, ScatterChart, Scatter, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 
 interface DashboardStats {
   totalDevices: number
@@ -37,6 +38,8 @@ interface DashboardMetrics {
   stripeFuturePayouts: number
   stripeInTransit: number
   stripeLifetimeVolume: number
+  uniqueTippersAllTime: number
+  mostTippedDenomination: number
 }
 
 interface DeviceSummary {
@@ -70,6 +73,43 @@ interface Device {
   deletedAt?: string
 }
 
+interface WeeklyTipsSummary {
+  weekStart: string
+  totalAmount: number
+  tipsCount: number
+  uniqueTippers: number
+  averageAmount: number
+  maxAmount: number
+}
+
+interface HourlyTipsSummary {
+  hour: number
+  totalAmount: number
+  tipsCount: number
+  uniqueTippers: number
+  averageAmount: number
+  maxAmount: number
+  denominationTotals: Record<string, number>
+}
+
+interface PerformerInsights {
+  metrics: DashboardMetrics
+  weeklyTips: WeeklyTipsSummary[]
+  hourlyTips: HourlyTipsSummary[]
+  timezoneLabel: string
+  totalBalance: number
+  futurePayouts: number
+  inTransit: number
+  uniqueTippersAllTime: number
+  mostTippedDenomination: number
+}
+
+interface TipPoint {
+  time: string
+  amount: number
+  timestamp: number
+}
+
 const Dashboard: React.FC = () => {
   const [stats, setStats] = useState<DashboardStats | null>(null)
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null)
@@ -80,6 +120,13 @@ const Dashboard: React.FC = () => {
   const [stripeEnabledDevices, setStripeEnabledDevices] = useState<string[]>([])
   const [userProfile, setUserProfile] = useState<any>(null)
   const [stripeMetricsLoading, setStripeMetricsLoading] = useState(true)
+  const [insights, setInsights] = useState<PerformerInsights | null>(null)
+  const [weeklyChartData, setWeeklyChartData] = useState<any[]>([])
+  const [trendData, setTrendData] = useState<any[]>([])
+  const [tipTimelinePoints, setTipTimelinePoints] = useState<TipPoint[]>([])
+  const [filteredTipPoints, setFilteredTipPoints] = useState<TipPoint[]>([])
+  const [startDateTime, setStartDateTime] = useState('')
+  const [endDateTime, setEndDateTime] = useState('')
   
   const getDeviceSetupUrl = () => {
     const host = window.location.hostname.toLowerCase()
@@ -126,6 +173,8 @@ const Dashboard: React.FC = () => {
   // Song Catalog Alert States
   const [showSongCatalogAlert, setShowSongCatalogAlert] = useState(false)
   const [songCatalogCount, setSongCatalogCount] = useState(0)
+  const [downloadingDeviceId, setDownloadingDeviceId] = useState<string | null>(null)
+  const [showHeaderMenu, setShowHeaderMenu] = useState(false)
   
   const navigate = useNavigate()
 
@@ -252,6 +301,8 @@ const Dashboard: React.FC = () => {
               stripeLifetimeVolume: fullMetrics.data.stripeLifetimeVolume ?? prev.stripeLifetimeVolume,
               totalEarnings: fullMetrics.data.totalEarnings ?? prev.totalEarnings,
               pendingPayouts: fullMetrics.data.pendingPayouts ?? prev.pendingPayouts,
+              uniqueTippersAllTime: fullMetrics.data.uniqueTippersAllTime ?? prev.uniqueTippersAllTime,
+              mostTippedDenomination: fullMetrics.data.mostTippedDenomination ?? prev.mostTippedDenomination,
             } : fullMetrics.data)
             logger.log(`⏱️ [PERF] Background Stripe metrics loaded in ${(performance.now() - stripeStart).toFixed(0)}ms`)
           }
@@ -259,6 +310,53 @@ const Dashboard: React.FC = () => {
           logger.warn('Skipping Stripe metrics due to error:', e)
         } finally {
           setStripeMetricsLoading(false)
+        }
+
+        // Background fetch: load insights data for charts
+        try {
+          const insightsStart = performance.now()
+          const timezoneOffset = new Date().getTimezoneOffset()
+          const response = await fetch(
+            `${API_BASE_URL}/api/tips/insights/${profileId}?timezoneOffsetMinutes=${timezoneOffset}`,
+            {
+              headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+              }
+            }
+          )
+
+          if (response.ok) {
+            const data = await response.json()
+            setInsights(data)
+            logger.log(`⏱️ [PERF] Insights data loaded in ${(performance.now() - insightsStart).toFixed(0)}ms`)
+          }
+
+          const timelineResp = await fetch(
+            `${API_BASE_URL}/api/tips/tips-timeline/${profileId}?limit=2000`,
+            {
+              headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+              }
+            }
+          )
+
+          if (timelineResp.ok) {
+            const timelineData = await timelineResp.json()
+            const points: TipPoint[] = timelineData.map((tip: any) => {
+              const timestamp = new Date(tip.createdAt).getTime()
+              return {
+                time: new Date(timestamp).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+                amount: tip.amount,
+                timestamp
+              }
+            })
+            points.sort((a, b) => a.timestamp - b.timestamp)
+            setTipTimelinePoints(points)
+          }
+        } catch (e) {
+          logger.warn('Skipping insights data due to error:', e)
         }
       } catch (error) {
         logger.error('Error initializing dashboard:', error)
@@ -330,6 +428,85 @@ const Dashboard: React.FC = () => {
 
     refreshData()
   }, [activeTab, userProfile?.id, stats?.devices, recentTips.length, deletedDevices.length])
+
+  // Process weekly chart data when insights change
+  useEffect(() => {
+    if (!insights?.weeklyTips) return
+
+    const chartData = insights.weeklyTips.map(week => {
+      const weekDate = new Date(week.weekStart)
+      const formattedWeek = `${weekDate.getMonth() + 1}/${weekDate.getDate()}`
+      return {
+        week: formattedWeek,
+        totalTips: week.totalAmount,
+        uniqueAudience: week.uniqueTippers
+      }
+    })
+
+    setWeeklyChartData(chartData)
+
+    // Calculate trend line
+    const validDataPoints = chartData.filter(d => d.totalTips > 0)
+    if (validDataPoints.length >= 2) {
+      const n = validDataPoints.length
+      const sumX = validDataPoints.reduce((sum, _, i) => sum + i, 0)
+      const sumY = validDataPoints.reduce((sum, d) => sum + d.totalTips, 0)
+      const sumXY = validDataPoints.reduce((sum, d, i) => sum + i * d.totalTips, 0)
+      const sumX2 = validDataPoints.reduce((sum, _, i) => sum + i * i, 0)
+
+      const slope = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX)
+      const intercept = (sumY - slope * sumX) / n
+
+      const trend = chartData.map((d, i) => ({
+        week: d.week,
+        trend: slope * i + intercept
+      }))
+
+      setTrendData(trend)
+    }
+  }, [insights])
+
+  // Set default date/time range (last 10 hours)
+  useEffect(() => {
+    if (startDateTime || endDateTime) return
+
+    const now = new Date()
+    const tenHoursAgo = new Date(now.getTime() - 10 * 60 * 60 * 1000)
+
+    const formatDateTime = (date: Date) => {
+      const year = date.getFullYear()
+      const month = String(date.getMonth() + 1).padStart(2, '0')
+      const day = String(date.getDate()).padStart(2, '0')
+      const hours = String(date.getHours()).padStart(2, '0')
+      const minutes = String(date.getMinutes()).padStart(2, '0')
+      return `${year}-${month}-${day}T${hours}:${minutes}`
+    }
+
+    setStartDateTime(formatDateTime(tenHoursAgo))
+    setEndDateTime(formatDateTime(now))
+  }, [startDateTime, endDateTime])
+
+  // Filter tip points by selected date/time window
+  useEffect(() => {
+    if (!tipTimelinePoints.length) {
+      setFilteredTipPoints([])
+      return
+    }
+
+    if (!startDateTime || !endDateTime) {
+      setFilteredTipPoints(tipTimelinePoints)
+      return
+    }
+
+    const start = new Date(startDateTime).getTime()
+    const end = new Date(endDateTime).getTime()
+
+    const filtered = tipTimelinePoints.filter(point =>
+      point.timestamp >= start && point.timestamp <= end
+    )
+
+    setFilteredTipPoints(filtered)
+  }, [tipTimelinePoints, startDateTime, endDateTime])
 
   const handleLogout = () => {
     localStorage.removeItem('token')
@@ -692,6 +869,7 @@ const Dashboard: React.FC = () => {
   }
 
   const downloadQRCode = async (deviceId: string, nickname: string) => {
+    setDownloadingDeviceId(deviceId)
     try {
       console.info('[QR] Download clicked', { deviceId, nickname })
 
@@ -699,11 +877,13 @@ const Dashboard: React.FC = () => {
       const qrBlob = await apiService.downloadQRCode(deviceId)
       if (!qrBlob) {
         alert('Could not download QR code. Please try again or check your connection.')
+        setDownloadingDeviceId(null)
         return
       }
 
       if (!qrBlob.type.startsWith('image/')) {
         alert(`QR download returned a non-image content-type: ${qrBlob.type || 'unknown'}`)
+        setDownloadingDeviceId(null)
         return
       }
 
@@ -751,6 +931,7 @@ const Dashboard: React.FC = () => {
         document.body.removeChild(a)
         URL.revokeObjectURL(rawUrl)
         alert('Could not generate the branded card because the QR image could not be decoded. Downloaded the raw QR instead.')
+        setDownloadingDeviceId(null)
         return
       }
 
@@ -760,7 +941,10 @@ const Dashboard: React.FC = () => {
       // Create a canvas for the 4x6 card (4in x 6in at 300 DPI = 1200 x 1800 px)
       const canvas = document.createElement('canvas')
       const ctx = canvas.getContext('2d')
-      if (!ctx) return
+      if (!ctx) {
+        setDownloadingDeviceId(null)
+        return
+      }
 
       const width = 1200
       const height = 1800
@@ -771,19 +955,18 @@ const Dashboard: React.FC = () => {
       ctx.fillStyle = '#ffffff'
       ctx.fillRect(0, 0, width, height)
 
-      // Load Tipwave logo
-      const logo = new Image()
-      logo.crossOrigin = 'anonymous'
-      logo.src = '/images/logo/tipwave-logo2b.png?v=20260208'
+      const loadImage = (src: string) => new Promise<HTMLImageElement>((resolve) => {
+        const img = new Image()
+        img.crossOrigin = 'anonymous'
+        img.onload = () => resolve(img)
+        img.onerror = () => resolve(img)
+        img.src = src
+      })
 
-      // Load music note icon
-      const musicNote = new Image()
-      musicNote.crossOrigin = 'anonymous'
-      musicNote.src = '/images/icons8-music-note-90.png'
-
-      // Wait for logo (optional)
-      await new Promise((resolve) => { logo.onload = resolve; logo.onerror = resolve })
-      await new Promise((resolve) => { musicNote.onload = resolve; musicNote.onerror = resolve })
+      const [logo, musicNote] = await Promise.all([
+        loadImage('/images/logo/tipwave-logo2b.png?v=20260208'),
+        loadImage('/images/icons8-music-note-90.png')
+      ])
       console.info('[QR] QR bitmap ready', { width: qrBitmap.width, height: qrBitmap.height })
 
       // Draw header
@@ -837,6 +1020,7 @@ const Dashboard: React.FC = () => {
         document.body.removeChild(a)
         URL.revokeObjectURL(rawUrl)
         alert('Could not render the branded card. Downloaded the raw QR instead.')
+        setDownloadingDeviceId(null)
         return
       }
 
@@ -901,11 +1085,16 @@ const Dashboard: React.FC = () => {
           window.URL.revokeObjectURL(url)
           window.URL.revokeObjectURL(qrBlobUrl)
           document.body.removeChild(a)
+          setDownloadingDeviceId(null)
+        } else {
+          alert('Failed to create download file')
+          setDownloadingDeviceId(null)
         }
       }, 'image/png')
     } catch (error) {
       logger.error('Error generating QR card:', error)
       alert(`Could not generate the QR card. ${error instanceof Error ? error.message : 'Please try again.'}`)
+      setDownloadingDeviceId(null)
     }
   }
 
@@ -1158,6 +1347,8 @@ const Dashboard: React.FC = () => {
     )
   }
 
+  const hasSongRequestEnabled = stats?.devices?.some(device => device.isAllowSongRequest) ?? false
+
   return (
     <div className="min-h-screen bg-white text-gray-900">
       {/* KYC Result Alert */}
@@ -1208,7 +1399,7 @@ const Dashboard: React.FC = () => {
       {/* Header */}
               <div className="bg-white shadow-sm border-b">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex justify-between items-center py-[14px]">
+            <div className="flex justify-between items-center py-[21px]">
             {/* Left side - Logo */}
             <div className="flex items-center">
               <div className="relative w-12 h-12 overflow-visible rounded-lg">
@@ -1223,48 +1414,103 @@ const Dashboard: React.FC = () => {
 
             {/* Right side - Actions */}
             <div className="flex items-center space-x-4">
-              {/* Admin Dashboard Button */}
-              {userProfile?.role === 'root_admin' && (
+              {hasSongRequestEnabled && (
                 <button
-                  onClick={() => navigate('/admin')}
-                  className="flex items-center space-x-2 bg-purple-50 border border-purple-200 rounded-lg px-3 py-2 text-purple-700 hover:bg-purple-100 transition-colors"
-                  title="Admin Dashboard"
+                  onClick={() => setShowMonitorFullscreen(true)}
+                  className="bg-gradient-to-r from-purple-600 to-blue-600 text-white px-3 py-2 sm:px-4 rounded-lg hover:from-purple-700 hover:to-blue-700 transition-all duration-200 font-medium text-sm flex items-center space-x-2 shadow-sm hover:shadow-md"
                 >
-                  <CrownOutlined className="text-purple-700 text-lg" />
-                  <span className="text-sm font-medium">Admin</span>
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                  <span className="sm:hidden">Monitor Songs</span>
+                  <span className="hidden sm:inline">Monitor Songs</span>
                 </button>
               )}
-
-              {/* Profile and Logout buttons */}
-              <button
-                onClick={() => navigate('/profile')}
-                className="p-2 text-gray-500 hover:text-gray-700 transition-colors"
-                title="Profile"
-              >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                </svg>
-              </button>
-              <button
-                onClick={handleLogout}
-                className="p-2 text-gray-500 hover:text-gray-700 transition-colors"
-                title="Logout"
-              >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                </svg>
-              </button>
+              {/* Hamburger Menu */}
+              <div className="relative">
+                <button
+                  onClick={() => setShowHeaderMenu((prev) => !prev)}
+                  className="p-2 text-gray-500 hover:text-gray-700 transition-colors"
+                  title="Menu"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                  </svg>
+                </button>
+              </div>
             </div>
           </div>
         </div>
       </div>
+
+      {showHeaderMenu && (
+        <div className="fixed inset-0 z-50">
+          <div
+            className="absolute inset-0 bg-black/40"
+            onClick={() => setShowHeaderMenu(false)}
+            aria-hidden="true"
+          />
+          <div className="absolute right-0 top-0 h-full w-64 bg-white shadow-xl flex flex-col">
+            <div className="flex items-center justify-between px-4 py-4 border-b border-gray-200">
+              <span className="text-sm font-semibold text-gray-800">Menu</span>
+              <button
+                onClick={() => setShowHeaderMenu(false)}
+                className="p-2 text-gray-500 hover:text-gray-700"
+                aria-label="Close menu"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <div className="flex flex-col py-2">
+              <button
+                onClick={() => {
+                  setShowHeaderMenu(false)
+                  navigate('/profile')
+                }}
+                className="w-full flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                </svg>
+                <span>Profile</span>
+              </button>
+              {userProfile?.role === 'root_admin' && (
+                <button
+                  onClick={() => {
+                    setShowHeaderMenu(false)
+                    navigate('/admin')
+                  }}
+                  className="w-full flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50"
+                >
+                  <CrownOutlined className="text-base text-purple-700" />
+                  <span>Admin</span>
+                </button>
+              )}
+              <button
+                onClick={() => {
+                  setShowHeaderMenu(false)
+                  handleLogout()
+                }}
+                className="w-full flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                </svg>
+                <span>Logout</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Welcome Message - Moved outside header */}
         <div className="mb-8 flex justify-between items-start">
           <div>
             <h2 className="text-3xl font-bold text-gray-900 mb-2">
-              Welcome back, {userProfile?.firstName || userProfile?.stageName || 'Performer'}! 👋
+              Welcome back, {userProfile?.firstName || userProfile?.stageName || 'Performer'}!
             </h2>
             <p className="text-gray-600">
               Here's how you're connecting with your audience and building meaningful social connections today.
@@ -1279,16 +1525,18 @@ const Dashboard: React.FC = () => {
               </div>
             )}
           </div>
-          <button
-            onClick={() => refreshDashboard()}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors duration-200 shadow-sm hover:shadow-md"
-            title="Refresh dashboard data"
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-            </svg>
-            <span>Refresh</span>
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => refreshDashboard()}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors duration-200 shadow-sm hover:shadow-md"
+              title="Refresh dashboard data"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+              <span>Refresh</span>
+            </button>
+          </div>
         </div>
 
         {/* Song Catalog Alert */}
@@ -1465,6 +1713,46 @@ const Dashboard: React.FC = () => {
             </div>
           </div>
 
+          {/* Audience Count */}
+          <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-4 transform hover:scale-105 transition-all duration-200">
+            <div className="flex flex-col items-center text-center">
+              <div className="flex-shrink-0 mb-3">
+                <div className="w-10 h-10 bg-indigo-500 rounded-lg flex items-center justify-center">
+                  <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                  </svg>
+                </div>
+              </div>
+              <div>
+                <p className="text-xs font-medium text-gray-700 mb-1">Audience</p>
+                <p className="text-lg font-bold text-gray-900 mb-1">
+                  {metrics ? (metrics.uniqueTippersAllTime || 0).toLocaleString() : '0'}
+                </p>
+                <p className="text-xs text-gray-600">Unique Tippers</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Most Tipped Denomination */}
+          <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-4 transform hover:scale-105 transition-all duration-200">
+            <div className="flex flex-col items-center text-center">
+              <div className="flex-shrink-0 mb-3">
+                <div className="w-10 h-10 bg-pink-500 rounded-lg flex items-center justify-center">
+                  <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
+                  </svg>
+                </div>
+              </div>
+              <div>
+                <p className="text-xs font-medium text-gray-700 mb-1">Most Tipped</p>
+                <p className="text-lg font-bold text-gray-900 mb-1">
+                  {metrics ? formatCurrency(metrics.mostTippedDenomination || 0) : '$0.00'}
+                </p>
+                <p className="text-xs text-gray-600">Denomination</p>
+              </div>
+            </div>
+          </div>
+
           {/* This Month */}
           <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-4 transform hover:scale-105 transition-all duration-200">
             <div className="flex flex-col items-center text-center">
@@ -1526,10 +1814,133 @@ const Dashboard: React.FC = () => {
           </div>
         </div>
 
+        {/* Weekly Performance Chart */}
+        {weeklyChartData.length > 0 && (
+          <div className="bg-white rounded-lg shadow-sm p-6 mb-8">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Last 8 Weeks Performance</h3>
+            <ResponsiveContainer width="100%" height={300}>
+              <LineChart data={weeklyChartData}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="week" />
+                    <YAxis yAxisId="left" domain={[0, 'auto']} />
+                    <YAxis yAxisId="right" orientation="right" domain={[0, 'auto']} />
+                <Tooltip 
+                  content={({ active, payload }) => {
+                    if (active && payload && payload.length) {
+                      return (
+                        <div className="bg-white p-3 border border-gray-200 rounded shadow-lg">
+                          <p className="font-medium">{payload[0].payload.week}</p>
+                          <p className="text-sm text-blue-600">Total Tips: ${payload[0].value?.toFixed(2)}</p>
+                          <p className="text-sm text-green-600">Unique Audience: {payload[0].payload.uniqueAudience}</p>
+                        </div>
+                      )
+                    }
+                    return null
+                  }}
+                />
+                <Legend />
+                <Line 
+                  yAxisId="left"
+                  type="monotone" 
+                  dataKey="totalTips" 
+                  stroke="#8b5cf6" 
+                  strokeWidth={2}
+                  name="Total Tips ($)"
+                />
+                {trendData.length > 0 && (
+                  <Line
+                    yAxisId="left"
+                    type="monotone"
+                    data={trendData}
+                    dataKey="trend"
+                    stroke="#d1d5db"
+                    strokeWidth={2}
+                    strokeDasharray="0"
+                    name="Trend"
+                    dot={false}
+                  />
+                )}
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        )}
+
+        {/* Time Window Tips Chart */}
+        {tipTimelinePoints.length > 0 && (
+          <div className="bg-white rounded-lg shadow-sm p-6 mb-8">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Tips by Time Window</h3>
+            
+            {/* Date/Time Range Selector */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Start Date/Time</label>
+                <input
+                  type="datetime-local"
+                  value={startDateTime}
+                  onChange={(e) => setStartDateTime(e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">End Date/Time</label>
+                <input
+                  type="datetime-local"
+                  value={endDateTime}
+                  onChange={(e) => setEndDateTime(e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+                />
+              </div>
+            </div>
+
+            <ResponsiveContainer width="100%" height={300}>
+              <ScatterChart>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis 
+                  dataKey="time" 
+                  name="Time"
+                  tick={{ fontSize: 12 }}
+                  angle={-45}
+                  textAnchor="end"
+                  height={80}
+                />
+                <YAxis 
+                  dataKey="amount" 
+                  name="Amount ($)"
+                />
+                <Tooltip 
+                  cursor={{ strokeDasharray: '3 3' }}
+                  content={({ active, payload }) => {
+                    if (active && payload && payload.length) {
+                      return (
+                        <div className="bg-white p-3 border border-gray-200 rounded shadow-lg">
+                          <p className="font-medium">{payload[0].payload.time}</p>
+                          <p className="text-sm text-green-600">Amount: ${payload[0].payload.amount.toFixed(2)}</p>
+                        </div>
+                      )
+                    }
+                    return null
+                  }}
+                />
+                <Scatter 
+                  name="Tips" 
+                  data={filteredTipPoints} 
+                  fill="#8b5cf6"
+                />
+              </ScatterChart>
+            </ResponsiveContainer>
+            
+            <p className="text-sm text-gray-500 mt-4">
+              {filteredTipPoints.length > 0
+                ? `Showing ${filteredTipPoints.length} tips in the selected time window`
+                : 'No tips in the selected time window. Adjust the range to see results.'}
+            </p>
+          </div>
+        )}
+
         {/* Tabs */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 mb-8">
           <div className="border-b border-gray-200">
-            <nav className="flex space-x-8 px-6">
+            <nav className="flex flex-wrap gap-x-6 gap-y-2 px-6">
               {!showAddDeviceForm ? (
                 <>
                   <button
@@ -1742,9 +2153,22 @@ const Dashboard: React.FC = () => {
                           <div className="flex space-x-2">
                             <button
                               onClick={() => downloadQRCode(device.id, device.nickname)}
-                              className="flex-1 px-3 py-2 bg-primary-600 text-white text-sm rounded-lg hover:bg-primary-700 transition-colors"
+                              disabled={downloadingDeviceId === device.id}
+                              className={`flex-1 px-3 py-2 text-white text-sm rounded-lg transition-colors ${
+                                downloadingDeviceId === device.id
+                                  ? 'bg-primary-400 cursor-not-allowed'
+                                  : 'bg-primary-600 hover:bg-primary-700'
+                              }`}
                             >
-                              Download QR
+                              {downloadingDeviceId === device.id ? (
+                                <span className="flex items-center justify-center gap-2">
+                                  <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                  </svg>
+                                  Generating...
+                                </span>
+                              ) : 'Download QR'}
                             </button>
                             <button
                               onClick={() => window.open(device.qrCodeUrl, '_blank')}
@@ -2225,15 +2649,6 @@ const Dashboard: React.FC = () => {
                 <div className="bg-white rounded-lg shadow p-6">
                   <div className="flex items-center justify-between mb-6">
                     <h2 className="text-xl font-semibold text-gray-900">Monitor Song Requests</h2>
-                    <button
-                      onClick={() => setShowMonitorFullscreen(true)}
-                      className="bg-gradient-to-r from-purple-600 to-blue-600 text-white px-6 py-2 rounded-lg hover:from-purple-700 hover:to-blue-700 transition-all duration-200 font-medium flex items-center space-x-2"
-                    >
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                      </svg>
-                      <span>Actively Monitor Request</span>
-                    </button>
                   </div>
                   
                   <div className="space-y-4">

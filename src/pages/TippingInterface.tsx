@@ -893,7 +893,7 @@ const TippingInterface: React.FC = () => {
         refreshPaymentMethodSession()
       } else {
         const errorMsg = response.raw?.error || response.error || 'Failed to submit tip. Please try again.'
-        logger.error('❌ Tip submission failed:', response.raw)
+        logger.error('❌ Tip submission failed:', response.raw, 'Error:', errorMsg)
         toast.error(errorMsg)
       }
     } catch (error) {
@@ -952,7 +952,7 @@ const TippingInterface: React.FC = () => {
         refreshPaymentMethodSession()
       } else {
         const errorMsg = response.raw?.error || response.error || 'Failed to submit tip. Please try again.'
-        logger.error('❌ Tip submission failed:', response.raw)
+        logger.error('❌ Tip submission failed:', response.raw, 'Error:', errorMsg)
         toast.error(errorMsg)
       }
     } catch (error) {

@@ -426,7 +426,11 @@ function PaymentForm({
       {paymentRequest && walletMode !== 'card' && (
         <div className="pb-4">
           <button
-            onClick={() => paymentRequest.show()}
+            type="button"
+            onClick={(event) => {
+              event.preventDefault()
+              paymentRequest.show()
+            }}
             disabled={loading}
             className={`w-full transition-all disabled:opacity-50 font-medium text-base flex items-center justify-center ${
               isApplePay
