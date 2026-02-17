@@ -1079,10 +1079,10 @@ const AdminDashboard: React.FC = () => {
                     setBatchResultMessage(null);
                     loadDashboardData();
                   }}
-                  className="w-full"
-                >
-                  Refresh Data
-                </Button>
+                  className="w-full flex items-center justify-center"
+                  aria-label="Refresh data"
+                  title="Refresh data"
+                />
                 <div className="text-sm text-gray-500 text-center">
                   {stats?.pendingTips || 0} pending tips
                 </div>
