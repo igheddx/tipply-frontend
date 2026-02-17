@@ -1016,7 +1016,6 @@ const TippingInterface: React.FC = () => {
         performerFirstName={deviceInfo?.ownerFirstName}
         performerLastName={deviceInfo?.ownerLastName}
         performerPhotoUrl={deviceInfo?.profilePhotoUrl}
-        walletMode="both"
       />
     )
   }
