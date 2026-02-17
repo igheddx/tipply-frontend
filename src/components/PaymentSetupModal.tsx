@@ -255,6 +255,9 @@ function PaymentForm({
             // Extract payment method ID from the SetupIntent, NOT the event
             const paymentMethodId = setupIntent?.payment_method as string
             logger.log('💳 Payment method ID from wallet:', paymentMethodId)
+
+            // Close the wallet sheet immediately after success to avoid hanging UI
+            event.complete('success')
             
             // Get unique device ID
             const uniqueDeviceId = getUniqueDeviceId()
@@ -281,10 +284,9 @@ function PaymentForm({
               }
             }
             // Persist payment info to backend so security checks pass
-            await storePaymentInfo(uniqueDeviceId!, paymentMethodId, customerId, platform)
-            
+            void storePaymentInfo(uniqueDeviceId!, paymentMethodId, customerId, platform)
+
             // Payment method is automatically attached to customer by Stripe during SetupIntent confirmation
-            event.complete('success')
             toast.success('Payment method added successfully!')
             onComplete(paymentMethodId)
           }
