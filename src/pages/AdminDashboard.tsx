@@ -949,7 +949,7 @@ const AdminDashboard: React.FC = () => {
         {/* Welcome Message */}
         <div className="mb-8">
           <h2 className="text-3xl font-bold text-gray-900 mb-2">
-            Admin Dashboard, Welcome {userProfile?.firstName || userProfile?.stageName || 'Admin'}! 👋
+            Admin Dashboard, Welcome {userProfile?.firstName || userProfile?.stageName || 'Admin'}!
           </h2>
           <p className="text-gray-600">
             System overview and performer management
