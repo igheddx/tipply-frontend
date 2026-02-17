@@ -15,6 +15,7 @@ const ForgotPassword: React.FC = () => {
   const [strengthScore, setStrengthScore] = useState(0);
   const [strengthLevel, setStrengthLevel] = useState('');
   const [showPasswords, setShowPasswords] = useState({ new: false, confirm: false });
+  const [passwordErrors, setPasswordErrors] = useState<{[key: string]: string}>({});
 
   // Calculate password strength in real-time
   const calculatePasswordStrength = (password: string) => {
@@ -141,6 +142,29 @@ const ForgotPassword: React.FC = () => {
     return 'text-red-600';
   };
 
+  const handlePasswordFieldBlur = (field: string) => {
+    const newErrors = { ...passwordErrors }
+    
+    if (field === 'newPassword') {
+      if (!newPassword) {
+        newErrors.newPassword = 'New password is required'
+      } else if (newPassword.length < 8) {
+        newErrors.newPassword = 'Password must be at least 8 characters'
+      } else {
+        delete newErrors.newPassword
+      }
+    } else if (field === 'confirmPassword') {
+      if (!confirmPassword) {
+        newErrors.confirmPassword = 'Please confirm your new password'
+      } else if (newPassword !== confirmPassword) {
+        newErrors.confirmPassword = 'Passwords do not match'
+      } else {
+        delete newErrors.confirmPassword
+      }
+    }
+    
+    setPasswordErrors(newErrors)
+  }
 
 
   return (
@@ -305,8 +329,14 @@ const ForgotPassword: React.FC = () => {
                     onChange={(e) => {
                       setNewPassword(e.target.value);
                       calculatePasswordStrength(e.target.value);
+                      if (passwordErrors.newPassword) {
+                        setPasswordErrors(prev => ({ ...prev, newPassword: '' }))
+                      }
                     }}
-                    className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all duration-200"
+                    onBlur={() => handlePasswordFieldBlur('newPassword')}
+                    className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all duration-200 ${
+                      passwordErrors.newPassword ? 'border-red-500' : 'border-gray-300'
+                    }`}
                     placeholder="Enter new password"
                   />
                   <button
@@ -343,9 +373,14 @@ const ForgotPassword: React.FC = () => {
                     </div>
                   </div>
                 )}
-                <p className="mt-2 text-sm text-gray-500">
-                  Must be at least 10 characters long
-                </p>
+                {passwordErrors.newPassword && (
+                  <p className="text-red-500 text-sm mt-2">{passwordErrors.newPassword}</p>
+                )}
+                {!passwordErrors.newPassword && (
+                  <p className="mt-2 text-sm text-gray-500">
+                    Must be at least 8 characters long
+                  </p>
+                )}
               </div>
 
               <div>
@@ -365,8 +400,16 @@ const ForgotPassword: React.FC = () => {
                     autoComplete="new-password"
                     required
                     value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all duration-200"
+                    onChange={(e) => {
+                      setConfirmPassword(e.target.value);
+                      if (passwordErrors.confirmPassword) {
+                        setPasswordErrors(prev => ({ ...prev, confirmPassword: '' }))
+                      }
+                    }}
+                    onBlur={() => handlePasswordFieldBlur('confirmPassword')}
+                    className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all duration-200 ${
+                      passwordErrors.confirmPassword ? 'border-red-500' : 'border-gray-300'
+                    }`}
                     placeholder="Confirm new password"
                   />
                   <button
@@ -387,6 +430,9 @@ const ForgotPassword: React.FC = () => {
                     )}
                   </button>
                 </div>
+                {passwordErrors.confirmPassword && (
+                  <p className="text-red-500 text-sm mt-2">{passwordErrors.confirmPassword}</p>
+                )}
               </div>
 
               <button

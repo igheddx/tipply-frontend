@@ -207,6 +207,36 @@ const Profile: React.FC = () => {
     }
   }
 
+  const handlePasswordFieldBlur = (field: string) => {
+    const errors: {[key: string]: string} = { ...passwordErrors }
+    
+    if (field === 'currentPassword') {
+      if (!passwordForm.currentPassword) {
+        errors.currentPassword = 'Current password is required'
+      } else {
+        delete errors.currentPassword
+      }
+    } else if (field === 'newPassword') {
+      if (!passwordForm.newPassword) {
+        errors.newPassword = 'New password is required'
+      } else if (passwordForm.newPassword.length < 8) {
+        errors.newPassword = 'Password must be at least 8 characters'
+      } else {
+        delete errors.newPassword
+      }
+    } else if (field === 'confirmPassword') {
+      if (!passwordForm.confirmPassword) {
+        errors.confirmPassword = 'Please confirm your new password'
+      } else if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+        errors.confirmPassword = 'Passwords do not match'
+      } else {
+        delete errors.confirmPassword
+      }
+    }
+    
+    setPasswordErrors(errors)
+  }
+
   const validatePasswordForm = () => {
     const errors: {[key: string]: string} = {}
     
@@ -713,6 +743,7 @@ const Profile: React.FC = () => {
                     type={showPasswordFields.current ? 'text' : 'password'}
                     value={passwordForm.currentPassword}
                     onChange={(e) => handlePasswordInputChange('currentPassword', e.target.value)}
+                    onBlur={() => handlePasswordFieldBlur('currentPassword')}
                     className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent ${
                       passwordErrors.currentPassword ? 'border-red-500' : 'border-gray-300'
                     }`}
@@ -749,6 +780,7 @@ const Profile: React.FC = () => {
                     type={showPasswordFields.new ? 'text' : 'password'}
                     value={passwordForm.newPassword}
                     onChange={(e) => handlePasswordInputChange('newPassword', e.target.value)}
+                    onBlur={() => handlePasswordFieldBlur('newPassword')}
                     className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent ${
                       passwordErrors.newPassword ? 'border-red-500' : 'border-gray-300'
                     }`}
@@ -785,6 +817,7 @@ const Profile: React.FC = () => {
                     type={showPasswordFields.confirm ? 'text' : 'password'}
                     value={passwordForm.confirmPassword}
                     onChange={(e) => handlePasswordInputChange('confirmPassword', e.target.value)}
+                    onBlur={() => handlePasswordFieldBlur('confirmPassword')}
                     className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent ${
                       passwordErrors.confirmPassword ? 'border-red-500' : 'border-gray-300'
                     }`}
