@@ -208,7 +208,7 @@ function PaymentForm({
       const pr = stripe.paymentRequest({
         country: 'US',
         currency: 'usd',
-        total: { label: 'Wallet Setup (No Charge)', amount: totalAmount },
+        total: { label: '– Wallet Setup (No Charge)', amount: totalAmount },
         requestPayerName: true,
         requestPayerEmail: true,
         displayItems: []
