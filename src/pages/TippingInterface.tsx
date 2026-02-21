@@ -1,14 +1,16 @@
 import logger from "../utils/logger";
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef, lazy, Suspense } from 'react'
 import { useParams } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { toast } from 'sonner'
-import confetti from 'canvas-confetti'
-import PaymentSetupModal from '../components/PaymentSetupModal'
-import SongCatalogSearch from '../components/SongCatalogSearch'
 import apiService from '../services/api'
 import { getApiBaseUrl } from '../utils/config'
 import { getUniqueDeviceId, detectPlatform, restoreDeviceIdFromIndexedDB } from '../utils/deviceId'
+
+const PaymentSetupModal = lazy(() => import('../components/PaymentSetupModal'))
+const SongCatalogSearch = lazy(() => import('../components/SongCatalogSearch'))
+
+let confettiLoader: any = null
 
 interface DeviceInfo {
   id: string
@@ -698,16 +700,29 @@ const TippingInterface: React.FC = () => {
 
     const config = getConfettiConfig(amount)
 
-    confetti({
-      particleCount: config.particleCount,
-      spread: config.spread,
-      startVelocity: config.startVelocity,
-      origin: { y: 0.6 },
-      colors: ['#ff0000', '#00ff00', '#0000ff', '#ffff00', '#ff00ff', '#00ffff'],
-      ticks: config.duration / 16.67, // Convert ms to ticks (60fps)
-      gravity: 1.2,
-      scalar: 1.2
-    })
+    const runConfetti = async () => {
+      try {
+        if (!confettiLoader) {
+          const module = await import('canvas-confetti')
+          confettiLoader = module.default
+        }
+
+        confettiLoader({
+          particleCount: config.particleCount,
+          spread: config.spread,
+          startVelocity: config.startVelocity,
+          origin: { y: 0.6 },
+          colors: ['#ff0000', '#00ff00', '#0000ff', '#ffff00', '#ff00ff', '#00ffff'],
+          ticks: config.duration / 16.67,
+          gravity: 1.2,
+          scalar: 1.2
+        })
+      } catch (error) {
+        logger.log('Confetti module load failed:', error)
+      }
+    }
+
+    void runConfetti()
   }
 
   const handleTipClick = (amount: number) => {
@@ -925,26 +940,28 @@ const TippingInterface: React.FC = () => {
             Set up payment
           </button>
         </div>
-        <PaymentSetupModal
-          isOpen={showPaymentModal}
-          onClose={() => setShowPaymentModal(false)}
-          onComplete={(paymentMethodId) => {
-            logger.log('🎉 Payment setup complete! Payment method ID:', paymentMethodId)
-            if (paymentMethodId) {
-              storePaymentMethodId(paymentMethodId)
-            }
-            setIsPaymentSetup(true)
-            setShowPaymentModal(false)
-            toast.success('Payment method added successfully!', { duration: 1000 })
-          }}
-          deviceUuid={deviceInfo?.uuid || ''}
-          userId={userId}
-          performerStageName={deviceInfo?.stageName}
-          performerFirstName={deviceInfo?.ownerFirstName}
-          performerLastName={deviceInfo?.ownerLastName}
-          performerPhotoUrl={deviceInfo?.profilePhotoUrl}
-          walletMode="both"
-        />
+        <Suspense fallback={null}>
+          <PaymentSetupModal
+            isOpen={showPaymentModal}
+            onClose={() => setShowPaymentModal(false)}
+            onComplete={(paymentMethodId) => {
+              logger.log('🎉 Payment setup complete! Payment method ID:', paymentMethodId)
+              if (paymentMethodId) {
+                storePaymentMethodId(paymentMethodId)
+              }
+              setIsPaymentSetup(true)
+              setShowPaymentModal(false)
+              toast.success('Payment method added successfully!', { duration: 1000 })
+            }}
+            deviceUuid={deviceInfo?.uuid || ''}
+            userId={userId}
+            performerStageName={deviceInfo?.stageName}
+            performerFirstName={deviceInfo?.ownerFirstName}
+            performerLastName={deviceInfo?.ownerLastName}
+            performerPhotoUrl={deviceInfo?.profilePhotoUrl}
+            walletMode="both"
+          />
+        </Suspense>
       </div>
     )
   }
@@ -1378,36 +1395,40 @@ const TippingInterface: React.FC = () => {
               exit={{ scale: 0.9, opacity: 0 }}
               className="bg-white rounded-2xl max-w-2xl w-full max-h-[80vh] overflow-hidden"
             >
-              <SongCatalogSearch
-                deviceUuid={deviceInfo?.uuid || ''}
-                userTempId={userId}
-                onSongSelect={handleSongSelect}
-                onBackToTip={() => setShowSongSearch(false)}
-                isVisible={showSongSearch}
-                refreshKey={tipsRefreshKey}
-              />
+              <Suspense fallback={<div className="p-8 text-center text-gray-600">Loading songs...</div>}>
+                <SongCatalogSearch
+                  deviceUuid={deviceInfo?.uuid || ''}
+                  userTempId={userId}
+                  onSongSelect={handleSongSelect}
+                  onBackToTip={() => setShowSongSearch(false)}
+                  isVisible={showSongSearch}
+                  refreshKey={tipsRefreshKey}
+                />
+              </Suspense>
             </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
 
       {/* Payment Setup Modal */}
-      <PaymentSetupModal
-        isOpen={showPaymentModal}
-        onClose={() => setShowPaymentModal(false)}
-        onComplete={(paymentMethodId) => {
-          logger.log('🎉 Payment setup complete! Payment method ID:', paymentMethodId)
-          if (paymentMethodId) {
-            storePaymentMethodId(paymentMethodId)
-          }
-          clearPaymentCache() // Clear cache so next check will be fresh
-          setIsPaymentSetup(true)
-          setShowPaymentModal(false)
-          toast.success('Payment method added successfully!', { duration: 1000 })
-        }}
-        deviceUuid={deviceInfo?.uuid || ''}
-        userId={userId}
-      />
+      <Suspense fallback={null}>
+        <PaymentSetupModal
+          isOpen={showPaymentModal}
+          onClose={() => setShowPaymentModal(false)}
+          onComplete={(paymentMethodId) => {
+            logger.log('🎉 Payment setup complete! Payment method ID:', paymentMethodId)
+            if (paymentMethodId) {
+              storePaymentMethodId(paymentMethodId)
+            }
+            clearPaymentCache() // Clear cache so next check will be fresh
+            setIsPaymentSetup(true)
+            setShowPaymentModal(false)
+            toast.success('Payment method added successfully!', { duration: 1000 })
+          }}
+          deviceUuid={deviceInfo?.uuid || ''}
+          userId={userId}
+        />
+      </Suspense>
 
       {/* Audio Element */}
       <audio
