@@ -219,14 +219,20 @@ function PaymentForm({
         displayItems: [{ label: '– Wallet Setup (No Charge)', amount: totalAmount }]
       })
       
-      applePaymentRequest.canMakePayment().then((result) => {
-        logger.log('Payment Request canMakePayment result:', result)
+      Promise.all([
+        applePaymentRequest.canMakePayment(),
+        googlePaymentRequest.canMakePayment()
+      ]).then(([appleResult, googleResult]) => {
+        logger.log('Payment Request canMakePayment result:', appleResult)
         logger.log('User Agent:', navigator.userAgent)
         logger.log('Platform:', navigator.platform)
         logger.log('Is HTTPS:', window.location.protocol === 'https:')
 
-        const appleAvailable = !!(result && (result as any).applePay)
-        const googleAvailable = !!(result && (result as any).googlePay)
+        const appleAvailable = !!(appleResult && (appleResult as any).applePay)
+        const googleAvailable = !!(
+          (googleResult && (googleResult as any).googlePay) ||
+          (appleResult && (appleResult as any).googlePay)
+        )
         const platform = detectPlatform()
         const preferredWallet = platform === 'iOS' && appleAvailable
           ? 'apple'
