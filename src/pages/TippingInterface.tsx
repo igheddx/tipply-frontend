@@ -99,21 +99,6 @@ const TippingInterface: React.FC = () => {
     }
   }, [])
 
-  // Update mobile status bar / theme color to match UI mode
-  useEffect(() => {
-    const themeColor = uiMode === 'cards' ? '#1e1b4b' : '#000000'
-    const meta = document.querySelector('meta[name="theme-color"]')
-    if (meta) {
-      meta.setAttribute('content', themeColor)
-    }
-    
-    // Also update Apple status bar style
-    const appleStatusBar = document.querySelector('meta[name="apple-mobile-web-app-status-bar-style"]')
-    if (appleStatusBar) {
-      appleStatusBar.setAttribute('content', 'black-translucent')
-    }
-  }, [uiMode])
-
   // Check if device is mobile
   useEffect(() => {
     const checkMobile = () => {
@@ -165,65 +150,6 @@ const TippingInterface: React.FC = () => {
       mq.removeEventListener('change', handler)
       window.removeEventListener('resize', handler)
       window.removeEventListener('orientationchange', handler)
-    }
-  }, [])
-
-  // Try to lock orientation to portrait where supported (Android Chrome/PWA)
-  // Only on actual mobile devices, not in desktop mobile emulation mode
-  useEffect(() => {
-    const attemptLock = async () => {
-      try {
-        // Check if this is a real mobile device (not desktop emulation)
-        const isMobileDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
-        
-        if (!isMobileDevice) {
-          logger.log('ℹ️ Skipping orientation lock on desktop/emulated device')
-          return
-        }
-
-        const ori: any = (window.screen as any).orientation
-        if (ori && typeof ori.lock === 'function') {
-          try {
-            await ori.lock('portrait-primary')
-            logger.log('✅ Screen orientation locked to portrait')
-          } catch (lockError: any) {
-            // On Android Chrome, we may need fullscreen first
-            logger.log('⚠️ Could not lock orientation without fullscreen:', lockError.message)
-            
-            // Try requesting fullscreen then locking
-            try {
-              const elem: any = document.documentElement
-              if (elem.requestFullscreen) {
-                await elem.requestFullscreen()
-              } else if (elem.webkitRequestFullscreen) {
-                elem.webkitRequestFullscreen()
-              } else if (elem.mozRequestFullScreen) {
-                elem.mozRequestFullScreen()
-              } else if (elem.msRequestFullscreen) {
-                elem.msRequestFullscreen()
-              }
-              
-              // Try lock again after fullscreen
-              await ori.lock('portrait-primary')
-              logger.log('✅ Fullscreen + orientation lock successful')
-            } catch (fullscreenError) {
-              logger.log('⚠️ Fullscreen request also failed:', fullscreenError)
-            }
-          }
-        }
-      } catch (e) {
-        logger.log('ℹ️ Screen orientation lock not supported on this device')
-      }
-    }
-
-    // Try immediately and again on first interaction (helps Chrome on Android)
-    attemptLock()
-    const onFirstInteraction = () => attemptLock()
-    window.addEventListener('touchstart', onFirstInteraction, { once: true })
-    window.addEventListener('click', onFirstInteraction, { once: true })
-    return () => {
-      window.removeEventListener('touchstart', onFirstInteraction)
-      window.removeEventListener('click', onFirstInteraction)
     }
   }, [])
 

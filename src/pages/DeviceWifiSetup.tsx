@@ -25,7 +25,6 @@ import { useState, useEffect } from 'react';
 import { Button, Input, Alert, Card, Steps, Modal, List } from 'antd';
 import { WifiOutlined, ScanOutlined, CheckCircleOutlined, LoadingOutlined, ApiOutlined, MobileOutlined, DesktopOutlined } from '@ant-design/icons';
 import { toast } from 'sonner';
-import { PWAInstallPrompt } from '../components/PWAInstallPrompt';
 
 interface BluetoothDevice {
   name: string;
@@ -40,7 +39,6 @@ interface WifiNetwork {
 }
 
 interface EnvironmentInfo {
-  isPWA: boolean;
   isIOS: boolean;
   isAndroid: boolean;
   isMobile: boolean;
@@ -73,11 +71,6 @@ const DeviceWifiSetup = () => {
     const isMobile = isIOS || isAndroid || /Mobile/.test(userAgent);
     const isDesktop = !isMobile;
     
-    // Check if running as PWA
-    const isPWA = window.matchMedia('(display-mode: standalone)').matches ||
-                  (window.navigator as any).standalone === true ||
-                  document.referrer.includes('android-app://');
-    
     // Detect browser
     let browser = 'Unknown';
     if (userAgent.includes('Chrome')) browser = 'Chrome';
@@ -90,7 +83,6 @@ const DeviceWifiSetup = () => {
     const supportsNotifications = 'Notification' in window;
     
     return {
-      isPWA,
       isIOS,
       isAndroid,
       isMobile,
@@ -114,7 +106,7 @@ const DeviceWifiSetup = () => {
     // Set appropriate error message based on environment
     if (!env.supportsWebBluetooth) {
       if (env.isIOS) {
-        setError('⚠️ Web Bluetooth is not supported on iOS. Please use an Android device with Chrome, Edge, or Opera, or install the Tipply PWA wrapper.');
+        setError('⚠️ Web Bluetooth is not supported on iOS. Please use an Android device with Chrome, Edge, or Opera.');
       } else if (env.isAndroid) {
         setError(`Web Bluetooth is not supported in ${env.browser}. Please open this page in Chrome, Edge, or Opera on your Android device.`);
       } else {
@@ -201,7 +193,7 @@ const DeviceWifiSetup = () => {
       
       if (!hasBluetoothAccess || !(navigator as any).bluetooth) {
         if (environment?.isIOS) {
-          toast.error('🚫 Provisioning requires desktop or Tipply PWA wrapper. iOS Safari does not support Web Bluetooth.', {
+          toast.error('🚫 Provisioning requires desktop or Android Chrome/Edge/Opera. iOS Safari does not support Web Bluetooth.', {
             duration: 6000
           });
         } else if (environment?.isAndroid) {
@@ -584,18 +576,13 @@ const DeviceWifiSetup = () => {
                 {environment.isMobile ? <MobileOutlined className="text-blue-400 text-xl" /> : <DesktopOutlined className="text-blue-400 text-xl" />}
                 <div>
                   <p className="text-white font-medium">
-                    {environment.isPWA ? '📱 Running as PWA' : environment.isMobile ? '📱 Mobile Browser' : '💻 Desktop Browser'}
+                    {environment.isMobile ? '📱 Mobile Browser' : '💻 Desktop Browser'}
                   </p>
                   <p className="text-gray-400 text-sm">
                     {environment.browser} • {environment.supportsWebBluetooth ? '✅ Bluetooth Ready' : '❌ No Bluetooth'} • {environment.supportsNotifications ? '🔔 Notifications Available' : '🔕 No Notifications'}
                   </p>
                 </div>
               </div>
-              {environment.isPWA && (
-                <span className="px-3 py-1 bg-blue-600 text-white rounded-full text-xs font-semibold">
-                  PWA Mode
-                </span>
-              )}
             </div>
           </Card>
         )}
@@ -690,7 +677,7 @@ const DeviceWifiSetup = () => {
               
               {!environment?.supportsWebBluetooth && (
                 <p className="text-yellow-400 mt-4 text-sm">
-                  🚫 Provisioning requires desktop or Tipply PWA wrapper
+                  🚫 Provisioning requires desktop or Android Chrome/Edge/Opera
                 </p>
               )}
             </div>
@@ -857,8 +844,6 @@ const DeviceWifiSetup = () => {
         />
       </Modal>
 
-      {/* PWA Install Prompt */}
-      <PWAInstallPrompt />
     </div>
   );
 };
