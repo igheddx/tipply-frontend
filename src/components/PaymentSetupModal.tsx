@@ -208,7 +208,7 @@ function PaymentForm({
       const pr = stripe.paymentRequest({
         country: 'US',
         currency: 'usd',
-        total: { label: 'Tipwave', amount: totalAmount },
+        total: { label: 'Activate Tipwave Wallet', amount: totalAmount },
         requestPayerName: true,
         requestPayerEmail: true,
         displayItems: []
