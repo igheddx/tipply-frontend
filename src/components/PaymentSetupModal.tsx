@@ -11,6 +11,38 @@ import googlePayButton from '../assets/plain-button-google-pay.png'
 
 // Stripe will be initialized dynamically with the publishable key from backend
 
+let stripePromiseCache: Promise<Stripe | null> | null = null
+
+const getOrCreateStripePromise = (): Promise<Stripe | null> => {
+  if (stripePromiseCache) {
+    return stripePromiseCache
+  }
+
+  stripePromiseCache = (async () => {
+    try {
+      const res = await fetch(`${getApiBaseUrl()}/api/stripe-config/publishable-key`)
+      if (res.ok) {
+        const data = await res.json()
+        const backendKey = data?.publishableKey
+        if (backendKey) {
+          return await loadStripe(backendKey)
+        }
+      }
+    } catch {
+      // Fall back to env key below
+    }
+
+    const fallbackKey = (import.meta as any).env.VITE_STRIPE_PUBLISHABLE_KEY
+    if (!fallbackKey) {
+      throw new Error('Unable to initialize Stripe: no publishable key available')
+    }
+
+    return await loadStripe(fallbackKey)
+  })()
+
+  return stripePromiseCache
+}
+
 interface PaymentSetupModalProps {
   isOpen: boolean
   onClose: () => void
@@ -36,7 +68,6 @@ export default function PaymentSetupModal({
   performerPhotoUrl,
   walletMode = 'both'
 }: PaymentSetupModalProps) {
-  if (!isOpen) return null
   const [stripePromise, setStripePromise] = useState<Promise<Stripe | null> | null>(null)
   const [initError, setInitError] = useState<string | null>(null)
 
@@ -44,34 +75,11 @@ export default function PaymentSetupModal({
     let isMounted = true
     ;(async () => {
       try {
-        // Fetch active publishable key from backend (respects live/test mode)
-        const res = await fetch(`${getApiBaseUrl()}/api/stripe-config/publishable-key`)
-        if (!res.ok) {
-          // Fallback to env var if endpoint fails
-          const fallbackKey = (import.meta as any).env.VITE_STRIPE_PUBLISHABLE_KEY
-          if (!fallbackKey) {
-            setInitError('Unable to initialize Stripe: missing publishable key')
-            return
-          }
-          const promise = loadStripe(fallbackKey)
-          if (isMounted) setStripePromise(promise)
-          return
-        }
-        const data = await res.json()
-        const key = data?.publishableKey || (import.meta as any).env.VITE_STRIPE_PUBLISHABLE_KEY
-        if (!key) {
-          setInitError('Unable to initialize Stripe: no publishable key available')
-          return
-        }
-        const promise = loadStripe(key)
+        const promise = getOrCreateStripePromise()
         if (isMounted) setStripePromise(promise)
-      } catch (e) {
-        const fallbackKey = (import.meta as any).env.VITE_STRIPE_PUBLISHABLE_KEY
-        if (fallbackKey) {
-          const promise = loadStripe(fallbackKey)
-          if (isMounted) setStripePromise(promise)
-        } else {
-          setInitError('Failed to initialize Stripe')
+      } catch (e: any) {
+        if (isMounted) {
+          setInitError(e?.message || 'Failed to initialize Stripe')
         }
       }
     })()
@@ -79,6 +87,8 @@ export default function PaymentSetupModal({
       isMounted = false
     }
   }, [])
+
+  if (!isOpen) return null
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
@@ -150,6 +160,7 @@ function PaymentForm({
   const [error, setError] = useState<string | null>(null)
   const [paymentRequest, setPaymentRequest] = useState<any>(null)
   const [isApplePay, setIsApplePay] = useState(false)
+  const [isCheckingWalletAvailability, setIsCheckingWalletAvailability] = useState(false)
 
   // Persist payment details to backend so ownership verification passes
   const storePaymentInfo = async (
@@ -204,6 +215,7 @@ function PaymentForm({
 
   useEffect(() => {
     if (stripe) {
+      setIsCheckingWalletAvailability(true)
       const totalAmount = 0
       const baseConfig = {
         country: 'US',
@@ -243,10 +255,14 @@ function PaymentForm({
           setIsApplePay(preferredWallet === 'apple')
           logger.log('Payment Request is available - Apple Pay:', appleAvailable, 'Google Pay:', googleAvailable, 'Preferred:', preferredWallet)
         } else {
+          setPaymentRequest(null)
           logger.log('Payment Request not available - no Apple Pay or Google Pay support detected')
         }
+        setIsCheckingWalletAvailability(false)
       }).catch((error) => {
         logger.error('Payment Request canMakePayment error:', error)
+        setPaymentRequest(null)
+        setIsCheckingWalletAvailability(false)
       })
 
       // Handle payment request events
@@ -337,6 +353,8 @@ function PaymentForm({
 
       attachPaymentHandlers(applePaymentRequest)
       attachPaymentHandlers(googlePaymentRequest)
+    } else {
+      setIsCheckingWalletAvailability(false)
     }
   }, [stripe, deviceUuid, userId, onComplete])
   const handleCardSubmit = async (e: React.FormEvent) => {
@@ -440,9 +458,19 @@ function PaymentForm({
   return (
     <form onSubmit={isWalletOnly || !showCardFields ? undefined : handleCardSubmit} className="space-y-0">
       {/* ========== SECTION 1: DIGITAL WALLETS ========== */}
-      {paymentRequest && walletMode !== 'card' && (
+      {walletMode !== 'card' && (
         <div className="pb-4">
-          {isApplePay && isSetupIntentMode && (
+          {isCheckingWalletAvailability && (
+            <button
+              type="button"
+              disabled
+              className="w-full min-h-[44px] border border-gray-200 text-gray-500 bg-gray-50 rounded-xl px-4 py-3 font-medium text-base"
+            >
+              Checking wallet availability...
+            </button>
+          )}
+
+          {!isCheckingWalletAvailability && paymentRequest && isApplePay && isSetupIntentMode && (
             <div className="mt-3 mb-3 flex items-start gap-2 text-[15px] text-[#444444]">
               <p>
                 🔒 First-time only: Apple Pay will securely save your payment method. You won’t be charged.
@@ -450,33 +478,35 @@ function PaymentForm({
             </div>
           )}
 
-          <button
-            type="button"
-            onClick={(event) => {
-              event.preventDefault()
-              paymentRequest.show()
-            }}
-            disabled={loading}
-            className={`w-full min-h-[44px] transition-all disabled:opacity-50 font-medium text-base flex items-center justify-center ${
-              isApplePay
-                ? 'bg-black text-white py-3 px-6 rounded-full hover:bg-gray-800 active:bg-gray-900'
-                : 'bg-transparent p-0'
-            }`}
-          >
-            {isApplePay ? (
-              <>
-                <span className="text-lg">Pay with</span>
-                <AppleFilled style={{ fontSize: '28px' }} />
-                <span className="text-lg">Pay</span>
-              </>
-            ) : (
-              <img
-                src={googlePayButton}
-                alt="Google Pay"
-                className="h-12 w-auto"
-              />
-            )}
-          </button>
+          {!isCheckingWalletAvailability && paymentRequest && (
+            <button
+              type="button"
+              onClick={(event) => {
+                event.preventDefault()
+                paymentRequest.show()
+              }}
+              disabled={loading}
+              className={`w-full min-h-[44px] transition-all disabled:opacity-50 font-medium text-base flex items-center justify-center ${
+                isApplePay
+                  ? 'bg-black text-white py-3 px-6 rounded-full hover:bg-gray-800 active:bg-gray-900'
+                  : 'bg-transparent p-0'
+              }`}
+            >
+              {isApplePay ? (
+                <>
+                  <span className="text-lg">Pay with</span>
+                  <AppleFilled style={{ fontSize: '28px' }} />
+                  <span className="text-lg">Pay</span>
+                </>
+              ) : (
+                <img
+                  src={googlePayButton}
+                  alt="Google Pay"
+                  className="h-12 w-auto"
+                />
+              )}
+            </button>
+          )}
 
         </div>
       )}

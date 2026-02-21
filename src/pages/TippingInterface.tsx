@@ -62,7 +62,6 @@ const TippingInterface: React.FC = () => {
 
     const [billRefresh, setBillRefresh] = useState(0)
   const [gridSelectedAmount, setGridSelectedAmount] = useState<number | null>(null)
-  const [imagesReady, setImagesReady] = useState(false)
   // Tip amounts for the cards
   const tipAmounts = [2, 5, 10, 20, 50, 100]
 
@@ -289,13 +288,10 @@ const TippingInterface: React.FC = () => {
           return
         }
 
-        // Check AWS IoT status
-        try {
-          const response = await apiService.getAwsIotStatus()
-          logger.log('AWS IoT Status:', response)
-        } catch (error) {
-          logger.log('AWS IoT Status check failed:', error)
-        }
+        // Check AWS IoT status in background (non-blocking for tip UI readiness)
+        void apiService.getAwsIotStatus()
+          .then((response) => logger.log('AWS IoT Status:', response))
+          .catch((error) => logger.log('AWS IoT Status check failed:', error))
 
         // Check payment methods using the device UUID
         const paymentCheck = await checkPaymentMethods(deviceInfoData)
@@ -586,30 +582,6 @@ const TippingInterface: React.FC = () => {
     }
     return images[amount] || '/images/1dollar.png'
   }
-
-  // Preload all bill images so they are ready before tipping UI/toasts
-  useEffect(() => {
-    let isMounted = true
-    const preload = async () => {
-      const urls = tipAmounts.map(getCurrencyImage)
-      await Promise.all(
-        urls.map(
-          (url) =>
-            new Promise<void>((resolve) => {
-              const img = new Image()
-              img.onload = () => resolve()
-              img.onerror = () => resolve()
-              img.src = url
-            })
-        )
-      )
-      if (isMounted) setImagesReady(true)
-    }
-    preload()
-    return () => {
-      isMounted = false
-    }
-  }, [])
 
   const cycleClassicIndex = (direction: -1 | 1) => {
     if (isBillFlying || isDebouncing) return
@@ -988,15 +960,6 @@ const TippingInterface: React.FC = () => {
             This tipping interface is designed for mobile devices only. Please open this page on your smartphone or tablet for the best experience.
           </p>
         </div>
-      </div>
-    )
-  }
-
-  // Ensure bill images are ready before showing the tipping UI / toasts
-  if (!imagesReady) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 flex items-center justify-center">
-        <div className="text-white text-xl">Loading images...</div>
       </div>
     )
   }
