@@ -427,9 +427,9 @@ function PaymentForm({
       {paymentRequest && walletMode !== 'card' && (
         <div className="pb-4">
           {isApplePay && isSetupIntentMode && (
-            <div className="mt-3 mb-3 flex items-start gap-2 text-sm text-gray-700">
+            <div className="mt-3 mb-3 flex items-start gap-2 text-[15px] text-[#444444]">
               <svg
-                className="w-4 h-4 mt-0.5 text-gray-700 flex-shrink-0"
+                className="w-4 h-4 mt-0.5 text-[#444444] flex-shrink-0"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
