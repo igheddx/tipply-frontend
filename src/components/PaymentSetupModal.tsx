@@ -220,7 +220,7 @@ function PaymentForm({
       const baseConfig = {
         country: 'US',
         currency: 'usd',
-        total: { label: '– Wallet Setup (No Charge)', amount: totalAmount },
+        total: { label: '– Select tip amount on next screen', amount: totalAmount },
         requestPayerName: true,
         requestPayerEmail: true,
         displayItems: []
@@ -228,7 +228,7 @@ function PaymentForm({
       const applePaymentRequest = stripe.paymentRequest(baseConfig)
       const googlePaymentRequest = stripe.paymentRequest({
         ...baseConfig,
-        displayItems: [{ label: '– Wallet Setup (No Charge)', amount: totalAmount }]
+        displayItems: [{ label: '– Select tip amount on next screen', amount: totalAmount }]
       })
       
       Promise.all([

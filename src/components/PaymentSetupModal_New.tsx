@@ -153,7 +153,7 @@ function PaymentForm({
       const baseConfig = {
         country: 'US',
         currency: 'usd',
-        total: { label: isPayWalletActivation ? '– Wallet Setup (No Charge)' : 'Tipwave Tip', amount: totalAmount },
+        total: { label: isPayWalletActivation ? '– Select tip amount on next screen' : 'Tipwave Tip', amount: totalAmount },
         requestPayerName: true,
         requestPayerEmail: true,
         displayItems: totalAmount > 0 ? [{ label: 'Tip Setup', amount: totalAmount }] : []
@@ -162,7 +162,7 @@ function PaymentForm({
       const googlePaymentRequest = stripe.paymentRequest({
         ...baseConfig,
         displayItems: isPayWalletActivation
-          ? [{ label: '– Wallet Setup (No Charge)', amount: totalAmount }]
+          ? [{ label: '– Select tip amount on next screen', amount: totalAmount }]
           : baseConfig.displayItems
       })
       
