@@ -150,16 +150,23 @@ function PaymentForm({
   useEffect(() => {
     if (stripe) {
       const totalAmount = isPayWalletActivation ? 0 : 100
-      const pr = stripe.paymentRequest({
+      const baseConfig = {
         country: 'US',
         currency: 'usd',
         total: { label: isPayWalletActivation ? '– Wallet Setup (No Charge)' : 'Tipwave Tip', amount: totalAmount },
         requestPayerName: true,
         requestPayerEmail: true,
         displayItems: totalAmount > 0 ? [{ label: 'Tip Setup', amount: totalAmount }] : []
+      }
+      const applePaymentRequest = stripe.paymentRequest(baseConfig)
+      const googlePaymentRequest = stripe.paymentRequest({
+        ...baseConfig,
+        displayItems: isPayWalletActivation
+          ? [{ label: '– Wallet Setup (No Charge)', amount: totalAmount }]
+          : baseConfig.displayItems
       })
       
-          pr.canMakePayment().then((result) => {
+          applePaymentRequest.canMakePayment().then((result) => {
             logger.log('Payment Request canMakePayment result:', result)
             logger.log('Is HTTPS:', window.location.protocol === 'https:')
 
@@ -171,7 +178,7 @@ function PaymentForm({
               : (googleAvailable ? 'google' : (appleAvailable ? 'apple' : null))
 
             if (preferredWallet) {
-              setPaymentRequest(pr)
+              setPaymentRequest(preferredWallet === 'google' ? googlePaymentRequest : applePaymentRequest)
               setIsApplePay(preferredWallet === 'apple')
               logger.log('Payment Request is available - Apple Pay:', appleAvailable, 'Google Pay:', googleAvailable, 'Preferred:', preferredWallet)
             } else {
@@ -181,7 +188,8 @@ function PaymentForm({
         logger.error('Payment Request canMakePayment error:', error)
       })
 
-      pr.on('paymentmethod', async (event) => {
+      const attachPaymentHandlers = (request: any) => {
+        request.on('paymentmethod', async (event: any) => {
         try {
           setLoading(true)
           setError(null)
@@ -237,11 +245,15 @@ function PaymentForm({
         } finally {
           setLoading(false)
         }
-      })
+        })
 
-      pr.on('cancel', () => {
+        request.on('cancel', () => {
         // User cancelled
       })
+      }
+
+      attachPaymentHandlers(applePaymentRequest)
+      attachPaymentHandlers(googlePaymentRequest)
     }
   }, [stripe, deviceUuid, userId, onComplete])
 
