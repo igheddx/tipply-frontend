@@ -205,16 +205,21 @@ function PaymentForm({
   useEffect(() => {
     if (stripe) {
       const totalAmount = 0
-      const pr = stripe.paymentRequest({
+      const baseConfig = {
         country: 'US',
         currency: 'usd',
         total: { label: '– Wallet Setup (No Charge)', amount: totalAmount },
         requestPayerName: true,
         requestPayerEmail: true,
         displayItems: []
+      }
+      const applePaymentRequest = stripe.paymentRequest(baseConfig)
+      const googlePaymentRequest = stripe.paymentRequest({
+        ...baseConfig,
+        displayItems: [{ label: '– Wallet Setup (No Charge)', amount: totalAmount }]
       })
       
-      pr.canMakePayment().then((result) => {
+      applePaymentRequest.canMakePayment().then((result) => {
         logger.log('Payment Request canMakePayment result:', result)
         logger.log('User Agent:', navigator.userAgent)
         logger.log('Platform:', navigator.platform)
@@ -228,7 +233,7 @@ function PaymentForm({
           : (googleAvailable ? 'google' : (appleAvailable ? 'apple' : null))
 
         if (preferredWallet) {
-          setPaymentRequest(pr)
+          setPaymentRequest(preferredWallet === 'google' ? googlePaymentRequest : applePaymentRequest)
           setIsApplePay(preferredWallet === 'apple')
           logger.log('Payment Request is available - Apple Pay:', appleAvailable, 'Google Pay:', googleAvailable, 'Preferred:', preferredWallet)
         } else {
@@ -239,7 +244,8 @@ function PaymentForm({
       })
 
       // Handle payment request events
-      pr.on('paymentmethod', async (event) => {
+      const attachPaymentHandlers = (request: any) => {
+        request.on('paymentmethod', async (event: any) => {
         logger.log('Payment Request paymentmethod event:', event)
         try {
           setLoading(true)
@@ -316,11 +322,15 @@ function PaymentForm({
         } finally {
           setLoading(false)
         }
-      })
+        })
 
-      pr.on('cancel', () => {
+        request.on('cancel', () => {
         logger.log('Payment Request cancelled')
       })
+      }
+
+      attachPaymentHandlers(applePaymentRequest)
+      attachPaymentHandlers(googlePaymentRequest)
     }
   }, [stripe, deviceUuid, userId, onComplete])
   const handleCardSubmit = async (e: React.FormEvent) => {
