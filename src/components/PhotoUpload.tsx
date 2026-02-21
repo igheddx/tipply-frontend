@@ -152,7 +152,7 @@ const PhotoUpload: React.FC<PhotoUploadProps> = ({
         <button
           onClick={handleButtonClick}
           disabled={uploading || isLoading}
-          className="absolute -bottom-3 left-1/2 -translate-x-1/2 px-4 py-1.5 bg-tipwave-teal hover:bg-teal-600 disabled:bg-gray-400 text-white rounded-full font-medium text-sm shadow-lg transition"
+          className="absolute -bottom-3 left-1/2 -translate-x-1/2 z-10 px-4 py-1.5 bg-teal-600 hover:bg-teal-700 disabled:bg-gray-400 text-white rounded-full font-medium text-sm shadow-lg transition"
         >
           {uploading ? (
             <span className="flex items-center gap-2">
