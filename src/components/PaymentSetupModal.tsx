@@ -418,6 +418,7 @@ function PaymentForm({
   }
 
   const isWalletOnly = walletMode === 'wallet'
+  const isSetupIntentMode = walletMode !== 'card'
   const [showCardFields, setShowCardFields] = useState(false)
 
   return (
@@ -432,7 +433,7 @@ function PaymentForm({
               paymentRequest.show()
             }}
             disabled={loading}
-            className={`w-full transition-all disabled:opacity-50 font-medium text-base flex items-center justify-center ${
+            className={`w-full min-h-[44px] transition-all disabled:opacity-50 font-medium text-base flex items-center justify-center ${
               isApplePay
                 ? 'bg-black text-white py-3 px-6 rounded-full hover:bg-gray-800 active:bg-gray-900'
                 : 'bg-transparent p-0'
@@ -452,18 +453,30 @@ function PaymentForm({
               />
             )}
           </button>
+
+          {isApplePay && isSetupIntentMode && (
+            <p className="mt-2 text-xs text-gray-600">
+              First-time only: Apple Pay will securely save your payment method. You won’t be charged.
+            </p>
+          )}
+
+          {isApplePay && isSetupIntentMode && (
+            <p className="mt-2 text-xs text-gray-700">
+              You are activating your Tipwave Wallet. No charge will be made.
+            </p>
+          )}
         </div>
       )}
 
-      {/* Secondary card link */}
+      {/* Secondary card action */}
       {walletMode !== 'wallet' && !showCardFields && (
         <div className="pb-6">
           <button
             type="button"
             onClick={() => setShowCardFields(true)}
-            className="text-base text-gray-500 hover:text-gray-700 underline underline-offset-2"
+            className="w-full min-h-[44px] border border-gray-300 text-gray-700 bg-white rounded-xl px-4 py-3 hover:bg-gray-50 active:bg-gray-100 transition-all font-medium text-base"
           >
-            Pay with a card
+            Pay with card
           </button>
         </div>
       )}
