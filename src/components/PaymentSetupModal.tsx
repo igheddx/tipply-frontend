@@ -208,7 +208,7 @@ function PaymentForm({
       const pr = stripe.paymentRequest({
         country: 'US',
         currency: 'usd',
-        total: { label: 'Activate Tipwave Wallet', amount: totalAmount },
+        total: { label: 'Wallet Setup (No Charge)', amount: totalAmount },
         requestPayerName: true,
         requestPayerEmail: true,
         displayItems: []
@@ -475,11 +475,6 @@ function PaymentForm({
             )}
           </button>
 
-          {isApplePay && isSetupIntentMode && (
-            <p className="mt-2 text-xs text-gray-700">
-              You are activating your Tipwave Wallet. No charge will be made.
-            </p>
-          )}
         </div>
       )}
 
