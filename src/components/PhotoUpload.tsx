@@ -135,7 +135,7 @@ const PhotoUpload: React.FC<PhotoUploadProps> = ({
   return (
     <div className={`flex flex-col items-center gap-4 ${isOnboarding ? 'py-6' : ''}`}>
       {/* Photo Preview Circle */}
-      <div className="relative w-fit">
+      <div className="relative w-fit pb-5">
         <div className="w-32 h-32 rounded-full bg-gray-200 flex items-center justify-center overflow-hidden border-4 border-gray-300">
           {preview ? (
             <img
@@ -147,6 +147,24 @@ const PhotoUpload: React.FC<PhotoUploadProps> = ({
             <div className="text-4xl text-gray-400">📸</div>
           )}
         </div>
+
+        {/* Upload Button - pinned to photo */}
+        <button
+          onClick={handleButtonClick}
+          disabled={uploading || isLoading}
+          className="absolute -bottom-3 left-1/2 -translate-x-1/2 px-4 py-1.5 bg-tipwave-teal hover:bg-teal-600 disabled:bg-gray-400 text-white rounded-full font-medium text-sm shadow-lg transition"
+        >
+          {uploading ? (
+            <span className="flex items-center gap-2">
+              <span className="inline-block animate-spin">⏳</span>
+              Uploading...
+            </span>
+          ) : preview ? (
+            'Change Photo'
+          ) : (
+            'Upload Photo'
+          )}
+        </button>
 
         {/* Delete Badge - positioned outside circle */}
         {preview && (
@@ -171,24 +189,6 @@ const PhotoUpload: React.FC<PhotoUploadProps> = ({
         className="hidden"
         aria-label="Upload profile photo"
       />
-
-      {/* Upload Button */}
-      <button
-        onClick={handleButtonClick}
-        disabled={uploading || isLoading}
-        className="px-6 py-2 bg-tipwave-teal hover:bg-teal-600 disabled:bg-gray-400 text-white rounded-lg font-medium transition"
-      >
-        {uploading ? (
-          <span className="flex items-center gap-2">
-            <span className="inline-block animate-spin">⏳</span>
-            Uploading...
-          </span>
-        ) : preview ? (
-          'Change Photo'
-        ) : (
-          'Upload Photo'
-        )}
-      </button>
 
       {/* Helper Text */}
       <p className="text-sm text-gray-600 text-center">
