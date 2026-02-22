@@ -805,13 +805,26 @@ const TippingInterface: React.FC = () => {
         // Refresh payment method session on successful tip (extends 30-day memory)
         refreshPaymentMethodSession()
       } else {
-        const errorMsg = response.raw?.error || response.error || 'Failed to submit tip. Please try again.'
-        logger.error('❌ Tip submission failed:', response.raw, 'Error:', errorMsg)
+        // Provide specific error messages based on error type
+        let errorMsg = response.error || 'Failed to submit tip. Please try again.'
+        if (response.errorType === 'timeout') {
+          errorMsg = '⏱️ Request timeout - the server took too long to respond. Please check your internet connection and try again.'
+        } else if (response.errorType === 'network') {
+          errorMsg = '🌐 Network error - unable to connect to the server. Please check your internet connection.'
+        } else if (response.errorType === 'validation') {
+          errorMsg = response.error || 'Invalid tip details. Please check and try again.'
+        } else if (response.errorType === 'authentication') {
+          errorMsg = 'Session expired. Please refresh and try again.'
+        } else if (response.errorType === 'server') {
+          errorMsg = '⚠️ Server error. Please try again in a moment.'
+        }
+        logger.error('❌ Tip submission failed:', response.raw, 'Error:', errorMsg, 'Type:', response.errorType)
         toast.error(errorMsg)
       }
     } catch (error) {
       logger.error('❌ Error submitting tip:', error)
-      toast.error(error instanceof Error ? error.message : 'Failed to submit tip. Please try again.')
+      const errorMsg = error instanceof Error ? error.message : 'Failed to submit tip. Please try again.'
+      toast.error(errorMsg)
     }
 
   }
@@ -864,13 +877,26 @@ const TippingInterface: React.FC = () => {
         // Refresh payment method session on successful tip (extends 30-day memory)
         refreshPaymentMethodSession()
       } else {
-        const errorMsg = response.raw?.error || response.error || 'Failed to submit tip. Please try again.'
-        logger.error('❌ Tip submission failed:', response.raw, 'Error:', errorMsg)
+        // Provide specific error messages based on error type
+        let errorMsg = response.error || 'Failed to submit tip. Please try again.'
+        if (response.errorType === 'timeout') {
+          errorMsg = '⏱️ Request timeout - the server took too long to respond. Please check your internet connection and try again.'
+        } else if (response.errorType === 'network') {
+          errorMsg = '🌐 Network error - unable to connect to the server. Please check your internet connection.'
+        } else if (response.errorType === 'validation') {
+          errorMsg = response.error || 'Invalid tip details. Please check and try again.'
+        } else if (response.errorType === 'authentication') {
+          errorMsg = 'Session expired. Please refresh and try again.'
+        } else if (response.errorType === 'server') {
+          errorMsg = '⚠️ Server error. Please try again in a moment.'
+        }
+        logger.error('❌ Tip submission failed:', response.raw, 'Error:', errorMsg, 'Type:', response.errorType)
         toast.error(errorMsg)
       }
     } catch (error) {
       logger.error('❌ Error submitting tip with song:', error)
-      toast.error(error instanceof Error ? error.message : 'Failed to submit tip. Please try again.')
+      const errorMsg = error instanceof Error ? error.message : 'Failed to submit tip. Please try again.'
+      toast.error(errorMsg)
     }
 
   }
