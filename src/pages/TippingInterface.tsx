@@ -1268,64 +1268,91 @@ const TippingInterface: React.FC = () => {
               </h1>
             </div>
 
-            {/* Song Request Instruction Message */}
+            {/* Song Request Information - Unified Top Container */}
             {selectedSong && (
               <motion.div
                 initial={{ opacity: 0, y: -10 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -10 }}
-                className="w-full max-w-xl px-2 mb-4"
+                className="w-full max-w-xl px-2 mb-5"
               >
-                <div className="bg-gradient-to-r from-purple-500/40 to-blue-500/40 backdrop-blur-md rounded-xl px-4 py-3 border border-purple-400/50 shadow-lg">
-                  <div className="text-white text-center font-bold text-lg leading-tight">
-                    Select a tip amount below to send your song request
+                {/* Main instruction container */}
+                <div className="bg-gradient-to-r from-purple-500/45 to-blue-500/45 backdrop-blur-md rounded-2xl px-5 py-4 border border-purple-300/40 shadow-xl">
+                  {/* Primary instruction text */}
+                  <div className="text-white text-center font-bold text-xl leading-tight mb-4">
+                    Your song is ready. Choose a tip amount to send your request.
+                  </div>
+                  
+                  {/* Song details */}
+                  <div className="border-t border-white/20 pt-4 mt-4">
+                    <div className="text-center mb-4">
+                      <div className="text-white text-sm font-semibold flex items-center justify-center gap-2 mb-2">
+                        <span>🎵 Song Selected</span>
+                      </div>
+                      <div className="text-white text-base font-bold mb-1">{selectedSong?.title}</div>
+                      <div className="text-white/80 text-sm">{selectedSong?.artist}</div>
+                    </div>
+                    
+                    {/* Optional: Show name/note input toggle and fields here */}
+                    <div className="mb-3">
+                      <button
+                        type="button"
+                        onClick={() => setShowSongRequestFields((prev) => !prev)}
+                        className="w-full text-xs font-medium text-white/70 hover:text-white/90 transition-colors py-2 rounded-lg hover:bg-white/10"
+                      >
+                        {showSongRequestFields ? '▼ Hide details' : '▶ Add your name or note (optional)'}
+                      </button>
+                    </div>
+                    
+                    {/* Name and Note input fields */}
+                    <AnimatePresence initial={false}>
+                      {showSongRequestFields && (
+                        <motion.div
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: 'auto' }}
+                          exit={{ opacity: 0, height: 0 }}
+                          transition={{ duration: 0.22 }}
+                          className="overflow-hidden"
+                        >
+                          <div className="space-y-2 bg-white/5 rounded-lg p-3 border border-white/10">
+                            <input
+                              type="text"
+                              value={songRequestName}
+                              onChange={(e) => setSongRequestName(e.target.value)}
+                              placeholder="Your name (optional)"
+                              maxLength={50}
+                              className="w-full px-3 py-2 bg-white/15 border border-white/25 rounded-md text-white placeholder-white/40 focus:ring-2 focus:ring-white/40 focus:border-white/30 focus:outline-none text-sm transition-all"
+                            />
+                            <textarea
+                              value={songRequestNote}
+                              onChange={(e) => setSongRequestNote(e.target.value)}
+                              placeholder="Add a note (optional)"
+                              rows={2}
+                              maxLength={200}
+                              className="w-full px-3 py-2 bg-white/15 border border-white/25 rounded-md text-white placeholder-white/40 focus:ring-2 focus:ring-white/40 focus:border-white/30 focus:outline-none text-sm resize-none transition-all"
+                            />
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                    
+                    {/* Cancel button */}
+                    <div className="mt-4 pt-3 border-t border-white/20">
+                      <button
+                        onClick={() => {
+                          setSelectedSong(null)
+                          setShowSongRequestFields(false)
+                          setSongRequestName('')
+                          setSongRequestNote('')
+                        }}
+                        className="w-full text-xs font-medium text-white/60 hover:text-white/80 py-2 rounded-lg hover:bg-white/10 transition-colors"
+                      >
+                        ✕ Cancel Song Request
+                      </button>
+                    </div>
                   </div>
                 </div>
               </motion.div>
-            )}
-
-            {selectedSong && (
-              <div className="w-full max-w-xl px-2 mb-3">
-                <div className="flex items-center justify-center">
-                  <button
-                    type="button"
-                    onClick={() => setShowSongRequestFields((prev) => !prev)}
-                    className="text-[15px] font-normal text-white/60 hover:text-white/80 underline-offset-2 hover:underline active:underline"
-                  >
-                    {showSongRequestFields ? 'Hide' : 'Add your name or a note (optional)'}
-                  </button>
-                </div>
-                <AnimatePresence initial={false}>
-                  {showSongRequestFields && (
-                    <motion.div
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: 'auto' }}
-                      exit={{ opacity: 0, height: 0 }}
-                      transition={{ duration: 0.22 }}
-                      className="overflow-hidden"
-                    >
-                      <div className="mt-3 space-y-2">
-                        <input
-                          type="text"
-                          value={songRequestName}
-                          onChange={(e) => setSongRequestName(e.target.value)}
-                          placeholder="Name (optional)"
-                          maxLength={50}
-                          className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-white/50 focus:ring-2 focus:ring-white/30 focus:border-transparent text-sm"
-                        />
-                        <textarea
-                          value={songRequestNote}
-                          onChange={(e) => setSongRequestNote(e.target.value)}
-                          placeholder="Note (optional)"
-                          rows={2}
-                          maxLength={200}
-                          className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-white/50 focus:ring-2 focus:ring-white/30 focus:border-transparent text-sm resize-none"
-                        />
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
             )}
 
             {/* Tip buttons grid - wraps naturally */}
