@@ -1243,207 +1243,215 @@ const TippingInterface: React.FC = () => {
       {/* Cards UI Grid - cards mode only */}
       {uiMode === 'cards' && (
         <div className="relative z-10 w-full h-[100dvh] overflow-hidden bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900">
-          {/* Responsive container with controlled spacing to avoid scroll on mobile */}
-          <div 
-            className="flex flex-col items-center w-full px-4 h-full"
-            style={{ 
-              paddingTop: isIOS 
-                ? 'calc(env(safe-area-inset-top) + 1.5rem)' 
-                : 'calc(env(safe-area-inset-top) + 0.75rem)',
-              paddingBottom: 'calc(env(safe-area-inset-bottom) + 2.75rem)'
-            }}
-          >
-            {/* Title with profile picture */}
-            <div className="flex items-center justify-center gap-3 mb-3 w-full">
-              {deviceInfo?.profilePhotoUrl && (
-                <img
-                  src={deviceInfo?.profilePhotoUrl}
-                  alt="Performer"
-                  className="w-10 h-10 rounded-full object-cover border-2 border-white/30 flex-shrink-0"
-                />
-              )}
-              <h1 className="text-2xl font-bold text-white truncate">
-                  Tip {deviceInfo?.stageName || `${deviceInfo?.ownerFirstName} ${deviceInfo?.ownerLastName}`}
-              </h1>
-            </div>
-
-            {/* Song Request Information - Unified Top Container */}
-            {selectedSong && (
-              <motion.div
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-                className="w-full max-w-xl px-2 mb-3"
-              >
-                {/* Main instruction container */}
-                <div className="bg-gradient-to-r from-purple-500/45 to-blue-500/45 backdrop-blur-md rounded-2xl px-4 py-3 border border-purple-300/40 shadow-xl">
-                  {/* Primary instruction text */}
-                  <div className="text-white text-center font-bold text-lg leading-tight mb-3">
-                    Your song is ready. Choose a tip amount to send your request.
-                  </div>
-                  
-                  {/* Song details */}
-                  <div className="border-t border-white/20 pt-3 mt-3">
-                    <div className="text-center mb-3">
-                      <div className="text-white text-xs font-semibold flex items-center justify-center gap-2 mb-1">
-                        <span>🎵 Song Selected</span>
-                      </div>
-                      <div className="text-white text-sm font-bold mb-1">{selectedSong?.title}</div>
-                      <div className="text-white/80 text-xs">{selectedSong?.artist}</div>
-                    </div>
-                    
-                    {/* Optional: Show name/note input toggle and fields here */}
-                    <div className="mb-3">
-                      <button
-                        type="button"
-                        onClick={() => setShowSongRequestFields((prev) => !prev)}
-                        className="w-full text-xs font-medium text-white/70 hover:text-white/90 transition-colors py-1.5 rounded-lg hover:bg-white/10"
-                      >
-                        {showSongRequestFields ? '▼ Hide details' : '▶ Add your name or note (optional)'}
-                      </button>
-                    </div>
-                    
-                    {/* Name and Note input fields */}
-                    <AnimatePresence initial={false}>
-                      {showSongRequestFields && (
-                        <motion.div
-                          initial={{ opacity: 0, height: 0 }}
-                          animate={{ opacity: 1, height: 'auto' }}
-                          exit={{ opacity: 0, height: 0 }}
-                          transition={{ duration: 0.22 }}
-                          className="overflow-hidden"
-                        >
-                          <div className="space-y-1.5 bg-white/5 rounded-lg p-2.5 border border-white/10">
-                            <input
-                              type="text"
-                              value={songRequestName}
-                              onChange={(e) => setSongRequestName(e.target.value)}
-                              placeholder="Your name (optional)"
-                              maxLength={50}
-                              className="w-full px-3 py-2 bg-white/15 border border-white/25 rounded-md text-white placeholder-white/40 focus:ring-2 focus:ring-white/40 focus:border-white/30 focus:outline-none text-sm transition-all"
-                            />
-                            <textarea
-                              value={songRequestNote}
-                              onChange={(e) => setSongRequestNote(e.target.value)}
-                              placeholder="Add a note (optional)"
-                              rows={2}
-                              maxLength={200}
-                              className="w-full px-3 py-2 bg-white/15 border border-white/25 rounded-md text-white placeholder-white/40 focus:ring-2 focus:ring-white/40 focus:border-white/30 focus:outline-none text-sm resize-none transition-all"
-                            />
-                          </div>
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
-                    
-                    {/* Cancel button */}
-                    <div className="mt-2 pt-2 border-t border-white/20">
-                      <button
-                        onClick={() => {
-                          setSelectedSong(null)
-                          setShowSongRequestFields(false)
-                          setSongRequestName('')
-                          setSongRequestNote('')
-                        }}
-                        className="w-full text-xs font-medium text-white/60 hover:text-white/80 py-2 rounded-lg hover:bg-white/10 transition-colors"
-                      >
-                        ✕ Cancel Song Request
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </motion.div>
-            )}
-
-            {/* Tip buttons grid - wraps naturally */}
-            <div className="flex flex-wrap justify-center gap-x-3 gap-y-5 max-w-xl w-full -mt-1 mb-3">
-              {tipAmounts.map((amount, index) => (
-                <motion.button
-                  key={amount}
-                  onClick={() => {
-                    handleTipClick(amount)
-                  }}
-                  disabled={isDebouncing}
-                  className={`
-                    relative min-h-[6.25rem] min-w-[8.25rem] flex-1 basis-[calc(50%-0.5rem)] max-w-[10.5rem]
-                    rounded-2xl bg-gradient-to-br ${cardColors[index]}
-                    flex items-center justify-center font-black text-white text-4xl
-                    shadow-2xl border border-white/20 overflow-hidden
-                    ${isDebouncing && clickedAmount === amount ? 'scale-95' : 'active:scale-95'}
-                    transition-transform duration-150 disabled:opacity-50
-                  `}
-                  initial={{ opacity: 0, y: 50 }}
-                  animate={
-                    shouldAnimateButtons
-                      ? {
-                          opacity: 1,
-                          y: 0,
-                          scale: [1, 1.08, 1],
-                          boxShadow: [
-                            '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
-                            '0 25px 50px -12px rgba(255, 255, 255, 0.5)',
-                            '0 25px 50px -12px rgba(0, 0, 0, 0.25)'
-                          ]
-                        }
-                      : { opacity: 1, y: 0 }
-                  }
-                  transition={
-                    shouldAnimateButtons
-                      ? {
-                          delay: index * 0.1,
-                          scale: { duration: 0.6, times: [0, 0.5, 1] },
-                          boxShadow: { duration: 0.6, times: [0, 0.5, 1] }
-                        }
-                      : { delay: index * 0.1 }
-                  }
-                  onAnimationComplete={() => {
-                    if (shouldAnimateButtons && index === tipAmounts.length - 1) {
-                      setShouldAnimateButtons(false)
-                    }
-                  }}
-                >
-                  {/* Shimmer effect */}
-                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -skew-x-12 animate-pulse"></div>
-                  
-                  {/* Amount */}
-                  <span className="relative z-10 px-1 py-1">${amount}</span>
-                  
-                  {/* Click ripple effect */}
-                  {clickedAmount === amount && (
-                    <motion.div
-                      className="absolute inset-0 bg-white/30 rounded-2xl"
-                      initial={{ scale: 0, opacity: 1 }}
-                      animate={{ scale: 2, opacity: 0 }}
-                      transition={{ duration: 0.6 }}
-                    />
-                  )}
-                </motion.button>
-              ))}
-            </div>
-
-            {/* Song request section - naturally flows below buttons */}
-            {deviceInfo?.isAllowSongRequest && !selectedSong && (
-              <div className="w-full max-w-xl px-2 mb-3">
-                <button
-                  onClick={() => setShowSongSearch(true)}
-                  className="w-full mt-2 bg-white/10 backdrop-blur-md text-white px-4 py-3 rounded-2xl border border-white/20 active:bg-white/20 transition-colors flex items-center justify-center gap-2 text-sm font-semibold"
-                >
-                  <span>🎵</span>
-                  <span>Request Song</span>
-                </button>
+          <div className="flex flex-col w-full h-full overflow-hidden">
+            {/* Scrollable top content region */}
+            <div
+              className="flex-1 overflow-y-auto px-4"
+              style={{
+                paddingTop: isIOS
+                  ? 'calc(env(safe-area-inset-top) + 1.5rem)'
+                  : 'calc(env(safe-area-inset-top) + 0.75rem)',
+                paddingBottom: '0.75rem'
+              }}
+            >
+              {/* Title with profile picture */}
+              <div className="flex items-center justify-center gap-3 mb-3 w-full max-w-xl mx-auto">
+                {deviceInfo?.profilePhotoUrl && (
+                  <img
+                    src={deviceInfo?.profilePhotoUrl}
+                    alt="Performer"
+                    className="w-10 h-10 rounded-full object-cover border-2 border-white/30 flex-shrink-0"
+                  />
+                )}
+                <h1 className="text-2xl font-bold text-white truncate">
+                    Tip {deviceInfo?.stageName || `${deviceInfo?.ownerFirstName} ${deviceInfo?.ownerLastName}`}
+                </h1>
               </div>
-            )}
 
-            {/* Control block - naturally flows below everything */}
-            <div className="w-full max-w-xl px-2 mt-auto mb-[1.75rem]">
-              <div className="relative bg-black/60 backdrop-blur-md rounded-3xl px-5 py-3 w-full border border-white/20 shadow-2xl">
-                {/* Total display - single horizontal row */}
-                <div className="flex items-center justify-between">
-                  <span className="text-white/80 text-base font-semibold uppercase tracking-wider">YOUR TIP:</span>
-                  <span className="font-black text-white text-2xl uppercase tracking-wider">${totalTipped}</span>
+              {/* Song Request Information - Unified Top Container */}
+              {selectedSong && (
+                <motion.div
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  className="w-full max-w-xl px-2 mb-3 mx-auto"
+                >
+                  {/* Main instruction container */}
+                  <div className="bg-gradient-to-r from-purple-500/45 to-blue-500/45 backdrop-blur-md rounded-2xl px-4 py-3 border border-purple-300/40 shadow-xl">
+                    {/* Primary instruction text */}
+                    <div className="text-white text-center font-bold text-lg leading-tight mb-3">
+                      Your song is ready. Choose a tip amount to send your request.
+                    </div>
+
+                    {/* Song details */}
+                    <div className="border-t border-white/20 pt-3 mt-3">
+                      <div className="text-center mb-3">
+                        <div className="text-white text-xs font-semibold flex items-center justify-center gap-2 mb-1">
+                          <span>🎵 Song Selected</span>
+                        </div>
+                        <div className="text-white text-sm font-bold mb-1">{selectedSong?.title}</div>
+                        <div className="text-white/80 text-xs">{selectedSong?.artist}</div>
+                      </div>
+
+                      {/* Optional: Show name/note input toggle and fields here */}
+                      <div className="mb-3">
+                        <button
+                          type="button"
+                          onClick={() => setShowSongRequestFields((prev) => !prev)}
+                          className="w-full text-xs font-medium text-white/70 hover:text-white/90 transition-colors py-1.5 rounded-lg hover:bg-white/10"
+                        >
+                          {showSongRequestFields ? '▼ Hide details' : '▶ Add your name or note (optional)'}
+                        </button>
+                      </div>
+
+                      {/* Name and Note input fields */}
+                      <AnimatePresence initial={false}>
+                        {showSongRequestFields && (
+                          <motion.div
+                            initial={{ opacity: 0, height: 0 }}
+                            animate={{ opacity: 1, height: 'auto' }}
+                            exit={{ opacity: 0, height: 0 }}
+                            transition={{ duration: 0.22 }}
+                            className="overflow-hidden"
+                          >
+                            <div className="space-y-1.5 bg-white/5 rounded-lg p-2.5 border border-white/10">
+                              <input
+                                type="text"
+                                value={songRequestName}
+                                onChange={(e) => setSongRequestName(e.target.value)}
+                                placeholder="Your name (optional)"
+                                maxLength={50}
+                                className="w-full px-3 py-2 bg-white/15 border border-white/25 rounded-md text-white placeholder-white/40 focus:ring-2 focus:ring-white/40 focus:border-white/30 focus:outline-none text-sm transition-all"
+                              />
+                              <textarea
+                                value={songRequestNote}
+                                onChange={(e) => setSongRequestNote(e.target.value)}
+                                placeholder="Add a note (optional)"
+                                rows={2}
+                                maxLength={200}
+                                className="w-full px-3 py-2 bg-white/15 border border-white/25 rounded-md text-white placeholder-white/40 focus:ring-2 focus:ring-white/40 focus:border-white/30 focus:outline-none text-sm resize-none transition-all"
+                              />
+                            </div>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+
+                      {/* Cancel button */}
+                      <div className="mt-2 pt-2 border-t border-white/20">
+                        <button
+                          onClick={() => {
+                            setSelectedSong(null)
+                            setShowSongRequestFields(false)
+                            setSongRequestName('')
+                            setSongRequestNote('')
+                          }}
+                          className="w-full text-xs font-medium text-white/60 hover:text-white/80 py-2 rounded-lg hover:bg-white/10 transition-colors"
+                        >
+                          ✕ Cancel Song Request
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+
+              {/* Song request action when no selected song */}
+              {deviceInfo?.isAllowSongRequest && !selectedSong && (
+                <div className="w-full max-w-xl px-2 mb-3 mx-auto">
+                  <button
+                    onClick={() => setShowSongSearch(true)}
+                    className="w-full mt-2 bg-white/10 backdrop-blur-md text-white px-4 py-3 rounded-2xl border border-white/20 active:bg-white/20 transition-colors flex items-center justify-center gap-2 text-sm font-semibold"
+                  >
+                    <span>🎵</span>
+                    <span>Request Song</span>
+                  </button>
                 </div>
+              )}
+            </div>
 
-                {/* Swipe UI toggle hidden for now */}
-                <div className="hidden" />
+            {/* Fixed bottom region: tip buttons + YOUR TIP bar */}
+            <div
+              className="shrink-0 px-4"
+              style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 2.75rem)' }}
+            >
+              {/* Tip buttons grid - wraps naturally */}
+              <div className="flex flex-wrap justify-center gap-x-3 gap-y-5 max-w-xl w-full -mt-1 mb-3 mx-auto">
+                {tipAmounts.map((amount, index) => (
+                  <motion.button
+                    key={amount}
+                    onClick={() => {
+                      handleTipClick(amount)
+                    }}
+                    disabled={isDebouncing}
+                    className={`
+                      relative min-h-[6.25rem] min-w-[8.25rem] flex-1 basis-[calc(50%-0.5rem)] max-w-[10.5rem]
+                      rounded-2xl bg-gradient-to-br ${cardColors[index]}
+                      flex items-center justify-center font-black text-white text-4xl
+                      shadow-2xl border border-white/20 overflow-hidden
+                      ${isDebouncing && clickedAmount === amount ? 'scale-95' : 'active:scale-95'}
+                      transition-transform duration-150 disabled:opacity-50
+                    `}
+                    initial={{ opacity: 0, y: 50 }}
+                    animate={
+                      shouldAnimateButtons
+                        ? {
+                            opacity: 1,
+                            y: 0,
+                            scale: [1, 1.08, 1],
+                            boxShadow: [
+                              '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+                              '0 25px 50px -12px rgba(255, 255, 255, 0.5)',
+                              '0 25px 50px -12px rgba(0, 0, 0, 0.25)'
+                            ]
+                          }
+                        : { opacity: 1, y: 0 }
+                    }
+                    transition={
+                      shouldAnimateButtons
+                        ? {
+                            delay: index * 0.1,
+                            scale: { duration: 0.6, times: [0, 0.5, 1] },
+                            boxShadow: { duration: 0.6, times: [0, 0.5, 1] }
+                          }
+                        : { delay: index * 0.1 }
+                    }
+                    onAnimationComplete={() => {
+                      if (shouldAnimateButtons && index === tipAmounts.length - 1) {
+                        setShouldAnimateButtons(false)
+                      }
+                    }}
+                  >
+                    {/* Shimmer effect */}
+                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -skew-x-12 animate-pulse"></div>
+
+                    {/* Amount */}
+                    <span className="relative z-10 px-1 py-1">${amount}</span>
+
+                    {/* Click ripple effect */}
+                    {clickedAmount === amount && (
+                      <motion.div
+                        className="absolute inset-0 bg-white/30 rounded-2xl"
+                        initial={{ scale: 0, opacity: 1 }}
+                        animate={{ scale: 2, opacity: 0 }}
+                        transition={{ duration: 0.6 }}
+                      />
+                    )}
+                  </motion.button>
+                ))}
+              </div>
+
+              {/* Control block */}
+              <div className="w-full max-w-xl px-2 mx-auto">
+                <div className="relative bg-black/60 backdrop-blur-md rounded-3xl px-5 py-3 w-full border border-white/20 shadow-2xl">
+                  {/* Total display - single horizontal row */}
+                  <div className="flex items-center justify-between">
+                    <span className="text-white/80 text-base font-semibold uppercase tracking-wider">YOUR TIP:</span>
+                    <span className="font-black text-white text-2xl uppercase tracking-wider">${totalTipped}</span>
+                  </div>
+
+                  {/* Swipe UI toggle hidden for now */}
+                  <div className="hidden" />
+                </div>
               </div>
             </div>
           </div>
