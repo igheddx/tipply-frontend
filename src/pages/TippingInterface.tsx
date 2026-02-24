@@ -1423,35 +1423,15 @@ const TippingInterface: React.FC = () => {
             </div>
 
             {/* Song request section - naturally flows below buttons */}
-            {deviceInfo?.isAllowSongRequest && (
+            {deviceInfo?.isAllowSongRequest && !selectedSong && (
               <div className="w-full max-w-xl px-2 mb-3">
-                {selectedSong ? (
-                  <div className="bg-green-500/20 backdrop-blur-md rounded-2xl px-4 py-3 border border-green-400/30 break-words">
-                    <div className="text-white text-xs font-semibold mb-2">🎵 Song Selected</div>
-                    <div className="text-white/90 text-sm truncate">{selectedSong?.title}</div>
-                    <div className="text-white/70 text-xs truncate">{selectedSong?.artist}</div>
-                    <div className="text-white/60 text-sm mt-2 mb-2 font-semibold">Select a tip amount above to send your song request</div>
-                    <button
-                      onClick={() => {
-                        setSelectedSong(null)
-                        setShowSongRequestFields(false)
-                        setSongRequestName('')
-                        setSongRequestNote('')
-                      }}
-                      className="text-white/70 active:text-white text-xs mt-2 underline"
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                ) : (
-                  <button
-                    onClick={() => setShowSongSearch(true)}
-                    className="w-full mt-2 bg-white/10 backdrop-blur-md text-white px-4 py-3 rounded-2xl border border-white/20 active:bg-white/20 transition-colors flex items-center justify-center gap-2 text-sm font-semibold"
-                  >
-                    <span>🎵</span>
-                    <span>Request Song</span>
-                  </button>
-                )}
+                <button
+                  onClick={() => setShowSongSearch(true)}
+                  className="w-full mt-2 bg-white/10 backdrop-blur-md text-white px-4 py-3 rounded-2xl border border-white/20 active:bg-white/20 transition-colors flex items-center justify-center gap-2 text-sm font-semibold"
+                >
+                  <span>🎵</span>
+                  <span>Request Song</span>
+                </button>
               </div>
             )}
 
