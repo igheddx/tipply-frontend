@@ -6,6 +6,30 @@ interface ApiResponse<T> {
   error?: string
   status?: number
   raw?: any
+  errorType?: 'timeout' | 'network' | 'validation' | 'authentication' | 'server' | 'unknown'
+}
+
+// Fetch with timeout utility
+const fetchWithTimeout = async (url: string, options: RequestInit = {}, timeoutMs: number = 30000): Promise<Response> => {
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs)
+
+  try {
+    const response = await fetch(url, {
+      ...options,
+      signal: controller.signal,
+    })
+    clearTimeout(timeoutId)
+    return response
+  } catch (error) {
+    clearTimeout(timeoutId)
+    if (error instanceof Error && error.name === 'AbortError') {
+      const timeoutError = new Error(`Request timeout after ${timeoutMs}ms`)
+      ;(timeoutError as any).isTimeout = true
+      throw timeoutError
+    }
+    throw error
+  }
 }
 
 class ApiService {
@@ -38,7 +62,7 @@ class ApiService {
       logger.log(`Token exists: ${!!token}`)
       logger.log(`UseApiKey: ${useApiKey}`)
       
-      const response = await fetch(url, config)
+      const response = await fetchWithTimeout(url, config, 30000)
       
       if (response.status === 401) {
         // Try to refresh token (with guard against parallel refreshes)
@@ -57,7 +81,7 @@ class ApiService {
                     Authorization: `Bearer ${newToken}`,
                   },
                 }
-                const retryResponse = await fetch(url, newConfig)
+                const retryResponse = await fetchWithTimeout(url, newConfig, 30000)
                 if (retryResponse.ok) {
                   const data = await retryResponse.json()
                   return { data }
@@ -67,13 +91,13 @@ class ApiService {
               // Start a new refresh
               this.refreshPromise = (async () => {
                 try {
-                  const refreshResponse = await fetch(`${API_BASE_URL}/api/auth/refresh`, {
+                  const refreshResponse = await fetchWithTimeout(`${API_BASE_URL}/api/auth/refresh`, {
                     method: 'POST',
                     headers: {
                       'Content-Type': 'application/json',
                     },
                     body: JSON.stringify({ refreshToken: localStorage.getItem('refreshToken') }),
-                  })
+                  }, 30000)
 
                   if (refreshResponse.ok) {
                     const refreshData = await refreshResponse.json()
@@ -120,7 +144,18 @@ class ApiService {
       
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}))
-        return { error: errorData.error || `HTTP ${response.status}: ${response.statusText}`, status: response.status, raw: errorData }
+        const errorMessage = errorData.error || `HTTP ${response.status}: ${response.statusText}`
+        let errorType: 'timeout' | 'network' | 'validation' | 'authentication' | 'server' | 'unknown' = 'unknown'
+
+        if (response.status === 400) {
+          errorType = 'validation'
+        } else if (response.status === 401 || response.status === 403) {
+          errorType = 'authentication'
+        } else if (response.status >= 500) {
+          errorType = 'server'
+        }
+
+        return { error: errorMessage, status: response.status, raw: errorData, errorType }
       }
 
       const data = await response.json()
@@ -129,7 +164,39 @@ class ApiService {
       logger.error('API request failed:', error)
       logger.error('Request URL was:', url)
       logger.error('Request config was:', config)
-      return { error: error instanceof Error ? error.message : 'Unknown error occurred' }
+
+      // Classify the error
+      let errorType: 'timeout' | 'network' | 'validation' | 'authentication' | 'server' | 'unknown' = 'unknown'
+      let errorMessage = 'Unknown error occurred'
+
+      if (error instanceof Error) {
+        if ((error as any).isTimeout || error.message.includes('timeout')) {
+          errorType = 'timeout'
+          errorMessage = `Request timeout: ${error.message}`
+        } else if (error.name === 'TypeError' || error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
+          errorType = 'network'
+          errorMessage = 'Network error - unable to reach server. Please check your connection.'
+        } else {
+          errorMessage = error.message
+        }
+      }
+
+      // Send error telemetry to backend
+      try {
+        await this.reportFrontendError({
+          errorType,
+          message: errorMessage,
+          url,
+          method: config.method || 'GET',
+          timestamp: new Date().toISOString(),
+          userAgent: navigator.userAgent,
+          hostname: window.location.hostname,
+        })
+      } catch (telemetryError) {
+        logger.log('Could not send error telemetry:', telemetryError)
+      }
+
+      return { error: errorMessage, errorType }
     }
   }
 
@@ -689,6 +756,26 @@ class ApiService {
 
   async delete(endpoint: string): Promise<ApiResponse<any>> {
     return this.request(endpoint, { method: 'DELETE' })
+  }
+
+  async reportFrontendError(errorData: {
+    errorType: string
+    message: string
+    url: string
+    method: string
+    timestamp: string
+    userAgent: string
+    hostname: string
+  }): Promise<void> {
+    try {
+      await fetch(`${API_BASE_URL}/api/errors/client-log`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(errorData),
+      })
+    } catch (error) {
+      logger.log('Failed to report frontend error:', error)
+    }
   }
 }
 

@@ -63,7 +63,6 @@ const TippingInterface: React.FC = () => {
   const audioContextRef = useRef<AudioContext | null>(null)
 
     const [billRefresh, setBillRefresh] = useState(0)
-  const [gridSelectedAmount, setGridSelectedAmount] = useState<number | null>(null)
   // Tip amounts for the cards
   const tipAmounts = [2, 5, 10, 20, 50, 100]
 
@@ -112,13 +111,33 @@ const TippingInterface: React.FC = () => {
     return () => window.removeEventListener('resize', checkMobile)
   }, [])
 
-  // Lock UI to portrait by showing overlay when rotated
+  // Lock UI to portrait for both iOS and Android
   useEffect(() => {
+    // Attempt to lock orientation using Screen Orientation API (primary method)
+    const lockOrientation = async () => {
+      try {
+        const screenOrientation = screen.orientation as any
+        if (screenOrientation && screenOrientation.lock) {
+          await screenOrientation.lock('portrait-primary').catch((error: Error) => {
+            logger.warn('Failed to lock to portrait-primary, trying portrait:', error)
+            // Fallback to generic portrait if portrait-primary fails
+            return screenOrientation.lock('portrait')
+          })
+          logger.log('✅ Screen orientation locked to portrait')
+        }
+      } catch (error) {
+        logger.log('📱 Screen Orientation API not available, using CSS fallback:', error)
+      }
+    }
+
+    // Lock orientation on component mount
+    lockOrientation()
+
     const updateOrientation = () => {
       const portrait = window.matchMedia('(orientation: portrait)').matches || window.innerHeight >= window.innerWidth
       setIsPortrait(portrait)
       
-      // Force CSS-based rotation on Android if in landscape
+      // CSS-based fallback for browsers without Screen Orientation API support
       if (!portrait && window.innerWidth < 768) {
         logger.log('📱 Landscape detected on mobile - applying CSS rotation lock')
         document.body.style.transform = 'rotate(-90deg)'
@@ -151,6 +170,17 @@ const TippingInterface: React.FC = () => {
       mq.removeEventListener('change', handler)
       window.removeEventListener('resize', handler)
       window.removeEventListener('orientationchange', handler)
+      
+      // Unlock orientation when component unmounts (cleanup)
+      try {
+        const screenOrientation = screen.orientation as any
+        if (screenOrientation && screenOrientation.unlock) {
+          screenOrientation.unlock()
+          logger.log('🔓 Screen orientation unlocked on component unmount')
+        }
+      } catch (error) {
+        logger.log('Could not unlock orientation:', error)
+      }
     }
   }, [])
 
@@ -805,13 +835,26 @@ const TippingInterface: React.FC = () => {
         // Refresh payment method session on successful tip (extends 30-day memory)
         refreshPaymentMethodSession()
       } else {
-        const errorMsg = response.raw?.error || response.error || 'Failed to submit tip. Please try again.'
-        logger.error('❌ Tip submission failed:', response.raw, 'Error:', errorMsg)
+        // Provide specific error messages based on error type
+        let errorMsg = response.error || 'Failed to submit tip. Please try again.'
+        if (response.errorType === 'timeout') {
+          errorMsg = '⏱️ Request timeout - the server took too long to respond. Please check your internet connection and try again.'
+        } else if (response.errorType === 'network') {
+          errorMsg = '🌐 Network error - unable to connect to the server. Please check your internet connection.'
+        } else if (response.errorType === 'validation') {
+          errorMsg = response.error || 'Invalid tip details. Please check and try again.'
+        } else if (response.errorType === 'authentication') {
+          errorMsg = 'Session expired. Please refresh and try again.'
+        } else if (response.errorType === 'server') {
+          errorMsg = '⚠️ Server error. Please try again in a moment.'
+        }
+        logger.error('❌ Tip submission failed:', response.raw, 'Error:', errorMsg, 'Type:', response.errorType)
         toast.error(errorMsg)
       }
     } catch (error) {
       logger.error('❌ Error submitting tip:', error)
-      toast.error(error instanceof Error ? error.message : 'Failed to submit tip. Please try again.')
+      const errorMsg = error instanceof Error ? error.message : 'Failed to submit tip. Please try again.'
+      toast.error(errorMsg)
     }
 
   }
@@ -864,13 +907,26 @@ const TippingInterface: React.FC = () => {
         // Refresh payment method session on successful tip (extends 30-day memory)
         refreshPaymentMethodSession()
       } else {
-        const errorMsg = response.raw?.error || response.error || 'Failed to submit tip. Please try again.'
-        logger.error('❌ Tip submission failed:', response.raw, 'Error:', errorMsg)
+        // Provide specific error messages based on error type
+        let errorMsg = response.error || 'Failed to submit tip. Please try again.'
+        if (response.errorType === 'timeout') {
+          errorMsg = '⏱️ Request timeout - the server took too long to respond. Please check your internet connection and try again.'
+        } else if (response.errorType === 'network') {
+          errorMsg = '🌐 Network error - unable to connect to the server. Please check your internet connection.'
+        } else if (response.errorType === 'validation') {
+          errorMsg = response.error || 'Invalid tip details. Please check and try again.'
+        } else if (response.errorType === 'authentication') {
+          errorMsg = 'Session expired. Please refresh and try again.'
+        } else if (response.errorType === 'server') {
+          errorMsg = '⚠️ Server error. Please try again in a moment.'
+        }
+        logger.error('❌ Tip submission failed:', response.raw, 'Error:', errorMsg, 'Type:', response.errorType)
         toast.error(errorMsg)
       }
     } catch (error) {
       logger.error('❌ Error submitting tip with song:', error)
-      toast.error(error instanceof Error ? error.message : 'Failed to submit tip. Please try again.')
+      const errorMsg = error instanceof Error ? error.message : 'Failed to submit tip. Please try again.'
+      toast.error(errorMsg)
     }
 
   }
@@ -1173,7 +1229,7 @@ const TippingInterface: React.FC = () => {
                     </button>
                   </div>
                   <div className="text-center mb-4">
-                    <span className="text-white/80 text-xs uppercase tracking-wider mr-2">Total:</span>
+                    <span className="text-white/80 text-xs uppercase tracking-wider mr-2">Your Tip:</span>
                     <span className="text-white/80 text-xs uppercase tracking-wider font-black">${totalTipped}</span>
                   </div>
 
@@ -1192,13 +1248,13 @@ const TippingInterface: React.FC = () => {
             className="flex flex-col items-center w-full px-4 h-full"
             style={{ 
               paddingTop: isIOS 
-                ? 'calc(env(safe-area-inset-top) + 2rem)' 
-                : 'calc(env(safe-area-inset-top) + 1.25rem)',
-              paddingBottom: 'calc(env(safe-area-inset-bottom) + 3.5rem)'
+                ? 'calc(env(safe-area-inset-top) + 1.5rem)' 
+                : 'calc(env(safe-area-inset-top) + 0.75rem)',
+              paddingBottom: 'calc(env(safe-area-inset-bottom) + 2.75rem)'
             }}
           >
             {/* Title with profile picture */}
-            <div className="flex items-center justify-center gap-3 mb-4 w-full">
+            <div className="flex items-center justify-center gap-3 mb-3 w-full">
               {deviceInfo?.profilePhotoUrl && (
                 <img
                   src={deviceInfo?.profilePhotoUrl}
@@ -1211,48 +1267,91 @@ const TippingInterface: React.FC = () => {
               </h1>
             </div>
 
+            {/* Song Request Information - Unified Top Container */}
             {selectedSong && (
-              <div className="w-full max-w-xl px-2 mb-3">
-                <div className="flex items-center justify-center">
-                  <button
-                    type="button"
-                    onClick={() => setShowSongRequestFields((prev) => !prev)}
-                    className="text-[15px] font-normal text-white/60 hover:text-white/80 underline-offset-2 hover:underline active:underline"
-                  >
-                    {showSongRequestFields ? 'Hide' : 'Add your name or a note (optional)'}
-                  </button>
-                </div>
-                <AnimatePresence initial={false}>
-                  {showSongRequestFields && (
-                    <motion.div
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: 'auto' }}
-                      exit={{ opacity: 0, height: 0 }}
-                      transition={{ duration: 0.22 }}
-                      className="overflow-hidden"
-                    >
-                      <div className="mt-3 space-y-2">
-                        <input
-                          type="text"
-                          value={songRequestName}
-                          onChange={(e) => setSongRequestName(e.target.value)}
-                          placeholder="Name (optional)"
-                          maxLength={50}
-                          className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-white/50 focus:ring-2 focus:ring-white/30 focus:border-transparent text-sm"
-                        />
-                        <textarea
-                          value={songRequestNote}
-                          onChange={(e) => setSongRequestNote(e.target.value)}
-                          placeholder="Note (optional)"
-                          rows={2}
-                          maxLength={200}
-                          className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-white/50 focus:ring-2 focus:ring-white/30 focus:border-transparent text-sm resize-none"
-                        />
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                className="w-full max-w-xl px-2 mb-3"
+              >
+                {/* Main instruction container */}
+                <div className="bg-gradient-to-r from-purple-500/45 to-blue-500/45 backdrop-blur-md rounded-2xl px-4 py-3 border border-purple-300/40 shadow-xl">
+                  {/* Primary instruction text */}
+                  <div className="text-white text-center font-bold text-lg leading-tight mb-3">
+                    Your song is ready. Choose a tip amount to send your request.
+                  </div>
+                  
+                  {/* Song details */}
+                  <div className="border-t border-white/20 pt-3 mt-3">
+                    <div className="text-center mb-3">
+                      <div className="text-white text-xs font-semibold flex items-center justify-center gap-2 mb-1">
+                        <span>🎵 Song Selected</span>
                       </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
+                      <div className="text-white text-sm font-bold mb-1">{selectedSong?.title}</div>
+                      <div className="text-white/80 text-xs">{selectedSong?.artist}</div>
+                    </div>
+                    
+                    {/* Optional: Show name/note input toggle and fields here */}
+                    <div className="mb-3">
+                      <button
+                        type="button"
+                        onClick={() => setShowSongRequestFields((prev) => !prev)}
+                        className="w-full text-xs font-medium text-white/70 hover:text-white/90 transition-colors py-1.5 rounded-lg hover:bg-white/10"
+                      >
+                        {showSongRequestFields ? '▼ Hide details' : '▶ Add your name or note (optional)'}
+                      </button>
+                    </div>
+                    
+                    {/* Name and Note input fields */}
+                    <AnimatePresence initial={false}>
+                      {showSongRequestFields && (
+                        <motion.div
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: 'auto' }}
+                          exit={{ opacity: 0, height: 0 }}
+                          transition={{ duration: 0.22 }}
+                          className="overflow-hidden"
+                        >
+                          <div className="space-y-1.5 bg-white/5 rounded-lg p-2.5 border border-white/10">
+                            <input
+                              type="text"
+                              value={songRequestName}
+                              onChange={(e) => setSongRequestName(e.target.value)}
+                              placeholder="Your name (optional)"
+                              maxLength={50}
+                              className="w-full px-3 py-2 bg-white/15 border border-white/25 rounded-md text-white placeholder-white/40 focus:ring-2 focus:ring-white/40 focus:border-white/30 focus:outline-none text-sm transition-all"
+                            />
+                            <textarea
+                              value={songRequestNote}
+                              onChange={(e) => setSongRequestNote(e.target.value)}
+                              placeholder="Add a note (optional)"
+                              rows={2}
+                              maxLength={200}
+                              className="w-full px-3 py-2 bg-white/15 border border-white/25 rounded-md text-white placeholder-white/40 focus:ring-2 focus:ring-white/40 focus:border-white/30 focus:outline-none text-sm resize-none transition-all"
+                            />
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                    
+                    {/* Cancel button */}
+                    <div className="mt-2 pt-2 border-t border-white/20">
+                      <button
+                        onClick={() => {
+                          setSelectedSong(null)
+                          setShowSongRequestFields(false)
+                          setSongRequestName('')
+                          setSongRequestNote('')
+                        }}
+                        className="w-full text-xs font-medium text-white/60 hover:text-white/80 py-2 rounded-lg hover:bg-white/10 transition-colors"
+                      >
+                        ✕ Cancel Song Request
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
             )}
 
             {/* Tip buttons grid - wraps naturally */}
@@ -1261,7 +1360,6 @@ const TippingInterface: React.FC = () => {
                 <motion.button
                   key={amount}
                   onClick={() => {
-                    setGridSelectedAmount(amount)
                     handleTipClick(amount)
                   }}
                   disabled={isDebouncing}
@@ -1323,53 +1421,25 @@ const TippingInterface: React.FC = () => {
             </div>
 
             {/* Song request section - naturally flows below buttons */}
-            {deviceInfo?.isAllowSongRequest && (
+            {deviceInfo?.isAllowSongRequest && !selectedSong && (
               <div className="w-full max-w-xl px-2 mb-3">
-                {selectedSong ? (
-                  <div className="bg-green-500/20 backdrop-blur-md rounded-2xl px-4 py-3 border border-green-400/30 break-words">
-                    <div className="text-white text-xs font-semibold mb-2">🎵 Song Selected</div>
-                    <div className="text-white/90 text-sm truncate">{selectedSong?.title}</div>
-                    <div className="text-white/70 text-xs truncate">{selectedSong?.artist}</div>
-                    <div className="text-white/60 text-sm mt-2 mb-2 font-semibold">Select a tip amount above to send your song request</div>
-                    <button
-                      onClick={() => {
-                        setSelectedSong(null)
-                        setShowSongRequestFields(false)
-                        setSongRequestName('')
-                        setSongRequestNote('')
-                      }}
-                      className="text-white/70 active:text-white text-xs mt-2 underline"
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                ) : (
-                  <button
-                    onClick={() => setShowSongSearch(true)}
-                    className="w-full mt-2 bg-white/10 backdrop-blur-md text-white px-4 py-3 rounded-2xl border border-white/20 active:bg-white/20 transition-colors flex items-center justify-center gap-2 text-sm font-semibold"
-                  >
-                    <span>🎵</span>
-                    <span>Request Song</span>
-                  </button>
-                )}
+                <button
+                  onClick={() => setShowSongSearch(true)}
+                  className="w-full mt-2 bg-white/10 backdrop-blur-md text-white px-4 py-3 rounded-2xl border border-white/20 active:bg-white/20 transition-colors flex items-center justify-center gap-2 text-sm font-semibold"
+                >
+                  <span>🎵</span>
+                  <span>Request Song</span>
+                </button>
               </div>
             )}
 
             {/* Control block - naturally flows below everything */}
-            <div className="w-full max-w-xl px-2 mt-auto mb-[2.25rem]">
-              <div className="relative bg-black/60 backdrop-blur-md rounded-3xl p-[20px] w-full border border-white/20 shadow-2xl text-center">
-                {/* Amount display */}
-                <div className="text-center mb-2">
-                  <span className="text-white/80 text-sm uppercase tracking-wider mr-2">Amount:</span>
-                  <span className="font-black text-white/80 text-sm uppercase tracking-wider">
-                    {gridSelectedAmount !== null ? `$${gridSelectedAmount}` : '—'}
-                  </span>
-                </div>
-
-                {/* Total display */}
-                <div className="text-center mb-3">
-                  <span className="text-white/80 text-sm uppercase tracking-wider mr-2">Total:</span>
-                  <span className="font-black text-white text-sm uppercase tracking-wider">${totalTipped}</span>
+            <div className="w-full max-w-xl px-2 mt-auto mb-[1.75rem]">
+              <div className="relative bg-black/60 backdrop-blur-md rounded-3xl px-5 py-3 w-full border border-white/20 shadow-2xl">
+                {/* Total display - single horizontal row */}
+                <div className="flex items-center justify-between">
+                  <span className="text-white/80 text-base font-semibold uppercase tracking-wider">Your Tip:</span>
+                  <span className="font-black text-white text-2xl uppercase tracking-wider">${totalTipped}</span>
                 </div>
 
                 {/* Swipe UI toggle hidden for now */}
