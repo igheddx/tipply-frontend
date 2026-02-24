@@ -112,13 +112,33 @@ const TippingInterface: React.FC = () => {
     return () => window.removeEventListener('resize', checkMobile)
   }, [])
 
-  // Lock UI to portrait by showing overlay when rotated
+  // Lock UI to portrait for both iOS and Android
   useEffect(() => {
+    // Attempt to lock orientation using Screen Orientation API (primary method)
+    const lockOrientation = async () => {
+      try {
+        const screenOrientation = screen.orientation as any
+        if (screenOrientation && screenOrientation.lock) {
+          await screenOrientation.lock('portrait-primary').catch((error: Error) => {
+            logger.warn('Failed to lock to portrait-primary, trying portrait:', error)
+            // Fallback to generic portrait if portrait-primary fails
+            return screenOrientation.lock('portrait')
+          })
+          logger.log('✅ Screen orientation locked to portrait')
+        }
+      } catch (error) {
+        logger.log('📱 Screen Orientation API not available, using CSS fallback:', error)
+      }
+    }
+
+    // Lock orientation on component mount
+    lockOrientation()
+
     const updateOrientation = () => {
       const portrait = window.matchMedia('(orientation: portrait)').matches || window.innerHeight >= window.innerWidth
       setIsPortrait(portrait)
       
-      // Force CSS-based rotation on Android if in landscape
+      // CSS-based fallback for browsers without Screen Orientation API support
       if (!portrait && window.innerWidth < 768) {
         logger.log('📱 Landscape detected on mobile - applying CSS rotation lock')
         document.body.style.transform = 'rotate(-90deg)'
@@ -151,6 +171,17 @@ const TippingInterface: React.FC = () => {
       mq.removeEventListener('change', handler)
       window.removeEventListener('resize', handler)
       window.removeEventListener('orientationchange', handler)
+      
+      // Unlock orientation when component unmounts (cleanup)
+      try {
+        const screenOrientation = screen.orientation as any
+        if (screenOrientation && screenOrientation.unlock) {
+          screenOrientation.unlock()
+          logger.log('🔓 Screen orientation unlocked on component unmount')
+        }
+      } catch (error) {
+        logger.log('Could not unlock orientation:', error)
+      }
     }
   }, [])
 
