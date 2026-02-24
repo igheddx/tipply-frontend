@@ -1277,7 +1277,7 @@ const TippingInterface: React.FC = () => {
                   className="w-full max-w-xl px-2 mb-3 mx-auto"
                 >
                   {/* Main instruction container */}
-                  <div className="bg-gradient-to-r from-purple-500/45 to-blue-500/45 backdrop-blur-md rounded-2xl px-4 py-3 border border-purple-300/40 shadow-xl">
+                  <div className="bg-gradient-to-r from-purple-500/45 to-blue-500/45 backdrop-blur-md rounded-2xl px-4 py-3 border border-purple-300/40 shadow-xl min-h-[15rem]">
                     {/* Primary instruction text */}
                     <div className="text-white text-center font-bold text-lg leading-tight mb-3">
                       Your song is ready. Choose a tip amount to send your request.
@@ -1286,11 +1286,7 @@ const TippingInterface: React.FC = () => {
                     {/* Song details */}
                     <div className="border-t border-white/20 pt-3 mt-3">
                       <div className="text-center mb-3">
-                        <div className="text-white text-xs font-semibold flex items-center justify-center gap-2 mb-1">
-                          <span>🎵 Song Selected</span>
-                        </div>
-                        <div className="text-white text-sm font-bold mb-1">{selectedSong?.title}</div>
-                        <div className="text-white/80 text-xs">{selectedSong?.artist}</div>
+                        <div className="text-white text-sm font-semibold truncate">🎵 Song Selected: {selectedSong?.title}</div>
                       </div>
 
                       {/* Optional: Show name/note input toggle and fields here */}
@@ -1355,18 +1351,6 @@ const TippingInterface: React.FC = () => {
                 </motion.div>
               )}
 
-              {/* Song request action when no selected song */}
-              {deviceInfo?.isAllowSongRequest && !selectedSong && (
-                <div className="w-full max-w-xl px-2 mb-3 mx-auto">
-                  <button
-                    onClick={() => setShowSongSearch(true)}
-                    className="w-full mt-2 bg-white/10 backdrop-blur-md text-white px-4 py-3 rounded-2xl border border-white/20 active:bg-white/20 transition-colors flex items-center justify-center gap-2 text-sm font-semibold"
-                  >
-                    <span>🎵</span>
-                    <span>Request Song</span>
-                  </button>
-                </div>
-              )}
             </div>
 
             {/* Fixed bottom region: tip buttons + YOUR TIP bar */}
@@ -1375,7 +1359,7 @@ const TippingInterface: React.FC = () => {
               style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 2.75rem)' }}
             >
               {/* Tip buttons grid - wraps naturally */}
-              <div className="flex flex-wrap justify-center gap-x-3 gap-y-5 max-w-xl w-full -mt-1 mb-3 mx-auto">
+              <div className="flex flex-wrap justify-center gap-x-3 gap-y-5 max-w-xl w-full mt-1 mb-3 mx-auto">
                 {tipAmounts.map((amount, index) => (
                   <motion.button
                     key={amount}
@@ -1439,6 +1423,19 @@ const TippingInterface: React.FC = () => {
                   </motion.button>
                 ))}
               </div>
+
+              {/* Song request action when no selected song */}
+              {deviceInfo?.isAllowSongRequest && !selectedSong && (
+                <div className="w-full max-w-xl px-2 mb-3 mx-auto">
+                  <button
+                    onClick={() => setShowSongSearch(true)}
+                    className="w-full mt-2 bg-white/10 backdrop-blur-md text-white px-4 py-3 rounded-2xl border border-white/20 active:bg-white/20 transition-colors flex items-center justify-center gap-2 text-sm font-semibold"
+                  >
+                    <span>🎵</span>
+                    <span>Request Song</span>
+                  </button>
+                </div>
+              )}
 
               {/* Control block */}
               <div className="w-full max-w-xl px-2 mx-auto">
