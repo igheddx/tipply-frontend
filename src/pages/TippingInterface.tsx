@@ -1249,13 +1249,13 @@ const TippingInterface: React.FC = () => {
             className="flex flex-col items-center w-full px-4 h-full"
             style={{ 
               paddingTop: isIOS 
-                ? 'calc(env(safe-area-inset-top) + 2rem)' 
-                : 'calc(env(safe-area-inset-top) + 1.25rem)',
-              paddingBottom: 'calc(env(safe-area-inset-bottom) + 3.5rem)'
+                ? 'calc(env(safe-area-inset-top) + 1.5rem)' 
+                : 'calc(env(safe-area-inset-top) + 0.75rem)',
+              paddingBottom: 'calc(env(safe-area-inset-bottom) + 2.75rem)'
             }}
           >
             {/* Title with profile picture */}
-            <div className="flex items-center justify-center gap-3 mb-4 w-full">
+            <div className="flex items-center justify-center gap-3 mb-3 w-full">
               {deviceInfo?.profilePhotoUrl && (
                 <img
                   src={deviceInfo?.profilePhotoUrl}
@@ -1274,23 +1274,23 @@ const TippingInterface: React.FC = () => {
                 initial={{ opacity: 0, y: -10 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -10 }}
-                className="w-full max-w-xl px-2 mb-5"
+                className="w-full max-w-xl px-2 mb-3"
               >
                 {/* Main instruction container */}
-                <div className="bg-gradient-to-r from-purple-500/45 to-blue-500/45 backdrop-blur-md rounded-2xl px-5 py-4 border border-purple-300/40 shadow-xl">
+                <div className="bg-gradient-to-r from-purple-500/45 to-blue-500/45 backdrop-blur-md rounded-2xl px-4 py-3 border border-purple-300/40 shadow-xl">
                   {/* Primary instruction text */}
-                  <div className="text-white text-center font-bold text-xl leading-tight mb-4">
+                  <div className="text-white text-center font-bold text-lg leading-tight mb-3">
                     Your song is ready. Choose a tip amount to send your request.
                   </div>
                   
                   {/* Song details */}
-                  <div className="border-t border-white/20 pt-4 mt-4">
-                    <div className="text-center mb-4">
-                      <div className="text-white text-sm font-semibold flex items-center justify-center gap-2 mb-2">
+                  <div className="border-t border-white/20 pt-3 mt-3">
+                    <div className="text-center mb-3">
+                      <div className="text-white text-xs font-semibold flex items-center justify-center gap-2 mb-1">
                         <span>🎵 Song Selected</span>
                       </div>
-                      <div className="text-white text-base font-bold mb-1">{selectedSong?.title}</div>
-                      <div className="text-white/80 text-sm">{selectedSong?.artist}</div>
+                      <div className="text-white text-sm font-bold mb-1">{selectedSong?.title}</div>
+                      <div className="text-white/80 text-xs">{selectedSong?.artist}</div>
                     </div>
                     
                     {/* Optional: Show name/note input toggle and fields here */}
@@ -1298,7 +1298,7 @@ const TippingInterface: React.FC = () => {
                       <button
                         type="button"
                         onClick={() => setShowSongRequestFields((prev) => !prev)}
-                        className="w-full text-xs font-medium text-white/70 hover:text-white/90 transition-colors py-2 rounded-lg hover:bg-white/10"
+                        className="w-full text-xs font-medium text-white/70 hover:text-white/90 transition-colors py-1.5 rounded-lg hover:bg-white/10"
                       >
                         {showSongRequestFields ? '▼ Hide details' : '▶ Add your name or note (optional)'}
                       </button>
@@ -1314,7 +1314,7 @@ const TippingInterface: React.FC = () => {
                           transition={{ duration: 0.22 }}
                           className="overflow-hidden"
                         >
-                          <div className="space-y-2 bg-white/5 rounded-lg p-3 border border-white/10">
+                          <div className="space-y-1.5 bg-white/5 rounded-lg p-2.5 border border-white/10">
                             <input
                               type="text"
                               value={songRequestName}
@@ -1337,7 +1337,7 @@ const TippingInterface: React.FC = () => {
                     </AnimatePresence>
                     
                     {/* Cancel button */}
-                    <div className="mt-4 pt-3 border-t border-white/20">
+                    <div className="mt-2 pt-2 border-t border-white/20">
                       <button
                         onClick={() => {
                           setSelectedSong(null)
@@ -1436,20 +1436,20 @@ const TippingInterface: React.FC = () => {
             )}
 
             {/* Control block - naturally flows below everything */}
-            <div className="w-full max-w-xl px-2 mt-auto mb-[2.25rem]">
-              <div className="relative bg-black/60 backdrop-blur-md rounded-3xl p-[20px] w-full border border-white/20 shadow-2xl text-center">
+            <div className="w-full max-w-xl px-2 mt-auto mb-[1.75rem]">
+              <div className="relative bg-black/60 backdrop-blur-md rounded-3xl p-4 w-full border border-white/20 shadow-2xl text-center">
                 {/* Amount display */}
                 <div className="text-center mb-2">
-                  <span className="text-white/80 text-sm uppercase tracking-wider mr-2">Amount:</span>
-                  <span className="font-black text-white/80 text-sm uppercase tracking-wider">
+                  <div className="text-white/80 text-base font-semibold uppercase tracking-wider mb-1">Amount:</div>
+                  <div className="font-black text-white text-xl uppercase tracking-wider">
                     {gridSelectedAmount !== null ? `$${gridSelectedAmount}` : '—'}
-                  </span>
+                  </div>
                 </div>
 
                 {/* Total display */}
-                <div className="text-center mb-3">
-                  <span className="text-white/80 text-sm uppercase tracking-wider mr-2">Total:</span>
-                  <span className="font-black text-white text-sm uppercase tracking-wider">${totalTipped}</span>
+                <div className="text-center">
+                  <div className="text-white/80 text-base font-semibold uppercase tracking-wider mb-1">Total:</div>
+                  <div className="font-black text-white text-xl uppercase tracking-wider">${totalTipped}</div>
                 </div>
 
                 {/* Swipe UI toggle hidden for now */}
