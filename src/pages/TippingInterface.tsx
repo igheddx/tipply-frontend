@@ -1229,7 +1229,7 @@ const TippingInterface: React.FC = () => {
                     </button>
                   </div>
                   <div className="text-center mb-4">
-                    <span className="text-white/80 text-xs uppercase tracking-wider mr-2">Your Tip:</span>
+                    <span className="text-white/80 text-xs uppercase tracking-wider mr-2">YOUR TIP:</span>
                     <span className="text-white/80 text-xs uppercase tracking-wider font-black">${totalTipped}</span>
                   </div>
 
@@ -1438,7 +1438,7 @@ const TippingInterface: React.FC = () => {
               <div className="relative bg-black/60 backdrop-blur-md rounded-3xl px-5 py-3 w-full border border-white/20 shadow-2xl">
                 {/* Total display - single horizontal row */}
                 <div className="flex items-center justify-between">
-                  <span className="text-white/80 text-base font-semibold uppercase tracking-wider">Your Tip:</span>
+                  <span className="text-white/80 text-base font-semibold uppercase tracking-wider">YOUR TIP:</span>
                   <span className="font-black text-white text-2xl uppercase tracking-wider">${totalTipped}</span>
                 </div>
 
