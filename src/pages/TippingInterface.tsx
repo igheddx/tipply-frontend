@@ -1237,6 +1237,22 @@ const TippingInterface: React.FC = () => {
               </h1>
             </div>
 
+            {/* Song Request Instruction Message */}
+            {selectedSong && (
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                className="w-full max-w-xl px-2 mb-4"
+              >
+                <div className="bg-gradient-to-r from-purple-500/40 to-blue-500/40 backdrop-blur-md rounded-xl px-4 py-3 border border-purple-400/50 shadow-lg">
+                  <div className="text-white text-center font-bold text-lg leading-tight">
+                    Select a tip amount below to send your song request
+                  </div>
+                </div>
+              </motion.div>
+            )}
+
             {selectedSong && (
               <div className="w-full max-w-xl px-2 mb-3">
                 <div className="flex items-center justify-center">

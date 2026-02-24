@@ -2,7 +2,6 @@ import logger from "../utils/logger";
 import React, { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { API_BASE_URL } from '../utils/config'
-import SongConfirmationModal from './SongConfirmationModal'
 
 interface Song {
   id: string
@@ -42,10 +41,6 @@ const SongCatalogSearch: React.FC<SongCatalogSearchProps> = ({
   const [dailyTotal, setDailyTotal] = useState<DailyTipSummary | null>(null)
   const [hasSearched, setHasSearched] = useState(false)
   const searchInputRef = useRef<HTMLInputElement>(null)
-  
-  // Modal state
-  const [showConfirmModal, setShowConfirmModal] = useState(false)
-  const [pendingSong, setPendingSong] = useState<Song | null>(null)
 
   // Auto-focus search input when component becomes visible
   useEffect(() => {
@@ -122,25 +117,12 @@ const SongCatalogSearch: React.FC<SongCatalogSearchProps> = ({
   }, [searchQuery])
 
   const handleSongRequest = (song: Song) => {
-    setPendingSong(song)
-    setShowConfirmModal(true)
-  }
-
-  const handleConfirmSong = () => {
-    if (pendingSong) {
-      onSongSelect({
-        id: pendingSong.id,
-        title: pendingSong.songTitle,
-        artist: pendingSong.artist
-      })
-      setShowConfirmModal(false)
-      setPendingSong(null)
-    }
-  }
-
-  const handleCancelConfirm = () => {
-    setShowConfirmModal(false)
-    setPendingSong(null)
+    // Directly select the song without showing a confirmation modal
+    onSongSelect({
+      id: song.id,
+      title: song.songTitle,
+      artist: song.artist
+    })
   }
 
   return (
@@ -303,15 +285,6 @@ const SongCatalogSearch: React.FC<SongCatalogSearchProps> = ({
           </div>
         </motion.div>
       )}
-      
-      {/* Confirmation Modal */}
-      <SongConfirmationModal
-        isOpen={showConfirmModal}
-        songTitle={pendingSong?.songTitle || ''}
-        artist={pendingSong?.artist || ''}
-        onContinue={handleConfirmSong}
-        onCancel={handleCancelConfirm}
-      />
     </AnimatePresence>
   )
 }
