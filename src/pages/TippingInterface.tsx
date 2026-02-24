@@ -63,7 +63,6 @@ const TippingInterface: React.FC = () => {
   const audioContextRef = useRef<AudioContext | null>(null)
 
     const [billRefresh, setBillRefresh] = useState(0)
-  const [gridSelectedAmount, setGridSelectedAmount] = useState<number | null>(null)
   // Tip amounts for the cards
   const tipAmounts = [2, 5, 10, 20, 50, 100]
 
@@ -1361,7 +1360,6 @@ const TippingInterface: React.FC = () => {
                 <motion.button
                   key={amount}
                   onClick={() => {
-                    setGridSelectedAmount(amount)
                     handleTipClick(amount)
                   }}
                   disabled={isDebouncing}
@@ -1437,19 +1435,11 @@ const TippingInterface: React.FC = () => {
 
             {/* Control block - naturally flows below everything */}
             <div className="w-full max-w-xl px-2 mt-auto mb-[1.75rem]">
-              <div className="relative bg-black/60 backdrop-blur-md rounded-3xl p-4 w-full border border-white/20 shadow-2xl text-center">
-                {/* Amount display */}
-                <div className="text-center mb-2">
-                  <div className="text-white/80 text-base font-semibold uppercase tracking-wider mb-1">Amount:</div>
-                  <div className="font-black text-white text-xl uppercase tracking-wider">
-                    {gridSelectedAmount !== null ? `$${gridSelectedAmount}` : '—'}
-                  </div>
-                </div>
-
-                {/* Total display */}
-                <div className="text-center">
-                  <div className="text-white/80 text-base font-semibold uppercase tracking-wider mb-1">Total:</div>
-                  <div className="font-black text-white text-xl uppercase tracking-wider">${totalTipped}</div>
+              <div className="relative bg-black/60 backdrop-blur-md rounded-3xl px-5 py-3 w-full border border-white/20 shadow-2xl">
+                {/* Total display - single horizontal row */}
+                <div className="flex items-center justify-between">
+                  <span className="text-white/80 text-base font-semibold uppercase tracking-wider">Total:</span>
+                  <span className="font-black text-white text-2xl uppercase tracking-wider">${totalTipped}</span>
                 </div>
 
                 {/* Swipe UI toggle hidden for now */}
