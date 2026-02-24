@@ -1246,7 +1246,7 @@ const TippingInterface: React.FC = () => {
           <div className="flex flex-col w-full h-full overflow-hidden">
             {/* Scrollable top content region */}
             <div
-              className="flex-1 overflow-y-auto px-4"
+              className={`${selectedSong ? 'flex-1 overflow-y-auto' : ''} px-4`}
               style={{
                 paddingTop: isIOS
                   ? 'calc(env(safe-area-inset-top) + 1.5rem)'
