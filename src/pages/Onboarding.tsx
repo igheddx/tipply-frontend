@@ -77,7 +77,7 @@ const Onboarding: React.FC = () => {
     {
       id: 4,
       title: 'Device Setup',
-      subtitle: 'Register your Tipply device',
+      subtitle: 'Register your Tipwave device',
       icon: '📱',
       description: 'Device ID and nickname'
     },
@@ -963,7 +963,7 @@ Please use a different serial number or contact support if this is your device.`
               Password Requirements
             </h4>
             <p className="text-blue-700 mb-4">
-              Your password will be used to log into your Tipply dashboard and manage your account.
+              Your password will be used to log into your Tipwave dashboard and manage your account.
             </p>
             <div className="space-y-3">
               <div className="flex items-center space-x-3">
@@ -1165,7 +1165,7 @@ Please use a different serial number or contact support if this is your device.`
       <div className="text-center">
         <div className="text-6xl mb-4">📱</div>
         <h3 className="text-2xl font-bold text-gray-900 mb-2">Device Registration</h3>
-        <p className="text-gray-600">Register your Tipply device to start accepting tips</p>
+        <p className="text-gray-600">Register your Tipwave device to start accepting tips</p>
       </div>
       
       <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-6">
@@ -1182,7 +1182,7 @@ Please use a different serial number or contact support if this is your device.`
               Device Setup Instructions
             </h4>
             <p className="text-blue-700 mb-4">
-              You'll need your Tipply device ID to complete this step. This is typically found on the device itself or in the device documentation.
+              You'll need your Tipwave device ID to complete this step. This is typically found on the device itself or in the device documentation.
             </p>
             <div className="space-y-3">
               <div className="flex items-center space-x-3">
@@ -1236,7 +1236,7 @@ Please use a different serial number or contact support if this is your device.`
             <p className="text-green-500 text-xs mt-1">✓ Serial Number validated successfully</p>
           )}
           <p className="text-sm text-gray-500 mt-1">
-            Enter the serial number from your Tipply device (e.g., TPY-5C07-K73)
+            Enter the serial number from your Tipwave device (e.g., TPY-5C07-K73)
           </p>
         </div>
         
@@ -1440,7 +1440,7 @@ Please use a different serial number or contact support if this is your device.`
           </div>
           <div className="flex-1">
             <h4 className="text-lg font-semibold text-purple-900 mb-2">
-              Welcome to Tipply!
+              Welcome to Tipwave!
             </h4>
             <p className="text-purple-700 mb-4">
               Your account is now fully set up and ready to accept tips. You can access your dashboard to view analytics, 
@@ -1537,7 +1537,7 @@ Please use a different serial number or contact support if this is your device.`
             />
           </div>
           <h1 className="text-4xl font-bold text-gray-900 mb-4">
-            Welcome to Tipply
+            Welcome to Tipwave
           </h1>
           <p className="text-xl text-gray-600 max-w-2xl mx-auto">
             Let's get you set up to start accepting tips in just a few minutes

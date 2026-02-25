@@ -160,7 +160,7 @@ function PaymentForm({
   const [error, setError] = useState<string | null>(null)
   const [paymentRequest, setPaymentRequest] = useState<any>(null)
   const [isApplePay, setIsApplePay] = useState(false)
-  const [isCheckingWalletAvailability, setIsCheckingWalletAvailability] = useState(false)
+  const [isCheckingWalletAvailability, setIsCheckingWalletAvailability] = useState(walletMode !== 'card')
 
   // Persist payment details to backend so ownership verification passes
   const storePaymentInfo = async (
@@ -353,8 +353,6 @@ function PaymentForm({
 
       attachPaymentHandlers(applePaymentRequest)
       attachPaymentHandlers(googlePaymentRequest)
-    } else {
-      setIsCheckingWalletAvailability(false)
     }
   }, [stripe, deviceUuid, userId, onComplete])
   const handleCardSubmit = async (e: React.FormEvent) => {
@@ -460,17 +458,22 @@ function PaymentForm({
       {/* ========== SECTION 1: DIGITAL WALLETS ========== */}
       {walletMode !== 'card' && (
         <div className="pb-4">
-          {isCheckingWalletAvailability && (
+          {(isCheckingWalletAvailability || !stripe) && (
             <button
               type="button"
               disabled
-              className="w-full min-h-[44px] border border-gray-200 text-gray-500 bg-gray-50 rounded-xl px-4 py-3 font-medium text-base"
+              className="w-full min-h-[44px] transition-all disabled:opacity-70 font-medium text-base flex items-center justify-center bg-transparent p-0"
+              aria-label="Loading Pay Wallet"
             >
-              Checking wallet availability...
+              <img
+                src={googlePayButton}
+                alt="Pay Wallet"
+                className="h-12 w-auto opacity-80"
+              />
             </button>
           )}
 
-          {!isCheckingWalletAvailability && paymentRequest && isApplePay && isSetupIntentMode && (
+          {!isCheckingWalletAvailability && stripe && paymentRequest && isApplePay && isSetupIntentMode && (
             <div className="mt-3 mb-3 flex items-start gap-2 text-[15px] text-[#444444]">
               <p>
                 🔒 First-time only: Apple Pay will securely save your payment method. You won’t be charged.
@@ -478,7 +481,7 @@ function PaymentForm({
             </div>
           )}
 
-          {!isCheckingWalletAvailability && paymentRequest && (
+          {!isCheckingWalletAvailability && stripe && paymentRequest && (
             <button
               type="button"
               onClick={(event) => {
