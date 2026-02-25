@@ -54,7 +54,7 @@ const EntertainerOnboarding: React.FC = () => {
           <div className="mx-auto w-32 h-32 overflow-visible rounded-2xl mb-4">
             <img 
               src="/images/tipply_logo.png" 
-              alt="Tipply Logo" 
+              alt="Tipwave Logo" 
               className="w-full h-full object-contain"
               style={{ transform: 'scale(1.25)', objectPosition: 'center' }}
             />
@@ -63,7 +63,7 @@ const EntertainerOnboarding: React.FC = () => {
             Create Your Account
           </h2>
           <p className="mt-2 text-center text-sm text-gray-600">
-            Join Tipply and start earning from your performances
+            Join Tipwave and start earning from your performances
           </p>
         </div>
         

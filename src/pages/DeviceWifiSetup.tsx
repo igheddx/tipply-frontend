@@ -473,7 +473,7 @@ const DeviceWifiSetup = () => {
     {
       title: 'Scan',
       icon: <ScanOutlined />,
-      description: 'Find your Tipply device'
+      description: 'Find your Tipwave device'
     },
     {
       title: 'Connect',

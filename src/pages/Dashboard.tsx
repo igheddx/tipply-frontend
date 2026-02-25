@@ -2099,7 +2099,7 @@ const Dashboard: React.FC = () => {
                           </div>
                           <div>
                             <p className="font-medium text-gray-900">Add New Device</p>
-                            <p className="text-sm text-gray-500">Register another Tipply device</p>
+                            <p className="text-sm text-gray-500">Register another Tipwave device</p>
                           </div>
                         </div>
                       </button>
@@ -2407,7 +2407,7 @@ const Dashboard: React.FC = () => {
                       </svg>
                     </div>
                     <h3 className="text-lg font-medium text-gray-900 mb-2">No devices yet</h3>
-                    <p className="text-gray-500 mb-4">Get started by adding your first Tipply device</p>
+                    <p className="text-gray-500 mb-4">Get started by adding your first Tipwave device</p>
                     <button
                       onClick={handleAddDeviceClick}
                       className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
@@ -2533,7 +2533,7 @@ const Dashboard: React.FC = () => {
                             <p className="text-green-500 text-sm mt-1">✓ Serial Number validated successfully</p>
                           )}
                           <p className="text-sm text-gray-500 mt-1">
-                            Enter the serial number from your Tipply device (e.g., TPY-5C07-K73)
+                            Enter the serial number from your Tipwave device (e.g., TPY-5C07-K73)
                           </p>
                         </div>
 
