@@ -1530,7 +1530,7 @@ Please use a different serial number or contact support if this is your device.`
         <div className="text-center mb-12">
           <div className="mx-auto w-36 h-36 overflow-visible rounded-2xl mb-6">
             <img 
-              src="/images/logo/tipwave-logo2.png" 
+              src="/images/logo/tipwave-logo2b.png" 
               alt="Tipwave Logo" 
               className="w-full h-full object-contain"
               style={{ transform: 'scale(1.25)', objectPosition: 'center' }}
