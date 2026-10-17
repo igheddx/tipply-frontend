@@ -1,7 +1,7 @@
 import logger from "../utils/logger";
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Row, Col, Statistic, Table, Button, Input, Modal, message, Spin, Card, Tag, Select, DatePicker, Space, Divider, Alert, Tabs, Radio } from 'antd';
+import { Row, Col, Statistic, Table, Button, Input, InputNumber, Modal, message, Spin, Card, Tag, Select, DatePicker, Space, Divider, Alert, Tabs, Radio } from 'antd';
 import { 
   UserOutlined, 
   DesktopOutlined, 
@@ -23,6 +23,12 @@ import dayjs from 'dayjs';
 
 const { Search } = Input;
 const { RangePicker } = DatePicker;
+
+interface PaymentSecurityLimits {
+  maxChargesPerHourPerUser: number;
+  maxChargesPerDayPerUser: number;
+  maxChargesPerHourPerPaymentMethod: number;
+}
 
 interface AdminDashboardStats {
   totalUsers: number;
@@ -148,6 +154,12 @@ const AdminDashboard: React.FC = () => {
   const [stripeModeError, setStripeModeError] = useState<string | null>(null);
   const [stripeModeNotice, setStripeModeNotice] = useState<{ type: 'success' | 'warning' | 'error' | 'info'; text: string } | null>(null);
 
+  // Payment security rate limits (stored per environment)
+  const [rateLimits, setRateLimits] = useState<PaymentSecurityLimits>({ maxChargesPerHourPerUser: 0, maxChargesPerDayPerUser: 0, maxChargesPerHourPerPaymentMethod: 0 });
+  const [rateLimitDefaults, setRateLimitDefaults] = useState<PaymentSecurityLimits | null>(null);
+  const [rateLimitsLoading, setRateLimitsLoading] = useState(false);
+  const [rateLimitsSaving, setRateLimitsSaving] = useState(false);
+
   const [updateFeeModal, setUpdateFeeModal] = useState(false);
   const [selectedPerformer, setSelectedPerformer] = useState<PerformerSummary | null>(null);
   const [newFeePercentage, setNewFeePercentage] = useState<number>(10);
@@ -235,6 +247,7 @@ const AdminDashboard: React.FC = () => {
       loadBatchStatus();
       loadTips();
       loadStripeMode();
+      loadRateLimits();
 
       // Auto-refresh batch status every 3 minutes
       const batchRefreshInterval = setInterval(() => {
@@ -339,6 +352,63 @@ const AdminDashboard: React.FC = () => {
       }
     } catch (error) {
       logger.error('Error loading Stripe mode:', error);
+    }
+  };
+
+  const applyRateLimitResponse = (data: { current: PaymentSecurityLimits; defaults: PaymentSecurityLimits }) => {
+    setRateLimits(data.current);
+    setRateLimitDefaults(data.defaults);
+  };
+
+  const loadRateLimits = async () => {
+    try {
+      setRateLimitsLoading(true);
+      const response = await apiService.get('/api/payment-security-config/rate-limits');
+      if (response.data) {
+        applyRateLimitResponse(response.data);
+      } else if (response.error) {
+        message.error(`Failed to load payment security limits: ${response.error}`);
+      }
+    } catch (error) {
+      logger.error('Error loading payment security limits:', error);
+    } finally {
+      setRateLimitsLoading(false);
+    }
+  };
+
+  const saveRateLimits = async () => {
+    try {
+      setRateLimitsSaving(true);
+      const response = await apiService.put('/api/payment-security-config/rate-limits', rateLimits);
+      if (response.error) {
+        message.error(response.error);
+      } else if (response.data) {
+        applyRateLimitResponse(response.data);
+        message.success('Payment security limits saved');
+      }
+    } catch (error) {
+      logger.error('Error saving payment security limits:', error);
+      message.error('Failed to save payment security limits');
+    } finally {
+      setRateLimitsSaving(false);
+    }
+  };
+
+  const resetRateLimits = async () => {
+    try {
+      setRateLimitsSaving(true);
+      const response = await apiService.delete('/api/payment-security-config/rate-limits');
+      if (response.error) {
+        message.error(response.error);
+      } else if (response.data) {
+        applyRateLimitResponse(response.data);
+        message.success('Payment security limits reset to defaults');
+      }
+    } catch (error) {
+      logger.error('Error resetting payment security limits:', error);
+      message.error('Failed to reset payment security limits');
+    } finally {
+      setRateLimitsSaving(false);
     }
   };
 
@@ -1183,6 +1253,57 @@ const AdminDashboard: React.FC = () => {
                 </div>
               </div>
             </div>
+          </Col>
+        </Row>
+
+        {/* Payment Security Limits (per environment) */}
+        <Row gutter={[16, 16]} className="mb-8">
+          <Col xs={24}>
+            <Card title="Payment Security Limits" loading={rateLimitsLoading}>
+              <p className="text-gray-600 mb-4">
+                Maximum charge attempts allowed before a tip is blocked. These values apply to this environment only;
+                resetting restores the defaults{rateLimitDefaults ? ` (${rateLimitDefaults.maxChargesPerHourPerUser} / ${rateLimitDefaults.maxChargesPerDayPerUser} / ${rateLimitDefaults.maxChargesPerHourPerPaymentMethod})` : ''}.
+              </p>
+              <Row gutter={[16, 16]}>
+                <Col xs={24} md={8}>
+                  <div className="mb-1 text-sm font-medium text-gray-700">Charges per user per hour</div>
+                  <InputNumber
+                    min={1}
+                    max={1000000}
+                    style={{ width: '100%' }}
+                    value={rateLimits.maxChargesPerHourPerUser}
+                    onChange={(value) => setRateLimits(prev => ({ ...prev, maxChargesPerHourPerUser: Number(value) || 1 }))}
+                    disabled={rateLimitsSaving}
+                  />
+                </Col>
+                <Col xs={24} md={8}>
+                  <div className="mb-1 text-sm font-medium text-gray-700">Charges per user per day</div>
+                  <InputNumber
+                    min={1}
+                    max={1000000}
+                    style={{ width: '100%' }}
+                    value={rateLimits.maxChargesPerDayPerUser}
+                    onChange={(value) => setRateLimits(prev => ({ ...prev, maxChargesPerDayPerUser: Number(value) || 1 }))}
+                    disabled={rateLimitsSaving}
+                  />
+                </Col>
+                <Col xs={24} md={8}>
+                  <div className="mb-1 text-sm font-medium text-gray-700">Charges per card per hour</div>
+                  <InputNumber
+                    min={1}
+                    max={1000000}
+                    style={{ width: '100%' }}
+                    value={rateLimits.maxChargesPerHourPerPaymentMethod}
+                    onChange={(value) => setRateLimits(prev => ({ ...prev, maxChargesPerHourPerPaymentMethod: Number(value) || 1 }))}
+                    disabled={rateLimitsSaving}
+                  />
+                </Col>
+              </Row>
+              <Space className="mt-4">
+                <Button type="primary" onClick={saveRateLimits} loading={rateLimitsSaving}>Save limits</Button>
+                <Button onClick={resetRateLimits} disabled={rateLimitsSaving}>Reset to defaults</Button>
+              </Space>
+            </Card>
           </Col>
         </Row>
 
