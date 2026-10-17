@@ -48,8 +48,27 @@ const SongRequestMonitor: React.FC<SongRequestMonitorProps> = ({
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date())
   const refreshIntervalRef = useRef<number | null>(null)
   const [pauseDeviceId, setPauseDeviceId] = useState('')
-  // One device: always selected. Several: the performer picks one from the dropdown first.
+  // One device: always selected. Several: the performer picks one from the dropdown first,
+  // unless some are paused (see the effect below).
   const selectedPauseDevice = devices.length === 1 ? devices[0] : devices.find(d => d.id === pauseDeviceId)
+  const pausedCount = devices.filter(d => d.isPaused).length
+  const pauseInitRef = useRef(false)
+
+  // When the monitor opens with a paused device, preselect it so it can be resumed right away.
+  // With several paused, pick one at random (the "multiple devices are paused" message explains it).
+  useEffect(() => {
+    if (!isVisible) {
+      pauseInitRef.current = false
+      setPauseDeviceId('')
+      return
+    }
+    if (pauseInitRef.current) return
+    pauseInitRef.current = true
+    const paused = devices.filter(d => d.isPaused)
+    if (devices.length > 1 && paused.length > 0) {
+      setPauseDeviceId(paused[Math.floor(Math.random() * paused.length)].id)
+    }
+  }, [isVisible, devices])
 
   // Auto-refresh every 5 seconds for live updates
   useEffect(() => {
@@ -249,9 +268,10 @@ const SongRequestMonitor: React.FC<SongRequestMonitorProps> = ({
                             busy={pausingDeviceId === selectedPauseDevice.id}
                             onToggle={() => onTogglePause(selectedPauseDevice.id)}
                           />
-                          {selectedPauseDevice.isPaused && <span className="text-amber-600">Paused</span>}
+                          {selectedPauseDevice.isPaused && pausedCount <= 1 && <span className="text-amber-600">Paused</span>}
                         </>
                       )}
+                      {pausedCount > 1 && <span className="text-amber-600">Multiple devices are paused</span>}
                     </div>
                   )}
                   <div className="text-right">
