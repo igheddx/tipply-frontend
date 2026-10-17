@@ -5,6 +5,7 @@ import type { BaseOptionType } from 'antd/es/select'
 import logger from '../utils/logger'
 import { API_BASE_URL } from '../utils/config'
 import apiService from '../services/api'
+import { TIP_TIERS, LIGHT_EFFECTS, SOUND_OPTIONS, VOLUME_OPTIONS, DEFAULT_SOUND_ID, DEFAULT_SOUND_VOLUME, DEFAULT_EFFECT_CONFIG, normalizeEffectConfig } from '../utils/deviceConfig'
 
 interface PerformerDevice {
   id: string
@@ -14,6 +15,8 @@ interface PerformerDevice {
   createdAt: string
   isSoundEnabled?: boolean
   isRandomLightEffect?: boolean
+  soundId?: number
+  soundVolume?: string
   effectConfiguration?: string
 }
 
@@ -850,22 +853,17 @@ const DeviceConfigModal: React.FC<{
 }> = ({ device, onClose, onSave }) => {
   const [isSoundEnabled, setIsSoundEnabled] = useState(device.isSoundEnabled || false)
   const [isRandomEffect, setIsRandomEffect] = useState(device.isRandomLightEffect || false)
+  const [soundId, setSoundId] = useState(device.soundId ?? DEFAULT_SOUND_ID)
+  const [soundVolume, setSoundVolume] = useState(device.soundVolume ?? DEFAULT_SOUND_VOLUME)
   const [effectConfig, setEffectConfig] = useState<Record<string, string>>(() => {
     try {
       if (device.effectConfiguration) {
-        return JSON.parse(device.effectConfiguration)
+        return normalizeEffectConfig(JSON.parse(device.effectConfiguration))
       }
     } catch (e) {
       logger.error('Error parsing effect configuration:', e)
     }
-    return {
-      "2": "effect1",
-      "5": "effect1",
-      "10": "effect2",
-      "20": "effect2",
-      "50": "effect3",
-      "100": "effect3"
-    }
+    return { ...DEFAULT_EFFECT_CONFIG }
   })
   const [isSaving, setIsSaving] = useState(false)
 
@@ -877,6 +875,8 @@ const DeviceConfigModal: React.FC<{
       const requestBody = {
         isSoundEnabled,
         isRandomLightEffect: isRandomEffect,
+        soundId,
+        soundVolume,
         effectConfiguration: JSON.stringify(effectConfig)
       }
       console.log('[Config] Request body:', requestBody)
@@ -917,14 +917,6 @@ const DeviceConfigModal: React.FC<{
     }
   }
 
-  const amounts = [2, 5, 10, 20, 50, 100]
-  const effects = ['effect1', 'effect2', 'effect3']
-  const effectNames: Record<string, string> = {
-    'effect1': 'Flash',
-    'effect2': 'Swirl',
-    'effect3': 'Breathing'
-  }
-
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
       <div className="bg-white rounded-lg shadow-xl max-w-lg w-full mx-4 p-6 max-h-[90vh] overflow-y-auto">
@@ -948,6 +940,36 @@ const DeviceConfigModal: React.FC<{
             </label>
           </div>
 
+          {/* Sound Selection (Prototype3) */}
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-medium text-gray-700">Sound</span>
+            <select
+              value={soundId}
+              onChange={(e) => setSoundId(Number(e.target.value))}
+              disabled={isSaving || !isSoundEnabled}
+              className="px-3 py-1.5 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
+            >
+              {SOUND_OPTIONS.map(option => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Sound Volume (Prototype3) - disabled while sound is off */}
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-medium text-gray-700">Sound Volume</span>
+            <select
+              value={soundVolume}
+              onChange={(e) => setSoundVolume(e.target.value)}
+              disabled={isSaving || !isSoundEnabled}
+              className="px-3 py-1.5 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
+            >
+              {VOLUME_OPTIONS.map(option => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
+            </select>
+          </div>
+
           {/* Random Light Effect Toggle */}
           <div className="flex items-center justify-between">
             <span className="text-sm font-medium text-gray-700">Random Light Effect</span>
@@ -967,7 +989,7 @@ const DeviceConfigModal: React.FC<{
           <div className="space-y-3">
             <h4 className="text-sm font-medium text-gray-700">Light Effects by Amount</h4>
             <div className="bg-gray-50 rounded-lg p-4 space-y-3">
-              {amounts.map(amount => (
+              {TIP_TIERS.map(amount => (
                 <div key={amount} className="flex items-center justify-between">
                   <span className="text-sm text-gray-600 font-medium">${amount}</span>
                   <select
@@ -978,9 +1000,9 @@ const DeviceConfigModal: React.FC<{
                     disabled={isSaving}
                     className="px-3 py-1.5 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
                   >
-                    {effects.map(effect => (
-                      <option key={effect} value={effect}>
-                        {effectNames[effect]}
+                    {LIGHT_EFFECTS.map(effect => (
+                      <option key={effect.value} value={effect.value}>
+                        {effect.label}
                       </option>
                     ))}
                   </select>

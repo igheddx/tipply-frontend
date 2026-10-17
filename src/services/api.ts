@@ -458,7 +458,7 @@ class ApiService {
     })
   }
 
-  async updateDeviceConfiguration(deviceId: string, config: { isSoundEnabled?: boolean, isRandomLightEffect?: boolean, effectConfiguration?: string }): Promise<ApiResponse<any>> {
+  async updateDeviceConfiguration(deviceId: string, config: { isSoundEnabled?: boolean, isRandomLightEffect?: boolean, effectConfiguration?: string, soundId?: number, soundVolume?: string }): Promise<ApiResponse<any>> {
     return this.request(`/api/devices/${deviceId}/configuration`, {
       method: 'PUT',
       body: JSON.stringify(config)

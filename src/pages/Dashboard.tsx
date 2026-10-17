@@ -5,6 +5,7 @@ import apiService from '../services/api'
 import SongManagement from '../components/SongManagement'
 import SongRequestMonitor from '../components/SongRequestMonitor'
 import { API_BASE_URL } from '../utils/config'
+import { TIP_TIERS, LIGHT_EFFECTS, SOUND_OPTIONS, VOLUME_OPTIONS, DEFAULT_SOUND_ID, DEFAULT_SOUND_VOLUME, DEFAULT_EFFECT_CONFIG, normalizeEffectConfig } from '../utils/deviceConfig'
 import { CrownOutlined } from '@ant-design/icons'
 import { LineChart, Line, ScatterChart, Scatter, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 
@@ -54,6 +55,8 @@ interface DeviceSummary {
   isAllowSongRequest: boolean
   isSoundEnabled?: boolean
   isRandomLightEffect?: boolean
+  soundId?: number
+  soundVolume?: string
   effectConfiguration?: string
 }
 
@@ -1239,7 +1242,9 @@ const Dashboard: React.FC = () => {
     deviceId: string,
     isSoundEnabled: boolean,
     isRandomLightEffect: boolean,
-    effectConfig: Record<string, string>
+    effectConfig: Record<string, string>,
+    soundId: number = DEFAULT_SOUND_ID,
+    soundVolume: string = DEFAULT_SOUND_VOLUME
   ) => {
     setUpdatingDeviceConfig(deviceId)
     try {
@@ -1247,6 +1252,8 @@ const Dashboard: React.FC = () => {
       const response = await apiService.updateDeviceConfiguration(deviceId, {
         isSoundEnabled,
         isRandomLightEffect,
+        soundId,
+        soundVolume,
         effectConfiguration: JSON.stringify(effectConfig)
       })
 
@@ -1260,7 +1267,7 @@ const Dashboard: React.FC = () => {
           const newDevices = prevStats.devices.map(d => {
             if (d.id === deviceId) {
               logger.log(`✏️ Updating device ${d.id}: sound ${d.isSoundEnabled} → ${isSoundEnabled}, random ${d.isRandomLightEffect} → ${isRandomLightEffect}`)
-              return { ...d, isSoundEnabled, isRandomLightEffect, effectConfiguration: JSON.stringify(effectConfig) }
+              return { ...d, isSoundEnabled, isRandomLightEffect, soundId, soundVolume, effectConfiguration: JSON.stringify(effectConfig) }
             } else {
               logger.log(`⏭️ Skipping device ${d.id} (not matching ${deviceId})`)
               return d
@@ -1290,27 +1297,28 @@ const Dashboard: React.FC = () => {
     }
   }
 
+  // Saves one changed setting while keeping the device's other current settings
+  const saveDeviceConfig = (
+    device: DeviceSummary,
+    patch: { isSoundEnabled?: boolean; isRandomLightEffect?: boolean; effectConfig?: Record<string, string>; soundId?: number; soundVolume?: string }
+  ) => updateDeviceConfiguration(
+    device.id,
+    patch.isSoundEnabled ?? device.isSoundEnabled ?? false,
+    patch.isRandomLightEffect ?? device.isRandomLightEffect ?? false,
+    patch.effectConfig ?? getEffectConfig(device),
+    patch.soundId ?? device.soundId ?? DEFAULT_SOUND_ID,
+    patch.soundVolume ?? device.soundVolume ?? DEFAULT_SOUND_VOLUME
+  )
+
   const getEffectConfig = (device: DeviceSummary): Record<string, string> => {
-    logger.log(`🎨 Getting effect config for device ${device.id}:`, device.effectConfiguration)
     try {
       if (device.effectConfiguration) {
-        const parsed = JSON.parse(device.effectConfiguration)
-        logger.log(`✅ Parsed effect config:`, parsed)
-        return parsed
+        return normalizeEffectConfig(JSON.parse(device.effectConfiguration))
       }
     } catch (e) {
       logger.error('❌ Error parsing effect configuration:', e, 'Raw value:', device.effectConfiguration)
     }
-    // Default configuration
-    logger.log('⚠️ Using default effect config for device', device.id)
-    return {
-      "2": "effect1",
-      "5": "effect1",
-      "10": "effect2",
-      "20": "effect2",
-      "50": "effect3",
-      "100": "effect3"
-    }
+    return { ...DEFAULT_EFFECT_CONFIG }
   }
 
   const loadSongRequests = async () => {
@@ -2266,15 +2274,42 @@ const Dashboard: React.FC = () => {
                                   <input
                                     type="checkbox"
                                     checked={device.isSoundEnabled ?? false}
-                                    onChange={(e) => {
-                                      const effectConfig = getEffectConfig(device)
-                                      updateDeviceConfiguration(device.id, e.target.checked, device.isRandomLightEffect ?? false, effectConfig)
-                                    }}
+                                    onChange={(e) => saveDeviceConfig(device, { isSoundEnabled: e.target.checked })}
                                     disabled={updatingDeviceConfig === device.id}
                                     className="sr-only peer"
                                   />
                                   <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-purple-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-600"></div>
                                 </label>
+                              </div>
+
+                              {/* Sound Selection (Prototype3) */}
+                              <div className="flex items-center justify-between">
+                                <span className="text-sm font-medium text-gray-700">Sound</span>
+                                <select
+                                  value={device.soundId ?? DEFAULT_SOUND_ID}
+                                  onChange={(e) => saveDeviceConfig(device, { soundId: Number(e.target.value) })}
+                                  disabled={updatingDeviceConfig === device.id || !(device.isSoundEnabled ?? false)}
+                                  className="px-2 py-1 border border-gray-300 rounded text-xs focus:ring-2 focus:ring-purple-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
+                                >
+                                  {SOUND_OPTIONS.map(option => (
+                                    <option key={option.value} value={option.value}>{option.label}</option>
+                                  ))}
+                                </select>
+                              </div>
+
+                              {/* Sound Volume (Prototype3) - disabled while sound is off */}
+                              <div className="flex items-center justify-between">
+                                <span className="text-sm font-medium text-gray-700">Sound Volume</span>
+                                <select
+                                  value={device.soundVolume ?? DEFAULT_SOUND_VOLUME}
+                                  onChange={(e) => saveDeviceConfig(device, { soundVolume: e.target.value })}
+                                  disabled={updatingDeviceConfig === device.id || !(device.isSoundEnabled ?? false)}
+                                  className="px-2 py-1 border border-gray-300 rounded text-xs focus:ring-2 focus:ring-purple-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
+                                >
+                                  {VOLUME_OPTIONS.map(option => (
+                                    <option key={option.value} value={option.value}>{option.label}</option>
+                                  ))}
+                                </select>
                               </div>
 
                               {/* Random Light Effect Toggle */}
@@ -2284,10 +2319,7 @@ const Dashboard: React.FC = () => {
                                   <input
                                     type="checkbox"
                                     checked={device.isRandomLightEffect ?? false}
-                                    onChange={(e) => {
-                                      const effectConfig = getEffectConfig(device)
-                                      updateDeviceConfiguration(device.id, device.isSoundEnabled ?? false, e.target.checked, effectConfig)
-                                    }}
+                                    onChange={(e) => saveDeviceConfig(device, { isRandomLightEffect: e.target.checked })}
                                     disabled={updatingDeviceConfig === device.id}
                                     className="sr-only peer"
                                   />
@@ -2300,25 +2332,20 @@ const Dashboard: React.FC = () => {
                                 <h4 className="text-sm font-medium text-gray-700 mb-2">Light Effects by Amount</h4>
                                 {(() => {
                                   const effectConfig = getEffectConfig(device)
-                                  const amounts = [2, 5, 10, 20, 50, 100]
-                                  const effects = ['effect1', 'effect2', 'effect3']
                                   
-                                  return amounts.map(amount => (
+                                  return TIP_TIERS.map(amount => (
                                     <div key={amount} className="flex items-center justify-between text-sm">
                                       <span className="text-gray-600">${amount}</span>
                                       <select
                                         value={effectConfig[amount.toString()] || 'effect1'}
                                         onChange={(e) => {
-                                          const newConfig = { ...effectConfig, [amount.toString()]: e.target.value }
-                                          updateDeviceConfiguration(device.id, device.isSoundEnabled ?? false, device.isRandomLightEffect ?? false, newConfig)
+                                          saveDeviceConfig(device, { effectConfig: { ...effectConfig, [amount.toString()]: e.target.value } })
                                         }}
                                         disabled={updatingDeviceConfig === device.id}
                                         className="px-2 py-1 border border-gray-300 rounded text-xs focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                                       >
-                                        {effects.map(effect => (
-                                          <option key={effect} value={effect}>
-                                            {effect === 'effect1' ? 'Flash' : effect === 'effect2' ? 'Swirl' : 'Breathing'}
-                                          </option>
+                                        {LIGHT_EFFECTS.map(effect => (
+                                          <option key={effect.value} value={effect.value}>{effect.label}</option>
                                         ))}
                                       </select>
                                     </div>
