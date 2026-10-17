@@ -5,7 +5,8 @@ import type { BaseOptionType } from 'antd/es/select'
 import logger from '../utils/logger'
 import { API_BASE_URL } from '../utils/config'
 import apiService from '../services/api'
-import { TIP_TIERS, LIGHT_EFFECTS, SOUND_OPTIONS, VOLUME_OPTIONS, DEFAULT_SOUND_ID, DEFAULT_SOUND_VOLUME, DEFAULT_EFFECT_CONFIG, normalizeEffectConfig } from '../utils/deviceConfig'
+import { DEFAULT_TIP_AMOUNTS, LIGHT_EFFECTS, SOUND_OPTIONS, VOLUME_OPTIONS, DEFAULT_SOUND_ID, DEFAULT_SOUND_VOLUME, normalizeEffectConfig, effectForAmount, buildEffectConfig } from '../utils/deviceConfig'
+import TipAmountsEditor from './TipAmountsEditor'
 
 interface PerformerDevice {
   id: string
@@ -89,6 +90,8 @@ const PerformerInsights: React.FC = () => {
   const [searchOptions, setSearchOptions] = useState<BaseOptionType[]>([])
   const [isSearching, setIsSearching] = useState(false)
   const [selectedPerformer, setSelectedPerformer] = useState<PerformerSearchResult | null>(null)
+  const [performerTipAmounts, setPerformerTipAmounts] = useState<number[]>(DEFAULT_TIP_AMOUNTS)
+  const [tipAmountsSaving, setTipAmountsSaving] = useState(false)
   const [insights, setInsights] = useState<PerformerInsights | null>(null)
   const [isLoadingInsights, setIsLoadingInsights] = useState(false)
   const [showConfigModal, setShowConfigModal] = useState(false)
@@ -167,6 +170,41 @@ const PerformerInsights: React.FC = () => {
     }, 300) // 300ms debounce
   }
 
+  const loadPerformerTipAmounts = async (performerId: string) => {
+    const response = await apiService.get(`/api/admin/performers/${performerId}/tip-amounts`)
+    setPerformerTipAmounts(response.data?.amounts ?? DEFAULT_TIP_AMOUNTS)
+  }
+
+  const savePerformerTipAmounts = async (amounts: number[]) => {
+    if (!selectedPerformer) return
+    setTipAmountsSaving(true)
+    try {
+      const response = await apiService.put(`/api/admin/performers/${selectedPerformer.id}/tip-amounts`, { amounts })
+      if (response.data?.amounts) {
+        setPerformerTipAmounts(response.data.amounts)
+      } else {
+        alert('Failed to save tip amounts: ' + (response.error || 'Unknown error'))
+      }
+    } finally {
+      setTipAmountsSaving(false)
+    }
+  }
+
+  const resetPerformerTipAmounts = async () => {
+    if (!selectedPerformer) return
+    setTipAmountsSaving(true)
+    try {
+      const response = await apiService.delete(`/api/admin/performers/${selectedPerformer.id}/tip-amounts`)
+      if (response.data?.amounts) {
+        setPerformerTipAmounts(response.data.amounts)
+      } else {
+        alert('Failed to reset tip amounts: ' + (response.error || 'Unknown error'))
+      }
+    } finally {
+      setTipAmountsSaving(false)
+    }
+  }
+
   const handleSelect = (value: string) => {
     const performer = allPerformers.find(p => p.id === value)
     if (performer) {
@@ -178,6 +216,7 @@ const PerformerInsights: React.FC = () => {
       setFilteredTipPoints([])
       setTipTimelinePoints([])
       loadPerformerInsights(performer.id)
+      loadPerformerTipAmounts(performer.id)
     }
   }
 
@@ -235,6 +274,7 @@ const PerformerInsights: React.FC = () => {
 
   const handleBack = () => {
     setSelectedPerformer(null)
+    setPerformerTipAmounts(DEFAULT_TIP_AMOUNTS)
     setInsights(null)
     setSearchTerm('')
     setSearchOptions([])
@@ -662,6 +702,13 @@ const PerformerInsights: React.FC = () => {
             </div>
           </div>
 
+          <TipAmountsEditor
+            amounts={performerTipAmounts}
+            saving={tipAmountsSaving}
+            onSave={savePerformerTipAmounts}
+            onReset={resetPerformerTipAmounts}
+          />
+
           {isLoadingInsights ? (
             <div className="text-center py-12">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto"></div>
@@ -834,6 +881,7 @@ const PerformerInsights: React.FC = () => {
       {showConfigModal && selectedDevice && (
         <DeviceConfigModal
           device={selectedDevice}
+          tipAmounts={performerTipAmounts}
           onClose={() => {
             setShowConfigModal(false)
             setSelectedDevice(null)
@@ -848,9 +896,10 @@ const PerformerInsights: React.FC = () => {
 // Device Config Modal Component
 const DeviceConfigModal: React.FC<{
   device: PerformerDevice
+  tipAmounts: number[]
   onClose: () => void
   onSave: () => void
-}> = ({ device, onClose, onSave }) => {
+}> = ({ device, tipAmounts, onClose, onSave }) => {
   const [isSoundEnabled, setIsSoundEnabled] = useState(device.isSoundEnabled || false)
   const [isRandomEffect, setIsRandomEffect] = useState(device.isRandomLightEffect || false)
   const [soundId, setSoundId] = useState(device.soundId ?? DEFAULT_SOUND_ID)
@@ -863,7 +912,7 @@ const DeviceConfigModal: React.FC<{
     } catch (e) {
       logger.error('Error parsing effect configuration:', e)
     }
-    return { ...DEFAULT_EFFECT_CONFIG }
+    return {}
   })
   const [isSaving, setIsSaving] = useState(false)
 
@@ -877,7 +926,7 @@ const DeviceConfigModal: React.FC<{
         isRandomLightEffect: isRandomEffect,
         soundId,
         soundVolume,
-        effectConfiguration: JSON.stringify(effectConfig)
+        effectConfiguration: JSON.stringify(buildEffectConfig(effectConfig, tipAmounts))
       }
       console.log('[Config] Request body:', requestBody)
       
@@ -989,11 +1038,11 @@ const DeviceConfigModal: React.FC<{
           <div className="space-y-3">
             <h4 className="text-sm font-medium text-gray-700">Light Effects by Amount</h4>
             <div className="bg-gray-50 rounded-lg p-4 space-y-3">
-              {TIP_TIERS.map(amount => (
+              {tipAmounts.map(amount => (
                 <div key={amount} className="flex items-center justify-between">
                   <span className="text-sm text-gray-600 font-medium">${amount}</span>
                   <select
-                    value={effectConfig[amount.toString()] || 'effect1'}
+                    value={effectForAmount(effectConfig, amount)}
                     onChange={(e) => {
                       setEffectConfig(prev => ({ ...prev, [amount.toString()]: e.target.value }))
                     }}

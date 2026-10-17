@@ -5,7 +5,8 @@ import apiService from '../services/api'
 import SongManagement from '../components/SongManagement'
 import SongRequestMonitor from '../components/SongRequestMonitor'
 import { API_BASE_URL } from '../utils/config'
-import { TIP_TIERS, LIGHT_EFFECTS, SOUND_OPTIONS, VOLUME_OPTIONS, DEFAULT_SOUND_ID, DEFAULT_SOUND_VOLUME, DEFAULT_EFFECT_CONFIG, normalizeEffectConfig } from '../utils/deviceConfig'
+import { DEFAULT_TIP_AMOUNTS, TIP_AMOUNT_COUNT, LIGHT_EFFECTS, SOUND_OPTIONS, VOLUME_OPTIONS, DEFAULT_SOUND_ID, DEFAULT_SOUND_VOLUME, DEFAULT_EFFECT_CONFIG, normalizeEffectConfig, effectForAmount, buildEffectConfig } from '../utils/deviceConfig'
+import TipAmountsEditor from '../components/TipAmountsEditor'
 import { CrownOutlined } from '@ant-design/icons'
 import { LineChart, Line, ScatterChart, Scatter, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 
@@ -122,6 +123,11 @@ const Dashboard: React.FC = () => {
   const [showStripeAlert, setShowStripeAlert] = useState(false)
   const [stripeEnabledDevices, setStripeEnabledDevices] = useState<string[]>([])
   const [userProfile, setUserProfile] = useState<any>(null)
+  const [tipAmountsSaving, setTipAmountsSaving] = useState(false)
+  // The performer's own tip amounts (defaults until they change them)
+  const tipAmounts: number[] = Array.isArray(userProfile?.tipAmounts) && userProfile.tipAmounts.length === TIP_AMOUNT_COUNT
+    ? userProfile.tipAmounts
+    : DEFAULT_TIP_AMOUNTS
   const [stripeMetricsLoading, setStripeMetricsLoading] = useState(true)
   const [insights, setInsights] = useState<PerformerInsights | null>(null)
   const [weeklyChartData, setWeeklyChartData] = useState<any[]>([])
@@ -1305,10 +1311,38 @@ const Dashboard: React.FC = () => {
     device.id,
     patch.isSoundEnabled ?? device.isSoundEnabled ?? false,
     patch.isRandomLightEffect ?? device.isRandomLightEffect ?? false,
-    patch.effectConfig ?? getEffectConfig(device),
+    buildEffectConfig(patch.effectConfig ?? getEffectConfig(device), tipAmounts),
     patch.soundId ?? device.soundId ?? DEFAULT_SOUND_ID,
     patch.soundVolume ?? device.soundVolume ?? DEFAULT_SOUND_VOLUME
   )
+
+  const saveTipAmounts = async (amounts: number[]) => {
+    setTipAmountsSaving(true)
+    try {
+      const response = await apiService.put('/api/profiles/me/tip-amounts', { amounts })
+      if (response.data?.amounts) {
+        setUserProfile((prev: any) => ({ ...prev, tipAmounts: response.data.amounts }))
+      } else {
+        alert('Failed to save tip amounts: ' + (response.error || 'Unknown error'))
+      }
+    } finally {
+      setTipAmountsSaving(false)
+    }
+  }
+
+  const resetTipAmounts = async () => {
+    setTipAmountsSaving(true)
+    try {
+      const response = await apiService.delete('/api/profiles/me/tip-amounts')
+      if (response.data?.amounts) {
+        setUserProfile((prev: any) => ({ ...prev, tipAmounts: response.data.amounts }))
+      } else {
+        alert('Failed to reset tip amounts: ' + (response.error || 'Unknown error'))
+      }
+    } finally {
+      setTipAmountsSaving(false)
+    }
+  }
 
   const getEffectConfig = (device: DeviceSummary): Record<string, string> => {
     try {
@@ -2136,6 +2170,12 @@ const Dashboard: React.FC = () => {
 
             {activeTab === 'devices' && (
               <div className="space-y-6">
+                <TipAmountsEditor
+                  amounts={tipAmounts}
+                  saving={tipAmountsSaving}
+                  onSave={saveTipAmounts}
+                  onReset={resetTipAmounts}
+                />
                 <div className="flex justify-between items-center">
                   <h3 className="text-lg font-semibold text-gray-900">Your Devices</h3>
                   <div className="flex space-x-3">
@@ -2333,11 +2373,11 @@ const Dashboard: React.FC = () => {
                                 {(() => {
                                   const effectConfig = getEffectConfig(device)
                                   
-                                  return TIP_TIERS.map(amount => (
+                                  return tipAmounts.map(amount => (
                                     <div key={amount} className="flex items-center justify-between text-sm">
                                       <span className="text-gray-600">${amount}</span>
                                       <select
-                                        value={effectConfig[amount.toString()] || 'effect1'}
+                                        value={effectForAmount(effectConfig, amount)}
                                         onChange={(e) => {
                                           saveDeviceConfig(device, { effectConfig: { ...effectConfig, [amount.toString()]: e.target.value } })
                                         }}

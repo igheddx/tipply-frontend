@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { toast } from 'sonner'
 import apiService from '../services/api'
 import { getApiBaseUrl } from '../utils/config'
+import { DEFAULT_TIP_AMOUNTS, TIP_AMOUNT_COUNT } from '../utils/deviceConfig'
 import { getUniqueDeviceId, detectPlatform, restoreDeviceIdFromIndexedDB } from '../utils/deviceId'
 
 const PaymentSetupModal = lazy(() => import('../components/PaymentSetupModal'))
@@ -22,6 +23,7 @@ interface DeviceInfo {
   ownerId: string
   stripeAccountId?: string
   isAllowSongRequest?: boolean
+  tipAmounts?: number[]
 }
 
 interface PaymentMethodsCheckResult {
@@ -63,8 +65,8 @@ const TippingInterface: React.FC = () => {
   const audioContextRef = useRef<AudioContext | null>(null)
 
     const [billRefresh, setBillRefresh] = useState(0)
-  // Tip amounts for the cards
-  const tipAmounts = [2, 5, 10, 20, 50, 100]
+  // Tip amounts for the cards: the performer's own six amounts (defaults until they change them)
+  const tipAmounts = deviceInfo?.tipAmounts?.length === TIP_AMOUNT_COUNT ? deviceInfo.tipAmounts : DEFAULT_TIP_AMOUNTS
 
   // Card colors - vibrant gradients
   const cardColors = [
@@ -306,7 +308,8 @@ const TippingInterface: React.FC = () => {
           stripeAccountId: '', // Not exposed in public endpoint
           isAllowSongRequest: device.isAllowSongRequest,
           isStripeVerified: device.isStripeVerified || false,
-          isKycVerified: device.isKycVerified || false
+          isKycVerified: device.isKycVerified || false,
+          tipAmounts: device.tipAmounts
         }
         setDeviceInfo(deviceInfoData)
         
@@ -602,17 +605,14 @@ const TippingInterface: React.FC = () => {
     return 'white'
   }
 
+  // Bill image for the largest denomination at or below the amount (amounts can be custom)
   const getCurrencyImage = (amount: number): string => {
-    const images: Record<number, string> = {
-      1: '/images/1dollar.png',
-      2: '/images/1dollar.png',
-      5: '/images/5dollars.png',
-      10: '/images/10dollars.png',
-      20: '/images/20dollars.png',
-      50: '/images/50dollars.png',
-      100: '/images/100dollars.png'
-    }
-    return images[amount] || '/images/1dollar.png'
+    if (amount >= 100) return '/images/100dollars.png'
+    if (amount >= 50) return '/images/50dollars.png'
+    if (amount >= 20) return '/images/20dollars.png'
+    if (amount >= 10) return '/images/10dollars.png'
+    if (amount >= 5) return '/images/5dollars.png'
+    return '/images/1dollar.png'
   }
 
   const cycleClassicIndex = (direction: -1 | 1) => {
