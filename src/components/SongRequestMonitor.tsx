@@ -2,6 +2,7 @@ import logger from "../utils/logger";
 import React, { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { API_BASE_URL } from '../utils/config'
+import PauseDeviceButton from './PauseDeviceButton'
 
 interface SongRequest {
   songId: string
@@ -17,16 +18,29 @@ interface SongRequest {
   note?: string
 }
 
+interface MonitorDevice {
+  id: string
+  nickname?: string
+  isPaused?: boolean
+}
+
 interface SongRequestMonitorProps {
   profileId: string
   isVisible: boolean
   onClose: () => void
+  // Song-request-enabled devices, so the performer can pause/resume them from this screen
+  devices?: MonitorDevice[]
+  pausingDeviceId?: string | null
+  onTogglePause?: (deviceId: string) => void
 }
 
 const SongRequestMonitor: React.FC<SongRequestMonitorProps> = ({
   profileId,
   isVisible,
-  onClose
+  onClose,
+  devices = [],
+  pausingDeviceId = null,
+  onTogglePause
 }) => {
   const [songRequests, setSongRequests] = useState<SongRequest[]>([])
   const [loading, setLoading] = useState(false)
@@ -251,6 +265,21 @@ const SongRequestMonitor: React.FC<SongRequestMonitorProps> = ({
                   </div>
                 </div>
               </div>
+
+              {/* Pause / resume the device light and sound - kept in the header so it is always in reach */}
+              {onTogglePause && devices.length > 0 && (
+                <div className="mt-4 mx-auto max-w-2xl space-y-2">
+                  {devices.map(device => (
+                    <PauseDeviceButton
+                      key={device.id}
+                      isPaused={!!device.isPaused}
+                      busy={pausingDeviceId === device.id}
+                      deviceName={device.nickname}
+                      onToggle={() => onTogglePause(device.id)}
+                    />
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 

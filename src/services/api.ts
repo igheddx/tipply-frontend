@@ -458,6 +458,13 @@ class ApiService {
     })
   }
 
+  async updateDevicePause(deviceId: string, isPaused: boolean): Promise<ApiResponse<any>> {
+    return this.request(`/api/devices/${deviceId}/pause`, {
+      method: 'PUT',
+      body: JSON.stringify({ isPaused })
+    })
+  }
+
   async updateDeviceConfiguration(deviceId: string, config: { isSoundEnabled?: boolean, isRandomLightEffect?: boolean, effectConfiguration?: string, soundId?: number, soundVolume?: string }): Promise<ApiResponse<any>> {
     return this.request(`/api/devices/${deviceId}/configuration`, {
       method: 'PUT',

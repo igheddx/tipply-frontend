@@ -7,6 +7,7 @@ import SongRequestMonitor from '../components/SongRequestMonitor'
 import { API_BASE_URL } from '../utils/config'
 import { DEFAULT_TIP_AMOUNTS, TIP_AMOUNT_COUNT, LIGHT_EFFECTS, SOUND_OPTIONS, VOLUME_OPTIONS, DEFAULT_SOUND_ID, DEFAULT_SOUND_VOLUME, DEFAULT_EFFECT_CONFIG, normalizeEffectConfig, effectForAmount, buildEffectConfig } from '../utils/deviceConfig'
 import TipAmountsEditor from '../components/TipAmountsEditor'
+import PauseDeviceButton from '../components/PauseDeviceButton'
 import { CrownOutlined } from '@ant-design/icons'
 import { LineChart, Line, ScatterChart, Scatter, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 
@@ -58,6 +59,7 @@ interface DeviceSummary {
   isRandomLightEffect?: boolean
   soundId?: number
   soundVolume?: string
+  isPaused?: boolean
   effectConfiguration?: string
 }
 
@@ -170,6 +172,7 @@ const Dashboard: React.FC = () => {
   
   // Song Request Toggle States
   const [updatingSongRequest, setUpdatingSongRequest] = useState<string | null>(null)
+  const [pausingDeviceId, setPausingDeviceId] = useState<string | null>(null)
   
   // Device Configuration States
   const [expandedDeviceConfig, setExpandedDeviceConfig] = useState<string | null>(null)
@@ -1244,6 +1247,29 @@ const Dashboard: React.FC = () => {
     }
   }
 
+  const toggleDevicePause = async (deviceId: string) => {
+    const device = stats?.devices.find(d => d.id === deviceId)
+    if (!device) return
+    const newPaused = !device.isPaused
+    setPausingDeviceId(deviceId)
+    try {
+      const response = await apiService.updateDevicePause(deviceId, newPaused)
+      if (response.data?.success) {
+        setStats(prevStats => prevStats && {
+          ...prevStats,
+          devices: prevStats.devices.map(d => (d.id === deviceId ? { ...d, isPaused: newPaused } : d))
+        })
+      } else {
+        alert('Failed to update device: ' + (response.error || 'Unknown error'))
+      }
+    } catch (error) {
+      logger.error('Error updating device pause state:', error)
+      alert('Error updating device pause state')
+    } finally {
+      setPausingDeviceId(null)
+    }
+  }
+
   const updateDeviceConfiguration = async (
     deviceId: string,
     isSoundEnabled: boolean,
@@ -2288,6 +2314,14 @@ const Dashboard: React.FC = () => {
                             }
                           </button>
                           
+                          {/* Pause / resume the device's light and sound */}
+                          <PauseDeviceButton
+                            isPaused={!!device.isPaused}
+                            busy={pausingDeviceId === device.id}
+                            deviceName={device.nickname}
+                            onToggle={() => toggleDevicePause(device.id)}
+                          />
+
                           {/* Device Configuration Section */}
                           <button
                             onClick={() => setExpandedDeviceConfig(expandedDeviceConfig === device.id ? null : device.id)}
@@ -2849,6 +2883,9 @@ const Dashboard: React.FC = () => {
         profileId={userProfile?.id || ''}
         isVisible={showMonitorFullscreen}
         onClose={() => setShowMonitorFullscreen(false)}
+        devices={(stats?.devices ?? []).filter(d => d.isAllowSongRequest)}
+        pausingDeviceId={pausingDeviceId}
+        onTogglePause={toggleDevicePause}
       />
     </div>
   )
