@@ -1,4 +1,5 @@
 import React from 'react'
+import { PauseCircleOutlined, PlayCircleOutlined } from '@ant-design/icons'
 
 interface PauseDeviceButtonProps {
   isPaused: boolean
@@ -6,24 +7,25 @@ interface PauseDeviceButtonProps {
   onToggle: () => void
 }
 
-// Low-key row for pausing a device's light and sound. Tips still go through while paused.
-const PauseDeviceButton: React.FC<PauseDeviceButtonProps> = ({ isPaused, busy, onToggle }) => (
-  <div>
-    <div className="flex items-center justify-between">
-      <div>
-        <span className="text-sm font-medium text-gray-700">Pause Device</span>
-        <p className="text-xs text-gray-500">Stops the light and sound. Tips still go through.</p>
-      </div>
-      <button
-        onClick={onToggle}
-        disabled={busy}
-        className="px-3 py-1 text-xs text-gray-600 border border-gray-300 rounded-md hover:bg-gray-100 disabled:opacity-50"
-      >
-        {busy ? '...' : isPaused ? 'Resume' : 'Pause'}
-      </button>
-    </div>
-    {isPaused && <p className="mt-1 text-xs text-amber-700">Paused: no light or sound.</p>}
-  </div>
-)
+// Small, low-key icon that pauses or resumes a device's light and sound. Tips still go through while paused.
+const PauseDeviceButton: React.FC<PauseDeviceButtonProps> = ({ isPaused, busy, onToggle }) => {
+  const label = isPaused
+    ? 'Resume device (turn light and sound back on)'
+    : 'Pause device (stops light and sound, tips still go through)'
+
+  return (
+    <button
+      onClick={onToggle}
+      disabled={busy}
+      title={label}
+      aria-label={label}
+      className={`text-lg leading-none transition-colors disabled:opacity-50 ${
+        isPaused ? 'text-amber-600 hover:text-amber-700' : 'text-gray-400 hover:text-gray-600'
+      }`}
+    >
+      {isPaused ? <PlayCircleOutlined /> : <PauseCircleOutlined />}
+    </button>
+  )
+}
 
 export default PauseDeviceButton

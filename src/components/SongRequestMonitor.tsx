@@ -2,6 +2,7 @@ import logger from "../utils/logger";
 import React, { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { API_BASE_URL } from '../utils/config'
+import PauseDeviceButton from './PauseDeviceButton'
 
 interface SongRequest {
   songId: string
@@ -47,7 +48,8 @@ const SongRequestMonitor: React.FC<SongRequestMonitorProps> = ({
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date())
   const refreshIntervalRef = useRef<number | null>(null)
   const [pauseDeviceId, setPauseDeviceId] = useState('')
-  const selectedPauseDevice = devices.find(d => d.id === pauseDeviceId) ?? devices[0]
+  // One device: always selected. Several: the performer picks one from the dropdown first.
+  const selectedPauseDevice = devices.length === 1 ? devices[0] : devices.find(d => d.id === pauseDeviceId)
 
   // Auto-refresh every 5 seconds for live updates
   useEffect(() => {
@@ -222,14 +224,15 @@ const SongRequestMonitor: React.FC<SongRequestMonitorProps> = ({
                 </motion.button>
 
                 <div className="flex items-center gap-4">
-                  {onTogglePause && selectedPauseDevice && (
+                  {onTogglePause && devices.length > 0 && (
                     <div className="flex items-center gap-2 text-xs text-gray-500">
                       {devices.length > 1 ? (
                         <select
-                          value={selectedPauseDevice.id}
+                          value={selectedPauseDevice?.id ?? ''}
                           onChange={(e) => setPauseDeviceId(e.target.value)}
                           className="rounded border border-gray-300 bg-white px-2 py-1 text-xs text-gray-700"
                         >
+                          <option value="">Select device</option>
                           {devices.map(device => (
                             <option key={device.id} value={device.id}>
                               {device.nickname || 'Device'}{device.isPaused ? ' (paused)' : ''}
@@ -237,17 +240,18 @@ const SongRequestMonitor: React.FC<SongRequestMonitorProps> = ({
                           ))}
                         </select>
                       ) : (
-                        <span>{selectedPauseDevice.nickname}</span>
+                        <span>{devices[0].nickname}</span>
                       )}
-                      <button
-                        onClick={() => onTogglePause(selectedPauseDevice.id)}
-                        disabled={pausingDeviceId === selectedPauseDevice.id}
-                        title="Stops the light and sound. Tips still go through."
-                        className="rounded border border-gray-300 px-2 py-1 text-gray-600 hover:bg-gray-100 disabled:opacity-50"
-                      >
-                        {pausingDeviceId === selectedPauseDevice.id ? '...' : selectedPauseDevice.isPaused ? 'Resume' : 'Pause'}
-                      </button>
-                      {selectedPauseDevice.isPaused && <span className="text-amber-600">Paused</span>}
+                      {selectedPauseDevice && (
+                        <>
+                          <PauseDeviceButton
+                            isPaused={!!selectedPauseDevice.isPaused}
+                            busy={pausingDeviceId === selectedPauseDevice.id}
+                            onToggle={() => onTogglePause(selectedPauseDevice.id)}
+                          />
+                          {selectedPauseDevice.isPaused && <span className="text-amber-600">Paused</span>}
+                        </>
+                      )}
                     </div>
                   )}
                   <div className="text-right">

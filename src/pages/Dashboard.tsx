@@ -2243,7 +2243,14 @@ const Dashboard: React.FC = () => {
                             </div>
                             <p className="text-sm text-gray-500">{device.uuid}</p>
                           </div>
-                          <div className={`w-3 h-3 rounded-full ${device.isOnline ? 'bg-green-500' : 'bg-gray-400'}`}></div>
+                          <div className="flex items-center gap-3">
+                            <PauseDeviceButton
+                              isPaused={!!device.isPaused}
+                              busy={pausingDeviceId === device.id}
+                              onToggle={() => toggleDevicePause(device.id)}
+                            />
+                            <div className={`w-3 h-3 rounded-full ${device.isOnline ? 'bg-green-500' : 'bg-gray-400'}`}></div>
+                          </div>
                         </div>
 
                         <div className="space-y-3 mb-4">
@@ -2319,7 +2326,7 @@ const Dashboard: React.FC = () => {
                             onClick={() => setExpandedDeviceConfig(expandedDeviceConfig === device.id ? null : device.id)}
                             className="w-full px-3 py-2 bg-purple-100 text-purple-700 text-sm rounded-lg hover:bg-purple-200 transition-colors flex items-center justify-between"
                           >
-                            <span>Device Configuration{device.isPaused && <span className="ml-2 text-xs text-amber-700">(paused)</span>}</span>
+                            <span>Device Configuration</span>
                             <svg 
                               className={`w-4 h-4 transition-transform ${expandedDeviceConfig === device.id ? 'rotate-180' : ''}`} 
                               fill="none" 
@@ -2377,13 +2384,6 @@ const Dashboard: React.FC = () => {
                                   ))}
                                 </select>
                               </div>
-
-                              {/* Pause Device (light and sound) */}
-                              <PauseDeviceButton
-                                isPaused={!!device.isPaused}
-                                busy={pausingDeviceId === device.id}
-                                onToggle={() => toggleDevicePause(device.id)}
-                              />
 
                               {/* Random Light Effect Toggle */}
                               <div className="flex items-center justify-between">
