@@ -2314,20 +2314,12 @@ const Dashboard: React.FC = () => {
                             }
                           </button>
                           
-                          {/* Pause / resume the device's light and sound */}
-                          <PauseDeviceButton
-                            isPaused={!!device.isPaused}
-                            busy={pausingDeviceId === device.id}
-                            deviceName={device.nickname}
-                            onToggle={() => toggleDevicePause(device.id)}
-                          />
-
                           {/* Device Configuration Section */}
                           <button
                             onClick={() => setExpandedDeviceConfig(expandedDeviceConfig === device.id ? null : device.id)}
                             className="w-full px-3 py-2 bg-purple-100 text-purple-700 text-sm rounded-lg hover:bg-purple-200 transition-colors flex items-center justify-between"
                           >
-                            <span>Device Configuration</span>
+                            <span>Device Configuration{device.isPaused && <span className="ml-2 text-xs text-amber-700">(paused)</span>}</span>
                             <svg 
                               className={`w-4 h-4 transition-transform ${expandedDeviceConfig === device.id ? 'rotate-180' : ''}`} 
                               fill="none" 
@@ -2385,6 +2377,13 @@ const Dashboard: React.FC = () => {
                                   ))}
                                 </select>
                               </div>
+
+                              {/* Pause Device (light and sound) */}
+                              <PauseDeviceButton
+                                isPaused={!!device.isPaused}
+                                busy={pausingDeviceId === device.id}
+                                onToggle={() => toggleDevicePause(device.id)}
+                              />
 
                               {/* Random Light Effect Toggle */}
                               <div className="flex items-center justify-between">

@@ -46,6 +46,8 @@ const SongRequestMonitor: React.FC<SongRequestMonitorProps> = ({
   const [updatingStatus, setUpdatingStatus] = useState<string | null>(null)
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date())
   const refreshIntervalRef = useRef<number | null>(null)
+  const [pauseDeviceId, setPauseDeviceId] = useState('')
+  const selectedPauseDevice = devices.find(d => d.id === pauseDeviceId) ?? devices[0]
 
   // Auto-refresh every 5 seconds for live updates
   useEffect(() => {
@@ -220,33 +222,34 @@ const SongRequestMonitor: React.FC<SongRequestMonitorProps> = ({
                 </motion.button>
 
                 <div className="flex items-center gap-4">
-                  {onTogglePause && devices.length > 0 && (() => {
-                    const pausedCount = devices.filter(d => d.isPaused).length
-                    const anyPaused = pausedCount > 0
-                    const busy = pausingDeviceId !== null
-                    // Pause everything when nothing is paused; otherwise resume whatever is paused
-                    const handleClick = () => devices
-                      .filter(d => !!d.isPaused === anyPaused)
-                      .forEach(d => onTogglePause(d.id))
-                    return (
-                      <motion.button
-                        whileTap={{ scale: 0.95 }}
-                        onClick={handleClick}
-                        disabled={busy}
+                  {onTogglePause && selectedPauseDevice && (
+                    <div className="flex items-center gap-2 text-xs text-gray-500">
+                      {devices.length > 1 ? (
+                        <select
+                          value={selectedPauseDevice.id}
+                          onChange={(e) => setPauseDeviceId(e.target.value)}
+                          className="rounded border border-gray-300 bg-white px-2 py-1 text-xs text-gray-700"
+                        >
+                          {devices.map(device => (
+                            <option key={device.id} value={device.id}>
+                              {device.nickname || 'Device'}{device.isPaused ? ' (paused)' : ''}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <span>{selectedPauseDevice.nickname}</span>
+                      )}
+                      <button
+                        onClick={() => onTogglePause(selectedPauseDevice.id)}
+                        disabled={pausingDeviceId === selectedPauseDevice.id}
                         title="Stops the light and sound. Tips still go through."
-                        className={`flex items-center gap-2 rounded-full px-4 py-2 text-sm font-extrabold uppercase tracking-wide text-white shadow-md transition-colors disabled:opacity-60 ${
-                          anyPaused ? 'bg-amber-500 hover:bg-amber-600' : 'bg-red-600 hover:bg-red-700'
-                        }`}
+                        className="rounded border border-gray-300 px-2 py-1 text-gray-600 hover:bg-gray-100 disabled:opacity-50"
                       >
-                        {anyPaused && <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-white" />}
-                        {busy
-                          ? 'Updating...'
-                          : anyPaused
-                          ? `▶ Resume${devices.length > 1 ? ` (${pausedCount} of ${devices.length} paused)` : ' · Paused'}`
-                          : `⏸ Pause${devices.length > 1 ? ' devices' : ' device'}`}
-                      </motion.button>
-                    )
-                  })()}
+                        {pausingDeviceId === selectedPauseDevice.id ? '...' : selectedPauseDevice.isPaused ? 'Resume' : 'Pause'}
+                      </button>
+                      {selectedPauseDevice.isPaused && <span className="text-amber-600">Paused</span>}
+                    </div>
+                  )}
                   <div className="text-right">
                     <div className="text-sm text-gray-500">Auto-refresh</div>
                     <div className="font-semibold text-blue-600 text-xs">
