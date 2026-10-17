@@ -1,7 +1,7 @@
 // Shared device configuration options (light effects, sounds, volume) for the portal.
 // Light Effect 4-6 and the sound options apply to Prototype3 devices only.
 
-export const TIP_TIERS = [1, 5, 10, 20, 50, 100]
+export const TIP_TIERS = [2, 5, 10, 20, 50, 100] // $2 is the minimum tip
 
 export const LIGHT_EFFECTS: { value: string; label: string }[] = [
   { value: 'effect1', label: 'Flash' },
@@ -28,7 +28,7 @@ export const DEFAULT_SOUND_ID = 1
 export const DEFAULT_SOUND_VOLUME = 'medium'
 
 export const DEFAULT_EFFECT_CONFIG: Record<string, string> = {
-  '1': 'effect1',
+  '2': 'effect1',
   '5': 'effect1',
   '10': 'effect2',
   '20': 'effect2',
@@ -36,13 +36,13 @@ export const DEFAULT_EFFECT_CONFIG: Record<string, string> = {
   '100': 'effect3',
 }
 
-// Older saved configs were keyed "2" instead of "1" for the lowest tier; carry that
-// value over so the $1 tip uses the effect the performer picked.
+// Configs created by the database default (or an earlier build of this screen) key the
+// lowest tier "1"; carry that value over to "2" so the $2 tip uses the effect the performer picked.
 export const normalizeEffectConfig = (config: Record<string, string>): Record<string, string> => {
   const normalized = { ...DEFAULT_EFFECT_CONFIG, ...config }
-  if (config['1'] === undefined && config['2'] !== undefined) {
-    normalized['1'] = config['2']
+  if (config['2'] === undefined && config['1'] !== undefined) {
+    normalized['2'] = config['1']
   }
-  delete normalized['2']
+  delete normalized['1']
   return normalized
 }
