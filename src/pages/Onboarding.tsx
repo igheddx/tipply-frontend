@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import apiService from '../services/api'
 import { getEncryptDecryptNoUserName } from '../utils/encryption'
 import { BrandIcon, IconTile, type BrandIconName } from '../components/icons/BrandIcons'
-import { Banner, Button } from '../components/ui'
+import { Banner, Button, PageLoader } from '../components/ui'
 
 const RESEND_SECONDS = 30
 
@@ -1013,12 +1013,7 @@ const Onboarding: React.FC = () => {
 
   if (!apiKeyGenerated) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-surface">
-        <div className="text-center">
-          <div className="mx-auto mb-4 h-10 w-10 animate-spin rounded-full border-2 border-brand-600 border-t-transparent" />
-          <p className="text-ink-500">Setting things up…</p>
-        </div>
-      </div>
+      <PageLoader label="Setting things up…" />
     )
   }
 

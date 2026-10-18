@@ -95,27 +95,72 @@ const Login: React.FC = () => {
     'w-full h-12 pl-11 pr-4 rounded-xl border border-slate-300 bg-white text-ink-900 placeholder:text-ink-400 transition-colors focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent'
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-surface px-4 py-10">
-      <div className="w-full max-w-md">
-        <div className="mb-8 text-center">
-          <img src="/images/logo/tipwave-logo-v2.png" alt="Tipwave" className="mx-auto h-14 w-auto" />
-          <h1 className="mt-6 text-3xl font-bold text-ink-900">Welcome back</h1>
-          <p className="mt-1 text-ink-500">Sign in to your Tipwave portal</p>
+    <div className="min-h-screen bg-surface lg:grid lg:grid-cols-[1.05fr_1fr]">
+      {/* Brand panel: a header band on phones, a full side panel on desktop */}
+      <aside
+        className="relative overflow-hidden px-6 pb-16 pt-8 text-white lg:flex lg:min-h-screen lg:flex-col lg:justify-between lg:px-14 lg:py-14"
+        style={{
+          background:
+            'radial-gradient(70% 55% at 100% 0%, rgba(6,182,200,0.35), transparent 70%),' +
+            'radial-gradient(60% 50% at 0% 100%, rgba(229,84,140,0.28), transparent 70%),' +
+            'linear-gradient(160deg,#0a2533,#0d4254 60%,#0f3447)'
+        }}
+      >
+        {/* Oversized monogram as a quiet background shape */}
+        <img
+          src="/images/logo/tipwave-monogram.png"
+          alt=""
+          aria-hidden
+          className="pointer-events-none absolute -bottom-10 -right-16 hidden w-[520px] max-w-none opacity-[0.07] lg:block"
+        />
+        <img src="/images/logo/tipwave-logo-v2-light.png" alt="Tipwave" className="relative h-10 w-auto self-start lg:h-12" />
+
+        <div className="relative mt-8 lg:mt-0">
+          <h2 className="text-3xl font-bold leading-tight lg:text-5xl">
+            Get tipped.
+            <br />
+            Get paid.
+          </h2>
+          <p className="mt-3 max-w-md text-white/75 lg:text-lg">
+            Your audience scans, picks an amount and tips. You see it the moment it happens.
+          </p>
+          <ul className="mt-8 hidden space-y-4 lg:block">
+            {[
+              { icon: 'qr' as const, text: 'One scan to tip. No app to download.' },
+              { icon: 'music' as const, text: 'Take song requests with every tip.' },
+              { icon: 'bank' as const, text: 'Payouts go straight to your bank.' }
+            ].map(item => (
+              <li key={item.text} className="flex items-center gap-3 text-white/90">
+                <span className="flex h-10 w-10 items-center justify-center rounded-full bg-white/10">
+                  <BrandIcon name={item.icon} size={20} color="#7EE3EF" />
+                </span>
+                {item.text}
+              </li>
+            ))}
+          </ul>
         </div>
 
-        {showKycSuccess && (
-          <Banner tone="success" title="Identity verified" className="mb-5">
-            Stripe has what it needs. Sign in to start getting paid.
-          </Banner>
-        )}
+        <p className="relative hidden text-sm text-white/50 lg:block">© Tipwave</p>
+      </aside>
 
-        {passwordResetMessage && (
-          <Banner tone="success" title="Password reset" className="mb-5">
-            Sign in with your new password.
-          </Banner>
-        )}
+      {/* Form */}
+      <main className="relative z-10 -mt-8 px-4 pb-10 lg:mt-0 lg:flex lg:items-center lg:justify-center lg:px-12">
+        <div className="mx-auto w-full max-w-md rounded-2xl bg-white p-6 shadow-card lg:bg-transparent lg:p-0 lg:shadow-none">
+          <h1 className="text-2xl font-bold text-ink-900 lg:text-3xl">Welcome back</h1>
+          <p className="mb-6 mt-1 text-ink-500">Sign in to your Tipwave portal</p>
 
-        <div className="rounded-2xl bg-white p-6 shadow-card sm:p-8">
+          {showKycSuccess && (
+            <Banner tone="success" title="Identity verified" className="mb-5">
+              Stripe has what it needs. Sign in to start getting paid.
+            </Banner>
+          )}
+
+          {passwordResetMessage && (
+            <Banner tone="success" title="Password reset" className="mb-5">
+              Sign in with your new password.
+            </Banner>
+          )}
+
           <form onSubmit={handleSubmit} className="space-y-5">
             {error && (
               <Banner tone="error" title="We could not sign you in">
@@ -196,7 +241,7 @@ const Login: React.FC = () => {
             </Button>
           </div>
         </div>
-      </div>
+      </main>
     </div>
   )
 }

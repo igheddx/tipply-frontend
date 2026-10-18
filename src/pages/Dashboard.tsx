@@ -1,7 +1,7 @@
 import logger from "../utils/logger";
 import { PortalShell, type PortalNavItem } from '../components/portal/PortalShell'
 import { HomeTab, type HomeData } from '../components/portal/HomeTab'
-import { Button, Card, EmptyState, PageHeader, StatusChip, type ChipKind } from '../components/ui'
+import { Button, Card, EmptyState, PageHeader, PageLoader, StatusChip, type ChipKind } from '../components/ui'
 import { BrandIcon } from '../components/icons/BrandIcons'
 import { Switch } from '../components/ui/Switch'
 import React, { useState, useEffect } from 'react'
@@ -1390,12 +1390,7 @@ const Dashboard: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-8 h-8 border-4 border-primary-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading dashboard...</p>
-        </div>
-      </div>
+      <PageLoader label="Loading your portal…" />
     )
   }
 

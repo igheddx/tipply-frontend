@@ -2,11 +2,11 @@ import { BrandIcon } from '../icons/BrandIcons'
 
 /** Gradient behind each of the six amounts, in order. They match the light colors the device shows. */
 const AMOUNT_STYLES: { background: string; color: string }[] = [
-  { background: 'linear-gradient(135deg,#2dd4a0,#0f8f7a)', color: '#FFFFFF' },
-  { background: 'linear-gradient(135deg,#60a5fa,#4f46e5)', color: '#FFFFFF' },
-  { background: 'linear-gradient(135deg,#c084fc,#7c3aed)', color: '#FFFFFF' },
-  { background: 'linear-gradient(135deg,#f472b6,#e11d48)', color: '#FFFFFF' },
-  { background: 'linear-gradient(135deg,#fb923c,#dc2626)', color: '#FFFFFF' },
+  { background: 'linear-gradient(135deg,#2dd4bf,#0f8f86)', color: '#FFFFFF' },
+  { background: 'linear-gradient(135deg,#22b8d6,#0e7490)', color: '#FFFFFF' },
+  { background: 'linear-gradient(135deg,#5b9bf8,#2748b8)', color: '#FFFFFF' },
+  { background: 'linear-gradient(135deg,#f472b6,#c92a70)', color: '#FFFFFF' },
+  { background: 'linear-gradient(135deg,#fb7185,#d92d4b)', color: '#FFFFFF' },
   // dark text: white on yellow is hard to read
   { background: 'linear-gradient(135deg,#fde047,#f59e0b)', color: '#3B2300' }
 ]
@@ -86,7 +86,7 @@ export function TipScreen({
         background:
           'radial-gradient(60% 40% at 90% 0%, rgba(6,182,200,0.28), transparent 70%),' +
           'radial-gradient(60% 40% at 0% 100%, rgba(229,84,140,0.22), transparent 70%),' +
-          'linear-gradient(135deg,#3b1a78,#1e3a8a 55%,#312e81)'
+          'linear-gradient(160deg,#0a2533,#0d4254 55%,#0f3447)'
       }}
     >
       <header className="flex flex-none items-center gap-3">
@@ -191,8 +191,8 @@ export function TipScreen({
         </span>
       </div>
 
-      <footer className="flex h-4 flex-none justify-center">
-        <img src="/images/logo/tipwave-logo-v2-light.png" alt="Tipwave" className="h-[15px] opacity-50" />
+      <footer className="flex h-6 flex-none items-center justify-center">
+        <img src="/images/logo/tipwave-logo-v2-light.png" alt="Tipwave" className="h-[22px] opacity-90" />
       </footer>
     </div>
   )

@@ -17,7 +17,7 @@ import AggregatedChargesTable from '../components/AggregatedChargesTable';
 import PerformerInsights from '../components/PerformerInsights';
 import dayjs from 'dayjs';
 import { PortalShell, type PortalNavItem } from '../components/portal/PortalShell';
-import { Banner, Card as UiCard, PageHeader, StatCard } from '../components/ui';
+import { Banner, Card as UiCard, PageHeader, PageLoader, StatCard } from '../components/ui';
 
 const { Search } = Input;
 const { RangePicker } = DatePicker;
@@ -965,9 +965,7 @@ const AdminDashboard: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <Spin size="large" />
-      </div>
+      <PageLoader label="Loading admin…" />
     );
   }
 
