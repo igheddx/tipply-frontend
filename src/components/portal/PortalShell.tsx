@@ -18,6 +18,8 @@ interface PortalShellProps {
   onOpenProfile: () => void
   onLogout: () => void
   profileActive?: boolean
+  /** Second line under the account name in the sidebar */
+  accountHint?: string
   /** Shown above the page on every screen, e.g. a payout warning */
   topNotice?: ReactNode
   children: ReactNode
@@ -47,6 +49,7 @@ export function PortalShell({
   onOpenProfile,
   onLogout,
   profileActive = false,
+  accountHint = 'Profile and payouts',
   topNotice,
   children
 }: PortalShellProps) {
@@ -89,7 +92,7 @@ export function PortalShell({
             <Avatar name={userName} photoUrl={userPhotoUrl} />
             <span className="min-w-0 flex-1">
               <span className="block truncate text-sm font-semibold text-ink-900">{userName}</span>
-              <span className="block text-xs text-ink-500">Profile and payouts</span>
+              <span className="block text-xs text-ink-500">{accountHint}</span>
             </span>
           </button>
           <button
@@ -120,7 +123,7 @@ export function PortalShell({
       {/* Phone bottom bar */}
       <nav
         aria-label="Main"
-        className="fixed inset-x-0 bottom-0 z-30 flex border-t border-slate-200 bg-white lg:hidden"
+        className="fixed inset-x-0 bottom-0 z-30 flex overflow-x-auto border-t border-slate-200 bg-white lg:hidden"
         style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
       >
         {items.map(item => {
@@ -130,7 +133,7 @@ export function PortalShell({
               key={item.id}
               onClick={() => onSelect(item.id)}
               aria-current={on ? 'page' : undefined}
-              className="relative flex h-16 flex-1 flex-col items-center justify-center gap-1"
+              className="relative flex h-16 min-w-[76px] flex-1 shrink-0 flex-col items-center justify-center gap-1"
             >
               <BrandIcon name={item.icon} size={22} tone={on ? 'brand' : 'muted'} />
               <span className={`text-[11px] font-semibold ${on ? 'text-brand-700' : 'text-ink-500'}`}>{item.label}</span>

@@ -1,14 +1,10 @@
 import logger from "../utils/logger";
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Row, Col, Statistic, Table, Button, Input, InputNumber, Modal, message, Spin, Card, Tag, Select, DatePicker, Space, Divider, Alert, Tabs, Radio } from 'antd';
+import { Row, Col, Table, Button, Input, InputNumber, Modal, message, Spin, Card, Tag, Select, DatePicker, Space, Divider, Alert, Tabs, Radio } from 'antd';
 import { 
-  UserOutlined, 
-  DesktopOutlined, 
-  DollarOutlined, 
   ReloadOutlined,
   PlayCircleOutlined,
-  ArrowLeftOutlined,
   CheckCircleOutlined,
   CloseCircleOutlined,
   SyncOutlined,
@@ -20,6 +16,8 @@ import { isRefundEligible } from '../utils/refunds';
 import AggregatedChargesTable from '../components/AggregatedChargesTable';
 import PerformerInsights from '../components/PerformerInsights';
 import dayjs from 'dayjs';
+import { PortalShell, type PortalNavItem } from '../components/portal/PortalShell';
+import { Banner, Card as UiCard, PageHeader, StatCard } from '../components/ui';
 
 const { Search } = Input;
 const { RangePicker } = DatePicker;
@@ -151,6 +149,7 @@ const AdminDashboard: React.FC = () => {
   const [canToggleStripe, setCanToggleStripe] = useState(false);
   const [stripeModeLoading, setStripeModeLoading] = useState(false);
   const [stripeModeConfirming, setStripeModeConfirming] = useState(false);
+  const [liveConfirmText, setLiveConfirmText] = useState('');
   const [stripeModeError, setStripeModeError] = useState<string | null>(null);
   const [stripeModeNotice, setStripeModeNotice] = useState<{ type: 'success' | 'warning' | 'error' | 'info'; text: string } | null>(null);
 
@@ -413,6 +412,7 @@ const AdminDashboard: React.FC = () => {
   };
 
   const handleToggleStripeMode = () => {
+    setLiveConfirmText('');
     setStripeModeError(null);
     setStripeModeNotice(null);
     setStripeModeConfirming(true);
@@ -971,196 +971,271 @@ const AdminDashboard: React.FC = () => {
     );
   }
 
+  const adminNav: PortalNavItem[] = [
+    { id: 'overview', label: 'Overview', icon: 'home' },
+    { id: 'performers', label: 'Performers', icon: 'users' },
+    { id: 'tips', label: 'Tips', icon: 'coin' },
+    { id: 'aggregated-charges', label: 'Charges', icon: 'card' },
+    ...(userProfile?.role === 'root_admin' ? [{ id: 'device-management', label: 'Devices', icon: 'device' } as PortalNavItem] : []),
+    { id: 'performer-insights', label: 'Insights', icon: 'trend-up' },
+    ...(isSimulationVisible ? [{ id: 'device-tip-simulation', label: 'Tools', icon: 'bolt' } as PortalNavItem] : []),
+    { id: 'settings', label: 'Settings', icon: 'sliders' }
+  ];
+
+  const ADMIN_TITLES: Record<string, { title: string; subtitle?: string }> = {
+    overview: { title: 'Overview', subtitle: 'How the platform is doing right now.' },
+    performers: { title: 'Performers', subtitle: 'Everyone who can receive tips, and their fee.' },
+    tips: { title: 'Tips', subtitle: 'Search, export and refund tips.' },
+    'aggregated-charges': { title: 'Charges', subtitle: 'What was charged to each card, combined per batch.' },
+    'device-management': { title: 'Devices', subtitle: 'Add or remove devices on a performer’s behalf.' },
+    'performer-insights': { title: 'Insights', subtitle: 'Tips by time of day and performer.' },
+    'device-tip-simulation': { title: 'Tools', subtitle: 'Send test tips to a device. Only on local and test sites.' },
+    settings: { title: 'Settings', subtitle: 'Stripe mode and payment security limits.' }
+  };
+
+  // Always visible in the corner of every page, so nobody mistakes the mode they are working in
+  const modeNotice =
+    stripeMode === 'live' ? (
+      <Banner tone="error" title="Live mode: real money">
+        Tips are charged to real cards.
+      </Banner>
+    ) : (
+      <Banner tone="info" title="Stripe test mode">
+        No real charges are made.
+      </Banner>
+    );
+
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-[21px]">{/* Left side - Logo */}
-            <div className="flex items-center">
-              <div className="relative w-12 h-12 overflow-visible rounded-lg">
-                <img
-                  src="/images/logo/tipwave-logo2b.png?v=20260208"
-                  alt="Tipwave Logo"
-                  className="w-full h-full object-contain"
-                  style={{ transform: 'scale(4)', objectPosition: 'center' }}
-                />
-              </div>
+    <PortalShell
+      items={adminNav}
+      active={activeTab}
+      onSelect={setActiveTab}
+      userName={userProfile?.firstName ? `${userProfile.firstName} ${userProfile.lastName || ''}`.trim() : 'Admin'}
+      userPhotoUrl={userProfile?.profilePhotoUrl || undefined}
+      accountHint="Back to my portal"
+      onOpenProfile={() => navigate('/dashboard')}
+      onLogout={() => {
+        localStorage.removeItem('token');
+        localStorage.removeItem('refreshToken');
+        navigate('/login');
+      }}
+      topNotice={modeNotice}
+    >
+      <PageHeader title={ADMIN_TITLES[activeTab]?.title || 'Admin'} subtitle={ADMIN_TITLES[activeTab]?.subtitle} />
+      <div>
+        {activeTab === 'overview' && (
+          <div className="space-y-5">
+            <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+              <StatCard variant="inline" icon="users" label="Audience" value={(stats?.totalUsers || 0).toLocaleString()} caption="People who have tipped" />
+              <StatCard variant="inline" icon="device" label="Devices" value={(stats?.totalDevices || 0).toLocaleString()} caption="Not deleted" />
+              <StatCard variant="inline" icon="coin" label="Tips" value={(stats?.totalTips || 0).toLocaleString()} caption={`${(stats?.pendingTips || 0).toLocaleString()} waiting to be charged`} />
+              <StatCard variant="inline" icon="mic" label="Performers" value={(stats?.activePerformers || 0).toLocaleString()} caption="With at least one device" />
             </div>
 
-            {/* Right side - Buttons */}
-            <div className="flex items-center space-x-4">
-              <Button 
-                icon={<ArrowLeftOutlined />}
-                onClick={() => navigate('/dashboard')}
-                className="flex items-center"
-              >
-                Back to Dashboard
-              </Button>
-              <button
-                onClick={() => {
-                  localStorage.removeItem('token');
-                  localStorage.removeItem('refreshToken');
-                  navigate('/login');
-                }}
-                className="p-2 text-gray-500 hover:text-gray-700 transition-colors"
-                title="Logout"
-              >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                </svg>
-              </button>
+            <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
+              <UiCard title="Revenue" subtitle="Tips that were charged successfully">
+                <dl className="space-y-3 text-sm">
+                  <div className="flex justify-between gap-3">
+                    <dt className="text-ink-500">Revenue</dt>
+                    <dd className="font-bold text-ink-900">${(stats?.totalRevenue || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</dd>
+                  </div>
+                  <div className="flex justify-between gap-3">
+                    <dt className="text-ink-500">Owed to performers</dt>
+                    <dd className="font-bold text-ink-900">${(stats?.totalPerformerPayouts || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</dd>
+                  </div>
+                </dl>
+              </UiCard>
+              <UiCard title="Platform earnings" subtitle="Estimated from the fee settings">
+                <dl className="space-y-3 text-sm">
+                  <div className="flex justify-between gap-3">
+                    <dt className="text-ink-500">Platform fees</dt>
+                    <dd className="font-bold text-ink-900">${(platformEarnings?.totalPlatformFees || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</dd>
+                  </div>
+                  <div className="flex justify-between gap-3">
+                    <dt className="text-ink-500">Stripe fees (estimated)</dt>
+                    <dd className="font-bold text-ink-900">${(platformEarnings?.totalPaymentPartnerFees || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</dd>
+                  </div>
+                  <div className="flex justify-between gap-3 border-t border-slate-100 pt-3">
+                    <dt className="font-semibold text-ink-700">Net earnings</dt>
+                    <dd className="font-bold text-ink-900">${(platformEarnings?.netPlatformEarnings || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</dd>
+                  </div>
+                </dl>
+              </UiCard>
+              <UiCard title="Charge tips" subtitle={`${stats?.pendingTips || 0} tips are waiting to be charged.`}>
+                {batchResultMessage && (
+                  <Alert
+                    className="mb-3"
+                    type={batchResultMessage.type}
+                    message={batchResultMessage.text}
+                    showIcon
+                    closable
+                    onClose={() => setBatchResultMessage(null)}
+                  />
+                )}
+                <div className="flex gap-2">
+                  <Button
+                    type="primary"
+                    icon={batchProcessing ? <ReloadOutlined spin /> : <PlayCircleOutlined />}
+                    onClick={() =>
+                      Modal.confirm({
+                        title: 'Run batch processing now?',
+                        content: `This charges ${stats?.pendingTips || 0} waiting tip(s) in ${stripeMode === 'live' ? 'LIVE mode with real money' : 'test mode'}. It cannot be undone.`,
+                        okText: 'Run batch',
+                        okButtonProps: { danger: stripeMode === 'live' },
+                        onOk: () => runBatchProcessing()
+                      })
+                    }
+                    loading={batchProcessing}
+                    disabled={batchProcessing}
+                    className="flex-1"
+                  >
+                    {batchProcessing ? 'Running…' : 'Run batch now'}
+                  </Button>
+                  <Button
+                    icon={<ReloadOutlined />}
+                    onClick={() => {
+                      setBatchResultMessage(null);
+                      loadDashboardData();
+                    }}
+                    aria-label="Refresh data"
+                    title="Refresh data"
+                  />
+                </div>
+              </UiCard>
             </div>
-          </div>
-        </div>
-      </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Welcome Message */}
-        <div className="mb-8">
-          <h2 className="text-3xl font-bold text-gray-900 mb-2">
-            Admin Dashboard, Welcome {userProfile?.firstName || userProfile?.stageName || 'Admin'}!
-          </h2>
-          <p className="text-gray-600">
-            System overview and performer management
-          </p>
-        </div>
-
-        {/* Stats Cards */}
-        <Row gutter={[16, 16]} className="mb-8">
-          <Col xs={24} sm={12} lg={6}>
-            <div className="bg-white p-6 rounded-lg shadow-sm border">
-              <Statistic
-                title="Total Audience"
-                value={stats?.totalUsers || 0}
-                prefix={<UserOutlined />}
-                valueStyle={{ color: '#3f8600' }}
-              />
-            </div>
-          </Col>
-          <Col xs={24} sm={12} lg={6}>
-            <div className="bg-white p-6 rounded-lg shadow-sm border">
-              <Statistic
-                title="Total Devices"
-                value={stats?.totalDevices || 0}
-                prefix={<DesktopOutlined />}
-                valueStyle={{ color: '#1890ff' }}
-              />
-            </div>
-          </Col>
-          <Col xs={24} sm={12} lg={6}>
-            <div className="bg-white p-6 rounded-lg shadow-sm border">
-              <Statistic
-                title="Total Tips"
-                value={stats?.totalTips || 0}
-                prefix={<DollarOutlined />}
-                valueStyle={{ color: '#722ed1' }}
-              />
-            </div>
-          </Col>
-          <Col xs={24} sm={12} lg={6}>
-            <div className="bg-white p-6 rounded-lg shadow-sm border">
-              <Statistic
-                title="Active Performers"
-                value={stats?.activePerformers || 0}
-                prefix={<UserOutlined />}
-                valueStyle={{ color: '#13c2c2' }}
-              />
-            </div>
-          </Col>
-        </Row>
-
-        {/* Financial Overview */}
-        <Row gutter={[16, 16]} className="mb-8">
-          <Col xs={24} lg={8}>
-            <div className="bg-white p-6 rounded-lg shadow-sm border h-full">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Revenue Overview</h3>
-              <div className="space-y-4">
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Total Revenue (processed):</span>
-                  <span className="font-semibold text-lg text-green-600">
-                    ${(stats?.totalRevenue || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                  </span>
+        {/* Batch Processing Status */}
+        <Row gutter={16}>
+          <Col xs={24} lg={12}>
+            <Card 
+              className="shadow-sm"
+              title={
+                <div className="flex items-center gap-2">
+                  {getBatchStatusIcon()}
+                  <span>Batch Processing Status</span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Performer Payouts:</span>
-                  <span className="font-semibold text-blue-600">
-                    ${(stats?.totalPerformerPayouts || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                  </span>
+              }
+            >
+              {batchStatus ? (
+                <div className="space-y-3">
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-600">Type:</span>
+                    <Tag color={batchStatus.isManual ? 'blue' : 'purple'}>
+                      {batchStatus.isManual ? 'MANUAL' : 'AUTOMATED'}
+                    </Tag>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-600">Status:</span>
+                    <Tag color={getBatchStatusColor()}>{batchStatus.status?.toUpperCase() || 'UNKNOWN'}</Tag>
+                  </div>
+                  {batchStatus.startedAt && (
+                    <div className="flex justify-between items-center">
+                      <span className="text-gray-600">Started:</span>
+                      <span>{new Date(batchStatus.startedAt).toLocaleString()}</span>
+                    </div>
+                  )}
+                  {batchStatus.completedAt && (
+                    <div className="flex justify-between items-center">
+                      <span className="text-gray-600">Completed:</span>
+                      <span>{new Date(batchStatus.completedAt).toLocaleString()}</span>
+                    </div>
+                  )}
+                  {batchStatus.durationSeconds && (
+                    <div className="flex justify-between items-center">
+                      <span className="text-gray-600">Duration:</span>
+                      <span>{batchStatus.durationSeconds}s</span>
+                    </div>
+                  )}
+                  <Divider className="my-3" />
+                  <div className="grid grid-cols-3 gap-2">
+                    <div className="text-center">
+                      <div className="text-xl font-bold text-green-600">{batchStatus.tipsProcessed}</div>
+                      <div className="text-xs text-gray-500">Processed</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-xl font-bold text-red-600">{batchStatus.tipsFailed}</div>
+                      <div className="text-xs text-gray-500">Failed</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-xl font-bold text-yellow-600">{batchStatus.tipsPending}</div>
+                      <div className="text-xs text-gray-500">Pending</div>
+                    </div>
+                  </div>
+                  <Divider className="my-3" />
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-600">Total Amount:</span>
+                    <span className="font-semibold text-lg">${batchStatus.totalAmount?.toFixed(2) || '0.00'}</span>
+                  </div>
+                  {batchStatus.errorMessage && (
+                    batchStatus.status === 'success' ? (
+                      <div className="bg-slate-50 p-3 rounded border border-slate-200">
+                        <p className="text-xs text-slate-700">{batchStatus.errorMessage}</p>
+                      </div>
+                    ) : (
+                      <div className="bg-red-50 p-3 rounded border border-red-200">
+                        <p className="text-xs text-red-700"><strong>Error:</strong> {batchStatus.errorMessage}</p>
+                      </div>
+                    )
+                  )}
+                  {batchStatus.failureDetails && batchStatus.failureDetails.length > 0 && (
+                    <div className="bg-yellow-50 p-3 rounded border border-yellow-200 max-h-32 overflow-y-auto">
+                      <p className="text-xs font-semibold text-yellow-800 mb-2">Failure Details:</p>
+                      <ul className="space-y-1">
+                        {batchStatus.failureDetails.slice(0, 5).map((detail, idx) => (
+                          <li key={idx} className="text-xs text-yellow-700">• {detail}</li>
+                        ))}
+                        {batchStatus.failureDetails.length > 5 && (
+                          <li className="text-xs text-yellow-700">• ... and {batchStatus.failureDetails.length - 5} more</li>
+                        )}
+                      </ul>
+                    </div>
+                  )}
+                  <Button 
+                    block 
+                    type="link" 
+                    size="small"
+                    onClick={loadBatchHistory}
+                  >
+                    View History
+                  </Button>
                 </div>
-              </div>
-            </div>
-          </Col>
-          <Col xs={24} lg={8}>
-            <div className="bg-white p-6 rounded-lg shadow-sm border h-full">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Platform Earnings</h3>
-              <div className="space-y-4">
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Total Platform Fee (YTD):</span>
-                  <span className="font-semibold text-blue-600">
-                    ${(platformEarnings?.totalPlatformFees || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Stripe Fees (actual):</span>
-                  <span className="font-semibold text-orange-600">
-                    ${(platformEarnings?.totalPaymentPartnerFees || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Net Earnings (platform fees - Stripe fees):</span>
-                  <span className="font-semibold text-green-600">
-                    ${(platformEarnings?.netPlatformEarnings || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                  </span>
-                </div>
-              </div>
-            </div>
-          </Col>
-          <Col xs={24} lg={8}>
-            <div className="bg-white p-6 rounded-lg shadow-sm border h-full">
-              {batchResultMessage && (
-                <Alert
-                  className="mb-4"
-                  type={batchResultMessage.type}
-                  message={batchResultMessage.text}
-                  showIcon
-                  closable
-                  onClose={() => setBatchResultMessage(null)}
-                />
+              ) : (
+                <p className="text-gray-500">No batch runs yet</p>
               )}
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h3>
-              <div className="space-y-3">
-                <Button 
-                  type="primary" 
-                  icon={batchProcessing ? <ReloadOutlined spin /> : <PlayCircleOutlined />}
-                  onClick={(e) => {
-                    e.preventDefault();
-                    runBatchProcessing();
-                  }}
-                  loading={batchProcessing}
-                  disabled={batchProcessing}
-                  className="w-full"
-                >
-                  {batchProcessing ? 'Running...' : 'Run Batch Processing'}
-                </Button>
-                <Button 
-                  icon={<ReloadOutlined />}
-                  onClick={() => {
-                    setBatchResultMessage(null);
-                    loadDashboardData();
-                  }}
-                  className="w-full flex items-center justify-center"
-                  aria-label="Refresh data"
-                  title="Refresh data"
-                />
-                <div className="text-sm text-gray-500 text-center">
-                  {stats?.pendingTips || 0} pending tips
+            </Card>
+          </Col>
+          <Col xs={24} lg={12}>
+            <Card 
+              className="shadow-sm"
+              title="Batch History Summary"
+            >
+              {batchHistory.length > 0 ? (
+                <div className="space-y-2 max-h-64 overflow-y-auto">
+                  {batchHistory.slice(0, 10).map((run, idx) => (
+                    <div key={idx} className="flex justify-between items-center p-2 bg-gray-50 rounded text-sm">
+                      <div>
+                        <div className="font-medium">{new Date(run.startedAt || '').toLocaleString()}</div>
+                        <div className="text-xs text-gray-500">{run.tipsProcessed} processed, {run.tipsFailed} failed</div>
+                      </div>
+                      <Tag color={run.status === 'success' ? 'green' : run.status === 'failed' ? 'red' : 'orange'}>
+                        {run.status}
+                      </Tag>
+                    </div>
+                  ))}
                 </div>
-              </div>
-            </div>
+              ) : (
+                <p className="text-gray-500 text-center py-4">No history available</p>
+              )}
+            </Card>
           </Col>
         </Row>
 
+          </div>
+        )}
+
+
+        {activeTab === 'settings' && (
+          <div className="space-y-5">
         {/* Stripe Mode Configuration */}
         <Row gutter={[16, 16]} className="mb-8">
           <Col xs={24}>
@@ -1190,19 +1265,19 @@ const AdminDashboard: React.FC = () => {
                           <span className="animate-ping absolute inline-flex h-3 w-3 rounded-full bg-red-600 opacity-75"></span>
                           <span className="relative inline-flex rounded-full h-3 w-3 bg-red-600"></span>
                         </span>
-                        <h3 className="text-xl font-bold text-red-800">⚠️ STRIPE LIVE MODE ACTIVE</h3>
+                        <h3 className="text-xl font-bold text-red-800">Stripe live mode is on</h3>
                       </>
                     )}
                     {stripeMode === 'test' && isProductionEnv && (
                       <>
                         <span className="inline-flex rounded-full h-3 w-3 bg-green-600"></span>
-                        <h3 className="text-xl font-bold text-green-800">✓ STRIPE TEST MODE</h3>
+                        <h3 className="text-xl font-bold text-green-800">Stripe test mode</h3>
                       </>
                     )}
                     {!isProductionEnv && (
                       <>
                         <span className="inline-flex rounded-full h-3 w-3 bg-gray-600"></span>
-                        <h3 className="text-xl font-bold text-gray-800">🛠️ DEVELOPMENT ENVIRONMENT</h3>
+                        <h3 className="text-xl font-bold text-gray-800">Development environment</h3>
                       </>
                     )}
                   </div>
@@ -1241,7 +1316,7 @@ const AdminDashboard: React.FC = () => {
                       loading={stripeModeLoading}
                       className={stripeMode === 'live' ? 'border-red-600 text-red-600 hover:bg-red-50' : ''}
                     >
-                      {stripeMode === 'test' ? '🔴 Enable Live Mode' : '🟢 Switch to Test Mode'}
+                      {stripeMode === 'test' ? 'Enable live mode' : 'Switch to test mode'}
                     </Button>
                   )}
                   {!canToggleStripe && (
@@ -1307,129 +1382,12 @@ const AdminDashboard: React.FC = () => {
           </Col>
         </Row>
 
-        {/* Batch Processing Status */}
-        <Row gutter={16} className="mb-6">
-          <Col xs={24} lg={12}>
-            <Card 
-              className="shadow-sm"
-              title={
-                <div className="flex items-center gap-2">
-                  {getBatchStatusIcon()}
-                  <span>Batch Processing Status</span>
-                </div>
-              }
-            >
-              {batchStatus ? (
-                <div className="space-y-3">
-                  <div className="flex justify-between items-center">
-                    <span className="text-gray-600">Type:</span>
-                    <Tag color={batchStatus.isManual ? 'blue' : 'purple'}>
-                      {batchStatus.isManual ? 'MANUAL' : 'AUTOMATED'}
-                    </Tag>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-gray-600">Status:</span>
-                    <Tag color={getBatchStatusColor()}>{batchStatus.status?.toUpperCase() || 'UNKNOWN'}</Tag>
-                  </div>
-                  {batchStatus.startedAt && (
-                    <div className="flex justify-between items-center">
-                      <span className="text-gray-600">Started:</span>
-                      <span>{new Date(batchStatus.startedAt).toLocaleString()}</span>
-                    </div>
-                  )}
-                  {batchStatus.completedAt && (
-                    <div className="flex justify-between items-center">
-                      <span className="text-gray-600">Completed:</span>
-                      <span>{new Date(batchStatus.completedAt).toLocaleString()}</span>
-                    </div>
-                  )}
-                  {batchStatus.durationSeconds && (
-                    <div className="flex justify-between items-center">
-                      <span className="text-gray-600">Duration:</span>
-                      <span>{batchStatus.durationSeconds}s</span>
-                    </div>
-                  )}
-                  <Divider className="my-3" />
-                  <div className="grid grid-cols-3 gap-2">
-                    <div className="text-center">
-                      <div className="text-xl font-bold text-green-600">{batchStatus.tipsProcessed}</div>
-                      <div className="text-xs text-gray-500">Processed</div>
-                    </div>
-                    <div className="text-center">
-                      <div className="text-xl font-bold text-red-600">{batchStatus.tipsFailed}</div>
-                      <div className="text-xs text-gray-500">Failed</div>
-                    </div>
-                    <div className="text-center">
-                      <div className="text-xl font-bold text-yellow-600">{batchStatus.tipsPending}</div>
-                      <div className="text-xs text-gray-500">Pending</div>
-                    </div>
-                  </div>
-                  <Divider className="my-3" />
-                  <div className="flex justify-between items-center">
-                    <span className="text-gray-600">Total Amount:</span>
-                    <span className="font-semibold text-lg">${batchStatus.totalAmount?.toFixed(2) || '0.00'}</span>
-                  </div>
-                  {batchStatus.errorMessage && (
-                    <div className="bg-red-50 p-3 rounded border border-red-200">
-                      <p className="text-xs text-red-700"><strong>Error:</strong> {batchStatus.errorMessage}</p>
-                    </div>
-                  )}
-                  {batchStatus.failureDetails && batchStatus.failureDetails.length > 0 && (
-                    <div className="bg-yellow-50 p-3 rounded border border-yellow-200 max-h-32 overflow-y-auto">
-                      <p className="text-xs font-semibold text-yellow-800 mb-2">Failure Details:</p>
-                      <ul className="space-y-1">
-                        {batchStatus.failureDetails.slice(0, 5).map((detail, idx) => (
-                          <li key={idx} className="text-xs text-yellow-700">• {detail}</li>
-                        ))}
-                        {batchStatus.failureDetails.length > 5 && (
-                          <li className="text-xs text-yellow-700">• ... and {batchStatus.failureDetails.length - 5} more</li>
-                        )}
-                      </ul>
-                    </div>
-                  )}
-                  <Button 
-                    block 
-                    type="link" 
-                    size="small"
-                    onClick={loadBatchHistory}
-                  >
-                    View History
-                  </Button>
-                </div>
-              ) : (
-                <p className="text-gray-500">No batch runs yet</p>
-              )}
-            </Card>
-          </Col>
-          <Col xs={24} lg={12}>
-            <Card 
-              className="shadow-sm"
-              title="Batch History Summary"
-            >
-              {batchHistory.length > 0 ? (
-                <div className="space-y-2 max-h-64 overflow-y-auto">
-                  {batchHistory.slice(0, 10).map((run, idx) => (
-                    <div key={idx} className="flex justify-between items-center p-2 bg-gray-50 rounded text-sm">
-                      <div>
-                        <div className="font-medium">{new Date(run.startedAt || '').toLocaleString()}</div>
-                        <div className="text-xs text-gray-500">{run.tipsProcessed} processed, {run.tipsFailed} failed</div>
-                      </div>
-                      <Tag color={run.status === 'success' ? 'green' : run.status === 'failed' ? 'red' : 'orange'}>
-                        {run.status}
-                      </Tag>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-gray-500 text-center py-4">No history available</p>
-              )}
-            </Card>
-          </Col>
-        </Row>
+          </div>
+        )}
 
-        {/* Main Content Tabs */}
-        <Tabs activeKey={activeTab} onChange={setActiveTab}>
-          <Tabs.TabPane tab="Overview" key="overview">
+        {/* Batch Procnt Tabs */}
+        <Tabs activeKey={activeTab} renderTabBar={() => <></>}>
+          <Tabs.TabPane tab="Tips" key="tips">
             {/* Tips Management */}
             <div className="bg-white p-6 rounded-lg shadow-sm border mb-6">
               <h3 className="text-lg font-semibold text-gray-900 mb-4">Tips Management</h3>
@@ -1623,6 +1581,8 @@ const AdminDashboard: React.FC = () => {
           </Modal>
         </div>
 
+          </Tabs.TabPane>
+          <Tabs.TabPane tab="Performers" key="performers">
         {/* Performers Management */}
         <div className="bg-white p-6 rounded-lg shadow-sm border">
           <div className="flex items-center justify-between mb-4">
@@ -2074,7 +2034,7 @@ const AdminDashboard: React.FC = () => {
 
         {/* Stripe Mode Toggle Confirmation Modal */}
         <Modal
-          title={stripeMode === 'test' ? '⚠️ Enable Live Mode' : '✓ Switch to Test Mode'}
+          title={stripeMode === 'test' ? 'Enable live mode' : 'Switch to test mode'}
           open={stripeModeConfirming}
           onOk={confirmToggleStripeMode}
           onCancel={() => setStripeModeConfirming(false)}
@@ -2082,7 +2042,8 @@ const AdminDashboard: React.FC = () => {
           cancelText="Cancel"
           okButtonProps={{ 
             danger: stripeMode === 'test',
-            loading: stripeModeLoading
+            loading: stripeModeLoading,
+            disabled: stripeMode === 'test' && liveConfirmText.trim() !== 'LIVE'
           }}
         >
           {stripeModeError && (
@@ -2117,9 +2078,12 @@ const AdminDashboard: React.FC = () => {
                   </div>
                 </div>
               </div>
-              <p className="text-gray-700">
-                Are you absolutely sure you want to switch to live mode?
-              </p>
+              <div>
+                <p className="mb-2 text-gray-700">
+                  To confirm, type <strong>LIVE</strong> below.
+                </p>
+                <Input value={liveConfirmText} onChange={(e) => setLiveConfirmText(e.target.value)} placeholder="LIVE" autoFocus />
+              </div>
             </div>
           ) : (
             <div className="space-y-4">
@@ -2150,7 +2114,7 @@ const AdminDashboard: React.FC = () => {
           )}
         </Modal>
       </div>
-    </div>
+    </PortalShell>
   );
 };
 
