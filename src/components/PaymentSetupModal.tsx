@@ -170,7 +170,7 @@ function PaymentForm({
     platform?: string,
     payWallet?: boolean,
     setupIntentId?: string
-  ) => {
+  ): Promise<boolean> => {
     logger.log('💾 [storePaymentInfo] Called with:', { persistedUserId, paymentMethodId, stripeCustomerId, platform })
     
     if (!paymentMethodId || !stripeCustomerId) {
@@ -178,7 +178,7 @@ function PaymentForm({
         paymentMethodId: paymentMethodId ? '✓' : '✗',
         stripeCustomerId: stripeCustomerId ? '✓' : '✗'
       })
-      return
+      return false
     }
 
     try {
@@ -205,11 +205,13 @@ function PaymentForm({
       
       if (response.ok) {
         logger.log('✅ [storePaymentInfo] Payment info stored successfully')
-      } else {
-        logger.error('❌ [storePaymentInfo] Backend returned error:', response.status, response.statusText, 'Body:', responseText)
+        return true
       }
+      logger.error('❌ [storePaymentInfo] Backend returned error:', response.status, response.statusText, 'Body:', responseText)
+      return false
     } catch (err) {
       logger.error('❌ [storePaymentInfo] Failed to persist payment info to backend', err)
+      return false
     }
   }
 
@@ -330,7 +332,13 @@ function PaymentForm({
               }
             }
             // Persist payment info to backend so security checks pass
-            await storePaymentInfo(uniqueDeviceId!, paymentMethodId, customerId, platform, true, setupIntent?.id)
+            const stored = await storePaymentInfo(uniqueDeviceId!, paymentMethodId, customerId, platform, true, setupIntent?.id)
+            if (!stored) {
+              // Don't report success: a card the server didn't save is rejected when the tip is sent
+              event.complete('fail')
+              setError('We could not save your payment method. Please try again.')
+              return
+            }
             
             // Payment method is automatically attached to customer by Stripe during SetupIntent confirmation
             event.complete('success')
@@ -435,7 +443,12 @@ function PaymentForm({
           }
         }
         // Persist payment info to backend so security checks pass
-        await storePaymentInfo(uniqueDeviceId!, paymentMethodId, customerId, platform, false, result.setupIntent?.id)
+        const stored = await storePaymentInfo(uniqueDeviceId!, paymentMethodId, customerId, platform, false, result.setupIntent?.id)
+        if (!stored) {
+          // Don't report success: a card the server didn't save is rejected when the tip is sent
+          setError('We could not save your payment method. Please try again.')
+          return
+        }
         
         // Payment method is automatically attached to customer by Stripe during SetupIntent confirmation
         toast.success('Payment method added successfully!')
