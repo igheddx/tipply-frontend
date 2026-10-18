@@ -6,7 +6,7 @@ import { toast } from 'sonner'
 import apiService from '../services/api'
 import { getApiBaseUrl } from '../utils/config'
 import { DEFAULT_TIP_AMOUNTS, TIP_AMOUNT_COUNT } from '../utils/deviceConfig'
-import { getUniqueDeviceId, detectPlatform, restoreDeviceIdFromIndexedDB } from '../utils/deviceId'
+import { getUniqueDeviceId, detectPlatform, initDeviceId } from '../utils/deviceId'
 
 const PaymentSetupModal = lazy(() => import('../components/PaymentSetupModal'))
 const SongCatalogSearch = lazy(() => import('../components/SongCatalogSearch'))
@@ -189,20 +189,10 @@ const TippingInterface: React.FC = () => {
   // Initialize user
   useEffect(() => {
     const initializeUser = async () => {
-      // Tipping needs the user ID. Use the saved one right away: IndexedDB can be slow or never answer
-      // (seen on iPhones), which used to leave every tip button silently doing nothing.
-      const savedId = localStorage.getItem('unique_device_id')
-      if (savedId) setUserId(savedId)
-
-      // Restore device ID from IndexedDB if localStorage was cleared (give up after 2 seconds)
-      const restoredId = await Promise.race([
-        restoreDeviceIdFromIndexedDB(),
-        new Promise<null>(resolve => setTimeout(() => resolve(null), 2000))
-      ])
-      
-      // Get unique device ID (random UUID stored persistently)
-      const uniqueDeviceId = getUniqueDeviceId()
-      logger.log('🔐 [Init] Unique device ID:', uniqueDeviceId, restoredId ? '(restored from IndexedDB)' : '(new)')
+      // One device ID for the whole page: taken from localStorage straight away, or (first visit / cleared site
+      // data) from IndexedDB for at most 1.5 seconds, otherwise newly generated. It never changes afterwards.
+      const uniqueDeviceId = await initDeviceId()
+      logger.log('🔐 [Init] Unique device ID:', uniqueDeviceId)
       
       // Detect platform (iOS, Android, Desktop)
       const platform = detectPlatform()

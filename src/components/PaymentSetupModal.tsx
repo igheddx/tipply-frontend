@@ -143,7 +143,6 @@ export default function PaymentSetupModal({
 
 function PaymentForm({ 
   deviceUuid, 
-  userId, 
   onComplete, 
   onClose,
   walletMode
@@ -279,7 +278,7 @@ function PaymentForm({
           const res = await fetch(`${getApiBaseUrl()}/api/stripe/setup-intent`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ deviceUuid, userId })
+            body: JSON.stringify({ deviceUuid, userId: getUniqueDeviceId() })
           })
           
           if (!res.ok) {
@@ -362,7 +361,7 @@ function PaymentForm({
       attachPaymentHandlers(applePaymentRequest)
       attachPaymentHandlers(googlePaymentRequest)
     }
-  }, [stripe, deviceUuid, userId, onComplete])
+  }, [stripe, deviceUuid, onComplete])
   const handleCardSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!stripe || !elements) return
@@ -375,7 +374,7 @@ function PaymentForm({
       const res = await fetch(`${getApiBaseUrl()}/api/stripe/setup-intent`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ deviceUuid, userId })
+        body: JSON.stringify({ deviceUuid, userId: getUniqueDeviceId() })
       })
       
       if (!res.ok) {
