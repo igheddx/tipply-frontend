@@ -2143,9 +2143,17 @@ const Dashboard: React.FC = () => {
 
             {activeTab === 'monitor' && (
               <div className="space-y-5">
-                <Button icon="mic" onClick={() => setShowMonitorFullscreen(true)}>
-                  Open full-screen view
-                </Button>
+                <div className="flex flex-wrap items-center gap-3">
+                  <Button icon="mic" onClick={() => setShowMonitorFullscreen(true)}>
+                    Open full-screen view
+                  </Button>
+                  <Button variant="secondary" icon="qr" onClick={() => window.open('/monitor', '_blank')}>
+                    Open in its own window
+                  </Button>
+                </div>
+                <p className="text-sm text-ink-500">
+                  On a tablet, open it in its own window to keep it beside your charts or sheet music. Bookmark /monitor or add it to your home screen to jump straight in.
+                </p>
                 <Card title="Today's requests" subtitle="The most-tipped songs come first." flush>
                   {songRequests.length === 0 ? (
                     <EmptyState icon="music" title="No song requests today">
