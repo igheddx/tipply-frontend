@@ -135,11 +135,11 @@ const PerformerInsights: React.FC = () => {
           value: performer.id,
           label: (
             <div className="py-1">
-              <div className="font-medium text-gray-900">
+              <div className="font-medium text-ink-900">
                 {performer.firstName} {performer.lastName}
-                {performer.stageName && <span className="text-purple-600 ml-2">({performer.stageName})</span>}
+                {performer.stageName && <span className="text-brand-700 ml-2">({performer.stageName})</span>}
               </div>
-              <div className="text-sm text-gray-500">{performer.email}</div>
+              <div className="text-sm text-ink-500">{performer.email}</div>
             </div>
           ),
           searchText: `${performer.firstName} ${performer.lastName} ${performer.stageName || ''} ${performer.email}`.toLowerCase()
@@ -628,7 +628,7 @@ const PerformerInsights: React.FC = () => {
       {/* Search Bar */}
       {!selectedPerformer && (
         <div className="bg-white rounded-lg shadow-sm p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Search Performers</h3>
+          <h3 className="text-lg font-semibold text-ink-900 mb-4">Search Performers</h3>
           <AutoComplete
             value={searchTerm}
             options={searchOptions}
@@ -639,7 +639,7 @@ const PerformerInsights: React.FC = () => {
             size="large"
             notFoundContent={isSearching ? 'Searching...' : searchTerm.length < 2 ? 'Type at least 2 characters' : 'No performers found'}
           />
-          <p className="text-sm text-gray-500 mt-2">
+          <p className="text-sm text-ink-500 mt-2">
             Start typing to search by name, stage name, or email address
           </p>
         </div>
@@ -652,15 +652,15 @@ const PerformerInsights: React.FC = () => {
           <div className="bg-white rounded-lg shadow-sm p-6">
             <button
               onClick={handleBack}
-              className="mb-4 text-purple-600 hover:text-purple-800 flex items-center gap-2"
+              className="mb-4 text-brand-700 hover:text-brand-800 flex items-center gap-2"
             >
               <span>←</span> Back to Search
             </button>
-            <h2 className="text-2xl font-bold text-gray-900">
+            <h2 className="text-2xl font-bold text-ink-900">
               {selectedPerformer.stageName || `${selectedPerformer.firstName} ${selectedPerformer.lastName}`}
             </h2>
-            <p className="text-sm text-gray-500">{selectedPerformer.email}</p>
-            <p className="text-xs text-gray-400 mt-1">
+            <p className="text-sm text-ink-500">{selectedPerformer.email}</p>
+            <p className="text-xs text-ink-400 mt-1">
               {selectedPerformer.devices?.length || 0} device(s)
             </p>
             
@@ -673,8 +673,8 @@ const PerformerInsights: React.FC = () => {
                     disabled={isDownloadingQR}
                     className={`px-4 py-2 text-white rounded-lg transition-all ${
                       isDownloadingQR 
-                        ? 'bg-blue-400 cursor-not-allowed' 
-                        : 'bg-blue-600 hover:bg-blue-700'
+                        ? 'bg-brand-400 cursor-not-allowed' 
+                        : 'bg-brand-700 hover:bg-brand-800'
                     }`}
                   >
                     {isDownloadingQR ? (
@@ -695,7 +695,7 @@ const PerformerInsights: React.FC = () => {
                   </button>
                 </>
               ) : (
-                <div className="text-sm text-gray-500 italic">
+                <div className="text-sm text-ink-500 italic">
                   No devices registered for this performer
                 </div>
               )}
@@ -711,54 +711,54 @@ const PerformerInsights: React.FC = () => {
 
           {isLoadingInsights ? (
             <div className="text-center py-12">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto"></div>
-              <p className="mt-4 text-gray-600">Loading insights...</p>
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand-700 mx-auto"></div>
+              <p className="mt-4 text-ink-500">Loading insights...</p>
             </div>
           ) : insights ? (
             <>
               {/* Metrics Cards */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 <div className="bg-white rounded-lg shadow-sm p-6">
-                  <div className="text-sm text-gray-500">Today's Tips</div>
-                  <div className="text-2xl font-bold text-gray-900">${(insights.metrics?.todaysTips || 0).toFixed(2)}</div>
+                  <div className="text-sm text-ink-500">Today's Tips</div>
+                  <div className="text-2xl font-bold text-ink-900">${(insights.metrics?.todaysTips || 0).toFixed(2)}</div>
                 </div>
                 
                 <div className="bg-white rounded-lg shadow-sm p-6">
-                  <div className="text-sm text-gray-500">Future Payouts</div>
-                  <div className="text-2xl font-bold text-gray-900">${(insights.futurePayouts || 0).toFixed(2)}</div>
+                  <div className="text-sm text-ink-500">Future Payouts</div>
+                  <div className="text-2xl font-bold text-ink-900">${(insights.futurePayouts || 0).toFixed(2)}</div>
                 </div>
                 
                 <div className="bg-white rounded-lg shadow-sm p-6">
-                  <div className="text-sm text-gray-500">In Transit</div>
-                  <div className="text-2xl font-bold text-gray-900">${(insights.inTransit || 0).toFixed(2)}</div>
+                  <div className="text-sm text-ink-500">In Transit</div>
+                  <div className="text-2xl font-bold text-ink-900">${(insights.inTransit || 0).toFixed(2)}</div>
                 </div>
                 
                 <div className="bg-white rounded-lg shadow-sm p-6">
-                  <div className="text-sm text-gray-500">Total Balance</div>
-                  <div className="text-2xl font-bold text-gray-900">${(insights.totalBalance || 0).toFixed(2)}</div>
+                  <div className="text-sm text-ink-500">Total Balance</div>
+                  <div className="text-2xl font-bold text-ink-900">${(insights.totalBalance || 0).toFixed(2)}</div>
                 </div>
                 
                 <div className="bg-white rounded-lg shadow-sm p-6">
-                  <div className="text-sm text-gray-500">Lifetime Volume</div>
-                  <div className="text-2xl font-bold text-gray-900">${(insights.metrics?.stripeLifetimeVolume || 0).toFixed(2)}</div>
+                  <div className="text-sm text-ink-500">Lifetime Volume</div>
+                  <div className="text-2xl font-bold text-ink-900">${(insights.metrics?.stripeLifetimeVolume || 0).toFixed(2)}</div>
                 </div>
                 
                 <div className="bg-white rounded-lg shadow-sm p-6">
-                  <div className="text-sm text-gray-500">Audience</div>
-                  <div className="text-2xl font-bold text-gray-900">{(insights.uniqueTippersAllTime || 0).toLocaleString()}</div>
-                  <div className="text-xs text-gray-400">Unique Tippers</div>
+                  <div className="text-sm text-ink-500">Audience</div>
+                  <div className="text-2xl font-bold text-ink-900">{(insights.uniqueTippersAllTime || 0).toLocaleString()}</div>
+                  <div className="text-xs text-ink-400">Unique Tippers</div>
                 </div>
                 
                 <div className="bg-white rounded-lg shadow-sm p-6">
-                  <div className="text-sm text-gray-500">Most Tipped</div>
-                  <div className="text-2xl font-bold text-gray-900">${(insights.mostTippedDenomination || 0).toFixed(2)}</div>
-                  <div className="text-xs text-gray-400">Denomination</div>
+                  <div className="text-sm text-ink-500">Most Tipped</div>
+                  <div className="text-2xl font-bold text-ink-900">${(insights.mostTippedDenomination || 0).toFixed(2)}</div>
+                  <div className="text-xs text-ink-400">Denomination</div>
                 </div>
               </div>
 
               {/* Weekly Tips Chart */}
               <div className="bg-white rounded-lg shadow-sm p-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Last 8 Weeks Performance</h3>
+                <h3 className="text-lg font-semibold text-ink-900 mb-4">Last 8 Weeks Performance</h3>
                 <ResponsiveContainer width="100%" height={300}>
                   <LineChart data={weeklyChartData}>
                     <CartesianGrid strokeDasharray="3 3" />
@@ -769,9 +769,9 @@ const PerformerInsights: React.FC = () => {
                       content={({ active, payload }) => {
                         if (active && payload && payload.length) {
                           return (
-                            <div className="bg-white p-3 border border-gray-200 rounded shadow-lg">
+                            <div className="bg-white p-3 border border-slate-200 rounded shadow-lg">
                               <p className="font-medium">{payload[0].payload.week}</p>
-                              <p className="text-sm text-blue-600">Total Tips: ${payload[0].value?.toFixed(2)}</p>
+                              <p className="text-sm text-brand-700">Total Tips: ${payload[0].value?.toFixed(2)}</p>
                               <p className="text-sm text-green-600">Unique Audience: {payload[0].payload.uniqueAudience}</p>
                             </div>
                           )
@@ -784,7 +784,7 @@ const PerformerInsights: React.FC = () => {
                       yAxisId="left"
                       type="monotone" 
                       dataKey="totalTips" 
-                      stroke="#8b5cf6" 
+                      stroke="#0891A6" 
                       strokeWidth={2}
                       name="Total Tips ($)"
                     />
@@ -794,7 +794,7 @@ const PerformerInsights: React.FC = () => {
                         type="monotone"
                         data={trendData}
                         dataKey="trend"
-                        stroke="#d1d5db"
+                        stroke="#CBD5E1"
                         strokeWidth={2}
                         strokeDasharray="0"
                         name="Trend"
@@ -807,26 +807,26 @@ const PerformerInsights: React.FC = () => {
 
               {/* Time Window Tips Chart */}
               <div className="bg-white rounded-lg shadow-sm p-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Tips by Time Window</h3>
+                <h3 className="text-lg font-semibold text-ink-900 mb-4">Tips by Time Window</h3>
                 
                 {/* Date/Time Range Selector */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Start Date/Time</label>
+                    <label className="block text-sm font-medium text-ink-700 mb-2">Start Date/Time</label>
                     <input
                       type="datetime-local"
                       value={startDateTime}
                       onChange={(e) => setStartDateTime(e.target.value)}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+                      className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-600"
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">End Date/Time</label>
+                    <label className="block text-sm font-medium text-ink-700 mb-2">End Date/Time</label>
                     <input
                       type="datetime-local"
                       value={endDateTime}
                       onChange={(e) => setEndDateTime(e.target.value)}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+                      className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-600"
                     />
                   </div>
                 </div>
@@ -851,7 +851,7 @@ const PerformerInsights: React.FC = () => {
                       content={({ active, payload }) => {
                         if (active && payload && payload.length) {
                           return (
-                            <div className="bg-white p-3 border border-gray-200 rounded shadow-lg">
+                            <div className="bg-white p-3 border border-slate-200 rounded shadow-lg">
                               <p className="font-medium">{payload[0].payload.time}</p>
                               <p className="text-sm text-green-600">Amount: ${payload[0].payload.amount.toFixed(2)}</p>
                             </div>
@@ -863,12 +863,12 @@ const PerformerInsights: React.FC = () => {
                     <Scatter 
                       name="Tips" 
                       data={filteredTipPoints} 
-                      fill="#8b5cf6"
+                      fill="#0891A6"
                     />
                   </ScatterChart>
                 </ResponsiveContainer>
                 
-                <p className="text-sm text-gray-500 mt-4">
+                <p className="text-sm text-ink-500 mt-4">
                   Showing {filteredTipPoints.length} tips in the selected time window
                 </p>
               </div>
@@ -969,14 +969,14 @@ const DeviceConfigModal: React.FC<{
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
       <div className="bg-white rounded-lg shadow-xl max-w-lg w-full mx-4 p-6 max-h-[90vh] overflow-y-auto">
-        <h3 className="text-xl font-bold text-gray-900 mb-4">
+        <h3 className="text-xl font-bold text-ink-900 mb-4">
           Configure Device: {device.nickname || device.serialNumber}
         </h3>
         
         <div className="space-y-6">
           {/* Sound Toggle */}
           <div className="flex items-center justify-between">
-            <span className="text-sm font-medium text-gray-700">Sound Enabled</span>
+            <span className="text-sm font-medium text-ink-700">Sound Enabled</span>
             <label className="relative inline-flex items-center cursor-pointer">
               <input
                 type="checkbox"
@@ -985,18 +985,18 @@ const DeviceConfigModal: React.FC<{
                 disabled={isSaving}
                 className="sr-only peer"
               />
-              <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-purple-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-600"></div>
+              <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-brand-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-brand-700"></div>
             </label>
           </div>
 
           {/* Sound Selection (Prototype3) */}
           <div className="flex items-center justify-between">
-            <span className="text-sm font-medium text-gray-700">Sound</span>
+            <span className="text-sm font-medium text-ink-700">Sound</span>
             <select
               value={soundId}
               onChange={(e) => setSoundId(Number(e.target.value))}
               disabled={isSaving || !isSoundEnabled}
-              className="px-3 py-1.5 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
+              className="px-3 py-1.5 border border-slate-300 rounded-md text-sm focus:ring-2 focus:ring-brand-600 focus:border-transparent disabled:bg-slate-100 disabled:cursor-not-allowed"
             >
               {SOUND_OPTIONS.map(option => (
                 <option key={option.value} value={option.value}>{option.label}</option>
@@ -1006,12 +1006,12 @@ const DeviceConfigModal: React.FC<{
 
           {/* Sound Volume (Prototype3) - disabled while sound is off */}
           <div className="flex items-center justify-between">
-            <span className="text-sm font-medium text-gray-700">Sound Volume</span>
+            <span className="text-sm font-medium text-ink-700">Sound Volume</span>
             <select
               value={soundVolume}
               onChange={(e) => setSoundVolume(e.target.value)}
               disabled={isSaving || !isSoundEnabled}
-              className="px-3 py-1.5 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
+              className="px-3 py-1.5 border border-slate-300 rounded-md text-sm focus:ring-2 focus:ring-brand-600 focus:border-transparent disabled:bg-slate-100 disabled:cursor-not-allowed"
             >
               {VOLUME_OPTIONS.map(option => (
                 <option key={option.value} value={option.value}>{option.label}</option>
@@ -1021,7 +1021,7 @@ const DeviceConfigModal: React.FC<{
 
           {/* Random Light Effect Toggle */}
           <div className="flex items-center justify-between">
-            <span className="text-sm font-medium text-gray-700">Random Light Effect</span>
+            <span className="text-sm font-medium text-ink-700">Random Light Effect</span>
             <label className="relative inline-flex items-center cursor-pointer">
               <input
                 type="checkbox"
@@ -1030,24 +1030,24 @@ const DeviceConfigModal: React.FC<{
                 disabled={isSaving}
                 className="sr-only peer"
               />
-              <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-purple-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-600"></div>
+              <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-brand-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-brand-700"></div>
             </label>
           </div>
 
           {/* Effect Configuration */}
           <div className="space-y-3">
-            <h4 className="text-sm font-medium text-gray-700">Light Effects by Amount</h4>
-            <div className="bg-gray-50 rounded-lg p-4 space-y-3">
+            <h4 className="text-sm font-medium text-ink-700">Light Effects by Amount</h4>
+            <div className="bg-surface rounded-lg p-4 space-y-3">
               {tipAmounts.map(amount => (
                 <div key={amount} className="flex items-center justify-between">
-                  <span className="text-sm text-gray-600 font-medium">${amount}</span>
+                  <span className="text-sm text-ink-500 font-medium">${amount}</span>
                   <select
                     value={effectForAmount(effectConfig, amount)}
                     onChange={(e) => {
                       setEffectConfig(prev => ({ ...prev, [amount.toString()]: e.target.value }))
                     }}
                     disabled={isSaving}
-                    className="px-3 py-1.5 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
+                    className="px-3 py-1.5 border border-slate-300 rounded-md text-sm focus:ring-2 focus:ring-brand-600 focus:border-transparent disabled:bg-slate-100 disabled:cursor-not-allowed"
                   >
                     {LIGHT_EFFECTS.map(effect => (
                       <option key={effect.value} value={effect.value}>
@@ -1065,14 +1065,14 @@ const DeviceConfigModal: React.FC<{
           <button
             onClick={onClose}
             disabled={isSaving}
-            className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex-1 px-4 py-2 border border-slate-300 rounded-lg hover:bg-surface disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Cancel
           </button>
           <button
             onClick={handleSave}
             disabled={isSaving}
-            className="flex-1 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+            className="flex-1 px-4 py-2 bg-brand-700 text-white rounded-lg hover:bg-brand-800 disabled:bg-slate-400 disabled:cursor-not-allowed"
           >
             {isSaving ? 'Saving...' : 'Save Changes'}
           </button>

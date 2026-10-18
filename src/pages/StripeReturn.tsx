@@ -1,4 +1,5 @@
 
+import { BrandIcon } from '../components/icons/BrandIcons'
 import React, { useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 
@@ -20,22 +21,22 @@ const StripeReturn: React.FC = () => {
   }, [searchParams])
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+    <div className="min-h-screen bg-surface flex items-center justify-center">
       <div className="max-w-md mx-auto text-center">
         {status === 'loading' && (
           <div>
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto"></div>
-            <p className="mt-4 text-gray-600">Processing payment setup...</p>
+            <p className="mt-4 text-ink-500">Processing payment setup...</p>
           </div>
         )}
 
         {status === 'success' && (
           <div>
-            <div className="text-green-600 text-6xl mb-4">✓</div>
-            <h1 className="text-2xl font-bold text-gray-900 mb-2">
+            <div className="mb-4 flex justify-center"><BrandIcon name="check-circle" size={64} color="#15803D" /></div>
+            <h1 className="text-2xl font-bold text-ink-900 mb-2">
               Payment Method Added!
             </h1>
-            <p className="text-gray-600 mb-6">
+            <p className="text-ink-500 mb-6">
               Your payment method has been successfully added and you can now make tips.
             </p>
             <button
@@ -49,11 +50,11 @@ const StripeReturn: React.FC = () => {
 
         {status === 'error' && (
           <div>
-            <div className="text-red-600 text-6xl mb-4">✗</div>
-            <h1 className="text-2xl font-bold text-gray-900 mb-2">
+            <div className="mb-4 flex justify-center"><BrandIcon name="error" size={64} color="#DC2626" /></div>
+            <h1 className="text-2xl font-bold text-ink-900 mb-2">
               Setup Failed
             </h1>
-            <p className="text-gray-600 mb-6">
+            <p className="text-ink-500 mb-6">
               There was an issue setting up your payment method. Please try again.
             </p>
             <button

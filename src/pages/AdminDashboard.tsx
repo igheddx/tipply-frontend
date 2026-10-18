@@ -1,12 +1,10 @@
 import logger from "../utils/logger";
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Row, Col, Table, Button, Input, InputNumber, Modal, message, Spin, Card, Tag, Select, DatePicker, Space, Divider, Alert, Tabs, Radio } from 'antd';
+import { Row, Col, Table, Button, Input, InputNumber, Modal, message, Spin, Card, Select, DatePicker, Space, Divider, Alert, Tabs, Radio } from 'antd';
 import { 
   ReloadOutlined,
   PlayCircleOutlined,
-  CheckCircleOutlined,
-  CloseCircleOutlined,
   SyncOutlined,
   DownloadOutlined,
   SearchOutlined
@@ -17,7 +15,8 @@ import AggregatedChargesTable from '../components/AggregatedChargesTable';
 import PerformerInsights from '../components/PerformerInsights';
 import dayjs from 'dayjs';
 import { PortalShell, type PortalNavItem } from '../components/portal/PortalShell';
-import { Banner, Card as UiCard, PageHeader, PageLoader, StatCard } from '../components/ui';
+import { Banner, Card as UiCard, PageHeader, PageLoader, StatCard, StatusChip, type ChipKind } from '../components/ui';
+import { BrandIcon } from '../components/icons/BrandIcons';
 
 const { Search } = Input;
 const { RangePicker } = DatePicker;
@@ -134,6 +133,29 @@ interface SimulationTipperSelection {
   paywalletTippers: SimulationTipper[];
   manualTippers: SimulationTipper[];
 }
+
+// Status chips: an icon plus a word, in the Tipwave status colors
+const tipStatusChip = (status: string) => {
+  const map: Record<string, { kind: ChipKind; label: string }> = {
+    processed: { kind: 'paid', label: 'Charged' },
+    pending: { kind: 'processing', label: 'Waiting' },
+    failed: { kind: 'failed', label: 'Failed' },
+    error: { kind: 'failed', label: 'Error' },
+    refunded: { kind: 'info', label: 'Refunded' }
+  };
+  const c = map[status] || { kind: 'offline' as ChipKind, label: status };
+  return <StatusChip kind={c.kind} label={c.label} />;
+};
+
+const runStatusChip = (status?: string) => {
+  const map: Record<string, { kind: ChipKind; label: string }> = {
+    success: { kind: 'paid', label: 'Success' },
+    failed: { kind: 'failed', label: 'Failed' },
+    running: { kind: 'processing', label: 'Running' }
+  };
+  const c = (status && map[status]) || { kind: 'offline' as ChipKind, label: status || 'Unknown' };
+  return <StatusChip kind={c.kind} label={c.label} />;
+};
 
 const AdminDashboard: React.FC = () => {
   const navigate = useNavigate();
@@ -870,18 +892,11 @@ const AdminDashboard: React.FC = () => {
     }
   };
 
-  const getBatchStatusColor = () => {
-    if (!batchStatus) return 'default';
-    if (batchStatus.status === 'success') return 'success';
-    if (batchStatus.status === 'failed') return 'error';
-    if (batchStatus.status === 'running') return 'processing';
-    return 'default';
-  };
 
   const getBatchStatusIcon = () => {
     if (!batchStatus) return null;
-    if (batchStatus.status === 'success') return <CheckCircleOutlined />;
-    if (batchStatus.status === 'failed') return <CloseCircleOutlined />;
+    if (batchStatus.status === 'success') return <BrandIcon name="check-circle" size={20} color="#15803D" />;
+    if (batchStatus.status === 'failed') return <BrandIcon name="error" size={20} color="#DC2626" />;
     if (batchStatus.status === 'running') return <SyncOutlined spin />;
     return null;
   };
@@ -896,7 +911,7 @@ const AdminDashboard: React.FC = () => {
             {record.firstName} {record.lastName}
           </div>
           {record.stageName && (
-            <div className="text-sm text-gray-500">@{record.stageName}</div>
+            <div className="text-sm text-ink-500">@{record.stageName}</div>
           )}
         </div>
       ),
@@ -911,7 +926,7 @@ const AdminDashboard: React.FC = () => {
       key: 'platformFee',
       render: (record: PerformerSummary) => (
         <div className="text-center">
-          <div className="font-medium text-blue-600">{record.platformFeePercentage}%</div>
+          <div className="font-medium text-brand-700">{record.platformFeePercentage}%</div>
           <Button 
             type="link" 
             size="small"
@@ -942,7 +957,7 @@ const AdminDashboard: React.FC = () => {
           <div className="font-medium text-green-600">
             ${record.totalEarnings.toFixed(2)}
           </div>
-          <div className="text-sm text-gray-500">
+          <div className="text-sm text-ink-500">
             Platform: ${record.totalPlatformFees.toFixed(2)}
           </div>
         </div>
@@ -952,13 +967,7 @@ const AdminDashboard: React.FC = () => {
       title: 'Status',
       key: 'status',
       render: (record: PerformerSummary) => (
-        <span className={`px-2 py-1 rounded-full text-xs ${
-          record.isActive 
-            ? 'bg-green-100 text-green-800' 
-            : 'bg-red-100 text-red-800'
-        }`}>
-          {record.isActive ? 'Active' : 'Inactive'}
-        </span>
+        <StatusChip kind={record.isActive ? 'active' : 'offline'} label={record.isActive ? 'Active' : 'Inactive'} />
       ),
     },
   ];
@@ -1118,30 +1127,28 @@ const AdminDashboard: React.FC = () => {
               {batchStatus ? (
                 <div className="space-y-3">
                   <div className="flex justify-between items-center">
-                    <span className="text-gray-600">Type:</span>
-                    <Tag color={batchStatus.isManual ? 'blue' : 'purple'}>
-                      {batchStatus.isManual ? 'MANUAL' : 'AUTOMATED'}
-                    </Tag>
+                    <span className="text-ink-500">Type:</span>
+                    <StatusChip kind="info" label={batchStatus.isManual ? 'Manual' : 'Automated'} />
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="text-gray-600">Status:</span>
-                    <Tag color={getBatchStatusColor()}>{batchStatus.status?.toUpperCase() || 'UNKNOWN'}</Tag>
+                    <span className="text-ink-500">Status:</span>
+                    {runStatusChip(batchStatus.status)}
                   </div>
                   {batchStatus.startedAt && (
                     <div className="flex justify-between items-center">
-                      <span className="text-gray-600">Started:</span>
+                      <span className="text-ink-500">Started:</span>
                       <span>{new Date(batchStatus.startedAt).toLocaleString()}</span>
                     </div>
                   )}
                   {batchStatus.completedAt && (
                     <div className="flex justify-between items-center">
-                      <span className="text-gray-600">Completed:</span>
+                      <span className="text-ink-500">Completed:</span>
                       <span>{new Date(batchStatus.completedAt).toLocaleString()}</span>
                     </div>
                   )}
                   {batchStatus.durationSeconds && (
                     <div className="flex justify-between items-center">
-                      <span className="text-gray-600">Duration:</span>
+                      <span className="text-ink-500">Duration:</span>
                       <span>{batchStatus.durationSeconds}s</span>
                     </div>
                   )}
@@ -1149,20 +1156,20 @@ const AdminDashboard: React.FC = () => {
                   <div className="grid grid-cols-3 gap-2">
                     <div className="text-center">
                       <div className="text-xl font-bold text-green-600">{batchStatus.tipsProcessed}</div>
-                      <div className="text-xs text-gray-500">Processed</div>
+                      <div className="text-xs text-ink-500">Processed</div>
                     </div>
                     <div className="text-center">
                       <div className="text-xl font-bold text-red-600">{batchStatus.tipsFailed}</div>
-                      <div className="text-xs text-gray-500">Failed</div>
+                      <div className="text-xs text-ink-500">Failed</div>
                     </div>
                     <div className="text-center">
                       <div className="text-xl font-bold text-yellow-600">{batchStatus.tipsPending}</div>
-                      <div className="text-xs text-gray-500">Pending</div>
+                      <div className="text-xs text-ink-500">Pending</div>
                     </div>
                   </div>
                   <Divider className="my-3" />
                   <div className="flex justify-between items-center">
-                    <span className="text-gray-600">Total Amount:</span>
+                    <span className="text-ink-500">Total Amount:</span>
                     <span className="font-semibold text-lg">${batchStatus.totalAmount?.toFixed(2) || '0.00'}</span>
                   </div>
                   {batchStatus.errorMessage && (
@@ -1199,7 +1206,7 @@ const AdminDashboard: React.FC = () => {
                   </Button>
                 </div>
               ) : (
-                <p className="text-gray-500">No batch runs yet</p>
+                <p className="text-ink-500">No batch runs yet</p>
               )}
             </Card>
           </Col>
@@ -1211,19 +1218,17 @@ const AdminDashboard: React.FC = () => {
               {batchHistory.length > 0 ? (
                 <div className="space-y-2 max-h-64 overflow-y-auto">
                   {batchHistory.slice(0, 10).map((run, idx) => (
-                    <div key={idx} className="flex justify-between items-center p-2 bg-gray-50 rounded text-sm">
+                    <div key={idx} className="flex justify-between items-center p-2 bg-surface rounded text-sm">
                       <div>
                         <div className="font-medium">{new Date(run.startedAt || '').toLocaleString()}</div>
-                        <div className="text-xs text-gray-500">{run.tipsProcessed} processed, {run.tipsFailed} failed</div>
+                        <div className="text-xs text-ink-500">{run.tipsProcessed} processed, {run.tipsFailed} failed</div>
                       </div>
-                      <Tag color={run.status === 'success' ? 'green' : run.status === 'failed' ? 'red' : 'orange'}>
-                        {run.status}
-                      </Tag>
+                      {runStatusChip(run.status)}
                     </div>
                   ))}
                 </div>
               ) : (
-                <p className="text-gray-500 text-center py-4">No history available</p>
+                <p className="text-ink-500 text-center py-4">No history available</p>
               )}
             </Card>
           </Col>
@@ -1243,7 +1248,7 @@ const AdminDashboard: React.FC = () => {
                 ? 'bg-red-50 border-red-300' 
                 : stripeMode === 'test' && isProductionEnv 
                   ? 'bg-green-50 border-green-300'
-                  : 'bg-gray-50 border-gray-300'
+                  : 'bg-surface border-slate-300'
             }`}>
               {stripeModeNotice && (
                 <Alert
@@ -1275,8 +1280,8 @@ const AdminDashboard: React.FC = () => {
                     )}
                     {!isProductionEnv && (
                       <>
-                        <span className="inline-flex rounded-full h-3 w-3 bg-gray-600"></span>
-                        <h3 className="text-xl font-bold text-gray-800">Development environment</h3>
+                        <span className="inline-flex rounded-full h-3 w-3 bg-slate-600"></span>
+                        <h3 className="text-xl font-bold text-ink-900">Development environment</h3>
                       </>
                     )}
                   </div>
@@ -1297,9 +1302,9 @@ const AdminDashboard: React.FC = () => {
                     )}
                     {!isProductionEnv && (
                       <>
-                        <p className="text-gray-700 font-semibold">Local development - Always uses TEST mode</p>
-                        <p className="text-gray-600 text-sm">• Cannot switch to live mode in development</p>
-                        <p className="text-gray-600 text-sm">• Deploy to production to enable live mode</p>
+                        <p className="text-ink-700 font-semibold">Local development - Always uses TEST mode</p>
+                        <p className="text-ink-500 text-sm">• Cannot switch to live mode in development</p>
+                        <p className="text-ink-500 text-sm">• Deploy to production to enable live mode</p>
                       </>
                     )}
                   </div>
@@ -1319,7 +1324,7 @@ const AdminDashboard: React.FC = () => {
                     </Button>
                   )}
                   {!canToggleStripe && (
-                    <div className="text-sm text-gray-500 text-center max-w-xs">
+                    <div className="text-sm text-ink-500 text-center max-w-xs">
                       Mode toggle not available
                       {!isProductionEnv && ' in development'}
                     </div>
@@ -1334,13 +1339,13 @@ const AdminDashboard: React.FC = () => {
         <Row gutter={[16, 16]} className="mb-8">
           <Col xs={24}>
             <Card title="Payment Security Limits" loading={rateLimitsLoading}>
-              <p className="text-gray-600 mb-4">
+              <p className="text-ink-500 mb-4">
                 Maximum charge attempts allowed before a tip is blocked. These values apply to this environment only;
                 resetting restores the defaults{rateLimitDefaults ? ` (${rateLimitDefaults.maxChargesPerHourPerUser} / ${rateLimitDefaults.maxChargesPerDayPerUser} / ${rateLimitDefaults.maxChargesPerHourPerPaymentMethod})` : ''}.
               </p>
               <Row gutter={[16, 16]}>
                 <Col xs={24} md={8}>
-                  <div className="mb-1 text-sm font-medium text-gray-700">Charges per user per hour</div>
+                  <div className="mb-1 text-sm font-medium text-ink-700">Charges per user per hour</div>
                   <InputNumber
                     min={1}
                     max={1000000}
@@ -1351,7 +1356,7 @@ const AdminDashboard: React.FC = () => {
                   />
                 </Col>
                 <Col xs={24} md={8}>
-                  <div className="mb-1 text-sm font-medium text-gray-700">Charges per user per day</div>
+                  <div className="mb-1 text-sm font-medium text-ink-700">Charges per user per day</div>
                   <InputNumber
                     min={1}
                     max={1000000}
@@ -1362,7 +1367,7 @@ const AdminDashboard: React.FC = () => {
                   />
                 </Col>
                 <Col xs={24} md={8}>
-                  <div className="mb-1 text-sm font-medium text-gray-700">Charges per card per hour</div>
+                  <div className="mb-1 text-sm font-medium text-ink-700">Charges per card per hour</div>
                   <InputNumber
                     min={1}
                     max={1000000}
@@ -1388,8 +1393,7 @@ const AdminDashboard: React.FC = () => {
         <Tabs activeKey={activeTab} renderTabBar={() => <></>}>
           <Tabs.TabPane tab="Tips" key="tips">
             {/* Tips Management */}
-            <div className="bg-white p-6 rounded-lg shadow-sm border mb-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Tips Management</h3>
+            <div className="rounded-2xl border border-slate-100 bg-white p-6 shadow-card mb-6">
           
           {/* Filters */}
           <div className="space-y-4 mb-4">
@@ -1459,19 +1463,6 @@ const AdminDashboard: React.FC = () => {
             <Table
               columns={[
                 {
-                  title: 'Refund',
-                  key: 'refund',
-                  width: 90,
-                  render: (_: unknown, record: TipDetail) =>
-                    isRefundEligible(record) ? (
-                      <Button type="link" danger onClick={() => openRefundModal(record)}>
-                        Refund
-                      </Button>
-                    ) : (
-                      '-'
-                    )
-                },
-                {
                   title: 'Created At',
                   dataIndex: 'createdAt',
                   key: 'createdAt',
@@ -1479,17 +1470,17 @@ const AdminDashboard: React.FC = () => {
                   width: 180
                 },
                 {
-                  title: 'Processed At',
-                  dataIndex: 'processedAt',
-                  key: 'processedAt',
-                  render: (date) => date ? new Date(date).toLocaleString() : '-',
-                  width: 180
-                },
-                {
                   title: 'Amount',
                   dataIndex: 'amount',
                   key: 'amount',
                   render: (amount) => `$${amount.toFixed(2)}`,
+                  width: 100
+                },
+                {
+                  title: 'Status',
+                  dataIndex: 'status',
+                  key: 'status',
+                  render: (status) => tipStatusChip(status),
                   width: 100
                 },
                 {
@@ -1512,31 +1503,37 @@ const AdminDashboard: React.FC = () => {
                   ellipsis: true
                 },
                 {
-                  title: 'Status',
-                  dataIndex: 'status',
-                  key: 'status',
-                  render: (status) => {
-                    let color = 'default';
-                    if (status === 'processed') color = 'green';
-                    if (status === 'failed' || status === 'error') color = 'red';
-                    if (status === 'pending') color = 'orange';
-                    if (status === 'refunded') color = 'blue';
-                    return <Tag color={color}>{status.toUpperCase()}</Tag>;
-                  },
-                  width: 100
-                },
-                {
-                  title: 'Effect',
+                  title: 'Light effect',
                   dataIndex: 'effect',
                   key: 'effect',
                   width: 80
                 },
                 {
-                  title: 'Performer Earnings',
+                  title: 'Performer gets',
                   dataIndex: 'performerEarnings',
                   key: 'performerEarnings',
                   render: (earnings) => `$${earnings.toFixed(2)}`,
                   width: 130
+                },
+                {
+                  title: 'Processed At',
+                  dataIndex: 'processedAt',
+                  key: 'processedAt',
+                  render: (date) => date ? new Date(date).toLocaleString() : '-',
+                  width: 180
+                },
+                {
+                  title: 'Refund',
+                  key: 'refund',
+                  width: 100,
+                  render: (_: unknown, record: TipDetail) =>
+                    isRefundEligible(record) ? (
+                      <Button type="link" danger onClick={() => openRefundModal(record)}>
+                        Refund
+                      </Button>
+                    ) : (
+                      '-'
+                    )
                 }
               ]}
               dataSource={tips}
@@ -1568,11 +1565,11 @@ const AdminDashboard: React.FC = () => {
             okButtonProps={{ danger: true }}
           >
             {refundTip && (
-              <div className="text-gray-700">
+              <div className="text-ink-700">
                 <p>
                   Refund ${refundTip.amount.toFixed(2)} to {refundTip.performerFirstName} {refundTip.performerLastName}?
                 </p>
-                <p className="text-sm text-gray-500">
+                <p className="text-sm text-ink-500">
                   Created: {new Date(refundTip.createdAt).toLocaleString()}
                 </p>
               </div>
@@ -1583,9 +1580,9 @@ const AdminDashboard: React.FC = () => {
           </Tabs.TabPane>
           <Tabs.TabPane tab="Performers" key="performers">
         {/* Performers Management */}
-        <div className="bg-white p-6 rounded-lg shadow-sm border">
+        <div className="rounded-2xl border border-slate-100 bg-white p-6 shadow-card">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold text-gray-900">Performers Management</h3>
+            <h3 className="text-base font-bold text-ink-900">All performers</h3>
             <Search
               placeholder="Search performers..."
               onSearch={handleSearch}
@@ -1616,11 +1613,11 @@ const AdminDashboard: React.FC = () => {
 
           {userProfile?.role === 'root_admin' && (
             <Tabs.TabPane tab="Device Management" key="device-management">
-              <div className="bg-white p-6 rounded-lg shadow-sm border mb-6">
+              <div className="rounded-2xl border border-slate-100 bg-white p-6 shadow-card mb-6">
               <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-4">
                 <div>
-                  <h3 className="text-lg font-semibold text-gray-900">Performer Device Management</h3>
-                  <p className="text-sm text-gray-500">
+                  <h3 className="text-base font-bold text-ink-900">Performer Device Management</h3>
+                  <p className="text-sm text-ink-500">
                     Search by first name, last name, public name, or device serial number.
                   </p>
                 </div>
@@ -1640,7 +1637,7 @@ const AdminDashboard: React.FC = () => {
 
               <Spin spinning={deviceSearchLoading}>
                 {deviceSearchResults.length === 0 ? (
-                  <p className="text-gray-500">
+                  <p className="text-ink-500">
                     {deviceSearchTerm.trim()
                       ? 'No performers or devices found for that search.'
                       : 'No results yet. Run a search to see devices.'}
@@ -1653,16 +1650,16 @@ const AdminDashboard: React.FC = () => {
                         className="shadow-sm"
                         title={
                           <div className="flex flex-col">
-                            <span className="font-semibold text-gray-900">
+                            <span className="font-semibold text-ink-900">
                               {performer.firstName} {performer.lastName}
                             </span>
-                            <span className="text-xs text-gray-500">
+                            <span className="text-xs text-ink-500">
                               {performer.stageName ? `Public Name: ${performer.stageName}` : 'Public Name: —'}
                             </span>
                           </div>
                         }
                       >
-                        <div className="text-sm text-gray-600 mb-4">
+                        <div className="text-sm text-ink-500 mb-4">
                           Email: {performer.email}
                         </div>
 
@@ -1759,15 +1756,15 @@ const AdminDashboard: React.FC = () => {
 
           {isSimulationVisible && (
             <Tabs.TabPane tab="Device Tip Simulation" key="device-tip-simulation">
-              <div className="bg-white p-6 rounded-lg shadow-sm border">
+              <div className="rounded-2xl border border-slate-100 bg-white p-6 shadow-card">
                 <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-4">
                   <div>
-                    <h3 className="text-lg font-semibold text-gray-900">Device Tip Simulation</h3>
-                    <p className="text-sm text-gray-500">
+                    <h3 className="text-base font-bold text-ink-900">Device Tip Simulation</h3>
+                    <p className="text-sm text-ink-500">
                       Available only on local and apptest environments.
                     </p>
                   </div>
-                  <div className="text-sm text-gray-600">
+                  <div className="text-sm text-ink-500">
                     <span className="font-semibold">Elapsed:</span> {formatSimulationTime(simulationElapsed)} ·{' '}
                     <span className="font-semibold">Tips:</span> {simulationTipCount}
                   </div>
@@ -1779,7 +1776,7 @@ const AdminDashboard: React.FC = () => {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Device Serial Number</label>
+                    <label className="block text-sm font-medium text-ink-700 mb-2">Device Serial Number</label>
                     <Select
                       showSearch
                       placeholder="Search device serial or performer..."
@@ -1803,7 +1800,7 @@ const AdminDashboard: React.FC = () => {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Tip Frequency</label>
+                    <label className="block text-sm font-medium text-ink-700 mb-2">Tip Frequency</label>
                     <Select
                       value={simulationFrequency}
                       onChange={(value) => setSimulationFrequency(value)}
@@ -1822,7 +1819,7 @@ const AdminDashboard: React.FC = () => {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Tipper Mode</label>
+                    <label className="block text-sm font-medium text-ink-700 mb-2">Tipper Mode</label>
                     <Select
                       value={simulationPaymentMode}
                       onChange={(value) => {
@@ -1840,7 +1837,7 @@ const AdminDashboard: React.FC = () => {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Denomination</label>
+                    <label className="block text-sm font-medium text-ink-700 mb-2">Denomination</label>
                     <Select
                       value={simulationAmountMode}
                       onChange={(value) => setSimulationAmountMode(value)}
@@ -1893,15 +1890,15 @@ const AdminDashboard: React.FC = () => {
           {selectedPerformer && (
             <div className="space-y-4">
               <div>
-                <p className="text-gray-600 mb-2">
+                <p className="text-ink-500 mb-2">
                   Update platform fee for <strong>{selectedPerformer.firstName} {selectedPerformer.lastName}</strong>
                 </p>
-                <p className="text-sm text-gray-500">
+                <p className="text-sm text-ink-500">
                   Current fee: {selectedPerformer.platformFeePercentage}%
                 </p>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-ink-700 mb-2">
                   New Platform Fee Percentage
                 </label>
                 <Input
@@ -1913,7 +1910,7 @@ const AdminDashboard: React.FC = () => {
                   onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewFeePercentage(Number(e.target.value))}
                   suffix="%"
                 />
-                <p className="text-xs text-gray-500 mt-1">
+                <p className="text-xs text-ink-500 mt-1">
                   Enter a value between 0.01% and 100%
                 </p>
               </div>
@@ -1935,7 +1932,7 @@ const AdminDashboard: React.FC = () => {
           }}
         >
           {pendingDeviceAction && (
-            <div className="text-gray-700">
+            <div className="text-ink-700">
               <p className="mb-2">
                 {pendingDeviceAction.type === 'add'
                   ? 'You are about to add a device to:'
@@ -1944,7 +1941,7 @@ const AdminDashboard: React.FC = () => {
               <p className="font-semibold">
                 {pendingDeviceAction.performer.firstName} {pendingDeviceAction.performer.lastName}
               </p>
-              <p className="text-sm text-gray-500">{pendingDeviceAction.performer.email}</p>
+              <p className="text-sm text-ink-500">{pendingDeviceAction.performer.email}</p>
               <p className="mt-3">
                 Device Serial Number: <strong>{pendingDeviceAction.serialNumber}</strong>
               </p>
@@ -1991,13 +1988,7 @@ const AdminDashboard: React.FC = () => {
                 title: 'Status',
                 dataIndex: 'status',
                 key: 'status',
-                render: (status) => {
-                  let color = 'default';
-                  if (status === 'success') color = 'green';
-                  if (status === 'failed') color = 'red';
-                  if (status === 'running') color = 'orange';
-                  return <Tag color={color}>{status.toUpperCase()}</Tag>;
-                }
+                render: (status) => runStatusChip(status)
               },
               {
                 title: 'Processed',
@@ -2078,7 +2069,7 @@ const AdminDashboard: React.FC = () => {
                 </div>
               </div>
               <div>
-                <p className="mb-2 text-gray-700">
+                <p className="mb-2 text-ink-700">
                   To confirm, type <strong>LIVE</strong> below.
                 </p>
                 <Input value={liveConfirmText} onChange={(e) => setLiveConfirmText(e.target.value)} placeholder="LIVE" autoFocus />
@@ -2106,7 +2097,7 @@ const AdminDashboard: React.FC = () => {
                   </div>
                 </div>
               </div>
-              <p className="text-gray-700">
+              <p className="text-ink-700">
                 Confirm switching to test mode?
               </p>
             </div>

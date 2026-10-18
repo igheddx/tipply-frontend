@@ -103,12 +103,12 @@ const KYCReturn: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+    <div className="min-h-screen bg-surface flex items-center justify-center">
       <div className="max-w-md mx-auto text-center">
         <div>
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Processing KYC verification and logging you in...</p>
-          <p className="mt-2 text-sm text-gray-500">Redirecting to dashboard...</p>
+          <p className="mt-4 text-ink-500">Processing KYC verification and logging you in...</p>
+          <p className="mt-2 text-sm text-ink-500">Redirecting to dashboard...</p>
         </div>
       </div>
     </div>

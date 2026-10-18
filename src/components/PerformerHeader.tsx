@@ -34,11 +34,11 @@ export default function PerformerHeader({
           <img
             src={photoUrl}
             alt={displayName}
-            className="w-16 h-16 rounded-full object-cover border-2 border-gray-200 shadow-lg"
+            className="w-16 h-16 rounded-full object-cover border-2 border-slate-200 shadow-lg"
             onError={() => setImageError(true)}
           />
         ) : (
-          <div className="w-16 h-16 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center border-2 border-gray-200 shadow-lg">
+          <div className="w-16 h-16 rounded-full bg-gradient-to-br from-brand-600 to-accent-500 flex items-center justify-center border-2 border-slate-200 shadow-lg">
             <span className="text-white text-2xl font-bold">
               {displayName.charAt(0).toUpperCase()}
             </span>
@@ -47,7 +47,7 @@ export default function PerformerHeader({
       </div>
       
       {/* Message */}
-      <p className="text-gray-700 text-center text-sm px-4">
+      <p className="text-ink-700 text-center text-sm px-4">
         {displayMessage}
       </p>
     </div>

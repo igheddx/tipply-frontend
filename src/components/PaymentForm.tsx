@@ -92,10 +92,10 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">
+        <label className="block text-sm font-medium text-ink-700 mb-2">
           Card Information
         </label>
-        <div className="border border-gray-300 rounded-md p-3">
+        <div className="border border-slate-300 rounded-md p-3">
           <CardElement options={cardElementOptions} />
         </div>
       </div>

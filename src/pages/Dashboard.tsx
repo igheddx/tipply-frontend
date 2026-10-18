@@ -1,8 +1,8 @@
 import logger from "../utils/logger";
 import { PortalShell, type PortalNavItem } from '../components/portal/PortalShell'
 import { HomeTab, type HomeData } from '../components/portal/HomeTab'
-import { Button, Card, EmptyState, PageHeader, PageLoader, StatusChip, type ChipKind } from '../components/ui'
-import { BrandIcon } from '../components/icons/BrandIcons'
+import { Banner, Button, Card, EmptyState, Modal, PageHeader, PageLoader, StatusChip, type ChipKind } from '../components/ui'
+import { BrandIcon, IconTile } from '../components/icons/BrandIcons'
 import { Switch } from '../components/ui/Switch'
 import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
@@ -122,6 +122,8 @@ interface TipPoint {
   timestamp: number
 }
 
+const INPUT = 'h-12 w-full rounded-xl border bg-white px-4 text-ink-900 placeholder:text-ink-400 transition-colors focus:border-transparent focus:outline-none focus:ring-2 focus:ring-brand-500'
+
 const Dashboard: React.FC = () => {
   const [stats, setStats] = useState<DashboardStats | null>(null)
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null)
@@ -159,7 +161,7 @@ const Dashboard: React.FC = () => {
   const [addDeviceForm, setAddDeviceForm] = useState({
     serialNumber: '', // Changed from deviceUuid to serialNumber
     nickname: '',
-    isAllowSongRequest: null as boolean | null
+    isAllowSongRequest: false as boolean | null
   })
   const [addDeviceErrors, setAddDeviceErrors] = useState<{[key: string]: string}>({})
   const [isAddingDevice, setIsAddingDevice] = useState(false)
@@ -702,7 +704,7 @@ const Dashboard: React.FC = () => {
     setShowAddDeviceForm(false)
     setShowStripeSetup(false)
     setActiveTab('overview')
-    setAddDeviceForm({ serialNumber: '', nickname: '', isAllowSongRequest: null })
+    setAddDeviceForm({ serialNumber: '', nickname: '', isAllowSongRequest: false })
     setAddDeviceErrors({})
     setAddDeviceValidationComplete(false)
     setIsValidatingAddDevice(false)
@@ -858,7 +860,7 @@ const Dashboard: React.FC = () => {
       
       // Clear form first
       setShowAddDeviceForm(false)
-      setAddDeviceForm({ serialNumber: '', nickname: '', isAllowSongRequest: null })
+      setAddDeviceForm({ serialNumber: '', nickname: '', isAllowSongRequest: false })
       setAddDeviceErrors({})
       setAddDeviceValidationComplete(false)
       setIsValidatingAddDevice(false)
@@ -1396,9 +1398,9 @@ const Dashboard: React.FC = () => {
 
   if (!stats) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-surface flex items-center justify-center">
         <div className="text-center">
-          <p className="text-gray-600">Failed to load dashboard data</p>
+          <p className="text-ink-500">Failed to load dashboard data</p>
           <button
             onClick={refreshDashboard}
             className="mt-4 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
@@ -1514,7 +1516,7 @@ const Dashboard: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 text-gray-900">
+    <div className="min-h-screen bg-surface text-ink-900">
       {/* KYC Result Alert */}
       {/* Removed KYC alert as per edit hint */}
 
@@ -1875,26 +1877,26 @@ const Dashboard: React.FC = () => {
         {/* Time Window Tips Chart */}
         {tipTimelinePoints.length > 0 && (
           <div className="bg-white rounded-lg shadow-sm p-6 mb-8">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Tips by Time Window</h3>
+            <h3 className="text-lg font-semibold text-ink-900 mb-4">Tips by Time Window</h3>
             
             {/* Date/Time Range Selector */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Start Date/Time</label>
+                <label className="block text-sm font-medium text-ink-700 mb-2">Start Date/Time</label>
                 <input
                   type="datetime-local"
                   value={startDateTime}
                   onChange={(e) => setStartDateTime(e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-600"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">End Date/Time</label>
+                <label className="block text-sm font-medium text-ink-700 mb-2">End Date/Time</label>
                 <input
                   type="datetime-local"
                   value={endDateTime}
                   onChange={(e) => setEndDateTime(e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-600"
                 />
               </div>
             </div>
@@ -1919,7 +1921,7 @@ const Dashboard: React.FC = () => {
                   content={({ active, payload }) => {
                     if (active && payload && payload.length) {
                       return (
-                        <div className="bg-white p-3 border border-gray-200 rounded shadow-lg">
+                        <div className="bg-white p-3 border border-slate-200 rounded shadow-lg">
                           <p className="font-medium">{payload[0].payload.time}</p>
                           <p className="text-sm text-green-600">Amount: ${payload[0].payload.amount.toFixed(2)}</p>
                         </div>
@@ -1936,7 +1938,7 @@ const Dashboard: React.FC = () => {
               </ScatterChart>
             </ResponsiveContainer>
             
-            <p className="text-sm text-gray-500 mt-4">
+            <p className="text-sm text-ink-500 mt-4">
               {filteredTipPoints.length > 0
                 ? `Showing ${filteredTipPoints.length} tips in the selected time window`
                 : 'No tips in the selected time window. Adjust the range to see results.'}
@@ -1947,190 +1949,120 @@ const Dashboard: React.FC = () => {
             )}
 
             {activeTab === 'addDevice' && (
-              <div className="space-y-6">
+              <div className="max-w-2xl space-y-5">
                 {!showStripeSetup ? (
-                  // Add Device Form
-                  <div>
-                    <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-                      <div className="mb-6">
-                        <h3 className="text-lg font-semibold text-gray-900 mb-2">Add New Device</h3>
-                        <p className="text-gray-600">Enter your device details to add it to your account.</p>
-                      </div>
-
-                      <form onSubmit={(e) => { e.preventDefault(); handleAddDeviceSubmit(); }} className="space-y-6">
-                        <div>
-                          <label htmlFor="serialNumber" className="block text-sm font-medium text-gray-700 mb-2">
-                            Serial Number *
-                          </label>
-                          <div className="relative">
-                            <input
-                              type="text"
-                              id="serialNumber"
-                              value={addDeviceForm.serialNumber}
-                              onChange={(e) => handleAddDeviceInputChange('serialNumber', e.target.value)}
-                              onBlur={async () => {
-                                if (addDeviceForm.serialNumber.trim()) {
-                                  await validateAddDeviceDetectedDevice()
-                                }
-                              }}
-                              className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all duration-200 ${
-                                addDeviceErrors.serialNumber ? 'border-red-500 focus:ring-red-200' : 'border-gray-300'
-                              }`}
-                              placeholder="e.g., TPY-5C07-K73"
-                            />
-                            {isValidatingAddDevice && (
-                              <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
-                                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-primary-600"></div>
-                              </div>
-                            )}
-                          </div>
-                          {addDeviceErrors.serialNumber && (
-                            <p className="text-red-500 text-sm mt-1">{addDeviceErrors.serialNumber}</p>
-                          )}
-                          {addDeviceValidationComplete && !addDeviceErrors.serialNumber && addDeviceForm.serialNumber.trim() && (
-                            <p className="text-green-500 text-sm mt-1">Serial number found</p>
-                          )}
-                          <p className="text-sm text-gray-500 mt-1">
-                            Enter the serial number from your Tipwave device (e.g., TPY-5C07-K73)
-                          </p>
-                        </div>
-
-                        <div>
-                          <label htmlFor="nickname" className="block text-sm font-medium text-gray-700 mb-2">
-                            Device Nickname *
-                          </label>
+                  <Card
+                    title="Add a device"
+                    subtitle="Enter the serial number printed on your Tipwave device."
+                  >
+                    <form onSubmit={(e) => { e.preventDefault(); handleAddDeviceSubmit(); }} className="space-y-5">
+                      <div>
+                        <label htmlFor="serialNumber" className="mb-1.5 block text-sm font-semibold text-ink-700">
+                          Serial number
+                        </label>
+                        <div className="relative">
                           <input
                             type="text"
-                            id="nickname"
-                            value={addDeviceForm.nickname}
-                            onChange={(e) => handleAddDeviceInputChange('nickname', e.target.value)}
-                            className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all duration-200 ${
-                              addDeviceErrors.nickname ? 'border-red-500 focus:ring-red-200' : 'border-gray-300'
-                            }`}
-                            placeholder="e.g., Main Stage, Bar Counter, VIP Room"
+                            id="serialNumber"
+                            value={addDeviceForm.serialNumber}
+                            onChange={(e) => handleAddDeviceInputChange('serialNumber', e.target.value)}
+                            onBlur={async () => {
+                              if (addDeviceForm.serialNumber.trim()) {
+                                await validateAddDeviceDetectedDevice()
+                              }
+                            }}
+                            autoCapitalize="characters"
+                            autoCorrect="off"
+                            spellCheck={false}
+                            className={`${INPUT} pr-11 uppercase placeholder:normal-case ${addDeviceErrors.serialNumber ? 'border-red-400' : 'border-slate-300'}`}
+                            placeholder="TPY-5C07-K73"
                           />
-                          {addDeviceErrors.nickname && (
-                            <p className="text-red-500 text-sm mt-1">{addDeviceErrors.nickname}</p>
-                          )}
-                          <p className="text-sm text-gray-500 mt-1">
-                            Give your device a friendly name for easy identification
-                          </p>
-                        </div>
-                        
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-3">
-                            Would you like to enable song requests from your audience? *
-                          </label>
-                          <p className="text-sm text-gray-500 mb-4">
-                            If you select "Yes", you'll be able to create a song catalog for your audience to choose from. This allows your audience to request specific songs when they tip you.
-                          </p>
-                          <div className="space-y-3">
-                            <label className="flex items-center cursor-pointer p-4 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
-                              <input
-                                type="radio"
-                                name="addDeviceIsAllowSongRequest"
-                                checked={addDeviceForm.isAllowSongRequest === true}
-                                onChange={() => setAddDeviceForm(prev => ({ ...prev, isAllowSongRequest: true }))}
-                                className="mr-4 h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300"
-                              />
-                              <div>
-                                <span className="text-sm font-medium text-gray-700">Yes, enable song requests</span>
-                                <p className="text-xs text-gray-500 mt-1">Your audience can request songs when they tip</p>
-                              </div>
-                            </label>
-                            <label className="flex items-center cursor-pointer p-4 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
-                              <input
-                                type="radio"
-                                name="addDeviceIsAllowSongRequest"
-                                checked={addDeviceForm.isAllowSongRequest === false}
-                                onChange={() => setAddDeviceForm(prev => ({ ...prev, isAllowSongRequest: false }))}
-                                className="mr-4 h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300"
-                              />
-                              <div>
-                                <span className="text-sm font-medium text-gray-700">No, disable song requests</span>
-                                <p className="text-xs text-gray-500 mt-1">Standard tipping without song requests</p>
-                              </div>
-                            </label>
-                          </div>
-                          {addDeviceErrors.isAllowSongRequest && (
-                            <p className="text-red-500 text-sm mt-1">{addDeviceErrors.isAllowSongRequest}</p>
-                          )}
-                        </div>
-
-                        {addDeviceErrors.submit && (
-                          <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-                            <p className="text-red-600 text-sm">{addDeviceErrors.submit}</p>
-                          </div>
-                        )}
-
-                        <div className="flex space-x-4 pt-4">
-                          <button
-                            type="button"
-                            onClick={handleBackToDashboard}
-                            className="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
-                          >
-                            Cancel
-                          </button>
-                          <button
-                            type="submit"
-                            disabled={isAddingDevice}
-                            className="px-6 py-3 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
-                          >
-                            {isAddingDevice ? (
-                              <>
-                                <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
-                                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                </svg>
-                                <span>Adding Device...</span>
-                              </>
-                            ) : (
-                              <span>Add Device</span>
+                          <div className="absolute inset-y-0 right-3 flex items-center">
+                            {isValidatingAddDevice && (
+                              <span className="h-5 w-5 animate-spin rounded-full border-2 border-brand-600 border-t-transparent" />
                             )}
-                          </button>
-                        </div>
-                      </form>
-                    </div>
-                  </div>
-                ) : (
-                  // Stripe Setup Required
-                  <div>
-                    <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-6">
-                      <div className="flex items-start space-x-4">
-                        <div className="flex-shrink-0">
-                          <svg className="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
-                          </svg>
-                        </div>
-                        <div className="flex-1">
-                          <h3 className="text-lg font-semibold text-yellow-800 mb-2">Stripe Setup Required</h3>
-                          <p className="text-yellow-700 mb-4">
-                            Before adding a new device, you need to complete your Stripe Connect account setup and KYC verification.
-                          </p>
-                          {addDeviceErrors.submit && (
-                            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
-                              <p className="text-red-700 text-sm">{addDeviceErrors.submit}</p>
-                            </div>
-                          )}
-                          <div className="flex space-x-4">
-                            <button
-                              onClick={handleStripeConnect}
-                              disabled={isAddingDevice}
-                              className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                              {isAddingDevice ? 'Setting up...' : 'Complete Stripe Setup'}
-                            </button>
-                            <button
-                              onClick={handleBackToDashboard}
-                              className="px-4 py-2 bg-yellow-100 text-yellow-800 rounded-lg hover:bg-yellow-200 transition-colors"
-                            >
-                              Back to Dashboard
-                            </button>
+                            {!isValidatingAddDevice && addDeviceValidationComplete && !addDeviceErrors.serialNumber && addDeviceForm.serialNumber.trim() && (
+                              <BrandIcon name="check-circle" size={22} color="#15803D" />
+                            )}
                           </div>
                         </div>
+                        {addDeviceErrors.serialNumber ? (
+                          <p className="mt-1.5 text-sm text-red-600">{addDeviceErrors.serialNumber}</p>
+                        ) : addDeviceValidationComplete && addDeviceForm.serialNumber.trim() ? (
+                          <p className="mt-1.5 text-sm text-green-700">Device found</p>
+                        ) : (
+                          <p className="mt-1.5 text-sm text-ink-500">It looks like TPY-5C07-K73 and is on the back of the device.</p>
+                        )}
                       </div>
-                    </div>
-                  </div>
+
+                      <div>
+                        <label htmlFor="nickname" className="mb-1.5 block text-sm font-semibold text-ink-700">
+                          Nickname
+                        </label>
+                        <input
+                          type="text"
+                          id="nickname"
+                          value={addDeviceForm.nickname}
+                          onChange={(e) => handleAddDeviceInputChange('nickname', e.target.value)}
+                          className={`${INPUT} ${addDeviceErrors.nickname ? 'border-red-400' : 'border-slate-300'}`}
+                          placeholder="Main stage"
+                        />
+                        {addDeviceErrors.nickname ? (
+                          <p className="mt-1.5 text-sm text-red-600">{addDeviceErrors.nickname}</p>
+                        ) : (
+                          <p className="mt-1.5 text-sm text-ink-500">Helps you tell devices apart, like Main stage or Bar counter.</p>
+                        )}
+                      </div>
+
+                      <div className="flex items-center justify-between gap-4 rounded-2xl border border-slate-200 p-4">
+                        <div className="flex items-center gap-3">
+                          <IconTile name="music" size={40} />
+                          <div>
+                            <div className="font-semibold text-ink-900">Let people request songs</div>
+                            <div className="text-sm text-ink-500">Fans can pick a song when they tip. You can change this any time.</div>
+                          </div>
+                        </div>
+                        <Switch
+                          checked={addDeviceForm.isAllowSongRequest === true}
+                          label="Let people request songs"
+                          onChange={() => setAddDeviceForm(prev => ({ ...prev, isAllowSongRequest: !prev.isAllowSongRequest }))}
+                        />
+                      </div>
+
+                      {addDeviceErrors.submit && (
+                        <Banner tone="error" title="We could not add the device">
+                          {addDeviceErrors.submit}
+                        </Banner>
+                      )}
+
+                      <div className="flex flex-col-reverse gap-3 border-t border-slate-100 pt-5 sm:flex-row sm:justify-end">
+                        <Button variant="secondary" size="lg" onClick={handleBackToDashboard}>
+                          Cancel
+                        </Button>
+                        <Button type="submit" size="lg" loading={isAddingDevice}>
+                          Add device
+                        </Button>
+                      </div>
+                    </form>
+                  </Card>
+                ) : (
+                  <Banner
+                    tone="warning"
+                    title="Set up payouts first"
+                    action={
+                      <div className="flex flex-wrap gap-3">
+                        <Button onClick={handleStripeConnect} loading={isAddingDevice}>
+                          Complete Stripe setup
+                        </Button>
+                        <Button variant="secondary" onClick={handleBackToDashboard}>
+                          Back to Home
+                        </Button>
+                      </div>
+                    }
+                  >
+                    Before you add another device, finish your Stripe account setup and identity verification.
+                    {addDeviceErrors.submit && <span className="mt-2 block font-semibold text-red-700">{addDeviceErrors.submit}</span>}
+                  </Banner>
                 )}
               </div>
             )}
@@ -2185,33 +2117,26 @@ const Dashboard: React.FC = () => {
         </div>
       </PortalShell>
 
-      {/* Delete Confirmation Modal */}
-      {showDeleteModal && deviceToDelete && (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50">
-          <div className="relative p-8 border w-96 shadow-lg rounded-md bg-white">
-            <div className="text-center">
-              <h3 className="text-lg font-semibold text-gray-900">Confirm Deletion</h3>
-              <p className="text-gray-600 mt-2">
-                Are you sure you want to delete the device "{deviceToDelete.nickname || deviceToDelete.uuid}"? This action cannot be undone.
-              </p>
-            </div>
-            <div className="items-center px-4 py-3">
-              <button
-                onClick={confirmDeleteDevice}
-                className="px-4 py-2 bg-red-600 text-white text-base font-medium rounded-md w-full shadow-sm hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500"
-              >
-                Delete
-              </button>
-              <button
-                onClick={cancelDeleteDevice}
-                className="mt-3 px-4 py-2 bg-gray-200 text-gray-800 text-base font-medium rounded-md w-full shadow-sm hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-500"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Remove device confirmation */}
+      <Modal
+        open={showDeleteModal && !!deviceToDelete}
+        onClose={cancelDeleteDevice}
+        title="Remove this device?"
+        footer={
+          <>
+            <Button variant="secondary" onClick={cancelDeleteDevice}>
+              Keep device
+            </Button>
+            <Button variant="danger" icon="trash" onClick={confirmDeleteDevice}>
+              Remove device
+            </Button>
+          </>
+        }
+      >
+        <p className="text-ink-700">
+          <strong>{deviceToDelete?.nickname || deviceToDelete?.uuid}</strong> will stop taking tips. You can restore it later from Devices, under removed devices.
+        </p>
+      </Modal>
 
       {/* Full-Screen Song Request Monitor */}
       <SongRequestMonitor

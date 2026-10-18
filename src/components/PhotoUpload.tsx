@@ -137,7 +137,7 @@ const PhotoUpload: React.FC<PhotoUploadProps> = ({
     <div className={`flex flex-col items-center gap-4 ${isOnboarding ? 'py-6' : ''}`}>
       {/* Photo Preview Circle */}
       <div className="relative w-fit pb-5">
-        <div className="w-32 h-32 rounded-full bg-gray-200 flex items-center justify-center overflow-hidden border-4 border-gray-300">
+        <div className="w-32 h-32 rounded-full bg-slate-200 flex items-center justify-center overflow-hidden border-4 border-slate-300">
           {preview ? (
             <img
               src={preview}
@@ -153,7 +153,7 @@ const PhotoUpload: React.FC<PhotoUploadProps> = ({
         <button
           onClick={handleButtonClick}
           disabled={uploading || isLoading}
-          className="absolute -bottom-3 left-1/2 -translate-x-1/2 z-10 px-4 py-1.5 bg-teal-600 hover:bg-teal-700 disabled:bg-gray-400 text-white rounded-full font-medium text-sm shadow-lg transition"
+          className="absolute -bottom-3 left-1/2 -translate-x-1/2 z-10 px-4 py-1.5 bg-teal-600 hover:bg-teal-700 disabled:bg-slate-400 text-white rounded-full font-medium text-sm shadow-lg transition"
         >
           {uploading ? (
             <span className="flex items-center gap-2">
@@ -172,7 +172,7 @@ const PhotoUpload: React.FC<PhotoUploadProps> = ({
           <button
             onClick={handleRemovePhoto}
             disabled={uploading || isLoading}
-            className="absolute top-0 right-0 bg-red-500 hover:bg-red-600 disabled:bg-gray-400 text-white rounded-full w-10 h-10 flex items-center justify-center shadow-lg transition -translate-y-1 translate-x-1"
+            className="absolute top-0 right-0 bg-red-500 hover:bg-red-600 disabled:bg-slate-400 text-white rounded-full w-10 h-10 flex items-center justify-center shadow-lg transition -translate-y-1 translate-x-1"
             title="Remove photo"
           >
             <BrandIcon name="close" size={18} tone="inverse" strokeWidth={2.4} />
@@ -192,7 +192,7 @@ const PhotoUpload: React.FC<PhotoUploadProps> = ({
       />
 
       {/* Helper Text */}
-      <p className="text-sm text-gray-600 text-center">
+      <p className="text-sm text-ink-500 text-center">
         JPEG or PNG • Max 2MB
       </p>
 

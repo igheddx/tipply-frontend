@@ -520,8 +520,8 @@ const Profile: React.FC = () => {
           </div>
 
           {/* Profile Photo Section */}
-          <div className="mb-8 border-b border-gray-200 pb-8">
-            <h3 className="text-sm font-medium text-gray-700 mb-4">Profile Photo</h3>
+          <div className="mb-8 border-b border-slate-200 pb-8">
+            <h3 className="text-sm font-medium text-ink-700 mb-4">Profile Photo</h3>
             <div className="min-h-[200px]">
               <PhotoUpload
                 photoUrl={profile?.profilePhotoUrl}
@@ -539,7 +539,7 @@ const Profile: React.FC = () => {
             <div className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-ink-700 mb-2">
                     First name
                   </label>
                   <input
@@ -547,7 +547,7 @@ const Profile: React.FC = () => {
                     value={editForm.firstName}
                     onChange={(e) => handleProfileInputChange('firstName', e.target.value)}
                     className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent ${
-                      profileErrors.firstName ? 'border-red-500' : 'border-gray-300'
+                      profileErrors.firstName ? 'border-red-500' : 'border-slate-300'
                     }`}
                   />
                   {profileErrors.firstName && (
@@ -556,7 +556,7 @@ const Profile: React.FC = () => {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-ink-700 mb-2">
                     Last name
                   </label>
                   <input
@@ -564,7 +564,7 @@ const Profile: React.FC = () => {
                     value={editForm.lastName}
                     onChange={(e) => handleProfileInputChange('lastName', e.target.value)}
                     className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent ${
-                      profileErrors.lastName ? 'border-red-500' : 'border-gray-300'
+                      profileErrors.lastName ? 'border-red-500' : 'border-slate-300'
                     }`}
                   />
                   {profileErrors.lastName && (
@@ -574,20 +574,20 @@ const Profile: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-ink-700 mb-2">
                   Stage name
                 </label>
                 <input
                   type="text"
                   value={editForm.stageName}
                   onChange={(e) => handleProfileInputChange('stageName', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                   placeholder="Your stage name (optional)"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-ink-700 mb-2">
                   Email
                 </label>
                 <input
@@ -595,7 +595,7 @@ const Profile: React.FC = () => {
                   value={editForm.email}
                   onChange={(e) => handleProfileInputChange('email', e.target.value)}
                   className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent ${
-                    profileErrors.email ? 'border-red-500' : 'border-gray-300'
+                    profileErrors.email ? 'border-red-500' : 'border-slate-300'
                   }`}
                 />
                 {profileErrors.email && (
@@ -604,26 +604,26 @@ const Profile: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-ink-700 mb-2">
                   Phone
                 </label>
                 <input
                   type="tel"
                   value={editForm.phone}
                   onChange={(e) => handleProfileInputChange('phone', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                   placeholder="Your phone number (optional)"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-ink-700 mb-2">
                   Bio
                 </label>
                 <textarea
                   value={editForm.bio}
                   onChange={(e) => handleProfileInputChange('bio', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                   rows={4}
                   placeholder="Write a brief bio about yourself (optional)"
                 />
@@ -632,7 +632,7 @@ const Profile: React.FC = () => {
               <div className="flex space-x-4 pt-4">
                 <button
                   onClick={handleCancelEdit}
-                  className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                  className="px-4 py-2 border border-slate-300 text-ink-700 rounded-lg hover:bg-surface transition-colors"
                 >
                   Cancel
                 </button>
@@ -649,33 +649,33 @@ const Profile: React.FC = () => {
             <div className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">First name</label>
-                  <p className="text-gray-900">{profile?.firstName || 'Not set'}</p>
+                  <label className="block text-sm font-medium text-ink-700 mb-1">First name</label>
+                  <p className="text-ink-900">{profile?.firstName || 'Not set'}</p>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Last name</label>
-                  <p className="text-gray-900">{profile?.lastName || 'Not set'}</p>
+                  <label className="block text-sm font-medium text-ink-700 mb-1">Last name</label>
+                  <p className="text-ink-900">{profile?.lastName || 'Not set'}</p>
                 </div>
               </div>
               
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Stage name</label>
-                <p className="text-gray-900">{profile?.stageName || 'Not set'}</p>
+                <label className="block text-sm font-medium text-ink-700 mb-1">Stage name</label>
+                <p className="text-ink-900">{profile?.stageName || 'Not set'}</p>
               </div>
               
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
-                <p className="text-gray-900">{profile?.email || 'Not set'}</p>
+                <label className="block text-sm font-medium text-ink-700 mb-1">Email</label>
+                <p className="text-ink-900">{profile?.email || 'Not set'}</p>
               </div>
               
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
-                <p className="text-gray-900">{profile?.phone || 'Not set'}</p>
+                <label className="block text-sm font-medium text-ink-700 mb-1">Phone</label>
+                <p className="text-ink-900">{profile?.phone || 'Not set'}</p>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Bio</label>
-                <p className="text-gray-900">{profile?.bio || 'Not set'}</p>
+                <label className="block text-sm font-medium text-ink-700 mb-1">Bio</label>
+                <p className="text-ink-900">{profile?.bio || 'Not set'}</p>
               </div>
             </div>
           )}
@@ -688,7 +688,7 @@ const Profile: React.FC = () => {
             {!isChangingPassword && (
               <button
                 onClick={handleChangePassword}
-                className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+                className="px-4 py-2 bg-slate-100 text-ink-700 rounded-lg hover:bg-slate-200 transition-colors"
               >
                 Change password
               </button>
@@ -698,7 +698,7 @@ const Profile: React.FC = () => {
           {isChangingPassword ? (
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-ink-700 mb-2">
                   Current password
                 </label>
                 <div className="relative">
@@ -708,13 +708,13 @@ const Profile: React.FC = () => {
                     onChange={(e) => handlePasswordInputChange('currentPassword', e.target.value)}
                     onBlur={() => handlePasswordFieldBlur('currentPassword')}
                     className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent ${
-                      passwordErrors.currentPassword ? 'border-red-500' : 'border-gray-300'
+                      passwordErrors.currentPassword ? 'border-red-500' : 'border-slate-300'
                     }`}
                   />
                   <button
                     type="button"
                     onClick={() => setShowPasswordFields((prev) => ({ ...prev, current: !prev.current }))}
-                    className="absolute inset-y-0 right-3 flex items-center text-gray-500 hover:text-gray-700"
+                    className="absolute inset-y-0 right-3 flex items-center text-ink-500 hover:text-ink-700"
                     aria-label={showPasswordFields.current ? 'Hide password' : 'Show password'}
                   >
                     {showPasswordFields.current ? (
@@ -735,7 +735,7 @@ const Profile: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-ink-700 mb-2">
                   New password
                 </label>
                 <div className="relative">
@@ -745,13 +745,13 @@ const Profile: React.FC = () => {
                     onChange={(e) => handlePasswordInputChange('newPassword', e.target.value)}
                     onBlur={() => handlePasswordFieldBlur('newPassword')}
                     className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent ${
-                      passwordErrors.newPassword ? 'border-red-500' : 'border-gray-300'
+                      passwordErrors.newPassword ? 'border-red-500' : 'border-slate-300'
                     }`}
                   />
                   <button
                     type="button"
                     onClick={() => setShowPasswordFields((prev) => ({ ...prev, new: !prev.new }))}
-                    className="absolute inset-y-0 right-3 flex items-center text-gray-500 hover:text-gray-700"
+                    className="absolute inset-y-0 right-3 flex items-center text-ink-500 hover:text-ink-700"
                     aria-label={showPasswordFields.new ? 'Hide password' : 'Show password'}
                   >
                     {showPasswordFields.new ? (
@@ -772,7 +772,7 @@ const Profile: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-ink-700 mb-2">
                   Confirm New password
                 </label>
                 <div className="relative">
@@ -782,13 +782,13 @@ const Profile: React.FC = () => {
                     onChange={(e) => handlePasswordInputChange('confirmPassword', e.target.value)}
                     onBlur={() => handlePasswordFieldBlur('confirmPassword')}
                     className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent ${
-                      passwordErrors.confirmPassword ? 'border-red-500' : 'border-gray-300'
+                      passwordErrors.confirmPassword ? 'border-red-500' : 'border-slate-300'
                     }`}
                   />
                   <button
                     type="button"
                     onClick={() => setShowPasswordFields((prev) => ({ ...prev, confirm: !prev.confirm }))}
-                    className="absolute inset-y-0 right-3 flex items-center text-gray-500 hover:text-gray-700"
+                    className="absolute inset-y-0 right-3 flex items-center text-ink-500 hover:text-ink-700"
                     aria-label={showPasswordFields.confirm ? 'Hide password' : 'Show password'}
                   >
                     {showPasswordFields.confirm ? (
@@ -811,7 +811,7 @@ const Profile: React.FC = () => {
               <div className="flex space-x-4 pt-4">
                 <button
                   onClick={handleCancelPassword}
-                  className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                  className="px-4 py-2 border border-slate-300 text-ink-700 rounded-lg hover:bg-surface transition-colors"
                 >
                   Cancel
                 </button>
@@ -826,7 +826,7 @@ const Profile: React.FC = () => {
             </div>
           ) : (
             <div>
-              <p className="text-gray-600">Keep your account secure by using a strong password.</p>
+              <p className="text-ink-500">Keep your account secure by using a strong password.</p>
             </div>
           )}
         </div>

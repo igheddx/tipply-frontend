@@ -1,4 +1,6 @@
 import logger from "../utils/logger";
+import { Banner, Button, Card, EmptyState, Modal, StatCard, Tabs, Toast } from './ui'
+import { BrandIcon, IconTile } from './icons/BrandIcons'
 import React, { useState, useEffect } from 'react'
 import { API_BASE_URL } from '../utils/config'
 
@@ -628,564 +630,379 @@ const SongManagement: React.FC<SongManagementProps> = ({ profileId }) => {
     })
   }
 
+  const inputClass =
+    'w-full h-12 rounded-xl border border-slate-300 bg-white px-4 text-ink-900 placeholder:text-ink-400 transition-colors focus:border-transparent focus:outline-none focus:ring-2 focus:ring-brand-500'
+  const meta = (song: { album?: string; genre?: string }) => [song.album, song.genre].filter(Boolean).join(' · ')
+
   return (
-    <div className="space-y-6">
-      {/* Notification */}
+    <div className="space-y-5">
       {notification && (
-        <div className={`fixed top-4 right-4 z-50 p-4 rounded-lg shadow-lg ${
-          notification.type === 'success' ? 'bg-green-100 text-green-800 border border-green-200' :
-          notification.type === 'error' ? 'bg-red-100 text-red-800 border border-red-200' :
-          'bg-blue-100 text-blue-800 border border-blue-200'
-        }`}>
-          <div className="flex items-center">
-            <span>{notification.message}</span>
-            <button
-              onClick={() => setNotification(null)}
-              className="ml-4 text-gray-400 hover:text-gray-600"
-            >
-              ×
-            </button>
-          </div>
+        <Toast tone={notification.type} message={notification.message} onDismiss={() => setNotification(null)} />
+      )}
+
+      <Tabs
+        active={activeView}
+        onChange={id => setActiveView(id as typeof activeView)}
+        items={[
+          { id: 'search', label: 'Find songs' },
+          { id: 'upload', label: 'Upload a list' },
+          { id: 'catalog', label: 'My catalog', count: catalogCount }
+        ]}
+      />
+
+      {/* Find songs */}
+      {activeView === 'search' && (
+        <div className="space-y-5">
+          <Banner tone="info" title="Search for a song to add">
+            Results are original albums and singles only, with no cover versions.
+          </Banner>
+
+          <Card>
+            <form onSubmit={handleSearchSubmit} className="space-y-4">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div>
+                  <label htmlFor="song-title" className="mb-1.5 block text-sm font-semibold text-ink-700">Song title</label>
+                  <input
+                    id="song-title"
+                    type="text"
+                    value={searchQuery}
+                    onChange={e => setSearchQuery(e.target.value)}
+                    placeholder="Your Love Is King"
+                    className={inputClass}
+                  />
+                </div>
+                <div>
+                  <label htmlFor="song-artist" className="mb-1.5 block text-sm font-semibold text-ink-700">
+                    Artist <span className="font-normal text-ink-500">(optional)</span>
+                  </label>
+                  <input
+                    id="song-artist"
+                    type="text"
+                    value={searchArtist}
+                    onChange={e => setSearchArtist(e.target.value)}
+                    placeholder="Sade"
+                    className={inputClass}
+                  />
+                </div>
+              </div>
+              <Button type="submit" icon="search" loading={isSearching} disabled={!searchQuery.trim()}>
+                Search
+              </Button>
+            </form>
+          </Card>
+
+          {searchResults.length > 0 && (
+            <Card title={`${searchResults.length} ${searchResults.length === 1 ? 'result' : 'results'}`} flush>
+              <ul className="divide-y divide-slate-100 px-5 pb-2">
+                {searchResults.map((song: any) => {
+                  const adding = isAddingSong === `${song.title}-${song.artist}`
+                  return (
+                    <li key={song.id} className="flex items-center gap-4 py-3">
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate font-semibold text-ink-900">{song.title}</div>
+                        <div className="truncate text-sm text-ink-500">{[song.artist, meta(song)].filter(Boolean).join(' · ')}</div>
+                      </div>
+                      <Button variant="secondary" size="sm" icon="plus" loading={adding} onClick={() => addSongToCatalog(song)}>
+                        Add
+                      </Button>
+                    </li>
+                  )
+                })}
+              </ul>
+            </Card>
+          )}
+
+          {searchQuery && searchResults.length === 0 && !isSearching && (
+            <Card>
+              <EmptyState icon="search" title="No songs found">
+                Try different keywords, or search by artist.
+              </EmptyState>
+            </Card>
+          )}
         </div>
       )}
 
-      {/* View Toggle */}
-      <div className="bg-white rounded-xl shadow-sm">
-        <div className="border-b border-gray-200">
-          <nav className="flex space-x-8 px-6">
-            <button
-              onClick={() => setActiveView('search')}
-              className={`py-4 px-1 border-b-2 font-medium text-sm ${
-                activeView === 'search'
-                  ? 'border-primary-500 text-primary-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
-            >
-              Search Songs
-            </button>
-            <button
-              onClick={() => setActiveView('upload')}
-              className={`py-4 px-1 border-b-2 font-medium text-sm ${
-                activeView === 'upload'
-                  ? 'border-primary-500 text-primary-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
-            >
-              Upload Songs
-            </button>
-            <button
-              onClick={() => setActiveView('catalog')}
-              className={`py-4 px-1 border-b-2 font-medium text-sm ${
-                activeView === 'catalog'
-                  ? 'border-primary-500 text-primary-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
-            >
-              My Catalog ({catalogCount})
-            </button>
-          </nav>
-        </div>
+      {/* Upload a list */}
+      {activeView === 'upload' && (
+        <div className="space-y-5">
+          <Banner tone="info" title="Add many songs at once">
+            Upload a CSV or text file with <strong>title, artist, album, genre</strong>. Title and artist are required. Text files can use commas, pipes (|) or tabs.
+          </Banner>
 
-        <div className="p-6">
-          {/* Search View */}
-          {activeView === 'search' && (
-            <div className="space-y-6">
-              {/* Info Banner */}
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                <p className="text-blue-800 text-sm">
-                  Search for high-quality music data. Only original albums and singles with no cover versions are shown.
-                </p>
-              </div>
+          <div
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+            className={`rounded-2xl border-2 border-dashed p-10 text-center transition-colors ${
+              isDragging ? 'border-brand-600 bg-brand-50' : 'border-slate-300 bg-white'
+            }`}
+          >
+            <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-brand-50">
+              <span className="rotate-180"><BrandIcon name="download" size={26} /></span>
+            </span>
+            <h3 className="mt-4 text-lg font-bold text-ink-900">{isDragging ? 'Drop the file here' : 'Drag a file here'}</h3>
+            <p className="mt-1 text-sm text-ink-500">or choose one from your device. CSV or TXT, up to 5 MB.</p>
+            <label className="mt-5 inline-block">
+              <input type="file" accept=".csv,.txt" onChange={handleFileInputChange} className="sr-only" />
+              <span className="inline-flex h-11 cursor-pointer items-center justify-center rounded-xl border border-slate-300 bg-white px-5 text-sm font-semibold text-ink-700 hover:bg-slate-50 focus-within:ring-2 focus-within:ring-brand-500">
+                Choose file
+              </span>
+            </label>
+          </div>
 
-              {/* Search Form */}
-              <form onSubmit={handleSearchSubmit} className="flex flex-col space-y-3">
-                <div className="flex space-x-4">
-                  <div className="flex-1">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Song Title *</label>
-                    <input
-                      type="text"
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      placeholder="e.g., Your Love Is King"
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                    />
-                  </div>
-                  <div className="flex-1">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Artist (Optional)</label>
-                    <input
-                      type="text"
-                      value={searchArtist}
-                      onChange={(e) => setSearchArtist(e.target.value)}
-                      placeholder="e.g., Sade"
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                    />
-                  </div>
+          {uploadedFile && (
+            <Card>
+              <div className="flex items-center gap-3">
+                <IconTile name="check" state="done" size={40} />
+                <div className="min-w-0 flex-1">
+                  <div className="truncate font-semibold text-ink-900">{uploadedFile.name}</div>
+                  <div className="text-sm text-ink-500">{(uploadedFile.size / 1024).toFixed(1)} KB</div>
                 </div>
-                <button
-                  type="submit"
-                  disabled={isSearching || !searchQuery.trim()}
-                  className="px-6 py-3 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2 w-full sm:w-auto"
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setUploadedFile(null)
+                    setParsedSongs([])
+                  }}
                 >
-                  {isSearching ? (
-                    <>
-                      <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                      </svg>
-                      <span>Searching...</span>
-                    </>
-                  ) : (
-                    <>
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                      </svg>
-                      <span>Search</span>
-                    </>
-                  )}
-                </button>
-              </form>
+                  Remove
+                </Button>
+              </div>
+            </Card>
+          )}
 
-              {/* Search Results */}
-              {searchResults.length > 0 && (
-                <div className="space-y-4">
-                  <p className="text-sm text-gray-600">Found {searchResults.length} results</p>
-                  <div className="grid gap-4">
-                    {searchResults.map((song: any) => (
-                      <div key={song.id} className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition">
-                        <div className="flex items-start justify-between">
-                          <div className="flex-1">
-                            <h4 className="font-medium text-gray-900">{song.title}</h4>
-                            <p className="text-gray-600 text-sm">by {song.artist}</p>
-                            {song.album && (
-                              <p className="text-sm text-gray-500">Album: {song.album}</p>
-                            )}
-                            {song.genre && (
-                              <p className="text-sm text-gray-500">Genre: {song.genre}</p>
-                            )}
-                          </div>
-                          <button
-                            onClick={() => addSongToCatalog(song)}
-                            disabled={isAddingSong === `${song.title}-${song.artist}`}
-                            className="ml-4 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 whitespace-nowrap text-sm"
-                          >
-                            {isAddingSong === `${song.title}-${song.artist}` ? 'Adding...' : 'Add'}
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
+          <Card title="What the file should look like">
+            <div className="grid gap-5 md:grid-cols-2">
+              <div>
+                <h4 className="mb-2 text-sm font-semibold text-ink-700">CSV</h4>
+                <pre className="overflow-x-auto rounded-xl bg-surface p-3 text-xs text-ink-700">{`title,artist,album,genre
+Bohemian Rhapsody,Queen,A Night at the Opera,Rock
+Hotel California,Eagles,Hotel California,Rock`}</pre>
+              </div>
+              <div>
+                <h4 className="mb-2 text-sm font-semibold text-ink-700">Text (commas, pipes or tabs)</h4>
+                <pre className="overflow-x-auto rounded-xl bg-surface p-3 text-xs text-ink-700">{`Bohemian Rhapsody,Queen,A Night at the Opera,Rock
+Hotel California|Eagles|Hotel California|Rock`}</pre>
+              </div>
+            </div>
+          </Card>
+        </div>
+      )}
 
-              {/* No results message */}
-              {searchQuery && searchResults.length === 0 && !isSearching && (
-                <div className="text-center py-12">
-                  <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                    </svg>
-                  </div>
-                  <h3 className="text-lg font-medium text-gray-900 mb-2">No songs found</h3>
-                  <p className="text-gray-500">Try searching with different keywords or artist names.</p>
-                </div>
-              )}
+      {/* My catalog */}
+      {activeView === 'catalog' && (
+        <div className="space-y-5">
+          <form onSubmit={handleCatalogSearch} className="flex gap-3">
+            <div className="relative flex-1">
+              <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center">
+                <BrandIcon name="search" size={20} tone="muted" />
+              </span>
+              <input
+                type="text"
+                value={catalogSearch}
+                onChange={e => setCatalogSearch(e.target.value)}
+                placeholder="Search your catalog"
+                aria-label="Search your catalog"
+                className={`${inputClass} pl-11`}
+              />
+            </div>
+            <Button type="submit" variant="secondary" size="lg" loading={isLoadingCatalog}>
+              Search
+            </Button>
+          </form>
+
+          {selectedCatalogSongs.size > 0 && (
+            <div className="sticky top-16 z-20 flex flex-wrap items-center gap-3 rounded-2xl bg-ink-900 px-4 py-3 text-white shadow-lift lg:top-3">
+              <span className="mr-auto font-semibold">{selectedCatalogSongs.size} selected</span>
+              <button onClick={() => setSelectedCatalogSongs(new Set())} className="h-9 rounded-lg px-3 text-sm font-semibold text-white/80 hover:bg-white/10">
+                Clear
+              </button>
+              <button
+                onClick={bulkRemoveSongs}
+                disabled={isBulkRemoving}
+                className="h-9 rounded-lg bg-red-500 px-4 text-sm font-bold text-white hover:bg-red-600 disabled:opacity-50"
+              >
+                {isBulkRemoving ? 'Removing…' : 'Remove selected'}
+              </button>
             </div>
           )}
 
-          {/* Upload View */}
-          {activeView === 'upload' && (
-            <div className="space-y-6">
-              {/* Info Banner */}
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                <p className="text-blue-800 text-sm">
-                  Upload a CSV or text file with your song list. Format: <strong>title, artist, album, genre</strong> (title and artist are required).
-                  Text files can use comma, pipe (|), or tab delimiters.
-                </p>
-              </div>
-
-              {/* Drag and Drop Zone */}
-              <div
-                onDragOver={handleDragOver}
-                onDragLeave={handleDragLeave}
-                onDrop={handleDrop}
-                className={`border-2 border-dashed rounded-lg p-12 text-center transition ${
-                  isDragging
-                    ? 'border-primary-500 bg-primary-50'
-                    : 'border-gray-300 bg-gray-50 hover:border-gray-400'
-                }`}
-              >
-                <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center mx-auto mb-4 shadow-sm">
-                  <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                  </svg>
-                </div>
-                <h3 className="text-lg font-medium text-gray-900 mb-2">
-                  {isDragging ? 'Drop file here' : 'Drag and drop your file here'}
-                </h3>
-                <p className="text-gray-500 mb-4">or</p>
-                <label className="inline-block">
-                  <input
-                    type="file"
-                    accept=".csv,.txt"
-                    onChange={handleFileInputChange}
-                    className="hidden"
-                  />
-                  <span className="px-6 py-3 bg-primary-600 text-white rounded-lg hover:bg-primary-700 cursor-pointer inline-block">
-                    Select File
-                  </span>
-                </label>
-                <p className="text-sm text-gray-500 mt-4">Supports CSV and TXT files (max 5MB)</p>
-              </div>
-
-              {/* File Info */}
-              {uploadedFile && (
-                <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-3">
-                      <svg className="w-5 h-5 text-green-600" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M6 2a2 2 0 00-2 2v12a2 2 0 002 2h8a2 2 0 002-2V7.414A2 2 0 0015.414 6L12 2.586A2 2 0 0010.586 2H6zm5 6a1 1 0 10-2 0v3.586l-1.293-1.293a1 1 0 10-1.414 1.414l3 3a1 1 0 001.414 0l3-3a1 1 0 00-1.414-1.414L11 11.586V8z" clipRule="evenodd" />
-                      </svg>
-                      <div>
-                        <p className="text-green-800 font-medium">{uploadedFile.name}</p>
-                        <p className="text-sm text-green-600">{(uploadedFile.size / 1024).toFixed(1)} KB</p>
-                      </div>
+          {myCatalog.length > 0 ? (
+            <Card flush>
+              <ul className="divide-y divide-slate-100 px-5 pb-2">
+                {myCatalog.map(song => (
+                  <li key={song.id} className="flex items-center gap-4 py-3">
+                    <input
+                      type="checkbox"
+                      checked={selectedCatalogSongs.has(song.id)}
+                      onChange={() => toggleCatalogSongSelection(song.id)}
+                      aria-label={`Select ${song.songTitle}`}
+                      className="h-5 w-5 shrink-0 rounded border-slate-300 accent-brand-700"
+                    />
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate font-semibold text-ink-900">{song.songTitle}</div>
+                      <div className="truncate text-sm text-ink-500">{[song.artist, meta(song)].filter(Boolean).join(' · ')}</div>
+                      <div className="text-xs text-ink-400">Added {new Date(song.createdAt).toLocaleDateString()}</div>
                     </div>
-                    <button
-                      onClick={() => {
-                        setUploadedFile(null)
-                        setParsedSongs([])
-                      }}
-                      className="text-green-600 hover:text-green-800"
+                    <Button
+                      variant="danger"
+                      size="sm"
+                      icon="trash"
+                      loading={isRemovingSong === song.id}
+                      onClick={() => removeSongFromCatalog(song.id)}
+                      aria-label={`Remove ${song.songTitle}`}
                     >
                       Remove
-                    </button>
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+
+              {catalogTotalCount > limit && (
+                <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 px-5 py-4">
+                  <div className="text-sm text-ink-500">
+                    {(catalogPage - 1) * limit + 1} to {Math.min(catalogPage * limit, catalogTotalCount)} of {catalogTotalCount} songs
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      icon="chevron-left"
+                      disabled={catalogPage <= 1 || isLoadingCatalog}
+                      onClick={() => {
+                        const newPage = catalogPage - 1
+                        setCatalogPage(newPage)
+                        loadMyCatalog(newPage, catalogSearch)
+                      }}
+                    >
+                      Previous
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      disabled={catalogPage * limit >= catalogTotalCount || isLoadingCatalog}
+                      onClick={() => {
+                        const newPage = catalogPage + 1
+                        setCatalogPage(newPage)
+                        loadMyCatalog(newPage, catalogSearch)
+                      }}
+                    >
+                      Next
+                      <BrandIcon name="chevron-right" size={16} tone="brand" />
+                    </Button>
                   </div>
                 </div>
               )}
-
-              {/* Format Examples */}
-              <div className="bg-gray-50 border border-gray-200 rounded-lg p-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">File Format Examples</h3>
-                <div className="grid md:grid-cols-2 gap-6">
-                  <div>
-                    <h4 className="font-medium text-gray-700 mb-2">CSV Format</h4>
-                    <pre className="bg-white p-3 rounded border border-gray-200 text-xs overflow-x-auto">
-{`title,artist,album,genre
-Bohemian Rhapsody,Queen,A Night at the Opera,Rock
-Hotel California,Eagles,Hotel California,Rock`}
-                    </pre>
-                  </div>
-                  <div>
-                    <h4 className="font-medium text-gray-700 mb-2">Text Format (Comma/Pipe/Tab)</h4>
-                    <pre className="bg-white p-3 rounded border border-gray-200 text-xs overflow-x-auto">
-{`Bohemian Rhapsody,Queen,A Night at the Opera,Rock
-Hotel California|Eagles|Hotel California|Rock`}
-                    </pre>
-                  </div>
-                </div>
-              </div>
-            </div>
+            </Card>
+          ) : (
+            <Card>
+              <EmptyState
+                icon="music"
+                title="No songs in your catalog yet"
+                action={<Button onClick={() => setActiveView('search')} icon="search">Find songs</Button>}
+              >
+                Search for songs or upload a list. Fans can only request songs that are here.
+              </EmptyState>
+            </Card>
           )}
-
-          {/* Catalog View */}
-          {activeView === 'catalog' && (
-            <div className="space-y-6">
-              {/* Catalog Search */}
-              <form onSubmit={handleCatalogSearch} className="flex space-x-4">
-                <div className="flex-1">
-                  <input
-                    type="text"
-                    value={catalogSearch}
-                    onChange={(e) => setCatalogSearch(e.target.value)}
-                    placeholder="Search your catalog..."
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                  />
-                </div>
-                <button
-                  type="submit"
-                  disabled={isLoadingCatalog}
-                  className="px-6 py-3 bg-gray-600 text-white rounded-lg hover:bg-gray-700 disabled:opacity-50"
-                >
-                  Filter
-                </button>
-              </form>
-
-              {/* Bulk Actions for Catalog */}
-              {selectedCatalogSongs.size > 0 && (
-                <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-                  <div className="flex items-center justify-between">
-                    <span className="text-red-800 font-medium">
-                      {selectedCatalogSongs.size} song(s) selected
-                    </span>
-                    <div className="flex space-x-2">
-                      <button
-                        onClick={() => setSelectedCatalogSongs(new Set())}
-                        className="px-3 py-1 text-red-600 hover:text-red-800 text-sm"
-                      >
-                        Clear Selection
-                      </button>
-                      <button
-                        onClick={bulkRemoveSongs}
-                        disabled={isBulkRemoving}
-                        className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50 text-sm"
-                      >
-                        {isBulkRemoving ? 'Removing...' : 'Remove Selected'}
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* My Catalog */}
-              {myCatalog.length > 0 ? (
-                <div className="space-y-4">
-                  <div className="grid gap-4">
-                    {myCatalog.map((song) => (
-                      <div key={song.id} className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center space-x-3">
-                            <input
-                              type="checkbox"
-                              checked={selectedCatalogSongs.has(song.id)}
-                              onChange={() => toggleCatalogSongSelection(song.id)}
-                              className="w-4 h-4 text-red-600 border-gray-300 rounded focus:ring-red-500"
-                            />
-                            <div>
-                              <h4 className="font-medium text-gray-900">{song.songTitle}</h4>
-                              <p className="text-gray-600">by {song.artist}</p>
-                              {song.album && (
-                                <p className="text-sm text-gray-500">Album: {song.album}</p>
-                              )}
-                              {song.genre && (
-                                <p className="text-sm text-gray-500">Genre: {song.genre}</p>
-                              )}
-                              <p className="text-xs text-gray-400">
-                                Added: {new Date(song.createdAt).toLocaleDateString()}
-                              </p>
-                            </div>
-                          </div>
-                          <button
-                            onClick={() => removeSongFromCatalog(song.id)}
-                            disabled={isRemovingSong === song.id}
-                            className="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50 text-sm"
-                          >
-                            {isRemovingSong === song.id ? 'Removing...' : 'Remove'}
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* Catalog Pagination */}
-                  {catalogTotalCount > limit && (
-                    <div className="flex items-center justify-between">
-                      <div className="text-sm text-gray-700">
-                        Showing {(catalogPage - 1) * limit + 1} to {Math.min(catalogPage * limit, catalogTotalCount)} of {catalogTotalCount} songs
-                      </div>
-                      <div className="flex space-x-2">
-                        <button
-                          onClick={() => {
-                            const newPage = catalogPage - 1
-                            setCatalogPage(newPage)
-                            loadMyCatalog(newPage, catalogSearch)
-                          }}
-                          disabled={catalogPage <= 1 || isLoadingCatalog}
-                          className="px-3 py-1 border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 text-sm"
-                        >
-                          Previous
-                        </button>
-                        <button
-                          onClick={() => {
-                            const newPage = catalogPage + 1
-                            setCatalogPage(newPage)
-                            loadMyCatalog(newPage, catalogSearch)
-                          }}
-                          disabled={catalogPage * limit >= catalogTotalCount || isLoadingCatalog}
-                          className="px-3 py-1 border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 text-sm"
-                        >
-                          Next
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div className="text-center py-12">
-                  <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
-                    </svg>
-                  </div>
-                  <h3 className="text-lg font-medium text-gray-900 mb-2">No songs in your catalog</h3>
-                  <p className="text-gray-500 mb-4">Start building your song catalog by searching and adding songs.</p>
-                  <button
-                    onClick={() => setActiveView('search')}
-                    className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
-                  >
-                    Search Songs
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Preview Modal */}
-      {showPreviewModal && (
-        <div className="fixed inset-0 z-50 overflow-y-auto">
-          <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
-            <div className="fixed inset-0 transition-opacity bg-gray-500 bg-opacity-75" onClick={cancelUpload}></div>
-
-            <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-4xl sm:w-full">
-              <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
-                <div className="sm:flex sm:items-start">
-                  <div className="w-full">
-                    <h3 className="text-lg leading-6 font-medium text-gray-900 mb-4">
-                      Preview Upload - {parsedSongs.length} Songs
-                    </h3>
-                    <div className="max-h-96 overflow-y-auto border border-gray-200 rounded-lg">
-                      <table className="min-w-full divide-y divide-gray-200">
-                        <thead className="bg-gray-50 sticky top-0">
-                          <tr>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Title</th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Artist</th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Album</th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Genre</th>
-                          </tr>
-                        </thead>
-                        <tbody className="bg-white divide-y divide-gray-200">
-                          {parsedSongs.map((song, index) => (
-                            <tr key={index} className="hover:bg-gray-50">
-                              <td className="px-4 py-3 text-sm text-gray-900">{song.title}</td>
-                              <td className="px-4 py-3 text-sm text-gray-600">{song.artist}</td>
-                              <td className="px-4 py-3 text-sm text-gray-500">{song.album || '-'}</td>
-                              <td className="px-4 py-3 text-sm text-gray-500">{song.genre || '-'}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
-                <button
-                  type="button"
-                  onClick={confirmUpload}
-                  disabled={isUploading}
-                  className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-primary-600 text-base font-medium text-white hover:bg-primary-700 focus:outline-none sm:ml-3 sm:w-auto sm:text-sm disabled:opacity-50"
-                >
-                  {isUploading ? 'Uploading...' : 'Confirm Upload'}
-                </button>
-                <button
-                  type="button"
-                  onClick={cancelUpload}
-                  disabled={isUploading}
-                  className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm disabled:opacity-50"
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
-          </div>
         </div>
       )}
 
-      {/* Summary Modal */}
-      {showSummaryModal && uploadSummary && (
-        <div className="fixed inset-0 z-50 overflow-y-auto">
-          <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
-            <div className="fixed inset-0 transition-opacity bg-gray-500 bg-opacity-75" onClick={() => setShowSummaryModal(false)}></div>
-
-            <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-4xl sm:w-full">
-              <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
-                <div className="sm:flex sm:items-start">
-                  <div className="w-full">
-                    <h3 className="text-lg leading-6 font-medium text-gray-900 mb-4">
-                      Upload Complete
-                    </h3>
-                    
-                    {/* Summary Stats */}
-                    <div className="grid grid-cols-3 gap-4 mb-6">
-                      <div className="bg-green-50 border border-green-200 rounded-lg p-4 text-center">
-                        <div className="text-2xl font-bold text-green-600">{uploadSummary.addedCount}</div>
-                        <div className="text-sm text-green-800">Added</div>
-                      </div>
-                      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 text-center">
-                        <div className="text-2xl font-bold text-yellow-600">{uploadSummary.duplicateCount}</div>
-                        <div className="text-sm text-yellow-800">Duplicates</div>
-                      </div>
-                      <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-center">
-                        <div className="text-2xl font-bold text-red-600">{uploadSummary.failedCount}</div>
-                        <div className="text-sm text-red-800">Failed</div>
-                      </div>
-                    </div>
-
-                    {/* Details */}
-                    <div className="max-h-96 overflow-y-auto space-y-4">
-                      {/* Added Songs */}
-                      {uploadSummary.addedSongs.length > 0 && (
-                        <div>
-                          <h4 className="font-medium text-green-800 mb-2">Added ({uploadSummary.addedCount})</h4>
-                          <div className="bg-green-50 border border-green-200 rounded p-3 space-y-1 max-h-40 overflow-y-auto">
-                            {uploadSummary.addedSongs.map((song, idx) => (
-                              <div key={idx} className="text-sm text-green-900">
-                                {song.title} - {song.artist}
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Duplicate Songs */}
-                      {uploadSummary.duplicateSongs.length > 0 && (
-                        <div>
-                          <h4 className="font-medium text-yellow-800 mb-2">Skipped duplicates ({uploadSummary.duplicateCount})</h4>
-                          <div className="bg-yellow-50 border border-yellow-200 rounded p-3 space-y-1 max-h-40 overflow-y-auto">
-                            {uploadSummary.duplicateSongs.map((song, idx) => (
-                              <div key={idx} className="text-sm text-yellow-900">
-                                {song.title} - {song.artist}
-                                {song.reason && <span className="text-yellow-700 ml-2">({song.reason})</span>}
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Failed Songs */}
-                      {uploadSummary.failedSongs.length > 0 && (
-                        <div>
-                          <h4 className="font-medium text-red-800 mb-2">Failed ({uploadSummary.failedCount})</h4>
-                          <div className="bg-red-50 border border-red-200 rounded p-3 space-y-1 max-h-40 overflow-y-auto">
-                            {uploadSummary.failedSongs.map((song, idx) => (
-                              <div key={idx} className="text-sm text-red-900">
-                                {song.title} - {song.artist}
-                                {song.reason && <span className="text-red-700 ml-2">({song.reason})</span>}
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
-                <button
-                  type="button"
-                  onClick={() => setShowSummaryModal(false)}
-                  className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-primary-600 text-base font-medium text-white hover:bg-primary-700 focus:outline-none sm:ml-3 sm:w-auto sm:text-sm"
-                >
-                  Close
-                </button>
-              </div>
-            </div>
-          </div>
+      {/* Upload preview */}
+      <Modal
+        open={showPreviewModal}
+        wide
+        onClose={cancelUpload}
+        title={`Preview: ${parsedSongs.length} ${parsedSongs.length === 1 ? 'song' : 'songs'}`}
+        footer={
+          <>
+            <Button variant="secondary" onClick={cancelUpload} disabled={isUploading}>
+              Cancel
+            </Button>
+            <Button onClick={confirmUpload} loading={isUploading}>
+              Add {parsedSongs.length} {parsedSongs.length === 1 ? 'song' : 'songs'}
+            </Button>
+          </>
+        }
+      >
+        <div className="max-h-96 overflow-auto rounded-xl border border-slate-200">
+          <table className="min-w-full divide-y divide-slate-200">
+            <thead className="sticky top-0 bg-surface">
+              <tr>
+                {['Title', 'Artist', 'Album', 'Genre'].map(h => (
+                  <th key={h} className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider text-ink-500">{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 bg-white">
+              {parsedSongs.map((song, index) => (
+                <tr key={index}>
+                  <td className="px-4 py-3 text-sm font-semibold text-ink-900">{song.title}</td>
+                  <td className="px-4 py-3 text-sm text-ink-700">{song.artist}</td>
+                  <td className="px-4 py-3 text-sm text-ink-500">{song.album || '—'}</td>
+                  <td className="px-4 py-3 text-sm text-ink-500">{song.genre || '—'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
-      )}
+      </Modal>
+
+      {/* Upload result */}
+      <Modal
+        open={showSummaryModal && !!uploadSummary}
+        wide
+        onClose={() => setShowSummaryModal(false)}
+        title="Upload complete"
+        footer={<Button onClick={() => setShowSummaryModal(false)}>Done</Button>}
+      >
+        {uploadSummary && (
+          <div className="space-y-5">
+            <div className="grid grid-cols-3 gap-3">
+              <StatCard variant="inline" icon="check-circle" label="Added" value={uploadSummary.addedCount} />
+              <StatCard variant="inline" icon="warning" label="Duplicates" value={uploadSummary.duplicateCount} />
+              <StatCard variant="inline" icon="error" label="Failed" value={uploadSummary.failedCount} />
+            </div>
+
+            {uploadSummary.addedSongs.length > 0 && (
+              <Banner tone="success" title={`Added (${uploadSummary.addedCount})`}>
+                <ul className="mt-1 max-h-40 space-y-0.5 overflow-y-auto">
+                  {uploadSummary.addedSongs.map((song, idx) => (
+                    <li key={idx}>{song.title} · {song.artist}</li>
+                  ))}
+                </ul>
+              </Banner>
+            )}
+            {uploadSummary.duplicateSongs.length > 0 && (
+              <Banner tone="warning" title={`Already in your catalog (${uploadSummary.duplicateCount})`}>
+                <ul className="mt-1 max-h-40 space-y-0.5 overflow-y-auto">
+                  {uploadSummary.duplicateSongs.map((song, idx) => (
+                    <li key={idx}>
+                      {song.title} · {song.artist}
+                      {song.reason && <span className="text-ink-500"> ({song.reason})</span>}
+                    </li>
+                  ))}
+                </ul>
+              </Banner>
+            )}
+            {uploadSummary.failedSongs.length > 0 && (
+              <Banner tone="error" title={`Could not add (${uploadSummary.failedCount})`}>
+                <ul className="mt-1 max-h-40 space-y-0.5 overflow-y-auto">
+                  {uploadSummary.failedSongs.map((song, idx) => (
+                    <li key={idx}>
+                      {song.title} · {song.artist}
+                      {song.reason && <span className="text-ink-500"> ({song.reason})</span>}
+                    </li>
+                  ))}
+                </ul>
+              </Banner>
+            )}
+          </div>
+        )}
+      </Modal>
     </div>
   )
 }
 
-export default SongManagement 
+export default SongManagement

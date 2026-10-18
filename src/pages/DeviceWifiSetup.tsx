@@ -22,8 +22,8 @@ import logger from "../utils/logger";
  */
 
 import { useState, useEffect } from 'react';
-import { Button, Input, Alert, Card, Steps, Modal, List } from 'antd';
-import { WifiOutlined, ScanOutlined, CheckCircleOutlined, LoadingOutlined, ApiOutlined, MobileOutlined, DesktopOutlined } from '@ant-design/icons';
+import { Banner, Button, Card, Modal } from '../components/ui';
+import { BrandIcon, IconTile, type BrandIconName } from '../components/icons/BrandIcons';
 import { toast } from 'sonner';
 
 interface BluetoothDevice {
@@ -469,381 +469,209 @@ const DeviceWifiSetup = () => {
     }
   };
 
-  const steps = [
-    {
-      title: 'Scan',
-      icon: <ScanOutlined />,
-      description: 'Find your Tipwave device'
-    },
-    {
-      title: 'Connect',
-      icon: <WifiOutlined />,
-      description: 'Connect via Bluetooth'
-    },
-    {
-      title: 'Configure',
-      icon: <WifiOutlined />,
-      description: 'Enter WiFi credentials'
-    },
-    {
-      title: 'Complete',
-      icon: <CheckCircleOutlined />,
-      description: 'Setup complete'
-    }
+  const steps: { title: string; description: string; icon: BrandIconName }[] = [
+    { title: 'Find', description: 'Find your Tipwave device', icon: 'qr' },
+    { title: 'Connect', description: 'Connect over Bluetooth', icon: 'device' },
+    { title: 'Wi-Fi', description: 'Enter your Wi-Fi details', icon: 'wifi' },
+    { title: 'Done', description: 'Your device is online', icon: 'check-circle' }
   ];
 
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black p-4 md:p-8">
-      <div className="max-w-4xl mx-auto">
-        {/* Header */}
-        <div className="text-center mb-8">
-          <div className="flex items-center justify-center gap-3 mb-3">
-            <h1 className="text-4xl md:text-5xl font-bold text-white">
-              Tipwave Device Setup
-            </h1>
-            {import.meta.env.DEV && demoMode && (
-              <span className="px-3 py-1 bg-yellow-600 text-white rounded-full text-xs font-semibold">
-                DEMO MODE
-              </span>
-            )}
-          </div>
-          <p className="text-gray-300 text-lg">
-            Connect your Tipwave device to WiFi via Bluetooth
-          </p>
-          <p className="text-gray-400 text-sm mt-2">
-            Looking for devices named: <span className="text-blue-400 font-mono">Tipwave-*</span>
-          </p>
-          {!demoMode && import.meta.env.DEV && (
-            <p className="text-yellow-400 text-xs mt-2">
-              💡 No hardware? Hold <kbd className="bg-gray-700 px-2 py-1 rounded">Shift</kbd> while clicking "Find My Device" to test demo mode
-            </p>
-          )}
-        </div>
+  const stepState = (i: number): 'current' | 'done' | 'upcoming' =>
+    i < currentStep || (i === 3 && connected) ? 'done' : i === currentStep ? 'current' : 'upcoming';
 
-        {/* Progress Steps */}
-        <Card className="bg-gray-800 border-gray-700 mb-6">
-          <style>{`
-            .ant-steps-item-title {
-              color: white !important;
-            }
-            .ant-steps-item-description {
-              color: #D1D5DB !important;
-            }
-            .ant-steps-item-wait .ant-steps-item-icon {
-              background-color: #374151 !important;
-              border-color: #4B5563 !important;
-            }
-            .ant-steps-item-wait .ant-steps-item-icon .ant-steps-icon {
-              color: #9CA3AF !important;
-            }
-            .ant-input-password input {
-              background-color: #374151 !important;
-              color: white !important;
-              border-color: #4B5563 !important;
-            }
-            .ant-input-password input:focus {
-              background-color: #374151 !important;
-              color: white !important;
-              border-color: #3B82F6 !important;
-            }
-            .ant-input-password input::placeholder {
-              color: #9CA3AF !important;
-            }
-            .ant-input-affix-wrapper {
-              background-color: #374151 !important;
-              border-color: #4B5563 !important;
-            }
-            .ant-input-affix-wrapper:focus,
-            .ant-input-affix-wrapper-focused {
-              background-color: #374151 !important;
-              border-color: #3B82F6 !important;
-            }
-            .ant-input-password .ant-input-suffix {
-              color: #9CA3AF !important;
-            }
-          `}</style>
-          <Steps 
-            current={currentStep} 
-            items={steps}
-          />
+  const inputClass =
+    'h-12 w-full rounded-xl border border-slate-300 bg-white px-4 text-ink-900 placeholder:text-ink-400 transition-colors focus:border-transparent focus:outline-none focus:ring-2 focus:ring-brand-500';
+
+  const resetToStart = () => {
+    setCurrentStep(0);
+    setSelectedDevice(null);
+    setWifiNetworks([]);
+    setSelectedSsid('');
+    setPassword('');
+  };
+
+  const startDemo = async () => {
+    setScanning(true);
+    setDemoMode(true);
+    toast.info('Demo mode activated - simulating Tipwave device');
+    await new Promise(resolve => setTimeout(resolve, 500));
+    const demoDevice: BluetoothDevice = { name: 'Tipwave-TPW-DEMO-001', id: 'demo-device-001', device: null };
+    setSelectedDevice(demoDevice);
+    toast.success(`Selected: ${demoDevice.name} (Demo)`);
+    setTimeout(() => {
+      connectToDevice(demoDevice);
+      setScanning(false);
+    }, 1000);
+  };
+
+  return (
+    <div className="min-h-screen bg-surface px-4 py-8">
+      <div className="mx-auto max-w-2xl">
+        <header className="mb-8 text-center">
+          <img src="/images/logo/tipwave-logo-v2.png" alt="Tipwave" className="mx-auto h-10 w-auto" />
+          <h1 className="mt-6 text-3xl font-bold text-ink-900">Connect your device to Wi-Fi</h1>
+          <p className="mt-2 text-ink-500">Your phone talks to the device over Bluetooth and gives it your Wi-Fi details.</p>
+          {import.meta.env.DEV && demoMode && (
+            <span className="mt-3 inline-block rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-800">Demo mode</span>
+          )}
+        </header>
+
+        {/* Progress */}
+        <Card className="mb-5">
+          <ol className="grid grid-cols-4 gap-2">
+            {steps.map((st, i) => {
+              const state = stepState(i);
+              return (
+                <li key={st.title} className="flex flex-col items-center text-center">
+                  <IconTile name={st.icon} state={state} size={44} />
+                  <span className={`mt-2 text-sm font-semibold ${state === 'upcoming' ? 'text-ink-500' : 'text-ink-900'}`}>{st.title}</span>
+                  <span className="hidden text-xs text-ink-500 sm:block">{st.description}</span>
+                </li>
+              );
+            })}
+          </ol>
         </Card>
 
-        {/* Environment Info Banner */}
-        {environment && (
-          <Card className="bg-gray-800 border-gray-700 mb-6">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                {environment.isMobile ? <MobileOutlined className="text-blue-400 text-xl" /> : <DesktopOutlined className="text-blue-400 text-xl" />}
-                <div>
-                  <p className="text-white font-medium">
-                    {environment.isMobile ? '📱 Mobile Browser' : '💻 Desktop Browser'}
-                  </p>
-                  <p className="text-gray-400 text-sm">
-                    {environment.browser} • {environment.supportsWebBluetooth ? '✅ Bluetooth Ready' : '❌ No Bluetooth'} • {environment.supportsNotifications ? '🔔 Notifications Available' : '🔕 No Notifications'}
-                  </p>
-                </div>
-              </div>
-            </div>
-          </Card>
+        {environment && !environment.supportsWebBluetooth && (
+          <Banner tone="warning" title="This browser can't connect to the device" className="mb-5">
+            Open this page in Chrome, Edge or Opera on a computer or Android phone. iPhones and iPads can't do Bluetooth setup from a browser.
+          </Banner>
         )}
 
-        {/* Error Alert */}
         {error && (
-          <Alert
-            message="Setup Requirements"
-            description={error}
-            type="warning"
-            closable
-            onClose={() => setError('')}
-            className="mb-6"
-            showIcon
-          />
+          <Banner tone="warning" title="Before we can continue" className="mb-5" onDismiss={() => setError('')}>
+            {error}
+          </Banner>
         )}
 
-        {/* Step 0: Scan for Devices */}
+        {/* Step 0: find the device */}
         {currentStep === 0 && (
-          <Card className="bg-gray-800 border-gray-700">
-            <div className="text-center py-8">
-              <ApiOutlined className="text-6xl text-blue-500 mb-4" />
-              <h2 className="text-2xl font-bold text-white mb-4">
-                Scan for Tipwave Device
-              </h2>
-              <p className="text-gray-300 mb-6">
-                Make sure your Tipwave device is powered on and in pairing mode
-              </p>
-              <div className="bg-blue-900/30 border border-blue-700 rounded-lg p-4 mb-6 text-left max-w-md mx-auto">
-                <p className="text-blue-200 text-sm mb-2">
-                  <strong>Device Name Format:</strong>
-                </p>
-                <p className="text-blue-100 text-sm font-mono">
-                  Tipwave-&lt;serial_number&gt;
-                </p>
-                <p className="text-blue-200 text-xs mt-2">
-                  Example: Tipwave-TPW-5C07-3VQ
-                </p>
+          <Card>
+            <div className="py-4 text-center">
+              <span className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-brand-50">
+                <BrandIcon name="device" size={32} />
+              </span>
+              <h2 className="mt-5 text-2xl font-bold text-ink-900">Find your Tipwave device</h2>
+              <p className="mx-auto mt-2 max-w-md text-ink-500">Turn the device on and keep it close to your phone or computer.</p>
+
+              <div className="mx-auto mt-6 max-w-md rounded-2xl bg-surface p-4 text-left">
+                <p className="text-sm font-semibold text-ink-700">Look for a device named</p>
+                <p className="mt-1 font-mono text-ink-900">Tipwave-&lt;serial number&gt;</p>
+                <p className="mt-1 text-xs text-ink-500">For example, Tipwave-TPW-5C07-3VQ</p>
               </div>
-              <div className="flex flex-col gap-3 items-center">
-                <Button
-                  type="primary"
-                  size="large"
-                  icon={scanning ? <LoadingOutlined /> : <ScanOutlined />}
-                  onClick={scanForDevices}
-                  loading={scanning}
-                  disabled={!environment?.supportsWebBluetooth}
-                  className="bg-blue-600 hover:bg-blue-700 border-none px-8"
-                >
-                  {scanning ? 'Scanning...' : 'Find My Device'}
+
+              <div className="mt-6 flex flex-col items-center gap-3">
+                <Button size="lg" icon="search" onClick={scanForDevices} loading={scanning} disabled={!environment?.supportsWebBluetooth}>
+                  {scanning ? 'Looking…' : 'Find my device'}
                 </Button>
-                
-                {/* Demo Mode Button - Only visible in development */}
                 {import.meta.env.DEV && (
-                  <>
-                    <div className="text-gray-400 text-sm">or</div>
-                    
-                    <Button
-                      type="default"
-                      size="large"
-                      onClick={async () => {
-                        // Activate demo mode directly
-                        setScanning(true);
-                        setDemoMode(true);
-                        toast.info('Demo mode activated - simulating Tipwave device');
-                        
-                        await new Promise(resolve => setTimeout(resolve, 500));
-                        
-                        // Simulate device selection
-                        const demoDevice: BluetoothDevice = {
-                          name: 'Tipwave-TPW-DEMO-001',
-                          id: 'demo-device-001',
-                          device: null
-                        };
-                        
-                        setSelectedDevice(demoDevice);
-                        toast.success(`Selected: ${demoDevice.name} (Demo)`);
-                        
-                        // Simulate connection with delay
-                        setTimeout(() => {
-                          connectToDevice(demoDevice);
-                          setScanning(false);
-                        }, 1000);
-                      }}
-                      className="bg-yellow-600 hover:bg-yellow-700 text-white border-none px-8"
-                    >
-                      🧪 Test Demo Mode
-                    </Button>
-                  </>
+                  <Button variant="secondary" onClick={startDemo} disabled={scanning}>
+                    Try demo mode
+                  </Button>
                 )}
               </div>
-              
-              {!environment?.supportsWebBluetooth && (
-                <p className="text-yellow-400 mt-4 text-sm">
-                  🚫 Provisioning requires desktop or Android Chrome/Edge/Opera
-                </p>
-              )}
             </div>
           </Card>
         )}
 
-        {/* Step 1: Connecting */}
+        {/* Step 1: connecting */}
         {currentStep === 1 && connecting && (
-          <Card className="bg-gray-800 border-gray-700">
-            <div className="text-center py-8">
-              <LoadingOutlined className="text-6xl text-blue-500 mb-4" />
-              <h2 className="text-2xl font-bold text-white mb-4">
-                Connecting to Device
-              </h2>
-              <p className="text-gray-300 mb-6">
-                Establishing Bluetooth connection...
-              </p>
+          <Card>
+            <div className="py-8 text-center">
+              <span className="mx-auto block h-12 w-12 animate-spin rounded-full border-4 border-brand-600 border-t-transparent" />
+              <h2 className="mt-5 text-2xl font-bold text-ink-900">Connecting to your device</h2>
+              <p className="mt-2 text-ink-500">This takes a few seconds. Keep the device close.</p>
             </div>
           </Card>
         )}
 
-        {/* Step 2: Enter WiFi Credentials */}
+        {/* Step 2: Wi-Fi details */}
         {currentStep === 2 && (
-          <Card className="bg-gray-800 border-gray-700">
-            <div className="py-6">
-              <h2 className="text-2xl font-bold text-white mb-4">
-                Enter WiFi Credentials
-              </h2>
-              
-              <div className="space-y-4 mb-6">
-                <div>
-                  <label className="block text-gray-300 font-semibold mb-2">
-                    WiFi Network Name (SSID)
-                  </label>
-                  <Input
-                    size="large"
-                    placeholder="Enter your WiFi network name"
-                    value={selectedSsid}
-                    onChange={(e) => setSelectedSsid(e.target.value)}
-                    className="bg-gray-700 border-gray-600 text-white"
-                    style={{ backgroundColor: '#374151', color: 'white', borderColor: '#4B5563' }}
-                    autoFocus
-                  />
-                  <p className="text-gray-400 text-xs mt-1">
-                    Enter the exact name of your WiFi network (case-sensitive)
-                  </p>
-                </div>
-
-                <div>
-                  <label className="block text-gray-300 font-semibold mb-2">
-                    Password
-                  </label>
-                  <Input.Password
-                    size="large"
-                    placeholder="Enter Wi-Fi password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    onPressEnter={configureWifi}
-                    className="bg-gray-700 border-gray-600 text-white [&_input]:bg-gray-700 [&_input]:text-white [&_input::placeholder]:text-gray-400"
-                    autoFocus
-                  />
-                </div>
+          <Card title="Your Wi-Fi details" subtitle="The device will use this network to send tips and play effects.">
+            <div className="space-y-5">
+              <div>
+                <label htmlFor="wifi-ssid" className="mb-1.5 block text-sm font-semibold text-ink-700">Network name</label>
+                <input
+                  id="wifi-ssid"
+                  className={inputClass}
+                  placeholder="Your Wi-Fi network name"
+                  value={selectedSsid}
+                  onChange={(e) => setSelectedSsid(e.target.value)}
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  autoFocus
+                />
+                <p className="mt-1.5 text-sm text-ink-500">Type it exactly as it appears, including capital letters.</p>
               </div>
 
-              <div className="flex gap-3">
-                <Button
-                  type="default"
-                  size="large"
-                  onClick={() => {
-                    setCurrentStep(0);
-                    setSelectedDevice(null);
-                    setWifiNetworks([]);
-                    setSelectedSsid('');
-                    setPassword('');
-                  }}
-                  className="bg-gray-700 text-white border-gray-600 hover:bg-gray-600"
-                >
-                  Cancel
+              <div>
+                <label htmlFor="wifi-password" className="mb-1.5 block text-sm font-semibold text-ink-700">Password</label>
+                <input
+                  id="wifi-password"
+                  type="password"
+                  className={inputClass}
+                  placeholder="Wi-Fi password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && selectedSsid && password && configureWifi()}
+                />
+              </div>
+
+              <div className="flex flex-col-reverse gap-3 border-t border-slate-100 pt-5 sm:flex-row sm:justify-end">
+                <Button variant="secondary" size="lg" onClick={resetToStart}>
+                  Start over
                 </Button>
-                <Button
-                  type="primary"
-                  size="large"
-                  icon={connecting ? <LoadingOutlined /> : <CheckCircleOutlined />}
-                  onClick={configureWifi}
-                  loading={connecting}
-                  disabled={!selectedSsid || !password}
-                  className="flex-1 bg-green-600 hover:bg-green-700 border-none"
-                >
-                  {connecting ? 'Connecting...' : 'Connect to WiFi'}
+                <Button size="lg" icon="wifi" onClick={configureWifi} loading={connecting} disabled={!selectedSsid || !password}>
+                  {connecting ? 'Connecting…' : 'Connect to Wi-Fi'}
                 </Button>
               </div>
             </div>
           </Card>
         )}
 
-        {/* Step 3: Success */}
+        {/* Step 3: done */}
         {currentStep === 3 && connected && (
-          <Card className="bg-gray-800 border-gray-700">
-            <div className="text-center py-8">
-              <CheckCircleOutlined className="text-6xl text-green-500 mb-4" />
-              <h2 className="text-2xl font-bold text-white mb-4">
-                Setup Complete!
-              </h2>
-              <p className="text-gray-300 mb-6">
-                Your Tipwave device is now connected to WiFi
+          <Card>
+            <div className="py-6 text-center">
+              <span className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-green-50">
+                <BrandIcon name="check-circle" size={34} color="#15803D" />
+              </span>
+              <h2 className="mt-5 text-2xl font-bold text-ink-900">Your device is online</h2>
+              <p className="mt-2 text-ink-500">
+                Connected to <strong className="text-ink-900">{selectedSsid}</strong>. You are ready to take tips.
               </p>
-              <div className="bg-gray-700 p-4 rounded-lg mb-6">
-                <p className="text-white font-semibold">
-                  Network: {selectedSsid}
-                </p>
+              <div className="mt-6">
+                <Button size="lg" onClick={() => (window.location.href = '/dashboard')}>
+                  Go to my portal
+                </Button>
               </div>
-              <Button
-                type="primary"
-                size="large"
-                onClick={() => window.location.href = '/dashboard'}
-                className="bg-blue-600 hover:bg-blue-700 border-none px-8"
-              >
-                Go to Dashboard
-              </Button>
             </div>
           </Card>
         )}
 
-        {/* Browser Support Info */}
-        <div className="mt-8 text-center">
-          <p className="text-gray-400 text-sm">
-            Web Bluetooth requires Chrome, Edge, or Opera browser on desktop or Android
-          </p>
-        </div>
+        <p className="mt-8 text-center text-sm text-ink-500">
+          Bluetooth setup works in Chrome, Edge or Opera on a computer or an Android phone.
+        </p>
       </div>
 
-      {/* Wi-Fi Networks Modal */}
-      <Modal
-        title={<span className="text-white">Select Wi-Fi Network</span>}
-        open={showWifiModal}
-        onCancel={() => setShowWifiModal(false)}
-        footer={null}
-        width={500}
-        styles={{
-          content: { backgroundColor: '#1f2937' },
-          header: { backgroundColor: '#1f2937', borderBottom: '1px solid #374151' }
-        }}
-      >
-        <List
-          dataSource={wifiNetworks}
-          renderItem={(network) => (
-            <List.Item
-              onClick={() => selectWifiNetwork(network.ssid)}
-              className="cursor-pointer hover:bg-gray-700 px-4 py-3 rounded-lg transition-colors"
-              style={{ borderBottom: '1px solid #374151' }}
-            >
-              <div className="flex items-center justify-between w-full">
-                <div className="flex items-center gap-3">
-                  <WifiOutlined className="text-blue-400 text-xl" />
-                  <span className="text-white font-medium">{network.ssid}</span>
-                </div>
-                <span className="text-gray-400 text-sm">
-                  {network.rssi} dBm
-                </span>
-              </div>
-            </List.Item>
-          )}
-          className="max-h-96 overflow-y-auto"
-        />
+      {/* Wi-Fi networks the device can see */}
+      <Modal open={showWifiModal} onClose={() => setShowWifiModal(false)} title="Choose a Wi-Fi network">
+        <ul className="divide-y divide-slate-100">
+          {wifiNetworks.map(network => (
+            <li key={network.ssid}>
+              <button
+                onClick={() => selectWifiNetwork(network.ssid)}
+                className="flex w-full items-center gap-3 py-3 text-left hover:bg-slate-50"
+              >
+                <BrandIcon name="wifi" size={22} />
+                <span className="flex-1 font-semibold text-ink-900">{network.ssid}</span>
+                <span className="text-sm text-ink-500">{network.rssi} dBm</span>
+              </button>
+            </li>
+          ))}
+        </ul>
       </Modal>
-
     </div>
   );
 };
