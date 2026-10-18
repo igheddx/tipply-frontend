@@ -177,7 +177,7 @@ export function SongPickerSheet({ open, deviceUuid, current, onClose, onPick }: 
                   ))}
                   {!loading && songs.length === 0 && (
                     <li className="px-2 py-10 text-center text-sm text-ink-500">
-                      {query.trim() ? `No songs match “${query.trim()}”.` : 'No songs yet.'}
+                      {query.trim() ? `No songs match “${query.trim()}”.` : 'This performer has not added any songs yet. You can still send a tip.'}
                       {query.trim() && (
                         <button type="button" onClick={() => setQuery('')} className="mt-2 block w-full font-semibold text-brand-700">
                           Show all songs

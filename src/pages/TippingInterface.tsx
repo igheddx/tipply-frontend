@@ -883,9 +883,8 @@ const TippingInterface: React.FC = () => {
   const performerName =
     deviceInfo?.stageName || `${deviceInfo?.ownerFirstName ?? ''} ${deviceInfo?.ownerLastName ?? ''}`.trim()
   const ready = !!deviceInfo && !!userId
-  // songCount is undefined only while the API is older than this page: keep showing the button then
-  const canRequestSong =
-    !!deviceInfo?.isAllowSongRequest && (deviceInfo.songCount === undefined || deviceInfo.songCount > 0)
+  // Always offer the button when the performer allows song requests; the picker explains an empty catalog
+  const canRequestSong = !!deviceInfo?.isAllowSongRequest
 
   const paymentModal = (
     <Suspense fallback={null}>
