@@ -34,8 +34,8 @@ describe('SongManagement Component', () => {
     it('renders search input fields', () => {
       render(<SongManagement profileId={mockProfileId} />)
       
-      const titleInput = screen.getByPlaceholderText(/e.g., Your Love Is King/)
-      const artistInput = screen.getByPlaceholderText(/e.g., Sade/)
+      const titleInput = screen.getByPlaceholderText(/Your Love Is King/)
+      const artistInput = screen.getByPlaceholderText(/Sade/)
       
       expect(titleInput).toBeInTheDocument()
       expect(artistInput).toBeInTheDocument()
@@ -59,8 +59,8 @@ describe('SongManagement Component', () => {
 
       render(<SongManagement profileId={mockProfileId} />)
 
-      const titleInput = screen.getByPlaceholderText(/e.g., Your Love Is King/)
-      const artistInput = screen.getByPlaceholderText(/e.g., Sade/)
+      const titleInput = screen.getByPlaceholderText(/Your Love Is King/)
+      const artistInput = screen.getByPlaceholderText(/Sade/)
       const searchButton = screen.getByRole('button', { name: /search/i })
 
       await userEvent.type(titleInput, 'Your Love Is King')
@@ -93,7 +93,7 @@ describe('SongManagement Component', () => {
 
       render(<SongManagement profileId={mockProfileId} />)
 
-      const titleInput = screen.getByPlaceholderText(/e.g., Your Love Is King/)
+      const titleInput = screen.getByPlaceholderText(/Your Love Is King/)
       const searchButton = screen.getByRole('button', { name: /search/i })
 
       await userEvent.type(titleInput, 'Your Love Is King')
@@ -112,7 +112,7 @@ describe('SongManagement Component', () => {
 
       render(<SongManagement profileId={mockProfileId} />)
 
-      const titleInput = screen.getByPlaceholderText(/e.g., Your Love Is King/)
+      const titleInput = screen.getByPlaceholderText(/Your Love Is King/)
       const searchButton = screen.getByRole('button', { name: /search/i })
 
       await userEvent.type(titleInput, 'NonExistentSong')
@@ -136,26 +136,26 @@ describe('SongManagement Component', () => {
     it('renders upload tab', () => {
       render(<SongManagement profileId={mockProfileId} />)
 
-      const uploadTab = screen.getByRole('button', { name: /upload songs/i })
+      const uploadTab = screen.getByRole('tab', { name: /upload a list/i })
       expect(uploadTab).toBeInTheDocument()
     })
 
     it('displays file upload area', () => {
       render(<SongManagement profileId={mockProfileId} />)
 
-      const uploadTab = screen.getByRole('button', { name: /upload songs/i })
+      const uploadTab = screen.getByRole('tab', { name: /upload a list/i })
       fireEvent.click(uploadTab)
 
-      expect(screen.getByText(/drag and drop your file here/i)).toBeInTheDocument()
+      expect(screen.getByText(/drag a file here/i)).toBeInTheDocument()
     })
 
     it('handles file selection', async () => {
       render(<SongManagement profileId={mockProfileId} />)
 
-      const uploadTab = screen.getByRole('button', { name: /upload songs/i })
+      const uploadTab = screen.getByRole('tab', { name: /upload a list/i })
       fireEvent.click(uploadTab)
 
-      const fileInput = screen.getByRole('button', { name: /select file/i }).parentElement?.querySelector('input[type="file"]')
+      const fileInput = screen.document.querySelector('input[type="file"]')
       
       if (fileInput) {
         const file = new File(['title,artist,album,genre\nYour Love Is King,Sade,Diamond Life,Soul'], 'songs.csv', { type: 'text/csv' })
@@ -172,7 +172,7 @@ describe('SongManagement Component', () => {
     it('renders my catalog tab', () => {
       render(<SongManagement profileId={mockProfileId} />)
 
-      const catalogTab = screen.getByRole('button', { name: /my catalog/i })
+      const catalogTab = screen.getByRole('tab', { name: /my catalog/i })
       expect(catalogTab).toBeInTheDocument()
     })
 
@@ -181,7 +181,7 @@ describe('SongManagement Component', () => {
 
       render(<SongManagement profileId={mockProfileId} />)
 
-      const catalogTab = screen.getByRole('button', { name: /my catalog/i })
+      const catalogTab = screen.getByRole('tab', { name: /my catalog/i })
       fireEvent.click(catalogTab)
 
       // Component should be in loading state
@@ -211,7 +211,7 @@ describe('SongManagement Component', () => {
 
       render(<SongManagement profileId={mockProfileId} />)
 
-      const catalogTab = screen.getByRole('button', { name: /my catalog/i })
+      const catalogTab = screen.getByRole('tab', { name: /my catalog/i })
       fireEvent.click(catalogTab)
 
       await waitFor(() => {
@@ -245,7 +245,7 @@ describe('SongManagement Component', () => {
 
       render(<SongManagement profileId={mockProfileId} />)
 
-      const catalogTab = screen.getByRole('button', { name: /my catalog/i })
+      const catalogTab = screen.getByRole('tab', { name: /my catalog/i })
       fireEvent.click(catalogTab)
 
       await waitFor(() => {
@@ -275,7 +275,7 @@ describe('SongManagement Component', () => {
 
       render(<SongManagement profileId={mockProfileId} />)
 
-      const catalogTab = screen.getByRole('button', { name: /my catalog/i })
+      const catalogTab = screen.getByRole('tab', { name: /my catalog/i })
       fireEvent.click(catalogTab)
 
       await waitFor(() => {
