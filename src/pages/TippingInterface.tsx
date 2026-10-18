@@ -189,8 +189,16 @@ const TippingInterface: React.FC = () => {
   // Initialize user
   useEffect(() => {
     const initializeUser = async () => {
-      // Restore device ID from IndexedDB if localStorage was cleared
-      const restoredId = await restoreDeviceIdFromIndexedDB()
+      // Tipping needs the user ID. Use the saved one right away: IndexedDB can be slow or never answer
+      // (seen on iPhones), which used to leave every tip button silently doing nothing.
+      const savedId = localStorage.getItem('unique_device_id')
+      if (savedId) setUserId(savedId)
+
+      // Restore device ID from IndexedDB if localStorage was cleared (give up after 2 seconds)
+      const restoredId = await Promise.race([
+        restoreDeviceIdFromIndexedDB(),
+        new Promise<null>(resolve => setTimeout(() => resolve(null), 2000))
+      ])
       
       // Get unique device ID (random UUID stored persistently)
       const uniqueDeviceId = getUniqueDeviceId()
@@ -756,7 +764,12 @@ const TippingInterface: React.FC = () => {
   }
 
   const handleTipClick = (amount: number) => {
-    if (isDebouncing || !deviceInfo || !userId) return
+    if (isDebouncing) return
+    if (!deviceInfo || !userId) {
+      logger.log('⏳ [handleTipClick] Not ready yet - deviceInfo:', !!deviceInfo, 'userId:', !!userId)
+      toast.error('Still loading, please try again in a moment')
+      return
+    }
 
     logger.log('🎯 [handleTipClick] Called with amount:', amount, 'selectedSong:', selectedSong)
 
