@@ -1,4 +1,9 @@
 import logger from "../utils/logger";
+import { PortalShell, type PortalNavItem } from '../components/portal/PortalShell'
+import { HomeTab, type HomeData } from '../components/portal/HomeTab'
+import { Button, Card, EmptyState, PageHeader, StatusChip, type ChipKind } from '../components/ui'
+import { BrandIcon } from '../components/icons/BrandIcons'
+import { Switch } from '../components/ui/Switch'
 import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import apiService from '../services/api'
@@ -7,9 +12,7 @@ import SongRequestMonitor from '../components/SongRequestMonitor'
 import { API_BASE_URL } from '../utils/config'
 import { DEFAULT_TIP_AMOUNTS, TIP_AMOUNT_COUNT, LIGHT_EFFECTS, SOUND_OPTIONS, VOLUME_OPTIONS, DEFAULT_SOUND_ID, DEFAULT_SOUND_VOLUME, DEFAULT_EFFECT_CONFIG, normalizeEffectConfig, effectForAmount, buildEffectConfig } from '../utils/deviceConfig'
 import TipAmountsEditor from '../components/TipAmountsEditor'
-import PauseDeviceButton from '../components/PauseDeviceButton'
-import { CrownOutlined } from '@ant-design/icons'
-import { LineChart, Line, ScatterChart, Scatter, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
+import { ScatterChart, Scatter, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 
 interface DashboardStats {
   totalDevices: number
@@ -34,6 +37,8 @@ interface DashboardMetrics {
   thisWeekTips: number
   thisWeekTipsCount: number
   thisMonthTips: number
+  failedTips?: number
+  failedTipsCount?: number
   lastMonthTips: number
   trendPercentage: number
   trendDirection: string
@@ -66,7 +71,8 @@ interface DeviceSummary {
 interface TipSummary {
   id: string
   amount: number
-  deviceNickname: string
+  deviceId?: string
+  deviceNickname?: string
   createdAt: string
   status: string
 }
@@ -121,7 +127,10 @@ const Dashboard: React.FC = () => {
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null)
   const [recentTips, setRecentTips] = useState<TipSummary[]>([])
   const [loading, setLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState('overview')
+  const [activeTab, setActiveTab] = useState(() => {
+    const t = new URLSearchParams(window.location.search).get('tab')
+    return t && ['devices', 'tips', 'songs', 'monitor'].includes(t) ? t : 'overview'
+  })
   const [showStripeAlert, setShowStripeAlert] = useState(false)
   const [stripeEnabledDevices, setStripeEnabledDevices] = useState<string[]>([])
   const [userProfile, setUserProfile] = useState<any>(null)
@@ -132,8 +141,6 @@ const Dashboard: React.FC = () => {
     : DEFAULT_TIP_AMOUNTS
   const [stripeMetricsLoading, setStripeMetricsLoading] = useState(true)
   const [insights, setInsights] = useState<PerformerInsights | null>(null)
-  const [weeklyChartData, setWeeklyChartData] = useState<any[]>([])
-  const [trendData, setTrendData] = useState<any[]>([])
   const [tipTimelinePoints, setTipTimelinePoints] = useState<TipPoint[]>([])
   const [filteredTipPoints, setFilteredTipPoints] = useState<TipPoint[]>([])
   const [startDateTime, setStartDateTime] = useState('')
@@ -148,7 +155,7 @@ const Dashboard: React.FC = () => {
   }
   
   // Add Device Form States
-  const [showAddDeviceForm, setShowAddDeviceForm] = useState(false)
+  const [, setShowAddDeviceForm] = useState(false)
   const [addDeviceForm, setAddDeviceForm] = useState({
     serialNumber: '', // Changed from deviceUuid to serialNumber
     nickname: '',
@@ -183,10 +190,9 @@ const Dashboard: React.FC = () => {
   const [songRequests, setSongRequests] = useState<any[]>([])
   
   // Song Catalog Alert States
-  const [showSongCatalogAlert, setShowSongCatalogAlert] = useState(false)
+  const [, setShowSongCatalogAlert] = useState(false)
   const [songCatalogCount, setSongCatalogCount] = useState(0)
   const [downloadingDeviceId, setDownloadingDeviceId] = useState<string | null>(null)
-  const [showHeaderMenu, setShowHeaderMenu] = useState(false)
   
   const navigate = useNavigate()
 
@@ -413,7 +419,7 @@ const Dashboard: React.FC = () => {
               setRecentTips(tipsResp.data.map((tip: any) => ({
                 id: tip.id,
                 amount: tip.amount,
-                deviceNickname: 'Device',
+                deviceId: tip.deviceId,
                 createdAt: tip.createdAt,
                 status: tip.status
               })))
@@ -440,43 +446,6 @@ const Dashboard: React.FC = () => {
 
     refreshData()
   }, [activeTab, userProfile?.id, stats?.devices, recentTips.length, deletedDevices.length])
-
-  // Process weekly chart data when insights change
-  useEffect(() => {
-    if (!insights?.weeklyTips) return
-
-    const chartData = insights.weeklyTips.map(week => {
-      const weekDate = new Date(week.weekStart)
-      const formattedWeek = `${weekDate.getMonth() + 1}/${weekDate.getDate()}`
-      return {
-        week: formattedWeek,
-        totalTips: week.totalAmount,
-        uniqueAudience: week.uniqueTippers
-      }
-    })
-
-    setWeeklyChartData(chartData)
-
-    // Calculate trend line
-    const validDataPoints = chartData.filter(d => d.totalTips > 0)
-    if (validDataPoints.length >= 2) {
-      const n = validDataPoints.length
-      const sumX = validDataPoints.reduce((sum, _, i) => sum + i, 0)
-      const sumY = validDataPoints.reduce((sum, d) => sum + d.totalTips, 0)
-      const sumXY = validDataPoints.reduce((sum, d, i) => sum + i * d.totalTips, 0)
-      const sumX2 = validDataPoints.reduce((sum, _, i) => sum + i * i, 0)
-
-      const slope = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX)
-      const intercept = (sumY - slope * sumX) / n
-
-      const trend = chartData.map((d, i) => ({
-        week: d.week,
-        trend: slope * i + intercept
-      }))
-
-      setTrendData(trend)
-    }
-  }, [insights])
 
   // Set default date/time range (last 10 hours)
   useEffect(() => {
@@ -582,7 +551,7 @@ const Dashboard: React.FC = () => {
         setRecentTips(tipsResp.data.map((tip: any) => ({
           id: tip.id,
           amount: tip.amount,
-          deviceNickname: 'Device',
+          deviceId: tip.deviceId,
           createdAt: tip.createdAt,
           status: tip.status
         })))
@@ -637,13 +606,6 @@ const Dashboard: React.FC = () => {
 
   const dismissStripeAlert = () => {
     setShowStripeAlert(false)
-  }
-
-  const dismissSongCatalogAlert = () => {
-    if (userProfile?.id) {
-      localStorage.setItem(`songCatalogAlertDismissed_${userProfile.id}`, 'true')
-    }
-    setShowSongCatalogAlert(false)
   }
 
   // Add Device Functions
@@ -1455,6 +1417,107 @@ const Dashboard: React.FC = () => {
 
   const hasSongRequestEnabled = stats?.devices?.some(device => device.isAllowSongRequest) ?? false
 
+  const displayName = userProfile?.stageName || `${userProfile?.firstName || ''} ${userProfile?.lastName || ''}`.trim() || 'Performer'
+
+  const navItems: PortalNavItem[] = [
+    { id: 'overview', label: 'Home', icon: 'home' },
+    { id: 'devices', label: 'Devices', icon: 'device' },
+    { id: 'tips', label: 'Tips', icon: 'coin' },
+    { id: 'songs', label: 'Songs', icon: 'music' },
+    ...(hasSongRequestEnabled ? [{ id: 'monitor', label: 'Live', icon: 'mic' } as PortalNavItem] : []),
+    ...(userProfile?.role === 'root_admin' ? [{ id: 'admin', label: 'Admin', icon: 'shield' } as PortalNavItem] : [])
+  ]
+
+  const handleNavSelect = (id: string) => {
+    if (id === 'admin') {
+      navigate('/admin')
+      return
+    }
+    setShowAddDeviceForm(false)
+    setActiveTab(id)
+    window.scrollTo({ top: 0 })
+  }
+
+  const PAGE_TITLES: Record<string, { title: string; subtitle?: string }> = {
+    devices: { title: 'Devices', subtitle: 'Your Tipwave devices, tip amounts and QR codes.' },
+    tips: { title: 'Tips', subtitle: 'Your latest tips and whether they have been charged.' },
+    songs: { title: 'Song catalog', subtitle: 'The songs your audience can pick from.' },
+    monitor: { title: 'Live requests', subtitle: 'Song requests as they come in.' }
+  }
+
+  const deviceList = stats.devices ?? []
+  const weekRows = (insights?.weeklyTips ?? []).slice(-8).map(w => {
+    const d = new Date(w.weekStart)
+    return { week: `${d.getMonth() + 1}/${d.getDate()}`, total: w.totalAmount }
+  })
+  const homeData: HomeData = {
+    firstName: userProfile?.firstName || userProfile?.stageName || '',
+    today: { amount: metrics ? metrics.todaysTips : stats.todayTipsReceived, count: stats.todayTipsCount },
+    month: {
+      amount: metrics ? metrics.thisMonthTips : stats.thisMonthTipsReceived,
+      count: stats.thisMonthTipsCount,
+      trendPercent: metrics?.trendPercentage ?? 0,
+      trendDirection: metrics?.trendDirection ?? 'up'
+    },
+    pendingTips: metrics?.pendingTips ?? 0,
+    failedTips: metrics?.failedTips ?? 0,
+    failedTipsCount: metrics?.failedTipsCount ?? 0,
+    scheduledPayouts: metrics?.stripeFuturePayouts ?? 0,
+    inTransit: metrics?.stripeInTransit ?? 0,
+    available: metrics?.stripeAvailableBalance ?? 0,
+    lifetime: metrics?.stripeLifetimeVolume ?? 0,
+    balancesLoading: stripeMetricsLoading,
+    devices: {
+      total: deviceList.length,
+      paused: deviceList.filter(d => d.isPaused).length,
+      active: deviceList.filter(d => d.isOnline && !d.isPaused).length,
+      offline: deviceList.filter(d => !d.isOnline && !d.isPaused).length
+    },
+    weeks: weekRows,
+    nextSteps: [
+      {
+        id: 'device',
+        icon: 'device',
+        title: 'Add your first device',
+        detail: 'Register the Tipwave device you will perform with.',
+        done: stats.totalDevices > 0,
+        actionLabel: 'Add device',
+        onAction: handleAddDeviceClick
+      },
+      {
+        id: 'payouts',
+        icon: 'bank',
+        title: 'Set up payouts',
+        detail: 'Verify your identity with Stripe so tips can reach your bank.',
+        done: !!userProfile?.stripeAccountId,
+        actionLabel: 'Set up',
+        onAction: () => navigate('/profile')
+      },
+      ...(hasSongRequestEnabled
+        ? [
+            {
+              id: 'songs',
+              icon: 'music' as const,
+              title: 'Add songs to your catalog',
+              detail: 'Fans can only request songs that are in your catalog.',
+              done: songCatalogCount > 0,
+              actionLabel: 'Add songs',
+              onAction: () => setActiveTab('songs')
+            }
+          ]
+        : []),
+      {
+        id: 'photo',
+        icon: 'user',
+        title: 'Add a profile photo',
+        detail: 'It appears at the top of your tipping page.',
+        done: !!userProfile?.profilePhotoUrl,
+        actionLabel: 'Add photo',
+        onAction: () => navigate('/profile')
+      }
+    ]
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 text-gray-900">
       {/* KYC Result Alert */}
@@ -1502,475 +1565,318 @@ const Dashboard: React.FC = () => {
 
 
 
-      {/* Header */}
-              <div className="bg-white shadow-sm border-b">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex justify-between items-center py-[21px]">
-            {/* Left side - Logo */}
-            <div className="flex items-center">
-              <div className="relative w-12 h-12 overflow-visible rounded-lg">
-                <img
-                  src="/images/logo/tipwave-logo2b.png?v=20260208"
-                  alt="Tipwave Logo"
-                  className="w-full h-full object-contain"
-                  style={{ transform: 'scale(4)', objectPosition: 'center' }}
-                />
-              </div>
-            </div>
-
-            {/* Right side - Actions */}
-            <div className="flex items-center space-x-4">
-              {hasSongRequestEnabled && (
-                <button
-                  onClick={() => setShowMonitorFullscreen(true)}
-                  className="bg-gradient-to-r from-purple-600 to-blue-600 text-white px-3 py-2 sm:px-4 rounded-lg hover:from-purple-700 hover:to-blue-700 transition-all duration-200 font-medium text-sm flex items-center space-x-2 shadow-sm hover:shadow-md"
-                >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                  </svg>
-                  <span className="sm:hidden">Monitor Songs</span>
-                  <span className="hidden sm:inline">Monitor Songs</span>
-                </button>
-              )}
-              {/* Hamburger Menu */}
-              <div className="relative">
-                <button
-                  onClick={() => setShowHeaderMenu((prev) => !prev)}
-                  className="p-2 text-gray-500 hover:text-gray-700 transition-colors"
-                  title="Menu"
-                >
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-                  </svg>
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {showHeaderMenu && (
-        <div className="fixed inset-0 z-50">
-          <div
-            className="absolute inset-0 bg-black/40"
-            onClick={() => setShowHeaderMenu(false)}
-            aria-hidden="true"
-          />
-          <div className="absolute right-0 top-0 h-full w-64 bg-white shadow-xl flex flex-col">
-            <div className="flex items-center justify-between px-4 py-4 border-b border-gray-200">
-              <span className="text-sm font-semibold text-gray-800">Menu</span>
-              <button
-                onClick={() => setShowHeaderMenu(false)}
-                className="p-2 text-gray-500 hover:text-gray-700"
-                aria-label="Close menu"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-            <div className="flex flex-col py-2">
-              <button
-                onClick={() => {
-                  setShowHeaderMenu(false)
-                  navigate('/profile')
-                }}
-                className="w-full flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                </svg>
-                <span>Profile</span>
-              </button>
-              {userProfile?.role === 'root_admin' && (
-                <button
-                  onClick={() => {
-                    setShowHeaderMenu(false)
-                    navigate('/admin')
-                  }}
-                  className="w-full flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50"
-                >
-                  <CrownOutlined className="text-base text-purple-700" />
-                  <span>Admin</span>
-                </button>
-              )}
-              <button
-                onClick={() => {
-                  setShowHeaderMenu(false)
-                  handleLogout()
-                }}
-                className="w-full flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                </svg>
-                <span>Logout</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Welcome Message - Moved outside header */}
-        <div className="mb-8 flex justify-between items-start">
-          <div>
-            <h2 className="text-3xl font-bold text-gray-900 mb-2">
-              Welcome back, {userProfile?.firstName || userProfile?.stageName || 'Performer'}!
-            </h2>
-            <p className="text-gray-600">
-              Here's how you're connecting with your audience and building meaningful social connections today.
-            </p>
-            {stripeMetricsLoading && (
-              <div className="mt-3 inline-flex items-center gap-2 bg-blue-50 text-blue-700 text-sm px-3 py-2 rounded-full border border-blue-100 shadow-sm">
-                <svg className="w-4 h-4 animate-spin text-blue-600" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
-                </svg>
-                <span>Updating payouts and balances...</span>
-              </div>
-            )}
-          </div>
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => refreshDashboard()}
-              className="flex items-center justify-center p-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors duration-200 shadow-sm hover:shadow-md"
-              aria-label="Refresh dashboard data"
-              title="Refresh dashboard data"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-              </svg>
-            </button>
-          </div>
-        </div>
-
-        {/* Song Catalog Alert */}
-        {showSongCatalogAlert && songCatalogCount === 0 && (
-          <div className="mb-6">
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 shadow-sm">
-              <div className="flex items-start">
-                <div className="flex-shrink-0">
-                  <svg className="h-5 w-5 text-blue-400" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-                  </svg>
-                </div>
-                <div className="ml-3 flex-1">
-                  <h3 className="text-sm font-medium text-blue-800">
-                    Add Songs to Your Catalog 🎵
-                  </h3>
-                  <div className="mt-2 text-sm text-blue-700">
-                    <p>
-                      You've enabled song requests for your devices! Get started by adding songs to your catalog so your audience can request their favorites when they tip.
-                    </p>
-                    <button
-                      onClick={() => {
-                        setActiveTab('songs')
-                        // Scroll to songs section after tab change
-                        setTimeout(() => {
-                          const songsSection = document.getElementById('songs-section')
-                          if (songsSection) {
-                            songsSection.scrollIntoView({ behavior: 'smooth', block: 'start' })
-                          }
-                        }, 100) // Small delay to ensure tab change completes
-                      }}
-                      className="mt-2 text-blue-800 hover:text-blue-900 font-medium underline"
-                    >
-                      Add songs now →
-                    </button>
-                  </div>
-                </div>
-                <div className="ml-auto pl-3">
-                  <button
-                    onClick={dismissSongCatalogAlert}
-                    className="inline-flex text-blue-400 hover:text-blue-600 focus:outline-none focus:text-blue-600"
-                  >
-                    <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-                    </svg>
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
+      <PortalShell
+        items={navItems}
+        active={activeTab === 'addDevice' ? 'devices' : activeTab}
+        onSelect={handleNavSelect}
+        userName={displayName}
+        userPhotoUrl={userProfile?.profilePhotoUrl || undefined}
+        onOpenProfile={() => navigate('/profile')}
+        onLogout={handleLogout}
+      >
+        {activeTab !== 'overview' && activeTab !== 'addDevice' && (
+          <PageHeader title={PAGE_TITLES[activeTab]?.title || ''} subtitle={PAGE_TITLES[activeTab]?.subtitle} />
         )}
+        <div>
+            {activeTab === 'overview' && (
+              <HomeTab
+                data={homeData}
+                formatCurrency={formatCurrency}
+                onGoToDevices={() => (stats.totalDevices === 0 ? handleAddDeviceClick() : setActiveTab('devices'))}
+                onGoToTips={() => setActiveTab('tips')}
+              />
+            )}
 
-        {/* Stats Overview */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 mb-8">
-          {/* Pending Tips Card */}
-          <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-4 transform hover:scale-105 transition-all duration-200">
-            <div className="flex flex-col items-center text-center">
-              <div className="flex-shrink-0 mb-3">
-                <div className="w-10 h-10 bg-orange-500 rounded-lg flex items-center justify-center">
-                  <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
+            {activeTab === 'devices' && (
+              <div className="space-y-5">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button icon="plus" onClick={handleAddDeviceClick}>
+                    Add device
+                  </Button>
+                  <Button variant="secondary" icon="wifi" onClick={() => window.open(getDeviceSetupUrl(), '_blank')}>
+                    Connect a device to Wi-Fi
+                  </Button>
+                  <Button variant="ghost" icon="refresh" onClick={refreshDashboard} aria-label="Refresh device status" title="Refresh device status" />
                 </div>
-              </div>
-              <div>
-                <p className="text-xs font-medium text-gray-700 mb-1">Pending Tips</p>
-                <p className="text-lg font-bold text-gray-900 mb-1">
-                  {metrics ? formatCurrency(metrics.pendingTips) : '$0.00'}
-                </p>
-                <p className="text-xs text-gray-600">Awaiting processing</p>
-              </div>
-            </div>
-          </div>
 
-          {/* Today's Tips */}
-          <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-4 transform hover:scale-105 transition-all duration-200">
-            <div className="flex flex-col items-center text-center">
-              <div className="flex-shrink-0 mb-3">
-                <div className="w-10 h-10 bg-cyan-500 rounded-lg flex items-center justify-center">
-                  <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                  </svg>
-                </div>
-              </div>
-              <div>
-                <p className="text-xs font-medium text-gray-700 mb-1">Today's Tips</p>
-                <p className="text-lg font-bold text-gray-900 mb-1">
-                  {metrics ? formatCurrency(metrics.todaysTips) : formatCurrency(stats.todayTipsReceived)}
-                </p>
-                <p className="text-xs text-gray-600">
-                  {metrics ? `${Math.round(metrics.todaysTips)} tips` : `${stats.todayTipsCount} tips`}
-                </p>
-              </div>
-            </div>
-          </div>
+                {stats.devices.length === 0 && (
+                  <Card>
+                    <EmptyState
+                      icon="device"
+                      title="No devices yet"
+                      action={<Button onClick={handleAddDeviceClick}>Add your first device</Button>}
+                    >
+                      Add the Tipwave device you perform with. You will get a QR code for your audience.
+                    </EmptyState>
+                  </Card>
+                )}
 
-          {/* Future Payouts */}
-          <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-4 transform hover:scale-105 transition-all duration-200">
-            <div className="flex flex-col items-center text-center">
-              <div className="flex-shrink-0 mb-3">
-                <div className="w-10 h-10 bg-amber-500 rounded-lg flex items-center justify-center">
-                  <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                </div>
-              </div>
-              <div>
-                <p className="text-xs font-medium text-gray-700 mb-1">Future Payouts</p>
-                <p className="text-lg font-bold text-gray-900 mb-1">
-                  {metrics ? formatCurrency(metrics.stripeFuturePayouts) : '$0.00'}
-                </p>
-                <p className="text-xs text-gray-600">Scheduled</p>
-              </div>
-            </div>
-          </div>
+                <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+                  {stats.devices.map(device => {
+                    const chip: ChipKind = device.isPaused ? 'paused' : device.isOnline ? 'active' : 'offline'
+                    const busyConfig = updatingDeviceConfig === device.id
+                    return (
+                      <Card key={device.id}>
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <h3 className="truncate text-lg font-bold text-ink-900">{device.nickname || 'Unnamed device'}</h3>
+                            <p className="mt-0.5 truncate text-xs text-ink-400">ID {device.uuid}</p>
+                          </div>
+                          <StatusChip kind={chip} />
+                        </div>
 
-          {/* In Transit to Bank */}
-          <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-4 transform hover:scale-105 transition-all duration-200">
-            <div className="flex flex-col items-center text-center">
-              <div className="flex-shrink-0 mb-3">
-                <div className="w-10 h-10 bg-sky-500 rounded-lg flex items-center justify-center">
-                  <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
-                  </svg>
-                </div>
-              </div>
-              <div>
-                <p className="text-xs font-medium text-gray-700 mb-1">In Transit</p>
-                <p className="text-lg font-bold text-gray-900 mb-1">
-                  {metrics ? formatCurrency(metrics.stripeInTransit) : '$0.00'}
-                </p>
-                <p className="text-xs text-gray-600">To bank</p>
-              </div>
-            </div>
-          </div>
+                        <dl className="mt-4 grid grid-cols-3 gap-3 rounded-xl bg-surface p-3 text-center">
+                          <div>
+                            <dt className="text-xs text-ink-500">Tips</dt>
+                            <dd className="text-base font-bold text-ink-900">{device.totalTipsCount}</dd>
+                          </div>
+                          <div>
+                            <dt className="text-xs text-ink-500">Earned</dt>
+                            <dd className="text-base font-bold text-ink-900">{formatCurrency(device.totalTipsReceived)}</dd>
+                          </div>
+                          <div>
+                            <dt className="text-xs text-ink-500">Last tip</dt>
+                            <dd className="text-sm font-semibold text-ink-900">
+                              {device.totalTipsCount > 0 ? formatDate(device.lastTipReceived) : 'No tips yet'}
+                            </dd>
+                          </div>
+                        </dl>
 
-          {/* Total Balance / Available Balance */}
-          <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-4 transform hover:scale-105 transition-all duration-200">
-            <div className="flex flex-col items-center text-center">
-              <div className="flex-shrink-0 mb-3">
-                <div className="w-10 h-10 bg-green-500 rounded-lg flex items-center justify-center">
-                  <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
-                  </svg>
-                </div>
-              </div>
-              <div>
-                <p className="text-xs font-medium text-gray-700 mb-1">Total Balance</p>
-                <p className="text-lg font-bold text-gray-900 mb-1">
-                  {metrics ? formatCurrency(metrics.stripeAvailableBalance) : '$0.00'}
-                </p>
-                <p className="text-xs text-gray-600">Available now</p>
-              </div>
-            </div>
-          </div>
+                        <div className="mt-4 flex flex-wrap gap-2">
+                          <Button
+                            icon="download"
+                            loading={downloadingDeviceId === device.id}
+                            onClick={() => downloadQRCode(device.id, device.nickname)}
+                          >
+                            Download QR code
+                          </Button>
+                          <Button variant="secondary" icon="qr" onClick={() => window.open(device.qrCodeUrl, '_blank')}>
+                            Open tip page
+                          </Button>
+                          <Button
+                            variant="secondary"
+                            icon={device.isPaused ? 'play' : 'pause'}
+                            loading={pausingDeviceId === device.id}
+                            onClick={() => toggleDevicePause(device.id)}
+                            title={
+                              device.isPaused
+                                ? 'Turn the light and sound back on'
+                                : 'Stops light and sound. Tips still go through.'
+                            }
+                          >
+                            {device.isPaused ? 'Resume' : 'Pause'}
+                          </Button>
+                        </div>
 
-          {/* Lifetime Volume */}
-          <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-4 transform hover:scale-105 transition-all duration-200">
-            <div className="flex flex-col items-center text-center">
-              <div className="flex-shrink-0 mb-3">
-                <div className="w-10 h-10 bg-purple-500 rounded-lg flex items-center justify-center">
-                  <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                  </svg>
-                </div>
-              </div>
-              <div>
-                <p className="text-xs font-medium text-gray-700 mb-1">Lifetime Volume</p>
-                <p className="text-lg font-bold text-gray-900 mb-1">
-                  {metrics ? formatCurrency(metrics.stripeLifetimeVolume) : '$0.00'}
-                </p>
-                <p className="text-xs text-gray-600">All-time</p>
-              </div>
-            </div>
-          </div>
+                        <div className="mt-4 flex items-center justify-between gap-4 border-t border-slate-100 pt-4">
+                          <div>
+                            <div className="text-sm font-semibold text-ink-900">Song requests</div>
+                            <div className="text-xs text-ink-500">Let people pick a song when they tip.</div>
+                          </div>
+                          <Switch
+                            checked={device.isAllowSongRequest}
+                            disabled={updatingSongRequest === device.id}
+                            label="Song requests"
+                            onChange={() => toggleSongRequestSetting(device)}
+                          />
+                        </div>
 
-          {/* Audience Count */}
-          <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-4 transform hover:scale-105 transition-all duration-200">
-            <div className="flex flex-col items-center text-center">
-              <div className="flex-shrink-0 mb-3">
-                <div className="w-10 h-10 bg-indigo-500 rounded-lg flex items-center justify-center">
-                  <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-                  </svg>
-                </div>
-              </div>
-              <div>
-                <p className="text-xs font-medium text-gray-700 mb-1">Audience</p>
-                <p className="text-lg font-bold text-gray-900 mb-1">
-                  {metrics ? (metrics.uniqueTippersAllTime || 0).toLocaleString() : '0'}
-                </p>
-                <p className="text-xs text-gray-600">Unique Tippers</p>
-              </div>
-            </div>
-          </div>
+                        <button
+                          onClick={() => setExpandedDeviceConfig(expandedDeviceConfig === device.id ? null : device.id)}
+                          aria-expanded={expandedDeviceConfig === device.id}
+                          className="mt-4 flex w-full items-center justify-between border-t border-slate-100 pt-4 text-left"
+                        >
+                          <span>
+                            <span className="block text-sm font-semibold text-ink-900">Sound and lights</span>
+                            <span className="block text-xs text-ink-500">Volume, tones and light effects for each tip amount</span>
+                          </span>
+                          <BrandIcon name={expandedDeviceConfig === device.id ? 'chevron-down' : 'chevron-right'} size={18} tone="muted" />
+                        </button>
 
-          {/* Most Tipped Denomination */}
-          <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-4 transform hover:scale-105 transition-all duration-200">
-            <div className="flex flex-col items-center text-center">
-              <div className="flex-shrink-0 mb-3">
-                <div className="w-10 h-10 bg-pink-500 rounded-lg flex items-center justify-center">
-                  <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
-                  </svg>
-                </div>
-              </div>
-              <div>
-                <p className="text-xs font-medium text-gray-700 mb-1">Most Tipped</p>
-                <p className="text-lg font-bold text-gray-900 mb-1">
-                  {metrics ? formatCurrency(metrics.mostTippedDenomination || 0) : '$0.00'}
-                </p>
-                <p className="text-xs text-gray-600">Denomination</p>
-              </div>
-            </div>
-          </div>
+                        {expandedDeviceConfig === device.id && (
+                          <div className="mt-3 space-y-4 rounded-xl bg-surface p-4">
+                            <div className="flex items-center justify-between">
+                              <span className="text-sm font-medium text-ink-700">Sound</span>
+                              <Switch
+                                checked={device.isSoundEnabled ?? false}
+                                disabled={busyConfig}
+                                label="Sound"
+                                onChange={() => saveDeviceConfig(device, { isSoundEnabled: !(device.isSoundEnabled ?? false) })}
+                              />
+                            </div>
+                            <div className="flex items-center justify-between gap-3">
+                              <span className="text-sm font-medium text-ink-700">Tone</span>
+                              <select
+                                value={device.soundId ?? DEFAULT_SOUND_ID}
+                                onChange={e => saveDeviceConfig(device, { soundId: Number(e.target.value) })}
+                                disabled={busyConfig || !(device.isSoundEnabled ?? false)}
+                                className="h-9 rounded-lg border border-slate-300 bg-white px-2 text-sm disabled:bg-slate-100 disabled:text-ink-400"
+                              >
+                                {SOUND_OPTIONS.map(option => (
+                                  <option key={option.value} value={option.value}>
+                                    {option.label}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                            <div className="flex items-center justify-between gap-3">
+                              <span className="text-sm font-medium text-ink-700">Volume</span>
+                              <select
+                                value={device.soundVolume ?? DEFAULT_SOUND_VOLUME}
+                                onChange={e => saveDeviceConfig(device, { soundVolume: e.target.value })}
+                                disabled={busyConfig || !(device.isSoundEnabled ?? false)}
+                                className="h-9 rounded-lg border border-slate-300 bg-white px-2 text-sm disabled:bg-slate-100 disabled:text-ink-400"
+                              >
+                                {VOLUME_OPTIONS.map(option => (
+                                  <option key={option.value} value={option.value}>
+                                    {option.label}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                            <div className="flex items-center justify-between">
+                              <span className="text-sm font-medium text-ink-700">Random light effect</span>
+                              <Switch
+                                checked={device.isRandomLightEffect ?? false}
+                                disabled={busyConfig}
+                                label="Random light effect"
+                                onChange={() => saveDeviceConfig(device, { isRandomLightEffect: !(device.isRandomLightEffect ?? false) })}
+                              />
+                            </div>
+                            <div className="border-t border-slate-200 pt-3">
+                              <div className="mb-2 text-sm font-semibold text-ink-900">Light effect for each tip amount</div>
+                              <div className="space-y-2">
+                                {(() => {
+                                  const effectConfig = getEffectConfig(device)
+                                  return tipAmounts.map(amount => (
+                                    <div key={amount} className="flex items-center justify-between text-sm">
+                                      <span className="font-medium text-ink-700">${amount}</span>
+                                      <select
+                                        value={effectForAmount(effectConfig, amount)}
+                                        onChange={e =>
+                                          saveDeviceConfig(device, { effectConfig: { ...effectConfig, [amount.toString()]: e.target.value } })
+                                        }
+                                        disabled={busyConfig}
+                                        className="h-9 rounded-lg border border-slate-300 bg-white px-2 text-sm"
+                                      >
+                                        {LIGHT_EFFECTS.map(effect => (
+                                          <option key={effect.value} value={effect.value}>
+                                            {effect.label}
+                                          </option>
+                                        ))}
+                                      </select>
+                                    </div>
+                                  ))
+                                })()}
+                              </div>
+                            </div>
+                            {busyConfig && <div className="text-center text-xs text-brand-700">Saving…</div>}
+                          </div>
+                        )}
 
-          {/* This Month */}
-          <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-4 transform hover:scale-105 transition-all duration-200">
-            <div className="flex flex-col items-center text-center">
-              <div className="flex-shrink-0 mb-3">
-                <div className="w-10 h-10 bg-yellow-500 rounded-lg flex items-center justify-center">
-                  <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-                  </svg>
+                        <div className="mt-4 border-t border-slate-100 pt-3">
+                          <Button
+                            variant="danger"
+                            size="sm"
+                            icon="trash"
+                            loading={isDeletingDevice === device.id}
+                            onClick={() => handleSoftDeleteDevice(device)}
+                          >
+                            Remove device
+                          </Button>
+                        </div>
+                      </Card>
+                    )
+                  })}
                 </div>
-              </div>
-              <div>
-                <div className="flex items-center justify-center space-x-2 mb-1">
-                  <p className="text-xs font-medium text-gray-700">This Month</p>
-                  {metrics && metrics.trendPercentage > 0 && (
-                    <div className={`flex items-center space-x-1 ${
-                      metrics.trendDirection === 'up' ? 'text-green-600' : 'text-red-600'
-                    }`}>
-                      {metrics.trendDirection === 'up' ? (
-                        <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                          <path fillRule="evenodd" d="M3.293 9.707a1 1 0 010-1.414l6-6a1 1 0 011.414 0l6 6a1 1 0 01-1.414 1.414L11 5.414V17a1 1 0 11-2 0V5.414L4.707 9.707a1 1 0 01-1.414 0z" clipRule="evenodd" />
-                        </svg>
+
+                <TipAmountsEditor
+                  amounts={tipAmounts}
+                  saving={tipAmountsSaving}
+                  onSave={saveTipAmounts}
+                  onReset={resetTipAmounts}
+                />
+
+                {/* Removed devices */}
+                <div>
+                  <button
+                    onClick={toggleDeletedDevices}
+                    aria-expanded={showDeletedDevices}
+                    className="flex items-center gap-2 text-sm font-semibold text-ink-500 hover:text-ink-700"
+                  >
+                    <BrandIcon name={showDeletedDevices ? 'chevron-down' : 'chevron-right'} size={16} tone="muted" />
+                    {showDeletedDevices ? 'Hide' : 'Show'} removed devices
+                  </button>
+
+                  {showDeletedDevices && (
+                    <div className="mt-3 grid grid-cols-1 gap-4 lg:grid-cols-2">
+                      {deletedDevices.length === 0 ? (
+                        <p className="text-sm text-ink-500">No removed devices.</p>
                       ) : (
-                        <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                          <path fillRule="evenodd" d="M16.707 10.293a1 1 0 010 1.414l-6 6a1 1 0 01-1.414 0l-6-6a1 1 0 111.414-1.414L9 14.586V3a1 1 0 012 0v11.586l4.293-4.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                        </svg>
+                        deletedDevices.map(device => (
+                          <Card key={device.id}>
+                            <div className="flex items-center justify-between gap-3">
+                              <div className="min-w-0">
+                                <div className="truncate font-bold text-ink-900">{device.nickname || 'Unnamed device'}</div>
+                                <div className="truncate text-xs text-ink-400">ID {device.uuid}</div>
+                                {device.deletedAt && (
+                                  <div className="mt-1 text-xs text-ink-500">Removed {formatDate(device.deletedAt)}</div>
+                                )}
+                              </div>
+                              <Button
+                                variant="secondary"
+                                size="sm"
+                                icon="refresh"
+                                loading={isRestoringDevice === device.id}
+                                onClick={() => handleRestoreDevice(device.id)}
+                              >
+                                Restore
+                              </Button>
+                            </div>
+                          </Card>
+                        ))
                       )}
-                      <span className="text-xs font-medium">
-                        {metrics.trendPercentage.toFixed(1)}%
-                      </span>
                     </div>
                   )}
                 </div>
-                <p className="text-lg font-bold text-gray-900 mb-1">
-                  {metrics ? formatCurrency(metrics.thisMonthTips) : formatCurrency(stats.thisMonthTipsReceived)}
-                </p>
-                <p className="text-xs text-gray-600">
-                  {metrics ? `${Math.round(metrics.thisMonthTips)} tips` : `${stats.thisMonthTipsCount} tips`}
-                </p>
               </div>
-            </div>
-          </div>
+            )}
 
-          {/* Active Devices */}
-          <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-4 transform hover:scale-105 transition-all duration-200">
-            <div className="flex flex-col items-center text-center">
-              <div className="flex-shrink-0 mb-3">
-                <div className="w-10 h-10 bg-fuchsia-500 rounded-lg flex items-center justify-center">
-                  <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-                  </svg>
-                </div>
-              </div>
-              <div>
-                <p className="text-xs font-medium text-gray-700 mb-1">Active Devices</p>
-                <p className="text-lg font-bold text-gray-900 mb-1">{stats.activeDevices}</p>
-                <p className="text-xs text-gray-600">of {stats.totalDevices} total</p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Weekly Performance Chart */}
-        {weeklyChartData.length > 0 && (
-          <div className="bg-white rounded-lg shadow-sm p-6 mb-8">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Last 8 Weeks Performance</h3>
-            <ResponsiveContainer width="100%" height={300}>
-              <LineChart data={weeklyChartData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="week" />
-                    <YAxis yAxisId="left" domain={[0, 'auto']} />
-                    <YAxis yAxisId="right" orientation="right" domain={[0, 'auto']} />
-                <Tooltip 
-                  content={({ active, payload }) => {
-                    if (active && payload && payload.length) {
+            {activeTab === 'tips' && (
+              <Card
+                title="Last 24 hours"
+                subtitle="Your 10 most recent tips. Waiting tips are charged in the next batch."
+                flush
+              >
+                {recentTips.length === 0 ? (
+                  <EmptyState icon="coin" title="No tips in the last 24 hours">
+                    New tips show up here the moment someone sends one.
+                  </EmptyState>
+                ) : (
+                  <ul className="divide-y divide-slate-100 px-5 pb-2">
+                    {recentTips.map(tip => {
+                      const device = (stats.devices ?? []).find(d => d.id === tip.deviceId || d.uuid === tip.deviceId)
+                      const kind = tip.status === 'processed' ? 'paid' : tip.status === 'pending' ? 'processing' : 'failed'
+                      const label = tip.status === 'processed' ? 'Charged' : tip.status === 'pending' ? 'Waiting' : 'Not charged'
                       return (
-                        <div className="bg-white p-3 border border-gray-200 rounded shadow-lg">
-                          <p className="font-medium">{payload[0].payload.week}</p>
-                          <p className="text-sm text-blue-600">Total Tips: ${payload[0].value?.toFixed(2)}</p>
-                          <p className="text-sm text-green-600">Unique Audience: {payload[0].payload.uniqueAudience}</p>
-                        </div>
+                        <li key={tip.id} className="flex items-center gap-3 py-3">
+                          <div className="min-w-0 flex-1">
+                            <div className="text-base font-bold text-ink-900">{formatCurrency(tip.amount)}</div>
+                            <div className="truncate text-xs text-ink-500">
+                              {device?.nickname || 'Tipwave device'} · {new Date(tip.createdAt).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
+                            </div>
+                          </div>
+                          <StatusChip kind={kind} label={label} />
+                        </li>
                       )
-                    }
-                    return null
-                  }}
-                />
-                <Legend />
-                <Line 
-                  yAxisId="left"
-                  type="monotone" 
-                  dataKey="totalTips" 
-                  stroke="#8b5cf6" 
-                  strokeWidth={2}
-                  name="Total Tips ($)"
-                />
-                {trendData.length > 0 && (
-                  <Line
-                    yAxisId="left"
-                    type="monotone"
-                    data={trendData}
-                    dataKey="trend"
-                    stroke="#d1d5db"
-                    strokeWidth={2}
-                    strokeDasharray="0"
-                    name="Trend"
-                    dot={false}
-                  />
+                    })}
+                  </ul>
                 )}
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-        )}
+              </Card>
+            )}
 
+            {activeTab === 'tips' && tipTimelinePoints.length > 0 && (
+              <div className="mt-6">
         {/* Time Window Tips Chart */}
         {tipTimelinePoints.length > 0 && (
           <div className="bg-white rounded-lg shadow-sm p-6 mb-8">
@@ -2042,549 +1948,6 @@ const Dashboard: React.FC = () => {
             </p>
           </div>
         )}
-
-        {/* Tabs */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 mb-8">
-          <div className="border-b border-gray-200">
-            <nav className="flex flex-wrap gap-x-6 gap-y-2 px-6">
-              {!showAddDeviceForm ? (
-                <>
-                  <button
-                    onClick={() => setActiveTab('overview')}
-                    className={`py-4 px-1 border-b-2 font-medium text-sm ${
-                      activeTab === 'overview'
-                        ? 'border-primary-500 text-primary-600'
-                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                    }`}
-                  >
-                    Overview
-                  </button>
-                  <button
-                    onClick={() => setActiveTab('devices')}
-                    className={`py-4 px-1 border-b-2 font-medium text-sm ${
-                      activeTab === 'devices'
-                        ? 'border-primary-500 text-primary-600'
-                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                    }`}
-                  >
-                    Devices
-                  </button>
-                  <button
-                    onClick={() => setActiveTab('tips')}
-                    className={`py-4 px-1 border-b-2 font-medium text-sm ${
-                      activeTab === 'tips'
-                        ? 'border-primary-500 text-primary-600'
-                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                    }`}
-                  >
-                    Recent Tips
-                  </button>
-                  <button
-                    onClick={() => setActiveTab('songs')}
-                    className={`py-4 px-1 border-b-2 font-medium text-sm ${
-                      activeTab === 'songs'
-                        ? 'border-primary-500 text-primary-600'
-                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                    }`}
-                  >
-                    Song Requests
-                  </button>
-                  <button
-                    onClick={() => setActiveTab('monitor')}
-                    className={`py-4 px-1 border-b-2 font-medium text-sm ${
-                      activeTab === 'monitor'
-                        ? 'border-primary-500 text-primary-600'
-                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                    }`}
-                  >
-                    Monitor Song Requests
-                  </button>
-                </>
-              ) : (
-                <div className="flex items-center justify-between w-full">
-                  <div className="flex items-center space-x-4">
-                    <button
-                      onClick={handleBackToDashboard}
-                      className="flex items-center space-x-2 text-gray-500 hover:text-gray-700 transition-colors"
-                    >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-                      </svg>
-                      <span>Back to Dashboard</span>
-                    </button>
-                  </div>
-                  <h3 className="text-lg font-semibold text-gray-900">Add New Device</h3>
-                </div>
-              )}
-            </nav>
-          </div>
-
-          <div className="p-6">
-            {activeTab === 'overview' && (
-              <div className="space-y-6">
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-6">
-                    <h3 className="text-lg font-semibold text-gray-900 mb-4">Weekly Performance</h3>
-                    <div className="space-y-3">
-                      <div className="flex justify-between items-center">
-                        <span className="text-gray-600">This Week</span>
-                        <span className="font-semibold">
-                          {metrics ? formatCurrency(metrics.thisWeekTips || 0) : formatCurrency(stats.thisWeekTipsReceived)}
-                        </span>
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <span className="text-gray-600">Tips Count</span>
-                        <span className="font-semibold">
-                          {metrics ? (metrics.thisWeekTipsCount || 0) : stats.thisWeekTipsCount}
-                        </span>
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <span className="text-gray-600">Average per Tip</span>
-                        <span className="font-semibold">
-                          {metrics && metrics.thisWeekTipsCount && metrics.thisWeekTipsCount > 0 
-                            ? formatCurrency(metrics.thisWeekTips / metrics.thisWeekTipsCount)
-                            : stats.thisWeekTipsCount > 0 
-                            ? formatCurrency(stats.thisWeekTipsReceived / stats.thisWeekTipsCount)
-                            : '$0.00'
-                          }
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl p-6">
-                    <h3 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h3>
-                    <div className="space-y-3">
-                      <button
-                        onClick={handleAddDeviceClick}
-                        className="w-full text-left p-3 bg-white rounded-lg border border-green-200 hover:border-green-300 transition-colors"
-                      >
-                        <div className="flex items-center space-x-3">
-                          <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
-                            <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                            </svg>
-                          </div>
-                          <div>
-                            <p className="font-medium text-gray-900">Add New Device</p>
-                            <p className="text-sm text-gray-500">Register another Tipwave device</p>
-                          </div>
-                        </div>
-                      </button>
-
-                      <button
-                        onClick={() => setActiveTab('devices')}
-                        className="w-full text-left p-3 bg-white rounded-lg border border-green-200 hover:border-green-300 transition-colors"
-                      >
-                        <div className="flex items-center space-x-3">
-                          <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
-                            <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                            </svg>
-                          </div>
-                          <div>
-                            <p className="font-medium text-gray-900">Download QR Codes</p>
-                            <p className="text-sm text-gray-500">Get QR codes for your devices</p>
-                          </div>
-                        </div>
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {activeTab === 'devices' && (
-              <div className="space-y-6">
-                <TipAmountsEditor
-                  amounts={tipAmounts}
-                  saving={tipAmountsSaving}
-                  onSave={saveTipAmounts}
-                  onReset={resetTipAmounts}
-                />
-                <div className="flex justify-between items-center">
-                  <h3 className="text-lg font-semibold text-gray-900">Your Devices</h3>
-                  <div className="flex space-x-3">
-                    <button
-                      onClick={refreshDashboard}
-                      className="p-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors flex items-center justify-center"
-                      aria-label="Refresh device status"
-                      title="Refresh device status"
-                    >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                      </svg>
-                    </button>
-                    <button
-                      onClick={() => window.open(getDeviceSetupUrl(), '_blank')}
-                      className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-semibold"
-                    >
-                      Connect Device To Wifi
-                    </button>
-                    <button
-                      onClick={handleAddDeviceClick}
-                      className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
-                    >
-                      Add Device
-                    </button>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {stats.devices.map((device) => {
-                    return (
-                      <div key={device.id} className="bg-gray-50 rounded-xl p-6 border border-gray-200">
-                        <div className="flex items-start justify-between mb-4">
-                          <div className="flex-1">
-                            <div className="flex items-center space-x-2 mb-1">
-                              <h4 className="font-semibold text-gray-900">
-                                {device.nickname || 'Unnamed Device'}
-                              </h4>
-                            </div>
-                            <p className="text-sm text-gray-500">{device.uuid}</p>
-                          </div>
-                          <div className="flex items-center gap-3">
-                            <PauseDeviceButton
-                              isPaused={!!device.isPaused}
-                              busy={pausingDeviceId === device.id}
-                              onToggle={() => toggleDevicePause(device.id)}
-                            />
-                            <div className={`w-3 h-3 rounded-full ${device.isOnline ? 'bg-green-500' : 'bg-gray-400'}`}></div>
-                          </div>
-                        </div>
-
-                        <div className="space-y-3 mb-4">
-                          <div className="flex justify-between text-sm">
-                            <span className="text-gray-600">Total Tips</span>
-                            <span className="font-medium">{device.totalTipsCount}</span>
-                          </div>
-                          <div className="flex justify-between text-sm">
-                            <span className="text-gray-600">Total Earned</span>
-                            <span className="font-medium">{formatCurrency(device.totalTipsReceived)}</span>
-                          </div>
-                          <div className="flex justify-between text-sm">
-                            <span className="text-gray-600">Last Tip</span>
-                            <span className="font-medium">{formatDate(device.lastTipReceived)}</span>
-                          </div>
-                          {/* Device status hidden for now */}
-                        </div>
-
-                        <div className="space-y-2">
-                          <div className="flex space-x-2">
-                            <button
-                              onClick={() => downloadQRCode(device.id, device.nickname)}
-                              disabled={downloadingDeviceId === device.id}
-                              className={`flex-1 px-3 py-2 text-white text-sm rounded-lg transition-colors ${
-                                downloadingDeviceId === device.id
-                                  ? 'bg-primary-400 cursor-not-allowed'
-                                  : 'bg-primary-600 hover:bg-primary-700'
-                              }`}
-                            >
-                              {downloadingDeviceId === device.id ? (
-                                <span className="flex items-center justify-center gap-2">
-                                  <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                  </svg>
-                                  Generating...
-                                </span>
-                              ) : 'Download QR'}
-                            </button>
-                            <button
-                              onClick={() => window.open(device.qrCodeUrl, '_blank')}
-                              className="px-3 py-2 bg-gray-200 text-gray-700 text-sm rounded-lg hover:bg-gray-300 transition-colors"
-                            >
-                              View
-                            </button>
-                            <button
-                              onClick={() => handleSoftDeleteDevice(device)}
-                              disabled={isDeletingDevice === device.id}
-                              className="px-3 py-2 bg-red-100 text-red-700 text-sm rounded-lg hover:bg-red-200 transition-colors disabled:opacity-50"
-                            >
-                              {isDeletingDevice === device.id ? 'Deleting...' : 'Delete'}
-                            </button>
-                          </div>
-                          <button
-                            onClick={() => toggleSongRequestSetting(device)}
-                            disabled={updatingSongRequest === device.id}
-                            className={`w-full px-3 py-2 text-sm rounded-lg transition-colors disabled:opacity-50 ${
-                              device.isAllowSongRequest
-                                ? 'bg-orange-100 text-orange-700 hover:bg-orange-200'
-                                : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
-                            }`}
-                          >
-                            {updatingSongRequest === device.id
-                              ? 'Updating...'
-                              : device.isAllowSongRequest
-                              ? 'Disable Song Request'
-                              : 'Enable Song Request'
-                            }
-                          </button>
-                          
-                          {/* Device Configuration Section */}
-                          <button
-                            onClick={() => setExpandedDeviceConfig(expandedDeviceConfig === device.id ? null : device.id)}
-                            className="w-full px-3 py-2 bg-purple-100 text-purple-700 text-sm rounded-lg hover:bg-purple-200 transition-colors flex items-center justify-between"
-                          >
-                            <span>Device Configuration</span>
-                            <svg 
-                              className={`w-4 h-4 transition-transform ${expandedDeviceConfig === device.id ? 'rotate-180' : ''}`} 
-                              fill="none" 
-                              stroke="currentColor" 
-                              viewBox="0 0 24 24"
-                            >
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                            </svg>
-                          </button>
-
-                          {/* Expanded Configuration Panel */}
-                          {expandedDeviceConfig === device.id && (
-                            <div className="mt-3 p-4 bg-white rounded-lg border border-purple-200 space-y-4">
-                              {/* Sound Toggle */}
-                              <div className="flex items-center justify-between">
-                                <span className="text-sm font-medium text-gray-700">Sound Enabled</span>
-                                <label className="relative inline-flex items-center cursor-pointer">
-                                  <input
-                                    type="checkbox"
-                                    checked={device.isSoundEnabled ?? false}
-                                    onChange={(e) => saveDeviceConfig(device, { isSoundEnabled: e.target.checked })}
-                                    disabled={updatingDeviceConfig === device.id}
-                                    className="sr-only peer"
-                                  />
-                                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-purple-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-600"></div>
-                                </label>
-                              </div>
-
-                              {/* Sound Selection (Prototype3) */}
-                              <div className="flex items-center justify-between">
-                                <span className="text-sm font-medium text-gray-700">Sound</span>
-                                <select
-                                  value={device.soundId ?? DEFAULT_SOUND_ID}
-                                  onChange={(e) => saveDeviceConfig(device, { soundId: Number(e.target.value) })}
-                                  disabled={updatingDeviceConfig === device.id || !(device.isSoundEnabled ?? false)}
-                                  className="px-2 py-1 border border-gray-300 rounded text-xs focus:ring-2 focus:ring-purple-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
-                                >
-                                  {SOUND_OPTIONS.map(option => (
-                                    <option key={option.value} value={option.value}>{option.label}</option>
-                                  ))}
-                                </select>
-                              </div>
-
-                              {/* Sound Volume (Prototype3) - disabled while sound is off */}
-                              <div className="flex items-center justify-between">
-                                <span className="text-sm font-medium text-gray-700">Sound Volume</span>
-                                <select
-                                  value={device.soundVolume ?? DEFAULT_SOUND_VOLUME}
-                                  onChange={(e) => saveDeviceConfig(device, { soundVolume: e.target.value })}
-                                  disabled={updatingDeviceConfig === device.id || !(device.isSoundEnabled ?? false)}
-                                  className="px-2 py-1 border border-gray-300 rounded text-xs focus:ring-2 focus:ring-purple-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
-                                >
-                                  {VOLUME_OPTIONS.map(option => (
-                                    <option key={option.value} value={option.value}>{option.label}</option>
-                                  ))}
-                                </select>
-                              </div>
-
-                              {/* Random Light Effect Toggle */}
-                              <div className="flex items-center justify-between">
-                                <span className="text-sm font-medium text-gray-700">Random Light Effect</span>
-                                <label className="relative inline-flex items-center cursor-pointer">
-                                  <input
-                                    type="checkbox"
-                                    checked={device.isRandomLightEffect ?? false}
-                                    onChange={(e) => saveDeviceConfig(device, { isRandomLightEffect: e.target.checked })}
-                                    disabled={updatingDeviceConfig === device.id}
-                                    className="sr-only peer"
-                                  />
-                                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-purple-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-600"></div>
-                                </label>
-                              </div>
-
-                              {/* Effect Configuration */}
-                              <div className="space-y-2">
-                                <h4 className="text-sm font-medium text-gray-700 mb-2">Light Effects by Amount</h4>
-                                {(() => {
-                                  const effectConfig = getEffectConfig(device)
-                                  
-                                  return tipAmounts.map(amount => (
-                                    <div key={amount} className="flex items-center justify-between text-sm">
-                                      <span className="text-gray-600">${amount}</span>
-                                      <select
-                                        value={effectForAmount(effectConfig, amount)}
-                                        onChange={(e) => {
-                                          saveDeviceConfig(device, { effectConfig: { ...effectConfig, [amount.toString()]: e.target.value } })
-                                        }}
-                                        disabled={updatingDeviceConfig === device.id}
-                                        className="px-2 py-1 border border-gray-300 rounded text-xs focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                                      >
-                                        {LIGHT_EFFECTS.map(effect => (
-                                          <option key={effect.value} value={effect.value}>{effect.label}</option>
-                                        ))}
-                                      </select>
-                                    </div>
-                                  ))
-                                })()}
-                              </div>
-
-                              {updatingDeviceConfig === device.id && (
-                                <div className="text-xs text-purple-600 text-center">Updating configuration...</div>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-
-                {/* Deleted Devices Section */}
-                <div className="mt-8">
-                  <div className="flex justify-between items-center mb-4">
-                    <h3 className="text-lg font-semibold text-gray-900">Deleted Devices</h3>
-                    <button
-                      onClick={toggleDeletedDevices}
-                      className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors flex items-center space-x-2"
-                    >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                      </svg>
-                      <span>{showDeletedDevices ? 'Hide' : 'Show'} Deleted Devices</span>
-                    </button>
-                  </div>
-
-                  {showDeletedDevices && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                      {deletedDevices.length === 0 ? (
-                        <div className="col-span-full text-center py-8">
-                          <p className="text-gray-500">No deleted devices found.</p>
-                        </div>
-                      ) : (
-                        deletedDevices.map((device) => (
-                          <div key={device.id} className="bg-gray-50 rounded-xl p-6 border border-gray-200 opacity-75">
-                            <div className="flex items-start justify-between mb-4">
-                              <div className="flex-1">
-                                <div className="flex items-center space-x-2 mb-1">
-                                  <h4 className="font-semibold text-gray-900">
-                                    {device.nickname || 'Unnamed Device'}
-                                  </h4>
-                                  <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                                    <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                                      <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
-                                    </svg>
-                                    Deleted
-                                  </span>
-                                </div>
-                                <p className="text-sm text-gray-500">{device.uuid}</p>
-                                {device.deletedAt && (
-                                  <p className="text-xs text-gray-400 mt-1">
-                                    Deleted on {formatDate(device.deletedAt)}
-                                  </p>
-                                )}
-                              </div>
-                            </div>
-
-                            <div className="flex space-x-2">
-                              <button
-                                onClick={() => handleRestoreDevice(device.id)}
-                                disabled={isRestoringDevice === device.id}
-                                className="flex-1 px-3 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50"
-                              >
-                                {isRestoringDevice === device.id ? 'Restoring...' : 'Restore'}
-                              </button>
-                            </div>
-                          </div>
-                        ))
-                      )}
-                    </div>
-                  )}
-                </div>
-
-                {stats.devices.length === 0 && (
-                  <div className="text-center py-12">
-                    <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                      <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                      </svg>
-                    </div>
-                    <h3 className="text-lg font-medium text-gray-900 mb-2">No devices yet</h3>
-                    <p className="text-gray-500 mb-4">Get started by adding your first Tipwave device</p>
-                    <button
-                      onClick={handleAddDeviceClick}
-                      className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
-                    >
-                      Add Your First Device
-                    </button>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {activeTab === 'tips' && (
-              <div className="space-y-6">
-                <h3 className="text-lg font-semibold text-gray-900">Recent Tips (Today)</h3>
-
-                <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
-                  <div className="overflow-x-auto">
-                    <table className="min-w-full divide-y divide-gray-200">
-                      <thead className="bg-gray-50">
-                        <tr>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Amount
-                          </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Device
-                          </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Date
-                          </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Status
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody className="bg-white divide-y divide-gray-200">
-                        {recentTips.map((tip) => (
-                          <tr key={tip.id} className="hover:bg-gray-50">
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <span className="text-lg font-semibold text-gray-900">
-                                {formatCurrency(tip.amount)}
-                              </span>
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <span className="text-sm text-gray-900">{tip.deviceNickname}</span>
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <span className="text-sm text-gray-500">{formatDate(tip.createdAt)}</span>
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                                tip.status === 'processed'
-                                  ? 'bg-green-100 text-green-800'
-                                  : tip.status === 'pending'
-                                  ? 'bg-yellow-100 text-yellow-800'
-                                  : 'bg-red-100 text-red-800'
-                              }`}>
-                                {tip.status}
-                              </span>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-
-                {recentTips.length === 0 && (
-                  <div className="text-center py-12">
-                    <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                      <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
-                      </svg>
-                    </div>
-                    <h3 className="text-lg font-medium text-gray-900 mb-2">No tips today</h3>
-                    <p className="text-gray-500">Tips from today (both pending and processed) will appear here once you start receiving them</p>
-                  </div>
-                )}
               </div>
             )}
 
@@ -2845,9 +2208,8 @@ const Dashboard: React.FC = () => {
                 </div>
               </div>
             )}
-          </div>
         </div>
-      </div>
+      </PortalShell>
 
       {/* Delete Confirmation Modal */}
       {showDeleteModal && deviceToDelete && (

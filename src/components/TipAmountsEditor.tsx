@@ -19,9 +19,9 @@ const TipAmountsEditor: React.FC<TipAmountsEditorProps> = ({ amounts, saving, on
   const unchanged = draft.every((value, i) => value === amounts[i])
 
   return (
-    <div className="bg-white rounded-lg shadow-sm border border-purple-200 p-4">
-      <h3 className="text-lg font-semibold text-gray-900">Tip Amounts</h3>
-      <p className="text-sm text-gray-600 mb-3">
+    <div className="rounded-2xl border border-slate-100 bg-white p-5 shadow-card">
+      <h3 className="text-base font-bold text-ink-900">Tip amounts</h3>
+      <p className="mb-3 mt-0.5 text-sm text-ink-500">
         The six amounts shown on the tip page. Whole dollars from ${MIN_TIP_AMOUNT} to ${MAX_TIP_AMOUNT}, lowest to highest.
         Default: {DEFAULT_TIP_AMOUNTS.map(a => `$${a}`).join(', ')}.
       </p>
