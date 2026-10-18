@@ -979,7 +979,8 @@ const AdminDashboard: React.FC = () => {
     ...(userProfile?.role === 'root_admin' ? [{ id: 'device-management', label: 'Devices', icon: 'device' } as PortalNavItem] : []),
     { id: 'performer-insights', label: 'Insights', icon: 'trend-up' },
     ...(isSimulationVisible ? [{ id: 'device-tip-simulation', label: 'Tools', icon: 'bolt' } as PortalNavItem] : []),
-    { id: 'settings', label: 'Settings', icon: 'sliders' }
+    { id: 'settings', label: 'Settings', icon: 'sliders' },
+    { id: 'performer-view', label: 'Performer view', icon: 'mic' }
   ];
 
   const ADMIN_TITLES: Record<string, { title: string; subtitle?: string }> = {
@@ -1009,7 +1010,7 @@ const AdminDashboard: React.FC = () => {
     <PortalShell
       items={adminNav}
       active={activeTab}
-      onSelect={setActiveTab}
+      onSelect={id => (id === 'performer-view' ? navigate('/dashboard') : setActiveTab(id))}
       userName={userProfile?.firstName ? `${userProfile.firstName} ${userProfile.lastName || ''}`.trim() : 'Admin'}
       userPhotoUrl={userProfile?.profilePhotoUrl || undefined}
       accountHint="Back to my portal"
