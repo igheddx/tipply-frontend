@@ -649,12 +649,6 @@ const SongManagement: React.FC<SongManagementProps> = ({ profileId }) => {
         </div>
       )}
 
-      {/* Header */}
-      <div className="bg-white rounded-xl shadow-sm p-6">
-        <h2 className="text-2xl font-bold text-gray-900 mb-2">Song Request Management</h2>
-        <p className="text-gray-600">Search for songs to add to your catalog or manage your existing song list.</p>
-      </div>
-
       {/* View Toggle */}
       <div className="bg-white rounded-xl shadow-sm">
         <div className="border-b border-gray-200">
@@ -699,7 +693,7 @@ const SongManagement: React.FC<SongManagementProps> = ({ profileId }) => {
               {/* Info Banner */}
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                 <p className="text-blue-800 text-sm">
-                  🎵 Search for high-quality music data. Only original albums and singles with no cover versions are shown.
+                  Search for high-quality music data. Only original albums and singles with no cover versions are shown.
                 </p>
               </div>
 
@@ -804,7 +798,7 @@ const SongManagement: React.FC<SongManagementProps> = ({ profileId }) => {
               {/* Info Banner */}
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                 <p className="text-blue-800 text-sm">
-                  📤 Upload a CSV or text file with your song list. Format: <strong>title, artist, album, genre</strong> (title and artist are required).
+                  Upload a CSV or text file with your song list. Format: <strong>title, artist, album, genre</strong> (title and artist are required).
                   Text files can use comma, pipe (|), or tab delimiters.
                 </p>
               </div>
@@ -1133,7 +1127,7 @@ Hotel California|Eagles|Hotel California|Rock`}
                       {/* Added Songs */}
                       {uploadSummary.addedSongs.length > 0 && (
                         <div>
-                          <h4 className="font-medium text-green-800 mb-2">✓ Successfully Added ({uploadSummary.addedCount})</h4>
+                          <h4 className="font-medium text-green-800 mb-2">Added ({uploadSummary.addedCount})</h4>
                           <div className="bg-green-50 border border-green-200 rounded p-3 space-y-1 max-h-40 overflow-y-auto">
                             {uploadSummary.addedSongs.map((song, idx) => (
                               <div key={idx} className="text-sm text-green-900">
@@ -1147,7 +1141,7 @@ Hotel California|Eagles|Hotel California|Rock`}
                       {/* Duplicate Songs */}
                       {uploadSummary.duplicateSongs.length > 0 && (
                         <div>
-                          <h4 className="font-medium text-yellow-800 mb-2">⚠ Skipped Duplicates ({uploadSummary.duplicateCount})</h4>
+                          <h4 className="font-medium text-yellow-800 mb-2">Skipped duplicates ({uploadSummary.duplicateCount})</h4>
                           <div className="bg-yellow-50 border border-yellow-200 rounded p-3 space-y-1 max-h-40 overflow-y-auto">
                             {uploadSummary.duplicateSongs.map((song, idx) => (
                               <div key={idx} className="text-sm text-yellow-900">
@@ -1162,7 +1156,7 @@ Hotel California|Eagles|Hotel California|Rock`}
                       {/* Failed Songs */}
                       {uploadSummary.failedSongs.length > 0 && (
                         <div>
-                          <h4 className="font-medium text-red-800 mb-2">✗ Failed ({uploadSummary.failedCount})</h4>
+                          <h4 className="font-medium text-red-800 mb-2">Failed ({uploadSummary.failedCount})</h4>
                           <div className="bg-red-50 border border-red-200 rounded p-3 space-y-1 max-h-40 overflow-y-auto">
                             {uploadSummary.failedSongs.map((song, idx) => (
                               <div key={idx} className="text-sm text-red-900">

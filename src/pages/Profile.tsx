@@ -3,6 +3,8 @@ import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import apiService from '../services/api'
 import PhotoUpload from '../components/PhotoUpload'
+import { PortalShell, type PortalNavItem } from '../components/portal/PortalShell'
+import { Banner, Button, Card, PageHeader, StatusChip } from '../components/ui'
 
 interface ProfileData {
   firstName: string
@@ -441,117 +443,83 @@ const Profile: React.FC = () => {
     )
   }
 
+  const navItems: PortalNavItem[] = [
+    { id: 'overview', label: 'Home', icon: 'home' },
+    { id: 'devices', label: 'Devices', icon: 'device' },
+    { id: 'tips', label: 'Tips', icon: 'coin' },
+    { id: 'songs', label: 'Songs', icon: 'music' }
+  ]
+  const goTo = (id: string) => navigate(id === 'overview' ? '/dashboard' : `/dashboard?tab=${id}`)
+  const displayName = profile?.stageName || `${profile?.firstName || ''} ${profile?.lastName || ''}`.trim() || 'Performer'
+
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white shadow-sm border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center space-x-4">
-              <button
-                onClick={() => navigate('/dashboard')}
-                className="flex items-center space-x-2 text-gray-500 hover:text-gray-700 transition-colors"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-                </svg>
-                <span>Back to Dashboard</span>
-              </button>
-            </div>
-            <h1 className="text-xl font-semibold text-gray-900">Profile</h1>
-            <button
-              onClick={handleLogout}
-              className="p-2 text-gray-500 hover:text-gray-700 transition-colors"
-              title="Logout"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-              </svg>
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Content */}
-      <div className="px-4 sm:px-6 lg:px-8 py-8">
+    <PortalShell
+      items={navItems}
+      active="overview"
+      profileActive
+      onSelect={goTo}
+      userName={displayName}
+      userPhotoUrl={profile?.profilePhotoUrl || undefined}
+      onOpenProfile={() => undefined}
+      onLogout={handleLogout}
+    >
+      <PageHeader title="Profile and payouts" subtitle="Your details, your tipping page photo, and how you get paid." />
+      <div>
         {error && (
-          <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-4">
-            <p className="text-red-600 text-sm">{error}</p>
-          </div>
+          <Banner tone="error" title="Something went wrong" className="mb-5" onDismiss={() => setError('')}>
+            {error}
+          </Banner>
         )}
-        
+
         {success && (
-          <div className="mb-6 bg-green-50 border border-green-200 rounded-lg p-4">
-            <p className="text-green-600 text-sm">{success}</p>
-          </div>
+          <Banner tone="success" title={success} className="mb-5" onDismiss={() => setSuccess('')} />
         )}
 
-        {/* Verification Status Section */}
-        <div className="bg-white rounded-xl shadow-sm p-6 mb-6 max-w-2xl">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Verification Status</h2>
-          <div className="flex flex-wrap gap-4">
-            {/* KYC Status */}
-            {kycStatus === 'verified' && (
-              <div className="flex items-center space-x-2 bg-green-50 border border-green-200 rounded-lg px-4 py-2">
-                <svg className="w-5 h-5 text-green-600" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                </svg>
-                <span className="text-sm font-medium text-green-800">KYC Verified</span>
-              </div>
-            )}
-            {kycStatus === 'pending' && (
-              <div className="space-y-3">
-                <div className="flex items-center space-x-2 bg-yellow-50 border border-yellow-200 rounded-lg px-4 py-2">
-                  <svg className="w-5 h-5 text-yellow-600" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                  </svg>
-                  <span className="text-sm font-medium text-yellow-800">KYC Pending</span>
-                </div>
-                <button
-                  onClick={handleStartVerification}
-                  className="w-full sm:w-auto px-6 py-2.5 bg-gradient-to-r from-primary-600 to-primary-700 text-white font-medium rounded-lg hover:from-primary-700 hover:to-primary-800 focus:ring-4 focus:ring-primary-200 transition-all duration-200"
-                >
-                  Continue Verification
-                </button>
-              </div>
-            )}
-            {kycStatus === 'not_verified' && (
-              <div className="space-y-3">
-                <div className="flex items-center space-x-2 bg-red-50 border border-red-200 rounded-lg px-4 py-2">
-                  <svg className="w-5 h-5 text-red-600" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                  </svg>
-                  <span className="text-sm font-medium text-red-800">KYC Not Verified</span>
-                </div>
-                {profile?.stripeAccountId ? (
-                  <button
-                    onClick={handleStartVerification}
-                    className="w-full sm:w-auto px-6 py-2.5 bg-gradient-to-r from-primary-600 to-primary-700 text-white font-medium rounded-lg hover:from-primary-700 hover:to-primary-800 focus:ring-4 focus:ring-primary-200 transition-all duration-200"
-                  >
-                    Start Stripe Verification
-                  </button>
-                ) : (
-                  <button
-                    onClick={handleStartOnboarding}
-                    className="w-full sm:w-auto px-6 py-2.5 bg-gradient-to-r from-primary-600 to-primary-700 text-white font-medium rounded-lg hover:from-primary-700 hover:to-primary-800 focus:ring-4 focus:ring-primary-200 transition-all duration-200"
-                  >
-                    Start Stripe Onboarding
-                  </button>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
+        {/* Payouts */}
+        <Card
+          className="mb-5 max-w-2xl"
+          title="Payouts"
+          subtitle="Stripe pays your tips to your bank account. They need to verify your identity first."
+          actions={
+            kycStatus === 'verified' ? (
+              <StatusChip kind="paid" label="Ready" />
+            ) : kycStatus === 'pending' ? (
+              <StatusChip kind="processing" label="In progress" />
+            ) : (
+              <StatusChip kind="failed" label="Not set up" />
+            )
+          }
+        >
+          {kycStatus === 'verified' && (
+            <p className="text-sm text-ink-700">Your identity is verified. Tips are paid out to your bank account automatically.</p>
+          )}
+          {kycStatus === 'pending' && (
+            <div className="space-y-3">
+              <p className="text-sm text-ink-700">Stripe is still waiting for some of your details. Pick up where you left off.</p>
+              <Button onClick={handleStartVerification}>Continue verification</Button>
+            </div>
+          )}
+          {(kycStatus === 'not_verified' || kycStatus === 'unknown') && (
+            <div className="space-y-3">
+              <p className="text-sm text-ink-700">You will not receive payouts until this is done. It takes about 3 minutes.</p>
+              {profile?.stripeAccountId ? (
+                <Button onClick={handleStartVerification}>Verify my identity</Button>
+              ) : (
+                <Button onClick={handleStartOnboarding}>Set up payouts</Button>
+              )}
+            </div>
+          )}
+        </Card>
 
-        <div className="bg-white rounded-xl shadow-sm p-6 mb-6 max-w-2xl">
+        <div className="mb-5 max-w-2xl rounded-2xl border border-slate-100 bg-white p-5 shadow-card">
           <div className="flex justify-between items-center mb-6">
-            <h2 className="text-lg font-semibold text-gray-900">Personal Information</h2>
+            <h2 className="text-base font-bold text-ink-900">Personal information</h2>
             {!isEditing && (
               <button
                 onClick={handleEditProfile}
                 className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
               >
-                Edit Profile
+                Edit profile
               </button>
             )}
           </div>
@@ -577,7 +545,7 @@ const Profile: React.FC = () => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    First Name *
+                    First name
                   </label>
                   <input
                     type="text"
@@ -594,7 +562,7 @@ const Profile: React.FC = () => {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Last Name *
+                    Last name
                   </label>
                   <input
                     type="text"
@@ -612,7 +580,7 @@ const Profile: React.FC = () => {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Stage Name
+                  Stage name
                 </label>
                 <input
                   type="text"
@@ -625,7 +593,7 @@ const Profile: React.FC = () => {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Email *
+                  Email
                 </label>
                 <input
                   type="email"
@@ -678,7 +646,7 @@ const Profile: React.FC = () => {
                   disabled={saving}
                   className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {saving ? 'Saving...' : 'Save Changes'}
+                  {saving ? 'Saving…' : 'Save Changes'}
                 </button>
               </div>
             </div>
@@ -686,17 +654,17 @@ const Profile: React.FC = () => {
             <div className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">First Name</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">First name</label>
                   <p className="text-gray-900">{profile?.firstName || 'Not set'}</p>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Last Name</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Last name</label>
                   <p className="text-gray-900">{profile?.lastName || 'Not set'}</p>
                 </div>
               </div>
               
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Stage Name</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Stage name</label>
                 <p className="text-gray-900">{profile?.stageName || 'Not set'}</p>
               </div>
               
@@ -719,15 +687,15 @@ const Profile: React.FC = () => {
         </div>
 
         {/* Password Section */}
-        <div className="bg-white rounded-xl shadow-sm p-6 max-w-2xl">
+        <div className="max-w-2xl rounded-2xl border border-slate-100 bg-white p-5 shadow-card">
           <div className="flex justify-between items-center mb-6">
-            <h2 className="text-lg font-semibold text-gray-900">Security</h2>
+            <h2 className="text-base font-bold text-ink-900">Security</h2>
             {!isChangingPassword && (
               <button
                 onClick={handleChangePassword}
                 className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
               >
-                Change Password
+                Change password
               </button>
             )}
           </div>
@@ -736,7 +704,7 @@ const Profile: React.FC = () => {
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Current Password *
+                  Current password
                 </label>
                 <div className="relative">
                   <input
@@ -773,7 +741,7 @@ const Profile: React.FC = () => {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  New Password *
+                  New password
                 </label>
                 <div className="relative">
                   <input
@@ -810,7 +778,7 @@ const Profile: React.FC = () => {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Confirm New Password *
+                  Confirm New password
                 </label>
                 <div className="relative">
                   <input
@@ -857,7 +825,7 @@ const Profile: React.FC = () => {
                   disabled={saving}
                   className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {saving ? 'Changing Password...' : 'Change Password'}
+                  {saving ? 'Changing password…' : 'Change password'}
                 </button>
               </div>
             </div>
@@ -868,7 +836,7 @@ const Profile: React.FC = () => {
           )}
         </div>
       </div>
-    </div>
+    </PortalShell>
   )
 }
 

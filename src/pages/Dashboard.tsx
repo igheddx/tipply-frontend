@@ -1535,7 +1535,7 @@ const Dashboard: React.FC = () => {
               </div>
               <div className="ml-3 flex-1">
                 <h3 className="text-sm font-medium text-green-800">
-                  Stripe Account Verified! 🎉
+                  Stripe account verified
                 </h3>
                 <div className="mt-2 text-sm text-green-700">
                   <p>
@@ -1993,7 +1993,7 @@ const Dashboard: React.FC = () => {
                             <p className="text-red-500 text-sm mt-1">{addDeviceErrors.serialNumber}</p>
                           )}
                           {addDeviceValidationComplete && !addDeviceErrors.serialNumber && addDeviceForm.serialNumber.trim() && (
-                            <p className="text-green-500 text-sm mt-1">✓ Serial Number validated successfully</p>
+                            <p className="text-green-500 text-sm mt-1">Serial number found</p>
                           )}
                           <p className="text-sm text-gray-500 mt-1">
                             Enter the serial number from your Tipwave device (e.g., TPY-5C07-K73)
@@ -2147,65 +2147,36 @@ const Dashboard: React.FC = () => {
             )}
 
             {activeTab === 'monitor' && (
-              <div className="space-y-6">
-                <div className="bg-white rounded-lg shadow p-6">
-                  <div className="flex items-center justify-between mb-6">
-                    <h2 className="text-xl font-semibold text-gray-900">Monitor Song Requests</h2>
-                  </div>
-                  
-                  <div className="space-y-4">
-                    {songRequests.length === 0 ? (
-                      <div className="text-center py-8">
-                        <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                          <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
-                          </svg>
-                        </div>
-                        <h3 className="text-lg font-medium text-gray-800 mb-2">No song requests today</h3>
-                        <p className="text-gray-600">Song requests will appear here when participants make them through the tip interface</p>
-                      </div>
-                    ) : (
-                      <div className="space-y-3">
-                        {songRequests.map((request) => (
-                          <div
-                            key={request.songId}
-                            className={`border rounded-lg p-4 ${
-                              request.status === 'completed' 
-                                ? 'bg-green-50 border-green-200' 
-                                : request.status === 'performing'
-                                ? 'bg-blue-50 border-blue-200'
-                                : 'bg-white border-gray-200'
-                            }`}
-                          >
-                            <div className="flex items-center justify-between">
-                              <div className="flex-1">
-                                <h4 className="font-semibold text-gray-900">{request.songTitle}</h4>
-                                <p className="text-gray-600 text-sm">by {request.artist}</p>
-                                <div className="flex items-center space-x-4 mt-2 text-sm text-gray-500">
-                                  <span className="font-medium text-green-600">${request.totalTipAmount.toFixed(2)}</span>
-                                  <span>{request.requestCount} request{request.requestCount > 1 ? 's' : ''}</span>
-                                  <span>{new Date(request.firstRequestTime).toLocaleTimeString()}</span>
-                                </div>
-                              </div>
-                              <div className="flex items-center space-x-2">
-                                <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                                  request.status === 'completed' 
-                                    ? 'bg-green-100 text-green-800' 
-                                    : request.status === 'performing'
-                                    ? 'bg-blue-100 text-blue-800'
-                                    : 'bg-yellow-100 text-yellow-800'
-                                }`}>
-                                  {request.status === 'completed' ? 'Completed' : 
-                                   request.status === 'performing' ? 'Performing' : 'Pending'}
-                                </span>
-                              </div>
+              <div className="space-y-5">
+                <Button icon="mic" onClick={() => setShowMonitorFullscreen(true)}>
+                  Open full-screen view
+                </Button>
+                <Card title="Today's requests" subtitle="The most-tipped songs come first." flush>
+                  {songRequests.length === 0 ? (
+                    <EmptyState icon="music" title="No song requests today">
+                      When someone tips and picks a song, it shows up here.
+                    </EmptyState>
+                  ) : (
+                    <ul className="divide-y divide-slate-100 px-5 pb-2">
+                      {songRequests.map(request => (
+                        <li key={request.songId} className="flex items-center gap-3 py-3">
+                          <div className="min-w-0 flex-1">
+                            <div className="truncate font-bold text-ink-900">{request.songTitle}</div>
+                            <div className="truncate text-sm text-ink-500">{request.artist}</div>
+                            <div className="mt-0.5 text-xs text-ink-400">
+                              {formatCurrency(request.totalTipAmount)} · {request.requestCount} {request.requestCount === 1 ? 'request' : 'requests'} ·{' '}
+                              {new Date(request.firstRequestTime).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
                             </div>
                           </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </div>
+                          <StatusChip
+                            kind={request.status === 'completed' ? 'paid' : request.status === 'performing' ? 'active' : 'processing'}
+                            label={request.status === 'completed' ? 'Played' : request.status === 'performing' ? 'Playing' : 'Waiting'}
+                          />
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </Card>
               </div>
             )}
         </div>

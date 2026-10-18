@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react'
 import apiService from '../services/api'
+import { BrandIcon } from './icons/BrandIcons'
 
 interface PhotoUploadProps {
   photoUrl?: string
@@ -144,7 +145,7 @@ const PhotoUpload: React.FC<PhotoUploadProps> = ({
               className="w-full h-full object-cover"
             />
           ) : (
-            <div className="text-4xl text-gray-400">📸</div>
+            <BrandIcon name="user" size={44} tone="muted" />
           )}
         </div>
 
@@ -174,7 +175,7 @@ const PhotoUpload: React.FC<PhotoUploadProps> = ({
             className="absolute top-0 right-0 bg-red-500 hover:bg-red-600 disabled:bg-gray-400 text-white rounded-full w-10 h-10 flex items-center justify-center shadow-lg transition -translate-y-1 translate-x-1"
             title="Remove photo"
           >
-            ✕
+            <BrandIcon name="close" size={18} tone="inverse" strokeWidth={2.4} />
           </button>
         )}
       </div>
