@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react'
 import { photoSrc } from '../utils/photoUrl'
 import apiService from '../services/api'
 import { BrandIcon } from './icons/BrandIcons'
+import { Banner, Button } from './ui'
 
 interface PhotoUploadProps {
   photoUrl?: string
@@ -135,53 +136,28 @@ const PhotoUpload: React.FC<PhotoUploadProps> = ({
   const isOnboarding = variant === 'onboarding'
 
   return (
-    <div className={`flex flex-col items-center gap-4 ${isOnboarding ? 'py-6' : ''}`}>
-      {/* Photo Preview Circle */}
-      <div className="relative w-fit pb-5">
-        <div className="w-32 h-32 rounded-full bg-slate-200 flex items-center justify-center overflow-hidden border-4 border-slate-300">
+    <div className={isOnboarding ? 'flex flex-col items-center gap-4 py-6' : 'flex flex-col gap-4'}>
+      <div className={`flex items-center gap-5 ${isOnboarding ? 'flex-col' : 'flex-wrap'}`}>
+        <div className="flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-full border-4 border-slate-200 bg-slate-100">
           {preview ? (
-            <img
-              src={preview}
-              alt="Profile preview"
-              className="w-full h-full object-cover"
-            />
+            <img src={preview} alt="Profile preview" className="h-full w-full object-cover" />
           ) : (
-            <BrandIcon name="user" size={44} tone="muted" />
+            <BrandIcon name="user" size={40} tone="muted" />
           )}
         </div>
 
-        {/* Upload Button - pinned to photo */}
-        <button
-          onClick={handleButtonClick}
-          disabled={uploading || isLoading}
-          className="absolute -bottom-3 left-1/2 -translate-x-1/2 z-10 px-4 py-1.5 bg-teal-600 hover:bg-teal-700 disabled:bg-slate-400 text-white rounded-full font-medium text-sm shadow-lg transition"
-        >
-          {uploading ? (
-            <span className="flex items-center gap-2">
-              <span className="inline-block animate-spin">⏳</span>
-              Uploading...
-            </span>
-          ) : preview ? (
-            'Change Photo'
-          ) : (
-            'Upload Photo'
+        <div className={`flex flex-wrap items-center gap-3 ${isOnboarding ? 'justify-center' : ''}`}>
+          <Button variant="secondary" icon="download" loading={uploading} disabled={isLoading} onClick={handleButtonClick}>
+            {uploading ? 'Uploading…' : preview ? 'Change photo' : 'Upload photo'}
+          </Button>
+          {preview && (
+            <Button variant="danger" icon="trash" disabled={uploading || isLoading} onClick={handleRemovePhoto}>
+              Remove
+            </Button>
           )}
-        </button>
-
-        {/* Delete Badge - positioned outside circle */}
-        {preview && (
-          <button
-            onClick={handleRemovePhoto}
-            disabled={uploading || isLoading}
-            className="absolute top-0 right-0 bg-red-500 hover:bg-red-600 disabled:bg-slate-400 text-white rounded-full w-10 h-10 flex items-center justify-center shadow-lg transition -translate-y-1 translate-x-1"
-            title="Remove photo"
-          >
-            <BrandIcon name="close" size={18} tone="inverse" strokeWidth={2.4} />
-          </button>
-        )}
+        </div>
       </div>
 
-      {/* File Input */}
       <input
         ref={fileInputRef}
         type="file"
@@ -192,16 +168,10 @@ const PhotoUpload: React.FC<PhotoUploadProps> = ({
         aria-label="Upload profile photo"
       />
 
-      {/* Helper Text */}
-      <p className="text-sm text-ink-500 text-center">
-        JPEG or PNG • Max 2MB
-      </p>
-
-      {/* Error Message */}
       {error && (
-        <div className="w-full bg-red-50 border border-red-200 rounded-lg p-3 text-red-700 text-sm">
+        <Banner tone="error" title="The photo could not be uploaded" onDismiss={() => setError('')}>
           {error}
-        </div>
+        </Banner>
       )}
     </div>
   )

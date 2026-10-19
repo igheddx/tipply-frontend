@@ -1,6 +1,7 @@
 import logger from "../utils/logger";
 import { PortalShell, type PortalNavItem } from '../components/portal/PortalShell'
 import { HomeTab, type HomeData } from '../components/portal/HomeTab'
+import { TipsTimeline } from '../components/charts/TipsTimeline'
 import { Banner, Button, Card, EmptyState, Modal, PageHeader, PageLoader, StatusChip, type ChipKind } from '../components/ui'
 import { BrandIcon, IconTile } from '../components/icons/BrandIcons'
 import { Switch } from '../components/ui/Switch'
@@ -12,7 +13,6 @@ import SongRequestMonitor from '../components/SongRequestMonitor'
 import { API_BASE_URL } from '../utils/config'
 import { DEFAULT_TIP_AMOUNTS, TIP_AMOUNT_COUNT, LIGHT_EFFECTS, SOUND_OPTIONS, VOLUME_OPTIONS, DEFAULT_SOUND_ID, DEFAULT_SOUND_VOLUME, DEFAULT_EFFECT_CONFIG, normalizeEffectConfig, effectForAmount, buildEffectConfig } from '../utils/deviceConfig'
 import TipAmountsEditor from '../components/TipAmountsEditor'
-import { ScatterChart, Scatter, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 
 interface DashboardStats {
   totalDevices: number
@@ -144,9 +144,6 @@ const Dashboard: React.FC = () => {
   const [stripeMetricsLoading, setStripeMetricsLoading] = useState(true)
   const [insights, setInsights] = useState<PerformerInsights | null>(null)
   const [tipTimelinePoints, setTipTimelinePoints] = useState<TipPoint[]>([])
-  const [filteredTipPoints, setFilteredTipPoints] = useState<TipPoint[]>([])
-  const [startDateTime, setStartDateTime] = useState('')
-  const [endDateTime, setEndDateTime] = useState('')
   
   const getDeviceSetupUrl = () => {
     const host = window.location.hostname.toLowerCase()
@@ -448,48 +445,6 @@ const Dashboard: React.FC = () => {
 
     refreshData()
   }, [activeTab, userProfile?.id, stats?.devices, recentTips.length, deletedDevices.length])
-
-  // Set default date/time range (last 10 hours)
-  useEffect(() => {
-    if (startDateTime || endDateTime) return
-
-    const now = new Date()
-    const tenHoursAgo = new Date(now.getTime() - 10 * 60 * 60 * 1000)
-
-    const formatDateTime = (date: Date) => {
-      const year = date.getFullYear()
-      const month = String(date.getMonth() + 1).padStart(2, '0')
-      const day = String(date.getDate()).padStart(2, '0')
-      const hours = String(date.getHours()).padStart(2, '0')
-      const minutes = String(date.getMinutes()).padStart(2, '0')
-      return `${year}-${month}-${day}T${hours}:${minutes}`
-    }
-
-    setStartDateTime(formatDateTime(tenHoursAgo))
-    setEndDateTime(formatDateTime(now))
-  }, [startDateTime, endDateTime])
-
-  // Filter tip points by selected date/time window
-  useEffect(() => {
-    if (!tipTimelinePoints.length) {
-      setFilteredTipPoints([])
-      return
-    }
-
-    if (!startDateTime || !endDateTime) {
-      setFilteredTipPoints(tipTimelinePoints)
-      return
-    }
-
-    const start = new Date(startDateTime).getTime()
-    const end = new Date(endDateTime).getTime()
-
-    const filtered = tipTimelinePoints.filter(point =>
-      point.timestamp >= start && point.timestamp <= end
-    )
-
-    setFilteredTipPoints(filtered)
-  }, [tipTimelinePoints, startDateTime, endDateTime])
 
   const handleLogout = () => {
     localStorage.removeItem('token')
@@ -1873,78 +1828,8 @@ const Dashboard: React.FC = () => {
             )}
 
             {activeTab === 'tips' && tipTimelinePoints.length > 0 && (
-              <div className="mt-6">
-        {/* Time Window Tips Chart */}
-        {tipTimelinePoints.length > 0 && (
-          <div className="bg-white rounded-lg shadow-sm p-6 mb-8">
-            <h3 className="text-lg font-semibold text-ink-900 mb-4">Tips by Time Window</h3>
-            
-            {/* Date/Time Range Selector */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-              <div>
-                <label className="block text-sm font-medium text-ink-700 mb-2">Start Date/Time</label>
-                <input
-                  type="datetime-local"
-                  value={startDateTime}
-                  onChange={(e) => setStartDateTime(e.target.value)}
-                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-600"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-ink-700 mb-2">End Date/Time</label>
-                <input
-                  type="datetime-local"
-                  value={endDateTime}
-                  onChange={(e) => setEndDateTime(e.target.value)}
-                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-600"
-                />
-              </div>
-            </div>
-
-            <ResponsiveContainer width="100%" height={300}>
-              <ScatterChart>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis 
-                  dataKey="time" 
-                  name="Time"
-                  tick={{ fontSize: 12 }}
-                  angle={-45}
-                  textAnchor="end"
-                  height={80}
-                />
-                <YAxis 
-                  dataKey="amount" 
-                  name="Amount ($)"
-                />
-                <Tooltip 
-                  cursor={{ strokeDasharray: '3 3' }}
-                  content={({ active, payload }) => {
-                    if (active && payload && payload.length) {
-                      return (
-                        <div className="bg-white p-3 border border-slate-200 rounded shadow-lg">
-                          <p className="font-medium">{payload[0].payload.time}</p>
-                          <p className="text-sm text-green-600">Amount: ${payload[0].payload.amount.toFixed(2)}</p>
-                        </div>
-                      )
-                    }
-                    return null
-                  }}
-                />
-                <Scatter 
-                  name="Tips" 
-                  data={filteredTipPoints} 
-                  fill="#8b5cf6"
-                />
-              </ScatterChart>
-            </ResponsiveContainer>
-            
-            <p className="text-sm text-ink-500 mt-4">
-              {filteredTipPoints.length > 0
-                ? `Showing ${filteredTipPoints.length} tips in the selected time window`
-                : 'No tips in the selected time window. Adjust the range to see results.'}
-            </p>
-          </div>
-        )}
+              <div className="mt-5">
+                <TipsTimeline points={tipTimelinePoints} />
               </div>
             )}
 

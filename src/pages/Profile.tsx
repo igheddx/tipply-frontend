@@ -4,7 +4,9 @@ import { useNavigate } from 'react-router-dom'
 import apiService from '../services/api'
 import PhotoUpload from '../components/PhotoUpload'
 import { PortalShell, type PortalNavItem } from '../components/portal/PortalShell'
-import { Banner, Button, Card, PageHeader, PageLoader, StatusChip } from '../components/ui'
+import { Banner, Button, Card, PageLoader, StatusChip, Tabs, ThemeToggle } from '../components/ui'
+import { IconTile } from '../components/icons/BrandIcons'
+import { photoSrc } from '../utils/photoUrl'
 
 interface ProfileData {
   firstName: string
@@ -23,9 +25,27 @@ interface PasswordData {
   confirmPassword: string
 }
 
+const Field = ({ label, hint, error, children }: { label: string; hint?: string; error?: string; children: React.ReactNode }) => (
+  <div>
+    <label className="mb-1.5 block text-sm font-semibold text-ink-700">{label}</label>
+    {children}
+    {error ? <p className="mt-1.5 text-sm text-red-600">{error}</p> : hint && <p className="mt-1.5 text-sm text-ink-500">{hint}</p>}
+  </div>
+)
+
+const ReadRow = ({ label, value }: { label: string; value?: string }) => (
+  <div className="flex flex-col gap-0.5 py-3 sm:flex-row sm:items-baseline sm:gap-6">
+    <dt className="w-40 shrink-0 text-sm text-ink-500">{label}</dt>
+    <dd className="min-w-0 break-words font-medium text-ink-900">{value || <span className="font-normal text-ink-400">Not set</span>}</dd>
+  </div>
+)
+
+
 const Profile: React.FC = () => {
   const [profile, setProfile] = useState<ProfileData | null>(null)
-  const [isEditing, setIsEditing] = useState(false)
+  // Which section is open for editing; saving always sends the whole form, so untouched fields keep their values
+  const [editingSection, setEditingSection] = useState<'public' | 'account' | null>(null)
+  const [section, setSection] = useState('public')
   const [isChangingPassword, setIsChangingPassword] = useState(false)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -109,14 +129,14 @@ const Profile: React.FC = () => {
     }
   }
 
-  const handleEditProfile = () => {
-    setIsEditing(true)
+  const handleEditProfile = (which: 'public' | 'account') => {
+    setEditingSection(which)
     setError('')
     setSuccess('')
   }
 
   const handleCancelEdit = () => {
-    setIsEditing(false)
+    setEditingSection(null)
     setEditForm({
       firstName: profile?.firstName || '',
       lastName: profile?.lastName || '',
@@ -173,7 +193,7 @@ const Profile: React.FC = () => {
       }
       
       setProfile(editForm)
-      setIsEditing(false)
+      setEditingSection(null)
       setSuccess('Profile updated successfully!')
       
       // Clear success message after 3 seconds
@@ -447,6 +467,55 @@ const Profile: React.FC = () => {
   const goTo = (id: string) => navigate(id === 'overview' ? '/dashboard' : `/dashboard?tab=${id}`)
   const displayName = profile?.stageName || `${profile?.firstName || ''} ${profile?.lastName || ''}`.trim() || 'Performer'
 
+  const inputClass = (hasError?: boolean) =>
+    `h-12 w-full rounded-xl border bg-white px-4 text-ink-900 placeholder:text-ink-400 transition-colors focus:border-transparent focus:outline-none focus:ring-2 focus:ring-brand-500 ${hasError ? 'border-red-400' : 'border-slate-300'}`
+
+  const editActions = (
+    <div className="flex flex-col-reverse gap-3 border-t border-slate-100 pt-5 sm:flex-row sm:justify-end">
+      <Button variant="secondary" onClick={handleCancelEdit} disabled={saving}>
+        Cancel
+      </Button>
+      <Button onClick={handleSaveProfile} loading={saving}>
+        Save changes
+      </Button>
+    </div>
+  )
+
+  const payoutChip =
+    kycStatus === 'verified' ? (
+      <StatusChip kind="paid" label="Payouts ready" />
+    ) : kycStatus === 'pending' ? (
+      <StatusChip kind="processing" label="Payouts in progress" />
+    ) : (
+      <StatusChip kind="failed" label="Payouts not set up" />
+    )
+
+  const previewName = (editingSection === 'public' ? editForm.stageName : profile?.stageName) || displayName
+  const previewBio = editingSection === 'public' ? editForm.bio : profile?.bio
+
+  const passwordInput = (id: 'current' | 'new' | 'confirm', label: string, field: keyof PasswordData, errorKey: string) => (
+    <Field label={label} error={passwordErrors[errorKey]}>
+      <div className="relative">
+        <input
+          type={showPasswordFields[id] ? 'text' : 'password'}
+          value={passwordForm[field]}
+          onChange={e => handlePasswordInputChange(field, e.target.value)}
+          onBlur={() => handlePasswordFieldBlur(field)}
+          autoComplete={id === 'current' ? 'current-password' : 'new-password'}
+          className={`${inputClass(!!passwordErrors[errorKey])} pr-16`}
+        />
+        <button
+          type="button"
+          onClick={() => setShowPasswordFields(prev => ({ ...prev, [id]: !prev[id] }))}
+          className="absolute inset-y-0 right-1 flex w-14 items-center justify-center text-sm font-semibold text-brand-700"
+          aria-label={showPasswordFields[id] ? 'Hide password' : 'Show password'}
+        >
+          {showPasswordFields[id] ? 'Hide' : 'Show'}
+        </button>
+      </div>
+    </Field>
+  )
+
   return (
     <PortalShell
       items={navItems}
@@ -458,381 +527,251 @@ const Profile: React.FC = () => {
       onOpenProfile={() => undefined}
       onLogout={handleLogout}
     >
-      <PageHeader title="Profile and payouts" subtitle="Your details, your tipping page photo, and how you get paid." />
-      <div>
-        {error && (
-          <Banner tone="error" title="Something went wrong" className="mb-5" onDismiss={() => setError('')}>
-            {error}
-          </Banner>
+      {/* Who you are, and whether payouts work, at a glance */}
+      <div className="mb-5 flex flex-wrap items-center gap-4">
+        {profile?.profilePhotoUrl ? (
+          <img src={photoSrc(profile.profilePhotoUrl)} alt="" className="h-16 w-16 rounded-full object-cover" />
+        ) : (
+          <span className="flex h-16 w-16 items-center justify-center rounded-full bg-brand-50 text-2xl font-bold text-brand-700">
+            {displayName.charAt(0).toUpperCase()}
+          </span>
         )}
+        <div className="min-w-0 flex-1">
+          <h1 className="truncate text-2xl font-bold text-ink-900">{displayName}</h1>
+          <p className="truncate text-sm text-ink-500">{profile?.email}</p>
+        </div>
+        <button onClick={() => setSection('payouts')} className="rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500" aria-label="Go to payouts">
+          {payoutChip}
+        </button>
+      </div>
 
-        {success && (
-          <Banner tone="success" title={success} className="mb-5" onDismiss={() => setSuccess('')} />
-        )}
+      {error && (
+        <Banner tone="error" title="Something went wrong" className="mb-5" onDismiss={() => setError('')}>
+          {error}
+        </Banner>
+      )}
+      {success && <Banner tone="success" title={success} className="mb-5" onDismiss={() => setSuccess('')} />}
 
-        {/* Payouts */}
-        <Card
-          className="mb-5 max-w-2xl"
-          title="Payouts"
-          subtitle="Stripe pays your tips to your bank account. They need to verify your identity first."
-          actions={
-            kycStatus === 'verified' ? (
-              <StatusChip kind="paid" label="Ready" />
-            ) : kycStatus === 'pending' ? (
-              <StatusChip kind="processing" label="In progress" />
-            ) : (
-              <StatusChip kind="failed" label="Not set up" />
-            )
-          }
-        >
-          {kycStatus === 'verified' && (
-            <p className="text-sm text-ink-700">Your identity is verified. Tips are paid out to your bank account automatically.</p>
-          )}
-          {kycStatus === 'pending' && (
-            <div className="space-y-3">
-              <p className="text-sm text-ink-700">Stripe is still waiting for some of your details. Pick up where you left off.</p>
-              <Button onClick={handleStartVerification}>Continue verification</Button>
-            </div>
-          )}
-          {(kycStatus === 'not_verified' || kycStatus === 'unknown') && (
-            <div className="space-y-3">
-              <p className="text-sm text-ink-700">You will not receive payouts until this is done. It takes about 3 minutes.</p>
-              {profile?.stripeAccountId ? (
-                <Button onClick={handleStartVerification}>Verify my identity</Button>
-              ) : (
-                <Button onClick={handleStartOnboarding}>Set up payouts</Button>
-              )}
-            </div>
-          )}
-        </Card>
+      <Tabs
+        className="mb-5"
+        active={section}
+        onChange={id => {
+          setSection(id)
+          if (editingSection) handleCancelEdit()
+        }}
+        items={[
+          { id: 'public', label: 'Public' },
+          { id: 'account', label: 'Account' },
+          { id: 'payouts', label: 'Payouts' },
+          { id: 'security', label: 'Security' }
+        ]}
+      />
 
-        <div className="mb-5 max-w-2xl rounded-2xl border border-slate-100 bg-white p-5 shadow-card">
-          <div className="flex justify-between items-center mb-6">
-            <h2 className="text-base font-bold text-ink-900">Personal information</h2>
-            {!isEditing && (
-              <button
-                onClick={handleEditProfile}
-                className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
-              >
-                Edit profile
-              </button>
-            )}
-          </div>
-
-          {/* Profile Photo Section */}
-          <div className="mb-8 border-b border-slate-200 pb-8">
-            <h3 className="text-sm font-medium text-ink-700 mb-4">Profile Photo</h3>
-            <div className="min-h-[200px]">
+      {/* Public profile: what fans see */}
+      {section === 'public' && (
+        <div className="grid items-start gap-5 lg:grid-cols-[1fr_320px]">
+          <div className="space-y-5">
+            <Card title="Photo" subtitle="Shown at the top of your tipping page. JPEG or PNG, up to 2 MB.">
               <PhotoUpload
                 photoUrl={profile?.profilePhotoUrl}
-                onPhotoChange={(url) => {
-                  if (profile) {
-                    setProfile({ ...profile, profilePhotoUrl: url })
-                  }
+                onPhotoChange={url => {
+                  if (profile) setProfile({ ...profile, profilePhotoUrl: url })
                 }}
                 variant="profile"
               />
-            </div>
+            </Card>
+
+            <Card
+              title="Stage name and bio"
+              actions={
+                editingSection !== 'public' && (
+                  <Button variant="secondary" size="sm" onClick={() => handleEditProfile('public')}>
+                    Edit
+                  </Button>
+                )
+              }
+            >
+              {editingSection === 'public' ? (
+                <div className="space-y-5">
+                  <Field label="Stage name" hint="The name your audience sees.">
+                    <input className={inputClass()} value={editForm.stageName} onChange={e => handleProfileInputChange('stageName', e.target.value)} placeholder="Your stage name" />
+                  </Field>
+                  <Field label="Bio" hint="A short line about you. It appears on your tipping page.">
+                    <textarea
+                      className={`${inputClass()} h-auto py-3`}
+                      rows={4}
+                      value={editForm.bio}
+                      onChange={e => handleProfileInputChange('bio', e.target.value)}
+                      placeholder="Tell your audience a little about you"
+                    />
+                  </Field>
+                  {editActions}
+                </div>
+              ) : (
+                <dl className="divide-y divide-slate-100">
+                  <ReadRow label="Stage name" value={profile?.stageName} />
+                  <ReadRow label="Bio" value={profile?.bio} />
+                </dl>
+              )}
+            </Card>
           </div>
 
-          {isEditing ? (
-            <div className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-ink-700 mb-2">
-                    First name
-                  </label>
-                  <input
-                    type="text"
-                    value={editForm.firstName}
-                    onChange={(e) => handleProfileInputChange('firstName', e.target.value)}
-                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent ${
-                      profileErrors.firstName ? 'border-red-500' : 'border-slate-300'
-                    }`}
-                  />
-                  {profileErrors.firstName && (
-                    <p className="text-red-500 text-sm mt-1">{profileErrors.firstName}</p>
-                  )}
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-ink-700 mb-2">
-                    Last name
-                  </label>
-                  <input
-                    type="text"
-                    value={editForm.lastName}
-                    onChange={(e) => handleProfileInputChange('lastName', e.target.value)}
-                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent ${
-                      profileErrors.lastName ? 'border-red-500' : 'border-slate-300'
-                    }`}
-                  />
-                  {profileErrors.lastName && (
-                    <p className="text-red-500 text-sm mt-1">{profileErrors.lastName}</p>
-                  )}
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-ink-700 mb-2">
-                  Stage name
-                </label>
-                <input
-                  type="text"
-                  value={editForm.stageName}
-                  onChange={(e) => handleProfileInputChange('stageName', e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                  placeholder="Your stage name (optional)"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-ink-700 mb-2">
-                  Email
-                </label>
-                <input
-                  type="email"
-                  value={editForm.email}
-                  onChange={(e) => handleProfileInputChange('email', e.target.value)}
-                  className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent ${
-                    profileErrors.email ? 'border-red-500' : 'border-slate-300'
-                  }`}
-                />
-                {profileErrors.email && (
-                  <p className="text-red-500 text-sm mt-1">{profileErrors.email}</p>
+          {/* A small preview of the tipping page header, updating as you type */}
+          <aside className="lg:sticky lg:top-6" aria-label="How fans see you">
+            <h2 className="mb-2 text-sm font-bold uppercase tracking-wider text-ink-500">How fans see you</h2>
+            <div
+              className="rounded-3xl p-5 text-white shadow-lift"
+              style={{ background: 'linear-gradient(160deg,#0a2533,#0d4254 60%,#0f3447)' }}
+            >
+              <div className="flex items-center gap-3">
+                {profile?.profilePhotoUrl ? (
+                  <img src={photoSrc(profile.profilePhotoUrl)} alt="" className="h-11 w-11 rounded-full border-2 border-white/30 object-cover" />
+                ) : (
+                  <span className="flex h-11 w-11 items-center justify-center rounded-full text-sm font-bold" style={{ background: 'linear-gradient(135deg,#06b6c8,#e5548c)' }}>
+                    {previewName.slice(0, 2).toUpperCase()}
+                  </span>
                 )}
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-ink-700 mb-2">
-                  Phone
-                </label>
-                <input
-                  type="tel"
-                  value={editForm.phone}
-                  onChange={(e) => handleProfileInputChange('phone', e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                  placeholder="Your phone number (optional)"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-ink-700 mb-2">
-                  Bio
-                </label>
-                <textarea
-                  value={editForm.bio}
-                  onChange={(e) => handleProfileInputChange('bio', e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                  rows={4}
-                  placeholder="Write a brief bio about yourself (optional)"
-                />
-              </div>
-
-              <div className="flex space-x-4 pt-4">
-                <button
-                  onClick={handleCancelEdit}
-                  className="px-4 py-2 border border-slate-300 text-ink-700 rounded-lg hover:bg-surface transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleSaveProfile}
-                  disabled={saving}
-                  className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {saving ? 'Saving…' : 'Save Changes'}
-                </button>
-              </div>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-ink-700 mb-1">First name</label>
-                  <p className="text-ink-900">{profile?.firstName || 'Not set'}</p>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-ink-700 mb-1">Last name</label>
-                  <p className="text-ink-900">{profile?.lastName || 'Not set'}</p>
+                <div className="min-w-0">
+                  <div className="truncate font-extrabold">Tip {previewName}</div>
+                  <div className="truncate text-sm text-white/70">{previewBio || 'Your bio shows here'}</div>
                 </div>
               </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-ink-700 mb-1">Stage name</label>
-                <p className="text-ink-900">{profile?.stageName || 'Not set'}</p>
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-ink-700 mb-1">Email</label>
-                <p className="text-ink-900">{profile?.email || 'Not set'}</p>
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-ink-700 mb-1">Phone</label>
-                <p className="text-ink-900">{profile?.phone || 'Not set'}</p>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-ink-700 mb-1">Bio</label>
-                <p className="text-ink-900">{profile?.bio || 'Not set'}</p>
+              <div className="mt-4 grid grid-cols-3 gap-2">
+                {['$2', '$5', '$10'].map((a, i) => (
+                  <div key={a} className="flex h-14 items-center justify-center rounded-xl text-lg font-extrabold" style={{ background: ['linear-gradient(135deg,#2dd4bf,#0f8f86)', 'linear-gradient(135deg,#22b8d6,#0e7490)', 'linear-gradient(135deg,#5b9bf8,#2748b8)'][i] }}>
+                    {a}
+                  </div>
+                ))}
               </div>
             </div>
-          )}
+          </aside>
         </div>
+      )}
 
-        {/* Password Section */}
-        <div className="max-w-2xl rounded-2xl border border-slate-100 bg-white p-5 shadow-card">
-          <div className="flex justify-between items-center mb-6">
-            <h2 className="text-base font-bold text-ink-900">Security</h2>
-            {!isChangingPassword && (
-              <button
-                onClick={handleChangePassword}
-                className="px-4 py-2 bg-slate-100 text-ink-700 rounded-lg hover:bg-slate-200 transition-colors"
-              >
-                Change password
-              </button>
+      {/* Account: you, and how the app looks */}
+      {section === 'account' && (
+        <div className="max-w-2xl space-y-5">
+          <Card
+            title="Your details"
+            actions={
+              editingSection !== 'account' && (
+                <Button variant="secondary" size="sm" onClick={() => handleEditProfile('account')}>
+                  Edit
+                </Button>
+              )
+            }
+          >
+            {editingSection === 'account' ? (
+              <div className="space-y-5">
+                <div className="grid gap-5 sm:grid-cols-2">
+                  <Field label="First name" error={profileErrors.firstName}>
+                    <input className={inputClass(!!profileErrors.firstName)} value={editForm.firstName} onChange={e => handleProfileInputChange('firstName', e.target.value)} autoComplete="given-name" />
+                  </Field>
+                  <Field label="Last name" error={profileErrors.lastName}>
+                    <input className={inputClass(!!profileErrors.lastName)} value={editForm.lastName} onChange={e => handleProfileInputChange('lastName', e.target.value)} autoComplete="family-name" />
+                  </Field>
+                </div>
+                <Field label="Email" error={profileErrors.email}>
+                  <input type="email" className={inputClass(!!profileErrors.email)} value={editForm.email} onChange={e => handleProfileInputChange('email', e.target.value)} autoComplete="email" />
+                </Field>
+                <Field label="Phone" hint="Optional">
+                  <input type="tel" className={inputClass()} value={editForm.phone} onChange={e => handleProfileInputChange('phone', e.target.value)} placeholder="+1 (555) 123-4567" autoComplete="tel" />
+                </Field>
+                {editActions}
+              </div>
+            ) : (
+              <dl className="divide-y divide-slate-100">
+                <ReadRow label="First name" value={profile?.firstName} />
+                <ReadRow label="Last name" value={profile?.lastName} />
+                <ReadRow label="Email" value={profile?.email} />
+                <ReadRow label="Phone" value={profile?.phone} />
+              </dl>
             )}
-          </div>
+          </Card>
 
-          {isChangingPassword ? (
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-ink-700 mb-2">
-                  Current password
-                </label>
-                <div className="relative">
-                  <input
-                    type={showPasswordFields.current ? 'text' : 'password'}
-                    value={passwordForm.currentPassword}
-                    onChange={(e) => handlePasswordInputChange('currentPassword', e.target.value)}
-                    onBlur={() => handlePasswordFieldBlur('currentPassword')}
-                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent ${
-                      passwordErrors.currentPassword ? 'border-red-500' : 'border-slate-300'
-                    }`}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPasswordFields((prev) => ({ ...prev, current: !prev.current }))}
-                    className="absolute inset-y-0 right-3 flex items-center text-ink-500 hover:text-ink-700"
-                    aria-label={showPasswordFields.current ? 'Hide password' : 'Show password'}
-                  >
-                    {showPasswordFields.current ? (
-                      <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-5 0-9-4-9-7 0-.88.21-1.715.58-2.47m3.15-3.15A9.956 9.956 0 0112 5c5 0 9 4 9 7 0 1.07-.34 2.07-.94 3m-3.28 3.28L4.22 4.22" />
-                      </svg>
-                    ) : (
-                      <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                      </svg>
-                    )}
-                  </button>
-                </div>
-                {passwordErrors.currentPassword && (
-                  <p className="text-red-500 text-sm mt-1">{passwordErrors.currentPassword}</p>
+          <Card title="Appearance" subtitle="Light, dark, or match this device. Saved on this device only.">
+            <ThemeToggle className="max-w-xs" />
+          </Card>
+        </div>
+      )}
+
+      {/* Payouts */}
+      {section === 'payouts' && (
+        <div className="max-w-2xl space-y-5">
+          <Card
+            title="Payouts"
+            subtitle="Stripe pays your tips to your bank account. They need to verify your identity first."
+            actions={payoutChip}
+          >
+            {kycStatus === 'verified' && (
+              <p className="text-sm text-ink-700">Your identity is verified. Tips are paid out to your bank account automatically.</p>
+            )}
+            {kycStatus === 'pending' && (
+              <div className="space-y-3">
+                <p className="text-sm text-ink-700">Stripe is still waiting for some of your details. Pick up where you left off.</p>
+                <Button onClick={handleStartVerification}>Continue verification</Button>
+              </div>
+            )}
+            {(kycStatus === 'not_verified' || kycStatus === 'unknown') && (
+              <div className="space-y-3">
+                <p className="text-sm text-ink-700">You will not receive payouts until this is done. It takes about 3 minutes.</p>
+                {profile?.stripeAccountId ? (
+                  <Button onClick={handleStartVerification}>Verify my identity</Button>
+                ) : (
+                  <Button onClick={handleStartOnboarding}>Set up payouts</Button>
                 )}
               </div>
-
-              <div>
-                <label className="block text-sm font-medium text-ink-700 mb-2">
-                  New password
-                </label>
-                <div className="relative">
-                  <input
-                    type={showPasswordFields.new ? 'text' : 'password'}
-                    value={passwordForm.newPassword}
-                    onChange={(e) => handlePasswordInputChange('newPassword', e.target.value)}
-                    onBlur={() => handlePasswordFieldBlur('newPassword')}
-                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent ${
-                      passwordErrors.newPassword ? 'border-red-500' : 'border-slate-300'
-                    }`}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPasswordFields((prev) => ({ ...prev, new: !prev.new }))}
-                    className="absolute inset-y-0 right-3 flex items-center text-ink-500 hover:text-ink-700"
-                    aria-label={showPasswordFields.new ? 'Hide password' : 'Show password'}
-                  >
-                    {showPasswordFields.new ? (
-                      <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-5 0-9-4-9-7 0-.88.21-1.715.58-2.47m3.15-3.15A9.956 9.956 0 0112 5c5 0 9 4 9 7 0 1.07-.34 2.07-.94 3m-3.28 3.28L4.22 4.22" />
-                      </svg>
-                    ) : (
-                      <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                      </svg>
-                    )}
-                  </button>
-                </div>
-                {passwordErrors.newPassword && (
-                  <p className="text-red-500 text-sm mt-1">{passwordErrors.newPassword}</p>
-                )}
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-ink-700 mb-2">
-                  Confirm New password
-                </label>
-                <div className="relative">
-                  <input
-                    type={showPasswordFields.confirm ? 'text' : 'password'}
-                    value={passwordForm.confirmPassword}
-                    onChange={(e) => handlePasswordInputChange('confirmPassword', e.target.value)}
-                    onBlur={() => handlePasswordFieldBlur('confirmPassword')}
-                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent ${
-                      passwordErrors.confirmPassword ? 'border-red-500' : 'border-slate-300'
-                    }`}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPasswordFields((prev) => ({ ...prev, confirm: !prev.confirm }))}
-                    className="absolute inset-y-0 right-3 flex items-center text-ink-500 hover:text-ink-700"
-                    aria-label={showPasswordFields.confirm ? 'Hide password' : 'Show password'}
-                  >
-                    {showPasswordFields.confirm ? (
-                      <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-5 0-9-4-9-7 0-.88.21-1.715.58-2.47m3.15-3.15A9.956 9.956 0 0112 5c5 0 9 4 9 7 0 1.07-.34 2.07-.94 3m-3.28 3.28L4.22 4.22" />
-                      </svg>
-                    ) : (
-                      <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                      </svg>
-                    )}
-                  </button>
-                </div>
-                {passwordErrors.confirmPassword && (
-                  <p className="text-red-500 text-sm mt-1">{passwordErrors.confirmPassword}</p>
-                )}
-              </div>
-
-              <div className="flex space-x-4 pt-4">
-                <button
-                  onClick={handleCancelPassword}
-                  className="px-4 py-2 border border-slate-300 text-ink-700 rounded-lg hover:bg-surface transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleSavePassword}
-                  disabled={saving}
-                  className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {saving ? 'Changing password…' : 'Change password'}
-                </button>
-              </div>
-            </div>
-          ) : (
-            <div>
-              <p className="text-ink-500">Keep your account secure by using a strong password.</p>
-            </div>
+            )}
+          </Card>
+          {kycStatus !== 'verified' && (
+            <Card title="What Stripe will ask for">
+              <ul className="space-y-3">
+                {[
+                  { icon: 'id-card' as const, text: 'A government photo ID' },
+                  { icon: 'home' as const, text: 'Your home address' },
+                  { icon: 'bank' as const, text: 'The bank account where payouts go' }
+                ].map(item => (
+                  <li key={item.text} className="flex items-center gap-3">
+                    <IconTile name={item.icon} size={36} />
+                    <span className="font-medium text-ink-900">{item.text}</span>
+                  </li>
+                ))}
+              </ul>
+            </Card>
           )}
         </div>
-      </div>
+      )}
+
+      {/* Security */}
+      {section === 'security' && (
+        <div className="max-w-2xl">
+          <Card title="Password" subtitle={isChangingPassword ? undefined : 'Keep your account safe with a strong password.'}
+            actions={!isChangingPassword && (
+              <Button variant="secondary" size="sm" onClick={handleChangePassword}>
+                Change password
+              </Button>
+            )}
+          >
+            {isChangingPassword && (
+              <div className="space-y-5">
+                {passwordInput('current', 'Current password', 'currentPassword', 'currentPassword')}
+                {passwordInput('new', 'New password', 'newPassword', 'newPassword')}
+                {passwordInput('confirm', 'Confirm new password', 'confirmPassword', 'confirmPassword')}
+                <div className="flex flex-col-reverse gap-3 border-t border-slate-100 pt-5 sm:flex-row sm:justify-end">
+                  <Button variant="secondary" onClick={handleCancelPassword} disabled={saving}>
+                    Cancel
+                  </Button>
+                  <Button onClick={handleSavePassword} loading={saving}>
+                    Change password
+                  </Button>
+                </div>
+              </div>
+            )}
+          </Card>
+        </div>
+      )}
     </PortalShell>
   )
 }
 
-export default Profile 
+export default Profile

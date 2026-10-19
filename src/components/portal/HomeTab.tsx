@@ -1,6 +1,7 @@
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { BrandIcon, IconTile, type BrandIconName } from '../icons/BrandIcons'
 import { Banner, Button, Card, StatCard, StatusChip } from '../ui'
+import { ChartTooltip } from '../charts/ChartTooltip'
 
 export interface HomeNextStep {
   id: string
@@ -167,9 +168,12 @@ export function HomeTab({ data, onGoToDevices, onGoToTips, formatCurrency }: Hom
                   tickFormatter={(v: number) => `$${v}`}
                 />
                 <Tooltip
-                  cursor={{ fill: '#F1F5F9' }}
-                  formatter={(v: any) => [formatCurrency(Number(v)), 'Tips']}
-                  labelFormatter={(l: any) => `Week of ${l}`}
+                  cursor={{ fill: 'rgba(8,145,166,0.08)' }}
+                  content={({ active, payload }) => {
+                    const row = payload?.[0]?.payload as { week: string; total: number } | undefined
+                    if (!active || !row) return null
+                    return <ChartTooltip active label={`Week of ${row.week}`} rows={[{ label: 'Tips', value: formatCurrency(row.total) }]} />
+                  }}
                 />
                 <Bar dataKey="total" fill="#0891A6" radius={[6, 6, 0, 0]} isAnimationActive={false} />
               </BarChart>
