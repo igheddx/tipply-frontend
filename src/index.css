@@ -10,7 +10,7 @@
   body {
     margin: 0;
     padding: 0;
-    background-color: #f8fafc;
+    background-color: #F5F7FA;
     height: 100vh;
     height: -webkit-fill-available;
   }
@@ -78,3 +78,127 @@
 }
 
 /* Force redeploy - PhotoUpload component */
+
+/* ------------------------------------------------------------------
+   Theme colors for shared components. Light values are the default;
+   .portal-dark (set on the portal, admin and monitor screens) swaps them.
+------------------------------------------------------------------- */
+:root {
+  --tone-success-bg: #ECFDF3; --tone-success-border: #BBF7D0; --tone-success-fg: #15803D;
+  --tone-info-bg: #E6F6F9;    --tone-info-border: #B6E4EC;    --tone-info-fg: #0E7490;
+  --tone-warning-bg: #FFF7E6; --tone-warning-border: #FDE3A7; --tone-warning-fg: #B45309;
+  --tone-error-bg: #FEF2F2;   --tone-error-border: #FECACA;   --tone-error-fg: #DC2626;
+  --chip-active-bg: #E6F6F9;  --chip-active-fg: #0E7490;
+  --chip-paused-bg: #FFF7E6;  --chip-paused-fg: #B45309;
+  --chip-offline-bg: #F1F5F9; --chip-offline-fg: #64748B;
+  --chip-paid-bg: #ECFDF3;    --chip-paid-fg: #15803D;
+  --chip-failed-bg: #FEF2F2;  --chip-failed-fg: #DC2626;
+  --tile-bg: #E6F6F9;
+  --tile-muted-bg: #F1F5F9;
+  --tile-badge-border: #FFFFFF;
+}
+
+.portal-dark {
+  color-scheme: dark;
+  --tone-success-bg: rgba(34,197,94,.14);  --tone-success-border: rgba(34,197,94,.35);  --tone-success-fg: #86EFAC;
+  --tone-info-bg: rgba(34,170,190,.15);    --tone-info-border: rgba(98,211,227,.35);    --tone-info-fg: #7EE3EF;
+  --tone-warning-bg: rgba(245,158,11,.14); --tone-warning-border: rgba(245,158,11,.35); --tone-warning-fg: #FCD34D;
+  --tone-error-bg: rgba(239,68,68,.14);    --tone-error-border: rgba(239,68,68,.4);     --tone-error-fg: #FCA5A5;
+  --chip-active-bg: rgba(34,170,190,.2);   --chip-active-fg: #7EE3EF;
+  --chip-paused-bg: rgba(245,158,11,.18);  --chip-paused-fg: #FCD34D;
+  --chip-offline-bg: rgba(148,163,184,.16);--chip-offline-fg: #A8BAC4;
+  --chip-paid-bg: rgba(34,197,94,.16);     --chip-paid-fg: #86EFAC;
+  --chip-failed-bg: rgba(239,68,68,.16);   --chip-failed-fg: #FCA5A5;
+  --tile-bg: rgba(34,170,190,.16);
+  --tile-muted-bg: rgba(148,163,184,.14);
+  --tile-badge-border: #112b3a;
+}
+
+html.theme-dark, html.theme-dark body { background-color: #0a1c27; color-scheme: dark; }
+
+/* Dark theme: the same Tailwind classes, recolored. Only applies under .portal-dark. */
+.portal-dark { background-color: #0a1c27; color: #C5D6DE; }
+.portal-dark .bg-white { background-color: #112b3a; }
+.portal-dark .bg-surface { background-color: #0a1c27; }
+.portal-dark .bg-slate-50 { background-color: #0e2533; }
+.portal-dark .bg-slate-100 { background-color: #16384a; }
+.portal-dark .bg-slate-200 { background-color: #1d4559; }
+.portal-dark .bg-slate-300 { background-color: #2c5a70; }
+.portal-dark .bg-white\/90 { background-color: rgba(10,28,39,.92); }
+.portal-dark .hover\:bg-slate-50:hover, .portal-dark .hover\:bg-slate-100:hover { background-color: #16384a; }
+.portal-dark .hover\:bg-white:hover { background-color: #16384a; }
+.portal-dark .hover\:bg-brand-50:hover { background-color: rgba(34,170,190,.2); }
+.portal-dark .active\:bg-slate-50:active { background-color: #16384a; }
+
+.portal-dark .border-slate-100 { border-color: rgba(255,255,255,.07); }
+.portal-dark .border-slate-200 { border-color: rgba(255,255,255,.12); }
+.portal-dark .border-slate-300 { border-color: rgba(255,255,255,.2); }
+.portal-dark .border-t, .portal-dark .border-b { border-color: rgba(255,255,255,.1); }
+.portal-dark .divide-slate-100 > :not([hidden]) ~ :not([hidden]),
+.portal-dark .divide-slate-200 > :not([hidden]) ~ :not([hidden]) { border-color: rgba(255,255,255,.08); }
+
+.portal-dark .text-ink-900 { color: #EAF3F7; }
+.portal-dark .text-ink-700 { color: #C5D6DE; }
+.portal-dark .text-ink-500 { color: #94ABB6; }
+.portal-dark .text-ink-400 { color: #7C939F; }
+.portal-dark .hover\:text-ink-700:hover { color: #E3EEF3; }
+.portal-dark .text-brand-600, .portal-dark .text-brand-700, .portal-dark .text-brand-800 { color: #62D3E3; }
+.portal-dark .hover\:text-brand-800:hover { color: #9BE6F1; }
+
+.portal-dark .bg-brand-50 { background-color: rgba(34,170,190,.16); }
+.portal-dark .bg-brand-100 { background-color: rgba(34,170,190,.26); }
+.portal-dark .border-brand-200 { border-color: rgba(98,211,227,.35); }
+
+.portal-dark .bg-green-50, .portal-dark .bg-green-100 { background-color: rgba(34,197,94,.15); }
+.portal-dark .bg-red-50, .portal-dark .bg-red-100 { background-color: rgba(239,68,68,.15); }
+.portal-dark .bg-amber-50, .portal-dark .bg-amber-100, .portal-dark .bg-yellow-50, .portal-dark .bg-yellow-100 { background-color: rgba(245,158,11,.15); }
+.portal-dark .border-green-200 { border-color: rgba(34,197,94,.35); }
+.portal-dark .border-red-200 { border-color: rgba(239,68,68,.4); }
+.portal-dark .border-amber-200, .portal-dark .border-yellow-200 { border-color: rgba(245,158,11,.35); }
+.portal-dark .text-green-600, .portal-dark .text-green-700, .portal-dark .text-green-800, .portal-dark .text-green-900 { color: #86EFAC; }
+.portal-dark .text-red-600, .portal-dark .text-red-700, .portal-dark .text-red-800 { color: #FCA5A5; }
+.portal-dark .text-amber-700, .portal-dark .text-amber-800, .portal-dark .text-yellow-700, .portal-dark .text-yellow-800 { color: #FCD34D; }
+
+.portal-dark input:not([type='checkbox']):not([type='radio']):not([type='file']),
+.portal-dark textarea,
+.portal-dark select {
+  background-color: #0c2230;
+  color: #EAF3F7;
+  border-color: rgba(255,255,255,.2);
+}
+.portal-dark ::placeholder { color: #6F8794; }
+.portal-dark pre { color: #C5D6DE; }
+
+/* Charts */
+.portal-dark .recharts-cartesian-grid line { stroke: rgba(255,255,255,.1); }
+.portal-dark .recharts-text, .portal-dark .recharts-cartesian-axis-tick-value { fill: #94ABB6; }
+.portal-dark .recharts-default-tooltip { background-color: #112b3a !important; border-color: rgba(255,255,255,.15) !important; }
+.portal-dark .recharts-tooltip-label, .portal-dark .recharts-tooltip-item { color: #EAF3F7 !important; }
+.portal-dark .recharts-tooltip-cursor { fill: rgba(255,255,255,.06); }
+
+/* Ant Design pop-ups (modals, messages) in the Tipwave style, for any that are still in use */
+.ant-modal .ant-modal-content { border-radius: 16px; padding: 24px; box-shadow: 0 12px 32px rgba(15, 23, 42, 0.18); }
+.ant-modal .ant-modal-title { font-size: 20px; font-weight: 700; }
+.ant-modal .ant-modal-footer .ant-btn { height: 44px; border-radius: 12px; font-weight: 600; padding-inline: 20px; }
+.ant-message .ant-message-notice-content { background: #1B2530; color: #FFFFFF; border-radius: 16px; padding: 12px 16px; font-weight: 600; box-shadow: 0 12px 32px rgba(15, 23, 42, 0.25); }
+.ant-message .ant-message-custom-content { color: #FFFFFF; }
+
+/* Tables: small caps headers, no column dividers, roomy rows */
+.ant-table-wrapper .ant-table { font-size: 14px; background: transparent; }
+.ant-table-wrapper .ant-table-thead > tr > th {
+  font-size: 12px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; padding: 12px 16px; white-space: nowrap;
+}
+.ant-table-wrapper .ant-table-thead > tr > th::before { display: none !important; }
+.ant-table-wrapper .ant-table-tbody > tr > td { padding: 14px 16px; vertical-align: top; }
+.ant-table-wrapper .ant-table-thead > tr:first-child > th:first-child { border-start-start-radius: 12px; }
+.ant-table-wrapper .ant-table-thead > tr:first-child > th:last-child { border-start-end-radius: 12px; }
+.ant-table-wrapper .ant-pagination { margin-top: 16px; }
+
+/* Tip page: a short pulse on the amount tiles when a song request is waiting for an amount */
+@keyframes tile-hint {
+  0% { box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.6), 0 8px 20px rgba(0, 0, 0, 0.25); }
+  100% { box-shadow: 0 0 0 14px rgba(255, 255, 255, 0), 0 8px 20px rgba(0, 0, 0, 0.25); }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .tile-hint { animation: tile-hint 1.4s ease-out 3; }
+}

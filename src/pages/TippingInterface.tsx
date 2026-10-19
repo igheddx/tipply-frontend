@@ -1,14 +1,17 @@
 import logger from "../utils/logger";
 import React, { useState, useEffect, useRef, lazy, Suspense } from 'react'
 import { useParams } from 'react-router-dom'
-import { motion, AnimatePresence } from 'framer-motion'
 import { toast } from 'sonner'
 import apiService from '../services/api'
 import { getApiBaseUrl } from '../utils/config'
-import { getUniqueDeviceId, detectPlatform, restoreDeviceIdFromIndexedDB } from '../utils/deviceId'
+import { DEFAULT_TIP_AMOUNTS, TIP_AMOUNT_COUNT } from '../utils/deviceConfig'
+import { getUniqueDeviceId, detectPlatform, initDeviceId } from '../utils/deviceId'
+import { TipScreen } from '../components/tip/TipScreen'
+import { SongPickerSheet, type PickedSong } from '../components/tip/SongPickerSheet'
+import { BrandIcon, type BrandIconName } from '../components/icons/BrandIcons'
+import { Button } from '../components/ui'
 
 const PaymentSetupModal = lazy(() => import('../components/PaymentSetupModal'))
-const SongCatalogSearch = lazy(() => import('../components/SongCatalogSearch'))
 
 let confettiLoader: any = null
 
@@ -19,20 +22,53 @@ interface DeviceInfo {
   ownerLastName: string
     stageName?: string
   profilePhotoUrl?: string
+  bio?: string
+  songCount?: number
   ownerId: string
   stripeAccountId?: string
   isAllowSongRequest?: boolean
+  tipAmounts?: number[]
 }
 
 interface PaymentMethodsCheckResult {
   hasPaymentMethods: boolean
   paymentMethodType?: string
+  paymentMethodId?: string
+  cardBrand?: string
+  cardLast4?: string
+}
+
+function InfoScreen({
+  icon,
+  title,
+  children,
+  action
+}: {
+  icon: BrandIconName
+  title: string
+  children: React.ReactNode
+  action?: React.ReactNode
+}) {
+  return (
+    <div
+      className="fixed inset-0 flex items-center justify-center p-6 text-white"
+      style={{ height: '100dvh', background: 'linear-gradient(135deg,#3b1a78,#1e3a8a 55%,#312e81)' }}
+    >
+      <div className="w-full max-w-sm rounded-3xl border border-white/20 bg-white/10 p-8 text-center backdrop-blur-md">
+        <span className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-white/15">
+          <BrandIcon name={icon} size={30} tone="inverse" />
+        </span>
+        <h2 className="mt-5 text-2xl font-bold">{title}</h2>
+        <p className="mt-3 text-white/80">{children}</p>
+        {action && <div className="mt-6">{action}</div>}
+      </div>
+    </div>
+  )
 }
 
 const TippingInterface: React.FC = () => {
   const { deviceId } = useParams<{ deviceId: string }>()
   const [totalTipped, setTotalTipped] = useState<number>(0)
-  const [tipsRefreshKey, setTipsRefreshKey] = useState(0)
   const [isDebouncing, setIsDebouncing] = useState(false)
   const [deviceInfo, setDeviceInfo] = useState<DeviceInfo | null>(null)
   const [showPaymentModal, setShowPaymentModal] = useState(false)
@@ -42,54 +78,27 @@ const TippingInterface: React.FC = () => {
   const [checkingPaymentMethods, setCheckingPaymentMethods] = useState(true)
   const [isDeviceVerified, setIsDeviceVerified] = useState<boolean | null>(null)
   const [audioEnabled, setAudioEnabled] = useState(false)
-  const [clickedAmount, setClickedAmount] = useState<number | null>(null)
+  // The amount tapped most recently: its button shows "Sent" for a moment
+  const [sentAmount, setSentAmount] = useState<number | null>(null)
+  // The song that was just sent with a tip, shown as "Request sent" for a few seconds
+  const [sentSong, setSentSong] = useState<{ title: string; artist: string } | null>(null)
+  const sentSongTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const sentTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const [savedCard, setSavedCard] = useState<{ brand?: string; last4?: string } | null>(null)
   const [isMobile, setIsMobile] = useState(false)
-  const [isIOS] = useState(() => {
-    // Detect iOS on initialization to prevent layout shift
-    return /iPhone|iPad|iPod/i.test(navigator.userAgent) || 
-           (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
-  })
   const [isPortrait, setIsPortrait] = useState(true)
   
   // Song request state
   const [showSongSearch, setShowSongSearch] = useState(false)
   const [selectedSong, setSelectedSong] = useState<{id: string, title: string, artist: string} | null>(null)
-  const [shouldAnimateButtons, setShouldAnimateButtons] = useState(false)
-  const [showSongRequestFields, setShowSongRequestFields] = useState(false)
   const [songRequestName, setSongRequestName] = useState('')
   const [songRequestNote, setSongRequestNote] = useState('')
   
   const audioRef = useRef<HTMLAudioElement>(null)
   const audioContextRef = useRef<AudioContext | null>(null)
 
-    const [billRefresh, setBillRefresh] = useState(0)
-  // Tip amounts for the cards
-  const tipAmounts = [2, 5, 10, 20, 50, 100]
-
-  // Card colors - vibrant gradients
-  const cardColors = [
-    'from-emerald-400 to-teal-600',     // $2 - Green
-    'from-blue-400 to-indigo-600',      // $5 - Blue
-    'from-purple-400 to-violet-600',    // $10 - Purple
-    'from-pink-400 to-rose-600',        // $20 - Pink
-    'from-orange-400 to-red-600',       // $50 - Orange/Red
-    'from-yellow-400 to-amber-600'      // $100 - Gold
-  ]
-
-  // Classic swipe UI state
-  // Force grid/cards UI as the primary experience
-  const [uiMode] = useState<'classic' | 'cards'>('cards')
-  const [classicIndex, setClassicIndex] = useState(0)
-  const [isBillFlying, setIsBillFlying] = useState(false)
-  const [enterSide, setEnterSide] = useState<'bottom' | 'left' | 'right'>('bottom')
-  const ANIM = {
-    exitFly: 0.8,
-    enterSlide: 0.7,
-    fadeExit: 0.25,
-    ease: 'easeInOut' as const
-  }
-  // Track fly state to sync exit animation; entry always starts from bottom
-  const swipeStart = useRef<{ x: number; y: number } | null>(null)
+  // Tip amounts for the cards: the performer's own six amounts (defaults until they change them)
+  const tipAmounts = deviceInfo?.tipAmounts?.length === TIP_AMOUNT_COUNT ? deviceInfo.tipAmounts : DEFAULT_TIP_AMOUNTS
 
   // Manage body overflow
   useEffect(() => {
@@ -187,12 +196,10 @@ const TippingInterface: React.FC = () => {
   // Initialize user
   useEffect(() => {
     const initializeUser = async () => {
-      // Restore device ID from IndexedDB if localStorage was cleared
-      const restoredId = await restoreDeviceIdFromIndexedDB()
-      
-      // Get unique device ID (random UUID stored persistently)
-      const uniqueDeviceId = getUniqueDeviceId()
-      logger.log('🔐 [Init] Unique device ID:', uniqueDeviceId, restoredId ? '(restored from IndexedDB)' : '(new)')
+      // One device ID for the whole page: taken from localStorage straight away, or (first visit / cleared site
+      // data) from IndexedDB for at most 1.5 seconds, otherwise newly generated. It never changes afterwards.
+      const uniqueDeviceId = await initDeviceId()
+      logger.log('🔐 [Init] Unique device ID:', uniqueDeviceId)
       
       // Detect platform (iOS, Android, Desktop)
       const platform = detectPlatform()
@@ -302,11 +309,14 @@ const TippingInterface: React.FC = () => {
           ownerLastName: device.ownerLastName,
             stageName: device.stageName,
           profilePhotoUrl: device.profilePhotoUrl,
+          bio: device.bio,
+          songCount: device.songCount,
           ownerId: device.id, // Using device.id since profileId is not exposed in public endpoint
           stripeAccountId: '', // Not exposed in public endpoint
           isAllowSongRequest: device.isAllowSongRequest,
           isStripeVerified: device.isStripeVerified || false,
-          isKycVerified: device.isKycVerified || false
+          isKycVerified: device.isKycVerified || false,
+          tipAmounts: device.tipAmounts
         }
         setDeviceInfo(deviceInfoData)
         
@@ -328,6 +338,9 @@ const TippingInterface: React.FC = () => {
         // Check payment methods using the device UUID
         const paymentCheck = await checkPaymentMethods(deviceInfoData)
         setIsPaymentSetup(paymentCheck.hasPaymentMethods)
+        if (paymentCheck.hasPaymentMethods) {
+          setSavedCard({ brand: paymentCheck.cardBrand, last4: paymentCheck.cardLast4 })
+        }
         if (!paymentCheck.hasPaymentMethods) {
           setShowPaymentModal(true)
         }
@@ -398,7 +411,9 @@ const TippingInterface: React.FC = () => {
         const result = {
           hasPaymentMethods: true,
           paymentMethodType: data.paymentMethodType,
-          paymentMethodId: data.paymentMethodId
+          paymentMethodId: data.paymentMethodId,
+          cardBrand: data.cardBrand,
+          cardLast4: data.cardLast4
         }
         
         // Store the payment method ID for 30-day persistence
@@ -602,51 +617,6 @@ const TippingInterface: React.FC = () => {
     return 'white'
   }
 
-  const getCurrencyImage = (amount: number): string => {
-    const images: Record<number, string> = {
-      1: '/images/1dollar.png',
-      2: '/images/1dollar.png',
-      5: '/images/5dollars.png',
-      10: '/images/10dollars.png',
-      20: '/images/20dollars.png',
-      50: '/images/50dollars.png',
-      100: '/images/100dollars.png'
-    }
-    return images[amount] || '/images/1dollar.png'
-  }
-
-  const cycleClassicIndex = (direction: -1 | 1) => {
-    if (isBillFlying || isDebouncing) return
-    setEnterSide(direction === -1 ? 'left' : 'right')
-    setClassicIndex(prev => {
-      const next = prev + direction
-      if (next < 0) return tipAmounts.length - 1
-      if (next >= tipAmounts.length) return 0
-      return next
-    })
-  }
-
-  const handleClassicTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
-    if (isBillFlying || isDebouncing) return
-    const touch = e.touches[0]
-    swipeStart.current = { x: touch.clientX, y: touch.clientY }
-  }
-
-  const handleClassicTouchEnd = (e: React.TouchEvent<HTMLDivElement>) => {
-    if (!swipeStart.current || isBillFlying || isDebouncing) return
-    const touch = e.changedTouches[0]
-    const dx = touch.clientX - swipeStart.current.x
-    const dy = touch.clientY - swipeStart.current.y
-    // Reduced thresholds for more responsive swipes
-    if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 30) {
-      setEnterSide(dx > 0 ? 'left' : 'right')
-      cycleClassicIndex(dx > 0 ? -1 : 1)
-    } else if (Math.abs(dy) > Math.abs(dx) && dy < -25) {
-      handleClassicTip()
-    }
-    swipeStart.current = null
-  }
-
   const playTipSound = () => {
     if (audioRef.current) {
       try {
@@ -660,41 +630,6 @@ const TippingInterface: React.FC = () => {
         // Ignore audio errors
       }
     }
-  }
-
-  const handleClassicTip = () => {
-    if (isBillFlying || isDebouncing) return
-    const amount = tipAmounts[classicIndex]
-    const exitDuration = 800
-
-    // Trigger haptic feedback immediately
-    triggerHaptic()
-    playTipSound()
-
-    // Short debounce to prevent accidental double taps
-    setIsDebouncing(true)
-    setClickedAmount(amount)
-    setTimeout(() => {
-      setIsDebouncing(false)
-      setClickedAmount(null)
-    }, 150)
-
-    // Trigger exit animation (don't change key yet - old bill stays and exits)
-    setIsBillFlying(true)
-
-    // Immediate user feedback (confetti handled after exit)
-    toast.success(`$${amount} Tip Sent!`, { duration: 800 })
-
-    // Submit tip WITHOUT confetti in the background
-    void processTip(amount)
-
-    // After exit completes: fire confetti, THEN mount new bill with updated key
-    setTimeout(() => {
-      triggerCanvasConfetti(amount)
-      setEnterSide('bottom')
-      setBillRefresh((v) => v + 1)
-      setIsBillFlying(false)
-    }, exitDuration)
   }
 
   // Trigger haptic feedback (Web Vibration API)
@@ -756,7 +691,12 @@ const TippingInterface: React.FC = () => {
   }
 
   const handleTipClick = (amount: number) => {
-    if (isDebouncing || !deviceInfo || !userId) return
+    if (isDebouncing) return
+    if (!deviceInfo || !userId) {
+      logger.log('⏳ [handleTipClick] Not ready yet - deviceInfo:', !!deviceInfo, 'userId:', !!userId)
+      toast.error('Still loading, please try again in a moment')
+      return
+    }
 
     logger.log('🎯 [handleTipClick] Called with amount:', amount, 'selectedSong:', selectedSong)
 
@@ -774,14 +714,12 @@ const TippingInterface: React.FC = () => {
 
     // Short debounce to prevent accidental double taps
     setIsDebouncing(true)
-    setClickedAmount(amount)
-    setTimeout(() => {
-      setIsDebouncing(false)
-      setClickedAmount(null)
-    }, 150)
+    setTimeout(() => setIsDebouncing(false), 150)
 
-    // Immediate user feedback
-    toast.success(`$${amount} Tip Sent!`, { duration: 800 })
+    // Immediate feedback: the tapped button shows "Sent" for a moment
+    setSentAmount(amount)
+    if (sentTimer.current) clearTimeout(sentTimer.current)
+    sentTimer.current = setTimeout(() => setSentAmount(null), 1600)
 
     // If song is selected, this completes the song request
     if (selectedSong) {
@@ -794,9 +732,11 @@ const TippingInterface: React.FC = () => {
       }
       setSelectedSong(null)
       setShowSongSearch(false)
-      setShowSongRequestFields(false)
       setSongRequestName('')
       setSongRequestNote('')
+      setSentSong({ title: selectedSongSnapshot.title, artist: selectedSongSnapshot.artist })
+      if (sentSongTimer.current) clearTimeout(sentSongTimer.current)
+      sentSongTimer.current = setTimeout(() => setSentSong(null), 4000)
       logger.log('🎵 [handleTipClick] Song is selected, calling processTipWithSong:', selectedSongSnapshot.id)
       void processTipWithSong(amount, selectedSongSnapshot)
       return
@@ -849,12 +789,14 @@ const TippingInterface: React.FC = () => {
           errorMsg = '⚠️ Server error. Please try again in a moment.'
         }
         logger.error('❌ Tip submission failed:', response.raw, 'Error:', errorMsg, 'Type:', response.errorType)
+        setSentAmount(null)
         toast.error(errorMsg)
       }
     } catch (error) {
       logger.error('❌ Error submitting tip:', error)
       const errorMsg = error instanceof Error ? error.message : 'Failed to submit tip. Please try again.'
-      toast.error(errorMsg)
+      setSentAmount(null)
+        toast.error(errorMsg)
     }
 
   }
@@ -899,11 +841,9 @@ const TippingInterface: React.FC = () => {
         if (selectedSong?.id === selectedSongSnapshot.id) {
           setSelectedSong(null)
           setShowSongSearch(false)
-          setShowSongRequestFields(false)
           setSongRequestName('')
           setSongRequestNote('')
         }
-        setTipsRefreshKey(prev => prev + 1)
         // Refresh payment method session on successful tip (extends 30-day memory)
         refreshPaymentMethodSession()
       } else {
@@ -921,597 +861,165 @@ const TippingInterface: React.FC = () => {
           errorMsg = '⚠️ Server error. Please try again in a moment.'
         }
         logger.error('❌ Tip submission failed:', response.raw, 'Error:', errorMsg, 'Type:', response.errorType)
+        setSentAmount(null); setSentSong(null)
         toast.error(errorMsg)
       }
     } catch (error) {
       logger.error('❌ Error submitting tip with song:', error)
       const errorMsg = error instanceof Error ? error.message : 'Failed to submit tip. Please try again.'
-      toast.error(errorMsg)
+      setSentAmount(null); setSentSong(null)
+        toast.error(errorMsg)
     }
 
   }
 
-  const handleSongSelect = (song: {id: string, title: string, artist: string}) => {
-    setSelectedSong(song)
+  const handleSongPick = (song: PickedSong) => {
+    setSelectedSong({ id: song.id, title: song.title, artist: song.artist })
+    setSongRequestName(song.requestorName ?? '')
+    setSongRequestNote(song.note ?? '')
     setShowSongSearch(false)
-    setShowSongRequestFields(false)
-    setSongRequestName('')
-    setSongRequestNote('')
-    setShouldAnimateButtons(true)
-    toast.success(`Song selected: ${song.title} by ${song.artist}. Now select a tip amount!`, { duration: 1000 })
   }
 
+  const clearSelectedSong = () => {
+    setSelectedSong(null)
+    setSongRequestName('')
+    setSongRequestNote('')
+  }
+
+  const performerName =
+    deviceInfo?.stageName || `${deviceInfo?.ownerFirstName ?? ''} ${deviceInfo?.ownerLastName ?? ''}`.trim()
+  const ready = !!deviceInfo && !!userId
+  // Always offer the button when the performer allows song requests; the picker explains an empty catalog
+  const canRequestSong = !!deviceInfo?.isAllowSongRequest
+
+  const paymentModal = (
+    <Suspense fallback={null}>
+      <PaymentSetupModal
+        isOpen={showPaymentModal}
+        onClose={() => setShowPaymentModal(false)}
+        onComplete={(paymentMethodId) => {
+          logger.log('🎉 Payment setup complete! Payment method ID:', paymentMethodId)
+          if (paymentMethodId) {
+            storePaymentMethodId(paymentMethodId)
+          }
+          clearPaymentCache() // Clear cache so next check will be fresh
+          setIsPaymentSetup(true)
+          setShowPaymentModal(false)
+          // Show the new card on the page
+          void checkPaymentMethods(deviceInfo).then((result) => {
+            if (result.hasPaymentMethods) setSavedCard({ brand: result.cardBrand, last4: result.cardLast4 })
+          })
+          toast.success('Payment method saved', { duration: 1200 })
+        }}
+        deviceUuid={deviceInfo?.uuid || ''}
+        userId={userId}
+        performerStageName={deviceInfo?.stageName}
+        performerFirstName={deviceInfo?.ownerFirstName}
+        performerLastName={deviceInfo?.ownerLastName}
+        performerPhotoUrl={deviceInfo?.profilePhotoUrl}
+        walletMode="both"
+      />
+    </Suspense>
+  )
+
+  // While the performer loads, show the real layout with placeholders so nothing jumps
   if (checkingPaymentMethods) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 flex items-center justify-center">
-        <div className="text-white text-xl">Loading...</div>
-      </div>
+      <TipScreen
+        performerName=""
+        amounts={DEFAULT_TIP_AMOUNTS}
+        ready={false}
+        sentAmount={null}
+        onTip={() => {}}
+        canRequestSong={false}
+        selectedSong={null}
+        onOpenSongPicker={() => {}}
+        onClearSong={() => {}}
+        card={null}
+        onChangeCard={() => {}}
+        total={0}
+      />
     )
   }
 
   // Check if device is verified (Stripe and KYC)
   if (isDeviceVerified === false) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 flex items-center justify-center p-6">
-        <div className="bg-white/10 backdrop-blur-md rounded-2xl p-8 max-w-md w-full text-center">
-          <div className="text-6xl mb-6">⚠️</div>
-          <h2 className="text-2xl font-bold text-white mb-4">Performer Not Set Up</h2>
-          <p className="text-white/80 mb-6">
-            This Performer is currently not set up to fully use the TipWave platform. Please contact your performer.
-          </p>
-        </div>
-      </div>
+      <InfoScreen icon="shield" title="Performer not set up">
+        This performer is not set up to receive tips yet. Please let them know.
+      </InfoScreen>
     )
   }
 
   // Block desktop usage and prompt user to open on mobile
   if (!isMobile) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 flex items-center justify-center p-6">
-        <div className="bg-white/10 backdrop-blur-md rounded-2xl p-8 text-center max-w-md mx-auto border border-white/20">
-          <div className="text-6xl mb-4">📱</div>
-          <h1 className="text-2xl font-bold text-white mb-4">Mobile Only</h1>
-          <p className="text-white/80 text-lg leading-relaxed">
-            This tipping interface is designed for mobile devices only. Please open this page on your smartphone or tablet for the best experience.
-          </p>
-        </div>
-      </div>
+      <InfoScreen icon="qr" title="Open this on your phone">
+        The tipping page is made for phones. Scan the QR code again with your phone's camera.
+      </InfoScreen>
     )
   }
 
   if (!isPaymentSetup) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 flex items-center justify-center p-6">
-        <div className="bg-white/10 backdrop-blur-md rounded-2xl p-8 max-w-md w-full text-center border border-white/20">
-          <div className="text-5xl mb-4">🔒</div>
-          <h2 className="text-2xl font-bold text-white mb-3">Payment Setup Required</h2>
-          <p className="text-white/80 mb-6">
-            Add a payment method to continue tipping.
-          </p>
-          <button
-            type="button"
-            onClick={() => setShowPaymentModal(true)}
-            className="w-full bg-blue-600 text-white py-4 px-4 rounded-xl hover:bg-blue-700 active:bg-blue-800 transition-all font-semibold text-base"
-          >
-            Set up payment
-          </button>
-        </div>
-        <Suspense fallback={null}>
-          <PaymentSetupModal
-            isOpen={showPaymentModal}
-            onClose={() => setShowPaymentModal(false)}
-            onComplete={(paymentMethodId) => {
-              logger.log('🎉 Payment setup complete! Payment method ID:', paymentMethodId)
-              if (paymentMethodId) {
-                storePaymentMethodId(paymentMethodId)
-              }
-              setIsPaymentSetup(true)
-              setShowPaymentModal(false)
-              toast.success('Payment method added successfully!', { duration: 1000 })
-            }}
-            deviceUuid={deviceInfo?.uuid || ''}
-            userId={userId}
-            performerStageName={deviceInfo?.stageName}
-            performerFirstName={deviceInfo?.ownerFirstName}
-            performerLastName={deviceInfo?.ownerLastName}
-            performerPhotoUrl={deviceInfo?.profilePhotoUrl}
-            walletMode="both"
-          />
-        </Suspense>
-      </div>
-    )
-  }
-
-  // Show desktop warning if not on mobile
-  if (!isMobile) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 flex items-center justify-center p-6">
-        <div className="bg-white/10 backdrop-blur-md rounded-2xl p-8 text-center max-w-md mx-auto border border-white/20">
-          <div className="text-6xl mb-4">📱</div>
-          <h1 className="text-2xl font-bold text-white mb-4">Mobile Only</h1>
-          <p className="text-white/80 text-lg leading-relaxed">
-            This tipping interface is designed for mobile devices only. Please open this page on your smartphone or tablet for the best experience.
-          </p>
-        </div>
-      </div>
+      <>
+        <InfoScreen
+          icon="card"
+          title="Add a card to tip"
+          action={
+            <Button size="lg" block onClick={() => setShowPaymentModal(true)}>
+              Add a card
+            </Button>
+          }
+        >
+          Add a payment method to continue tipping.
+        </InfoScreen>
+        {paymentModal}
+      </>
     )
   }
 
   return (
-    <div className={`min-h-screen relative ${uiMode === 'classic' ? 'overflow-hidden' : ''} ${uiMode === 'cards' ? 'bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900' : 'bg-black'}`}>
+    <>
+      <TipScreen
+        performerName={performerName}
+        photoUrl={deviceInfo?.profilePhotoUrl}
+        bio={deviceInfo?.bio}
+        amounts={tipAmounts}
+        ready={ready}
+        sentAmount={sentAmount}
+        onTip={handleTipClick}
+        canRequestSong={canRequestSong}
+        selectedSong={selectedSong}
+        sentSong={sentSong}
+        onOpenSongPicker={() => setShowSongSearch(true)}
+        onClearSong={clearSelectedSong}
+        card={savedCard}
+        onChangeCard={() => setShowPaymentModal(true)}
+        total={totalTipped}
+      />
+
       {!isPortrait && (
-        <div className="fixed inset-0 z-50 bg-black/80 text-white flex flex-col items-center justify-center px-6 text-center">
-          <div className="text-5xl mb-4">🔒</div>
-          <p className="text-lg font-semibold mb-2">Portrait mode only</p>
-          <p className="text-sm text-white/80">Please rotate your device back to portrait to continue tipping.</p>
+        <div className="fixed inset-0 z-[60] flex flex-col items-center justify-center bg-slate-950/85 px-6 text-center text-white">
+          <BrandIcon name="refresh" size={36} tone="inverse" />
+          <p className="mt-4 text-lg font-semibold">Portrait mode only</p>
+          <p className="mt-1 text-sm text-white/80">Please turn your phone upright to keep tipping.</p>
         </div>
       )}
 
-      {/* Background Effects - cards mode only */}
-      {uiMode === 'cards' && (
-        <>
-          <div className="absolute inset-0 bg-black/20"></div>
-      
-      {/* Animated Background Particles */}
-      <div className="absolute inset-0">
-        {[...Array(20)].map((_, i) => (
-          <motion.div
-            key={i}
-            className="absolute w-2 h-2 bg-white/10 rounded-full"
-            initial={{
-              x: Math.random() * window.innerWidth,
-              y: Math.random() * window.innerHeight,
-            }}
-            animate={{
-              y: [0, -20, 0],
-              opacity: [0.1, 0.3, 0.1],
-            }}
-            transition={{
-              duration: 3 + Math.random() * 2,
-              repeat: Infinity,
-              delay: Math.random() * 2,
-            }}
-          />
-        ))}
-          </div>
-        </>
-      )}
+      <SongPickerSheet
+        open={showSongSearch}
+        deviceUuid={deviceInfo?.uuid || ''}
+        current={selectedSong ? { ...selectedSong, requestorName: songRequestName, note: songRequestNote } : null}
+        onClose={() => setShowSongSearch(false)}
+        onPick={handleSongPick}
+      />
 
-      {/* Classic Swipe UI - Full Screen Bill */}
-      {uiMode === 'classic' && false && (
-        <div
-          className="fixed inset-0 z-50 flex flex-col"
-          onTouchStart={handleClassicTouchStart}
-          onTouchEnd={handleClassicTouchEnd}
-        >
-          {/* Full screen currency image */}
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={`bill-${classicIndex}-${billRefresh}`}
-              className="absolute inset-0 flex-1"
-              initial={
-                isBillFlying 
-                  ? { y: 0, opacity: 1, scale: 1 }
-                  : enterSide === 'left'
-                    ? { x: -window.innerWidth, opacity: 0, scale: 1 }
-                    : enterSide === 'right'
-                      ? { x: window.innerWidth, opacity: 0, scale: 1 }
-                      : { y: window.innerHeight, opacity: 0, scale: 0.8 }
-              }
-              animate={{ x: 0, y: 0, opacity: 1, scale: 1 }}
-              exit={
-                isBillFlying
-                  ? { y: -window.innerHeight - 100, opacity: 0, rotate: 360, scale: 1.2 }
-                  : { opacity: 0 }
-              }
-              transition={{ 
-                duration: isBillFlying ? ANIM.exitFly : ANIM.enterSlide, 
-                ease: ANIM.ease 
-              }}
-            >
-              <img
-                src={getCurrencyImage(tipAmounts[classicIndex])}
-                alt={`$${tipAmounts[classicIndex]} bill`}
-                className="w-full h-full object-cover"
-              />
-            </motion.div>
-          </AnimatePresence>
-
-          {/* Up arrow hint */}
-          <AnimatePresence>
-            {!isBillFlying && (
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1, y: [0, -10, 0] }}
-                exit={{ opacity: 0 }}
-                transition={{ y: { duration: 2, repeat: Infinity }, opacity: { duration: 0.3 } }}
-                className="absolute top-8 left-1/2 -translate-x-1/2 text-white text-6xl drop-shadow-2xl z-40"
-              >
-                ↑
-              </motion.div>
-            )}
-          </AnimatePresence>
-
-          {/* Owner name overlay */}
-          <AnimatePresence>
-            {!isBillFlying && (
-              <motion.div
-                initial={{ opacity: 0, y: -20 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0 }}
-                className="absolute top-24 left-1/2 -translate-x-1/2 z-40 text-center"
-              >
-                <div className="bg-black/50 backdrop-blur-md px-6 py-3 rounded-2xl border border-white/20">
-                  <div className="flex items-center gap-3">
-                    {deviceInfo?.profilePhotoUrl && (
-                      <img
-                        src={deviceInfo?.profilePhotoUrl}
-                        alt="Performer"
-                        className="w-10 h-10 rounded-full object-cover border-2 border-white/30"
-                      />
-                    )}
-                    <h1 className="text-2xl font-bold text-white drop-shadow-lg">
-                        Tip {deviceInfo?.stageName || `${deviceInfo?.ownerFirstName} ${deviceInfo?.ownerLastName}`}
-                    </h1>
-                  </div>
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-
-            {/* Song Request - Classic mode (overlay) */}
-            <AnimatePresence>
-              {!isBillFlying && deviceInfo?.isAllowSongRequest && (
-                <motion.div
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: 20 }}
-                  className="absolute bottom-[min(40vh,20rem)] left-0 right-0 z-40 flex justify-center px-4"
-                >
-                  {selectedSong ? (
-                    <div className="bg-green-500/30 backdrop-blur-md rounded-2xl px-4 py-3 border border-green-400/30 shadow-2xl max-w-sm w-full">
-                      <div className="text-white text-xs font-semibold mb-1">🎵 Song Selected</div>
-                      <div className="text-white/90 text-sm">{selectedSong?.title}</div>
-                      <div className="text-white/70 text-xs">{selectedSong?.artist}</div>
-                      <div className="text-white/60 text-sm mt-2 mb-1 font-semibold">Select a tip amount above to send your song request</div>
-                      <button
-                        onClick={() => {
-                          setSelectedSong(null)
-                          setShowSongRequestFields(false)
-                          setSongRequestName('')
-                          setSongRequestNote('')
-                        }}
-                        className="text-white/70 hover:text-white text-xs mt-1 underline"
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                  ) : (
-                    <button
-                      onClick={() => setShowSongSearch(true)}
-                      className="bg-black/40 backdrop-blur-md text-white px-4 py-3 rounded-2xl border border-white/20 hover:bg-black/60 transition-colors flex items-center gap-2 text-sm font-semibold shadow-2xl"
-                    >
-                      <span>🎵</span>
-                      <span>Request Song</span>
-                    </button>
-                  )}
-                </motion.div>
-              )}
-            </AnimatePresence>
-
-            {/* Controls at bottom */}
-          <AnimatePresence>
-            {!isBillFlying && (
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: 20 }}
-                className="absolute bottom-0 left-0 right-0 z-40 flex items-end justify-center pb-[max(env(safe-area-inset-bottom),1.5rem)] px-4"
-              >
-                <div className="relative bg-black/60 backdrop-blur-md rounded-3xl p-6 w-full max-w-sm border border-white/20 shadow-2xl">
-                  <div className="text-white/90 text-xs mb-4 font-medium text-center">Swipe left/right to change • Swipe up to send</div>
-                  <div className="flex items-center justify-center gap-4 mb-3">
-                    <button
-                      onClick={() => cycleClassicIndex(-1)}
-                      className="w-12 h-12 rounded-full bg-white/20 backdrop-blur-sm text-white text-2xl flex items-center justify-center hover:bg-white/30 transition-colors border border-white/20 flex-shrink-0"
-                    >
-                      ←
-                    </button>
-                    <div className="text-center flex-grow">
-                      <span className="text-white/80 text-xs uppercase tracking-wider mr-2">Amount:</span>
-                      <span className="text-white/80 text-xs uppercase tracking-wider font-black">${tipAmounts[classicIndex]}</span>
-                    </div>
-                    <button
-                      onClick={() => cycleClassicIndex(1)}
-                      className="w-12 h-12 rounded-full bg-white/20 backdrop-blur-sm text-white text-2xl flex items-center justify-center hover:bg-white/30 transition-colors border border-white/20 flex-shrink-0"
-                    >
-                      →
-                    </button>
-                  </div>
-                  <div className="text-center mb-4">
-                    <span className="text-white/80 text-xs uppercase tracking-wider mr-2">YOUR TIP:</span>
-                    <span className="text-white/80 text-xs uppercase tracking-wider font-black">${totalTipped}</span>
-                  </div>
-
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
-      )}
-
-      {/* Cards UI Grid - cards mode only */}
-      {uiMode === 'cards' && (
-        <div className="relative z-10 w-full h-[100dvh] overflow-hidden bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900">
-          <div className="flex flex-col w-full h-full overflow-hidden">
-            {/* Scrollable top content region */}
-            <div
-              className={`${selectedSong ? 'flex-1 overflow-y-auto' : ''} px-4`}
-              style={{
-                paddingTop: isIOS
-                  ? 'calc(env(safe-area-inset-top) + 1.5rem)'
-                  : 'calc(env(safe-area-inset-top) + 0.75rem)',
-                paddingBottom: '0.75rem'
-              }}
-            >
-              {/* Title with profile picture */}
-              <div className="flex items-center justify-center gap-3 mb-3 w-full max-w-xl mx-auto">
-                {deviceInfo?.profilePhotoUrl && (
-                  <img
-                    src={deviceInfo?.profilePhotoUrl}
-                    alt="Performer"
-                    className="w-10 h-10 rounded-full object-cover border-2 border-white/30 flex-shrink-0"
-                  />
-                )}
-                <h1 className="text-2xl font-bold text-white truncate">
-                    Tip {deviceInfo?.stageName || `${deviceInfo?.ownerFirstName} ${deviceInfo?.ownerLastName}`}
-                </h1>
-              </div>
-
-              {/* Song Request Information - Unified Top Container */}
-              {selectedSong && (
-                <motion.div
-                  initial={{ opacity: 0, y: -10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                  className="w-full max-w-xl px-2 mb-3 mx-auto"
-                >
-                  {/* Main instruction container */}
-                  <div className="bg-gradient-to-r from-purple-500/45 to-blue-500/45 backdrop-blur-md rounded-2xl px-4 py-3 border border-purple-300/40 shadow-xl min-h-[15rem]">
-                    {/* Primary instruction text */}
-                    <div className="text-white text-center font-bold text-lg leading-tight mb-3">
-                      Your song is ready. Choose a tip amount to send your request.
-                    </div>
-
-                    {/* Song details */}
-                    <div className="border-t border-white/20 pt-3 mt-3">
-                      <div className="text-center mb-3">
-                        <div className="text-white text-sm font-semibold truncate">🎵 Song Selected: {selectedSong?.title}</div>
-                      </div>
-
-                      {/* Optional: Show name/note input toggle and fields here */}
-                      <div className="mb-3">
-                        <button
-                          type="button"
-                          onClick={() => setShowSongRequestFields((prev) => !prev)}
-                          className="w-full text-xs font-medium text-white/70 hover:text-white/90 transition-colors py-1.5 rounded-lg hover:bg-white/10"
-                        >
-                          {showSongRequestFields ? '▼ Hide details' : '▶ Add your name or note (optional)'}
-                        </button>
-                      </div>
-
-                      {/* Name and Note input fields */}
-                      <AnimatePresence initial={false}>
-                        {showSongRequestFields && (
-                          <motion.div
-                            initial={{ opacity: 0, height: 0 }}
-                            animate={{ opacity: 1, height: 'auto' }}
-                            exit={{ opacity: 0, height: 0 }}
-                            transition={{ duration: 0.22 }}
-                            className="overflow-hidden"
-                          >
-                            <div className="space-y-1.5 bg-white/5 rounded-lg p-2.5 border border-white/10">
-                              <input
-                                type="text"
-                                value={songRequestName}
-                                onChange={(e) => setSongRequestName(e.target.value)}
-                                placeholder="Your name (optional)"
-                                maxLength={50}
-                                className="w-full px-3 py-2 bg-white/15 border border-white/25 rounded-md text-white placeholder-white/40 focus:ring-2 focus:ring-white/40 focus:border-white/30 focus:outline-none text-sm transition-all"
-                              />
-                              <textarea
-                                value={songRequestNote}
-                                onChange={(e) => setSongRequestNote(e.target.value)}
-                                placeholder="Add a note (optional)"
-                                rows={2}
-                                maxLength={200}
-                                className="w-full px-3 py-2 bg-white/15 border border-white/25 rounded-md text-white placeholder-white/40 focus:ring-2 focus:ring-white/40 focus:border-white/30 focus:outline-none text-sm resize-none transition-all"
-                              />
-                            </div>
-                          </motion.div>
-                        )}
-                      </AnimatePresence>
-
-                      {/* Cancel button */}
-                      <div className="mt-2 pt-2 border-t border-white/20">
-                        <button
-                          onClick={() => {
-                            setSelectedSong(null)
-                            setShowSongRequestFields(false)
-                            setSongRequestName('')
-                            setSongRequestNote('')
-                          }}
-                          className="w-full text-xs font-medium text-white/60 hover:text-white/80 py-2 rounded-lg hover:bg-white/10 transition-colors"
-                        >
-                          ✕ Cancel Song Request
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                </motion.div>
-              )}
-
-            </div>
-
-            {/* Fixed bottom region: tip buttons + YOUR TIP bar */}
-            <div
-              className="shrink-0 px-4"
-              style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 2.75rem)' }}
-            >
-              {/* Tip buttons grid - wraps naturally */}
-              <div className="flex flex-wrap justify-center gap-x-3 gap-y-5 max-w-xl w-full mt-1 mb-3 mx-auto">
-                {tipAmounts.map((amount, index) => (
-                  <motion.button
-                    key={amount}
-                    onClick={() => {
-                      handleTipClick(amount)
-                    }}
-                    disabled={isDebouncing}
-                    className={`
-                      relative min-h-[6.25rem] min-w-[8.25rem] flex-1 basis-[calc(50%-0.5rem)] max-w-[10.5rem]
-                      rounded-2xl bg-gradient-to-br ${cardColors[index]}
-                      flex items-center justify-center font-black text-white text-4xl
-                      shadow-2xl border border-white/20 overflow-hidden
-                      ${isDebouncing && clickedAmount === amount ? 'scale-95' : 'active:scale-95'}
-                      transition-transform duration-150 disabled:opacity-50
-                    `}
-                    initial={{ opacity: 0, y: 50 }}
-                    animate={
-                      shouldAnimateButtons
-                        ? {
-                            opacity: 1,
-                            y: 0,
-                            scale: [1, 1.08, 1],
-                            boxShadow: [
-                              '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
-                              '0 25px 50px -12px rgba(255, 255, 255, 0.5)',
-                              '0 25px 50px -12px rgba(0, 0, 0, 0.25)'
-                            ]
-                          }
-                        : { opacity: 1, y: 0 }
-                    }
-                    transition={
-                      shouldAnimateButtons
-                        ? {
-                            delay: index * 0.1,
-                            scale: { duration: 0.6, times: [0, 0.5, 1] },
-                            boxShadow: { duration: 0.6, times: [0, 0.5, 1] }
-                          }
-                        : { delay: index * 0.1 }
-                    }
-                    onAnimationComplete={() => {
-                      if (shouldAnimateButtons && index === tipAmounts.length - 1) {
-                        setShouldAnimateButtons(false)
-                      }
-                    }}
-                  >
-                    {/* Shimmer effect */}
-                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -skew-x-12 animate-pulse"></div>
-
-                    {/* Amount */}
-                    <span className="relative z-10 px-1 py-1">${amount}</span>
-
-                    {/* Click ripple effect */}
-                    {clickedAmount === amount && (
-                      <motion.div
-                        className="absolute inset-0 bg-white/30 rounded-2xl"
-                        initial={{ scale: 0, opacity: 1 }}
-                        animate={{ scale: 2, opacity: 0 }}
-                        transition={{ duration: 0.6 }}
-                      />
-                    )}
-                  </motion.button>
-                ))}
-              </div>
-
-              {/* Song request action when no selected song */}
-              {deviceInfo?.isAllowSongRequest && !selectedSong && (
-                <div className="w-full max-w-xl px-2 mb-3 mx-auto">
-                  <button
-                    onClick={() => setShowSongSearch(true)}
-                    className="w-full mt-2 bg-white/10 backdrop-blur-md text-white px-4 py-3 rounded-2xl border border-white/20 active:bg-white/20 transition-colors flex items-center justify-center gap-2 text-sm font-semibold"
-                  >
-                    <span>🎵</span>
-                    <span>Request Song</span>
-                  </button>
-                </div>
-              )}
-
-              {/* Control block */}
-              <div className="w-full max-w-xl px-2 mx-auto">
-                <div className="relative bg-black/60 backdrop-blur-md rounded-3xl px-5 py-3 w-full border border-white/20 shadow-2xl">
-                  {/* Total display - single horizontal row */}
-                  <div className="flex items-center justify-between">
-                    <span className="text-white/80 text-base font-semibold uppercase tracking-wider">YOUR TIP:</span>
-                    <span className="font-black text-white text-2xl uppercase tracking-wider">${totalTipped}</span>
-                  </div>
-
-                  {/* Swipe UI toggle hidden for now */}
-                  <div className="hidden" />
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Song Search Modal */}
-      <AnimatePresence>
-        {showSongSearch && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-6"
-          >
-            <motion.div
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              className="bg-white rounded-2xl max-w-2xl w-full max-h-[80vh] overflow-hidden"
-            >
-              <Suspense fallback={<div className="p-8 text-center text-gray-600">Loading songs...</div>}>
-                <SongCatalogSearch
-                  deviceUuid={deviceInfo?.uuid || ''}
-                  userTempId={userId}
-                  onSongSelect={handleSongSelect}
-                  onBackToTip={() => setShowSongSearch(false)}
-                  isVisible={showSongSearch}
-                  refreshKey={tipsRefreshKey}
-                />
-              </Suspense>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Payment Setup Modal */}
-      <Suspense fallback={null}>
-        <PaymentSetupModal
-          isOpen={showPaymentModal}
-          onClose={() => setShowPaymentModal(false)}
-          onComplete={(paymentMethodId) => {
-            logger.log('🎉 Payment setup complete! Payment method ID:', paymentMethodId)
-            if (paymentMethodId) {
-              storePaymentMethodId(paymentMethodId)
-            }
-            clearPaymentCache() // Clear cache so next check will be fresh
-            setIsPaymentSetup(true)
-            setShowPaymentModal(false)
-            toast.success('Payment method added successfully!', { duration: 1000 })
-          }}
-          deviceUuid={deviceInfo?.uuid || ''}
-          userId={userId}
-        />
-      </Suspense>
+      {paymentModal}
 
       {/* Audio Element */}
-      <audio
-        ref={audioRef}
-        src="/cash-register.mp3"
-        preload="auto"
-      />
-    </div>
+      <audio ref={audioRef} src="/cash-register.mp3" preload="auto" />
+    </>
   )
 }
 

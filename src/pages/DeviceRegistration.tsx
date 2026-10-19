@@ -50,20 +50,20 @@ const DeviceRegistration: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-surface py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md mx-auto">
         <div className="text-center mb-8">
-          <h2 className="text-3xl font-extrabold text-gray-900">
+          <h2 className="text-3xl font-extrabold text-ink-900">
             Register New Device
           </h2>
-          <p className="mt-2 text-sm text-gray-600">
+          <p className="mt-2 text-sm text-ink-500">
             Create a new tipping device
           </p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
           <div>
-            <label htmlFor="deviceName" className="block text-sm font-medium text-gray-700">
+            <label htmlFor="deviceName" className="block text-sm font-medium text-ink-700">
               Device Name
             </label>
             <input
@@ -78,10 +78,10 @@ const DeviceRegistration: React.FC = () => {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-3">
+            <label className="block text-sm font-medium text-ink-700 mb-3">
               Would you like to enable song requests from your audience? *
             </label>
-            <p className="text-sm text-gray-500 mb-4">
+            <p className="text-sm text-ink-500 mb-4">
               If you select "Yes", you'll be able to create a song catalog for your audience to choose from once you're logged in. This allows your audience to request specific songs when they tip you.
             </p>
             <div className="space-y-2">
@@ -91,9 +91,9 @@ const DeviceRegistration: React.FC = () => {
                   name="allowSongRequests"
                   checked={allowSongRequests === true}
                   onChange={() => setAllowSongRequests(true)}
-                  className="mr-3 h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300"
+                  className="mr-3 h-4 w-4 text-brand-700 focus:ring-brand-600 border-slate-300"
                 />
-                <span className="text-sm text-gray-700">Yes, enable song requests</span>
+                <span className="text-sm text-ink-700">Yes, enable song requests</span>
               </label>
               <label className="flex items-center cursor-pointer">
                 <input
@@ -101,9 +101,9 @@ const DeviceRegistration: React.FC = () => {
                   name="allowSongRequests"
                   checked={allowSongRequests === false}
                   onChange={() => setAllowSongRequests(false)}
-                  className="mr-3 h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300"
+                  className="mr-3 h-4 w-4 text-brand-700 focus:ring-brand-600 border-slate-300"
                 />
-                <span className="text-sm text-gray-700">No, disable song requests</span>
+                <span className="text-sm text-ink-700">No, disable song requests</span>
               </label>
             </div>
           </div>
@@ -127,7 +127,7 @@ const DeviceRegistration: React.FC = () => {
 
         {qrCodeUrl && (
           <div className="mt-8 text-center">
-            <h3 className="text-lg font-medium text-gray-900 mb-4">
+            <h3 className="text-lg font-medium text-ink-900 mb-4">
               QR Code for Device
             </h3>
             <div className="bg-white p-4 rounded-lg shadow">
@@ -138,7 +138,7 @@ const DeviceRegistration: React.FC = () => {
                 style={{ maxWidth: '200px' }}
               />
             </div>
-            <p className="text-sm text-gray-500 mt-2">
+            <p className="text-sm text-ink-500 mt-2">
               Scan this QR code to access the tipping interface
             </p>
           </div>

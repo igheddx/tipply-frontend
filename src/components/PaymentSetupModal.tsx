@@ -1,4 +1,5 @@
 import logger from "../utils/logger";
+import { photoSrc } from '../utils/photoUrl'
 import React, { useState, useEffect } from 'react'
 import { loadStripe, type Stripe } from '@stripe/stripe-js'
 import { Elements, CardElement, useStripe, useElements } from '@stripe/react-stripe-js'
@@ -91,24 +92,24 @@ export default function PaymentSetupModal({
   if (!isOpen) return null
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl max-w-md w-full max-h-[90vh] overflow-y-auto shadow-2xl">
+    <div className="fixed inset-0 z-[60] flex items-end justify-center bg-ink-900/50 p-0 sm:items-center sm:p-4" role="dialog" aria-modal="true">
+      <div className="max-h-[92vh] w-full max-w-md overflow-y-auto rounded-t-2xl bg-white shadow-lift sm:rounded-2xl">
         {/* ========== PERFORMER HERO SECTION ========== */}
-        <div className="bg-gradient-to-b from-purple-50 via-blue-50 to-white px-6 pt-10 pb-8 text-center">
+        <div className="bg-gradient-to-b from-brand-50 via-brand-50 to-white px-6 pt-10 pb-8 text-center">
           <div className="flex flex-col items-center space-y-4">
             {performerPhotoUrl && (
               <img
-                src={performerPhotoUrl}
+                src={photoSrc(performerPhotoUrl)}
                 alt="Performer"
                 className="w-24 h-24 rounded-full object-cover border-4 border-white shadow-lg"
               />
             )}
             <div className="space-y-3">
-              <h1 className="text-3xl font-bold text-gray-900">
+              <h1 className="text-3xl font-bold text-ink-900">
                 {performerStageName || `${performerFirstName} ${performerLastName}`}
               </h1>
-              <p className="text-base text-purple-700 font-medium">
-                You're about to light up their stage ✨
+              <p className="text-base text-brand-800 font-medium">
+                You're about to light up their stage
               </p>
             </div>
           </div>
@@ -118,7 +119,7 @@ export default function PaymentSetupModal({
         <div className="px-6 py-8">
           {!stripePromise && (
             <div className="text-center py-8">
-              <p className="text-sm text-gray-600">Initializing secure payment...</p>
+              <p className="text-sm text-ink-500">Initializing secure payment...</p>
               {initError && (
                 <p className="mt-2 text-sm text-red-600">{initError}</p>
               )}
@@ -143,7 +144,6 @@ export default function PaymentSetupModal({
 
 function PaymentForm({ 
   deviceUuid, 
-  userId, 
   onComplete, 
   onClose,
   walletMode
@@ -170,7 +170,7 @@ function PaymentForm({
     platform?: string,
     payWallet?: boolean,
     setupIntentId?: string
-  ) => {
+  ): Promise<boolean> => {
     logger.log('💾 [storePaymentInfo] Called with:', { persistedUserId, paymentMethodId, stripeCustomerId, platform })
     
     if (!paymentMethodId || !stripeCustomerId) {
@@ -178,7 +178,7 @@ function PaymentForm({
         paymentMethodId: paymentMethodId ? '✓' : '✗',
         stripeCustomerId: stripeCustomerId ? '✓' : '✗'
       })
-      return
+      return false
     }
 
     try {
@@ -205,11 +205,13 @@ function PaymentForm({
       
       if (response.ok) {
         logger.log('✅ [storePaymentInfo] Payment info stored successfully')
-      } else {
-        logger.error('❌ [storePaymentInfo] Backend returned error:', response.status, response.statusText, 'Body:', responseText)
+        return true
       }
+      logger.error('❌ [storePaymentInfo] Backend returned error:', response.status, response.statusText, 'Body:', responseText)
+      return false
     } catch (err) {
       logger.error('❌ [storePaymentInfo] Failed to persist payment info to backend', err)
+      return false
     }
   }
 
@@ -277,7 +279,7 @@ function PaymentForm({
           const res = await fetch(`${getApiBaseUrl()}/api/stripe/setup-intent`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ deviceUuid, userId })
+            body: JSON.stringify({ deviceUuid, userId: getUniqueDeviceId() })
           })
           
           if (!res.ok) {
@@ -330,7 +332,13 @@ function PaymentForm({
               }
             }
             // Persist payment info to backend so security checks pass
-            await storePaymentInfo(uniqueDeviceId!, paymentMethodId, customerId, platform, true, setupIntent?.id)
+            const stored = await storePaymentInfo(uniqueDeviceId!, paymentMethodId, customerId, platform, true, setupIntent?.id)
+            if (!stored) {
+              // Don't report success: a card the server didn't save is rejected when the tip is sent
+              event.complete('fail')
+              setError('We could not save your payment method. Please try again.')
+              return
+            }
             
             // Payment method is automatically attached to customer by Stripe during SetupIntent confirmation
             event.complete('success')
@@ -354,7 +362,7 @@ function PaymentForm({
       attachPaymentHandlers(applePaymentRequest)
       attachPaymentHandlers(googlePaymentRequest)
     }
-  }, [stripe, deviceUuid, userId, onComplete])
+  }, [stripe, deviceUuid, onComplete])
   const handleCardSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!stripe || !elements) return
@@ -367,7 +375,7 @@ function PaymentForm({
       const res = await fetch(`${getApiBaseUrl()}/api/stripe/setup-intent`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ deviceUuid, userId })
+        body: JSON.stringify({ deviceUuid, userId: getUniqueDeviceId() })
       })
       
       if (!res.ok) {
@@ -435,7 +443,12 @@ function PaymentForm({
           }
         }
         // Persist payment info to backend so security checks pass
-        await storePaymentInfo(uniqueDeviceId!, paymentMethodId, customerId, platform, false, result.setupIntent?.id)
+        const stored = await storePaymentInfo(uniqueDeviceId!, paymentMethodId, customerId, platform, false, result.setupIntent?.id)
+        if (!stored) {
+          // Don't report success: a card the server didn't save is rejected when the tip is sent
+          setError('We could not save your payment method. Please try again.')
+          return
+        }
         
         // Payment method is automatically attached to customer by Stripe during SetupIntent confirmation
         toast.success('Payment method added successfully!')
@@ -476,7 +489,7 @@ function PaymentForm({
           {!isCheckingWalletAvailability && stripe && paymentRequest && isApplePay && isSetupIntentMode && (
             <div className="mt-3 mb-3 flex items-start gap-2 text-[15px] text-[#444444]">
               <p>
-                🔒 First-time only: Apple Pay will securely save your payment method. You won’t be charged.
+                First-time only: Apple Pay will securely save your payment method. You won’t be charged.
               </p>
             </div>
           )}
@@ -491,7 +504,7 @@ function PaymentForm({
               disabled={loading}
               className={`w-full min-h-[44px] transition-all disabled:opacity-50 font-medium text-base flex items-center justify-center ${
                 isApplePay
-                  ? 'bg-black text-white py-3 px-6 rounded-full hover:bg-gray-800 active:bg-gray-900'
+                  ? 'bg-black text-white py-3 px-6 rounded-full hover:bg-slate-800 active:bg-slate-900'
                   : 'bg-transparent p-0'
               }`}
             >
@@ -520,7 +533,7 @@ function PaymentForm({
           <button
             type="button"
             onClick={() => setShowCardFields(true)}
-            className="w-full min-h-[44px] border border-gray-300 text-gray-700 bg-white rounded-xl px-4 py-3 hover:bg-gray-50 active:bg-gray-100 transition-all font-medium text-base"
+            className="w-full min-h-[44px] border border-slate-300 text-ink-700 bg-white rounded-xl px-4 py-3 hover:bg-surface active:bg-slate-100 transition-all font-medium text-base"
           >
             Pay with card
           </button>
@@ -535,10 +548,10 @@ function PaymentForm({
           }`}
         >
           <div className="flex items-center justify-between mb-4">
-            <label className="text-sm font-semibold text-gray-900">Card Details</label>
+            <label className="text-sm font-semibold text-ink-900">Card Details</label>
           </div>
           
-          <div className="border-2 border-gray-200 rounded-lg p-4 bg-white hover:border-gray-300 focus-within:border-blue-500 transition-colors">
+          <div className="border-2 border-slate-200 rounded-lg p-4 bg-white hover:border-slate-300 focus-within:border-brand-600 transition-colors">
             <CardElement 
               options={{ 
                 style: { 
@@ -561,7 +574,7 @@ function PaymentForm({
           <button
             type="submit"
             disabled={loading || !stripe || !showCardFields}
-            className="mt-4 w-full bg-blue-600 text-white py-4 px-4 rounded-xl hover:bg-blue-700 active:bg-blue-800 transition-all disabled:opacity-50 disabled:cursor-not-allowed font-semibold text-base"
+            className="mt-4 w-full bg-brand-700 text-white py-4 px-4 rounded-xl hover:bg-brand-800 active:bg-brand-800 transition-all disabled:opacity-50 disabled:cursor-not-allowed font-semibold text-base"
           >
             {loading ? (
               <span className="flex items-center justify-center gap-2">
@@ -586,7 +599,7 @@ function PaymentForm({
       )}
 
       {/* ========== SECTION 3: ACTION BUTTONS ========== */}
-      <div className="pb-6 border-b border-gray-200 space-y-3">
+      <div className="pb-6 border-b border-slate-200 space-y-3">
         {isWalletOnly && (
           <button
             type="button"
@@ -598,7 +611,7 @@ function PaymentForm({
               }
             }}
             disabled={loading || !stripe || !paymentRequest}
-            className="w-full bg-blue-600 text-white py-4 px-4 rounded-xl hover:bg-blue-700 active:bg-blue-800 transition-all disabled:opacity-50 disabled:cursor-not-allowed font-semibold text-base"
+            className="w-full bg-brand-700 text-white py-4 px-4 rounded-xl hover:bg-brand-800 active:bg-brand-800 transition-all disabled:opacity-50 disabled:cursor-not-allowed font-semibold text-base"
           >
             {loading ? (
               <span className="flex items-center justify-center gap-2">
@@ -618,7 +631,7 @@ function PaymentForm({
           type="button"
           onClick={onClose}
           disabled={loading}
-          className="w-full text-gray-600 py-3 px-4 rounded-xl hover:text-gray-900 hover:bg-gray-50 transition-all disabled:opacity-50 disabled:cursor-not-allowed font-medium text-base"
+          className="w-full text-ink-500 py-3 px-4 rounded-xl hover:text-ink-900 hover:bg-surface transition-all disabled:opacity-50 disabled:cursor-not-allowed font-medium text-base"
         >
           Cancel
         </button>
@@ -640,11 +653,11 @@ function PaymentForm({
               d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
             />
           </svg>
-          <p className="text-xs text-gray-500 font-medium">
+          <p className="text-xs text-ink-500 font-medium">
             Securely processed by Stripe
           </p>
         </div>
-        <p className="text-xs text-gray-400 leading-relaxed px-2">
+        <p className="text-xs text-ink-400 leading-relaxed px-2">
           Your card details are encrypted and never stored on your device.
         </p>
       </div>

@@ -1,0 +1,13 @@
+{
+  "name": "Tipwave",
+  "short_name": "Tipwave",
+  "start_url": "/dashboard",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#0a2533",
+  "theme_color": "#0E7490",
+  "icons": [
+    { "src": "/images/logo/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/images/logo/tipwave-mark.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}

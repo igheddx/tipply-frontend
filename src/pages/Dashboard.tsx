@@ -1,12 +1,18 @@
 import logger from "../utils/logger";
+import { PortalShell, type PortalNavItem } from '../components/portal/PortalShell'
+import { HomeTab, type HomeData } from '../components/portal/HomeTab'
+import { TipsTimeline } from '../components/charts/TipsTimeline'
+import { Banner, Button, Card, EmptyState, Modal, PageHeader, PageLoader, StatusChip, useFeedback, type ChipKind } from '../components/ui'
+import { BrandIcon, IconTile } from '../components/icons/BrandIcons'
+import { Switch } from '../components/ui/Switch'
 import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import apiService from '../services/api'
 import SongManagement from '../components/SongManagement'
 import SongRequestMonitor from '../components/SongRequestMonitor'
 import { API_BASE_URL } from '../utils/config'
-import { CrownOutlined } from '@ant-design/icons'
-import { LineChart, Line, ScatterChart, Scatter, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
+import { DEFAULT_TIP_AMOUNTS, TIP_AMOUNT_COUNT, LIGHT_EFFECTS, SOUND_OPTIONS, VOLUME_OPTIONS, DEFAULT_SOUND_ID, DEFAULT_SOUND_VOLUME, DEFAULT_EFFECT_CONFIG, normalizeEffectConfig, effectForAmount, buildEffectConfig } from '../utils/deviceConfig'
+import TipAmountsEditor from '../components/TipAmountsEditor'
 
 interface DashboardStats {
   totalDevices: number
@@ -31,6 +37,8 @@ interface DashboardMetrics {
   thisWeekTips: number
   thisWeekTipsCount: number
   thisMonthTips: number
+  failedTips?: number
+  failedTipsCount?: number
   lastMonthTips: number
   trendPercentage: number
   trendDirection: string
@@ -54,13 +62,17 @@ interface DeviceSummary {
   isAllowSongRequest: boolean
   isSoundEnabled?: boolean
   isRandomLightEffect?: boolean
+  soundId?: number
+  soundVolume?: string
+  isPaused?: boolean
   effectConfiguration?: string
 }
 
 interface TipSummary {
   id: string
   amount: number
-  deviceNickname: string
+  deviceId?: string
+  deviceNickname?: string
   createdAt: string
   status: string
 }
@@ -110,23 +122,31 @@ interface TipPoint {
   timestamp: number
 }
 
+const INPUT = 'h-12 w-full rounded-xl border bg-white px-4 text-ink-900 placeholder:text-ink-400 transition-colors focus:border-transparent focus:outline-none focus:ring-2 focus:ring-brand-500'
+
 const Dashboard: React.FC = () => {
+  const { toast } = useFeedback()
   const [stats, setStats] = useState<DashboardStats | null>(null)
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null)
   const [recentTips, setRecentTips] = useState<TipSummary[]>([])
   const [loading, setLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState('overview')
+  const [activeTab, setActiveTab] = useState(() => {
+    const t = new URLSearchParams(window.location.search).get('tab')
+    return t && ['devices', 'tips', 'songs', 'monitor'].includes(t) ? t : 'overview'
+  })
   const [showStripeAlert, setShowStripeAlert] = useState(false)
   const [stripeEnabledDevices, setStripeEnabledDevices] = useState<string[]>([])
   const [userProfile, setUserProfile] = useState<any>(null)
+  const [tipAmountsSaving, setTipAmountsSaving] = useState(false)
+  // The performer's own tip amounts (defaults until they change them)
+  const tipAmounts: number[] = Array.isArray(userProfile?.tipAmounts) && userProfile.tipAmounts.length === TIP_AMOUNT_COUNT
+    ? userProfile.tipAmounts
+    : DEFAULT_TIP_AMOUNTS
   const [stripeMetricsLoading, setStripeMetricsLoading] = useState(true)
   const [insights, setInsights] = useState<PerformerInsights | null>(null)
-  const [weeklyChartData, setWeeklyChartData] = useState<any[]>([])
-  const [trendData, setTrendData] = useState<any[]>([])
   const [tipTimelinePoints, setTipTimelinePoints] = useState<TipPoint[]>([])
-  const [filteredTipPoints, setFilteredTipPoints] = useState<TipPoint[]>([])
-  const [startDateTime, setStartDateTime] = useState('')
-  const [endDateTime, setEndDateTime] = useState('')
+  // True until the charts' data (weekly totals and every tip) has arrived
+  const [chartsLoading, setChartsLoading] = useState(true)
   
   const getDeviceSetupUrl = () => {
     const host = window.location.hostname.toLowerCase()
@@ -137,11 +157,11 @@ const Dashboard: React.FC = () => {
   }
   
   // Add Device Form States
-  const [showAddDeviceForm, setShowAddDeviceForm] = useState(false)
+  const [, setShowAddDeviceForm] = useState(false)
   const [addDeviceForm, setAddDeviceForm] = useState({
     serialNumber: '', // Changed from deviceUuid to serialNumber
     nickname: '',
-    isAllowSongRequest: null as boolean | null
+    isAllowSongRequest: false as boolean | null
   })
   const [addDeviceErrors, setAddDeviceErrors] = useState<{[key: string]: string}>({})
   const [isAddingDevice, setIsAddingDevice] = useState(false)
@@ -161,6 +181,7 @@ const Dashboard: React.FC = () => {
   
   // Song Request Toggle States
   const [updatingSongRequest, setUpdatingSongRequest] = useState<string | null>(null)
+  const [pausingDeviceId, setPausingDeviceId] = useState<string | null>(null)
   
   // Device Configuration States
   const [expandedDeviceConfig, setExpandedDeviceConfig] = useState<string | null>(null)
@@ -171,10 +192,9 @@ const Dashboard: React.FC = () => {
   const [songRequests, setSongRequests] = useState<any[]>([])
   
   // Song Catalog Alert States
-  const [showSongCatalogAlert, setShowSongCatalogAlert] = useState(false)
+  const [, setShowSongCatalogAlert] = useState(false)
   const [songCatalogCount, setSongCatalogCount] = useState(0)
   const [downloadingDeviceId, setDownloadingDeviceId] = useState<string | null>(null)
-  const [showHeaderMenu, setShowHeaderMenu] = useState(false)
   
   const navigate = useNavigate()
 
@@ -287,30 +307,32 @@ const Dashboard: React.FC = () => {
         setLoading(false)
         logger.log(`🎉 [PERF] Dashboard init complete in ${(performance.now() - startTime).toFixed(0)}ms`)
 
-        // Background fetch: load Stripe metrics and merge into state when ready
-        try {
-          const stripeStart = performance.now()
-          setStripeMetricsLoading(true)
-          const fullMetrics = await apiService.getDashboardMetrics(profileId, { skipStripe: false })
-          if (fullMetrics.data) {
-            setMetrics(prev => prev ? {
-              ...prev,
-              stripeAvailableBalance: fullMetrics.data.stripeAvailableBalance ?? prev.stripeAvailableBalance,
-              stripeFuturePayouts: fullMetrics.data.stripeFuturePayouts ?? prev.stripeFuturePayouts,
-              stripeInTransit: fullMetrics.data.stripeInTransit ?? prev.stripeInTransit,
-              stripeLifetimeVolume: fullMetrics.data.stripeLifetimeVolume ?? prev.stripeLifetimeVolume,
-              totalEarnings: fullMetrics.data.totalEarnings ?? prev.totalEarnings,
-              pendingPayouts: fullMetrics.data.pendingPayouts ?? prev.pendingPayouts,
-              uniqueTippersAllTime: fullMetrics.data.uniqueTippersAllTime ?? prev.uniqueTippersAllTime,
-              mostTippedDenomination: fullMetrics.data.mostTippedDenomination ?? prev.mostTippedDenomination,
-            } : fullMetrics.data)
-            logger.log(`⏱️ [PERF] Background Stripe metrics loaded in ${(performance.now() - stripeStart).toFixed(0)}ms`)
+        // Background fetch: load Stripe balances and merge them in when ready. This is slow, so the charts below do not wait for it.
+        void (async () => {
+          try {
+            const stripeStart = performance.now()
+            setStripeMetricsLoading(true)
+            const fullMetrics = await apiService.getDashboardMetrics(profileId, { skipStripe: false })
+            if (fullMetrics.data) {
+              setMetrics(prev => prev ? {
+                ...prev,
+                stripeAvailableBalance: fullMetrics.data.stripeAvailableBalance ?? prev.stripeAvailableBalance,
+                stripeFuturePayouts: fullMetrics.data.stripeFuturePayouts ?? prev.stripeFuturePayouts,
+                stripeInTransit: fullMetrics.data.stripeInTransit ?? prev.stripeInTransit,
+                stripeLifetimeVolume: fullMetrics.data.stripeLifetimeVolume ?? prev.stripeLifetimeVolume,
+                totalEarnings: fullMetrics.data.totalEarnings ?? prev.totalEarnings,
+                pendingPayouts: fullMetrics.data.pendingPayouts ?? prev.pendingPayouts,
+                uniqueTippersAllTime: fullMetrics.data.uniqueTippersAllTime ?? prev.uniqueTippersAllTime,
+                mostTippedDenomination: fullMetrics.data.mostTippedDenomination ?? prev.mostTippedDenomination,
+              } : fullMetrics.data)
+              logger.log(`⏱️ [PERF] Background Stripe metrics loaded in ${(performance.now() - stripeStart).toFixed(0)}ms`)
+            }
+          } catch (e) {
+            logger.warn('Skipping Stripe metrics due to error:', e)
+          } finally {
+            setStripeMetricsLoading(false)
           }
-        } catch (e) {
-          logger.warn('Skipping Stripe metrics due to error:', e)
-        } finally {
-          setStripeMetricsLoading(false)
-        }
+        })()
 
         // Background fetch: load insights data for charts
         try {
@@ -357,6 +379,8 @@ const Dashboard: React.FC = () => {
           }
         } catch (e) {
           logger.warn('Skipping insights data due to error:', e)
+        } finally {
+          setChartsLoading(false)
         }
       } catch (error) {
         logger.error('Error initializing dashboard:', error)
@@ -401,7 +425,7 @@ const Dashboard: React.FC = () => {
               setRecentTips(tipsResp.data.map((tip: any) => ({
                 id: tip.id,
                 amount: tip.amount,
-                deviceNickname: 'Device',
+                deviceId: tip.deviceId,
                 createdAt: tip.createdAt,
                 status: tip.status
               })))
@@ -428,85 +452,6 @@ const Dashboard: React.FC = () => {
 
     refreshData()
   }, [activeTab, userProfile?.id, stats?.devices, recentTips.length, deletedDevices.length])
-
-  // Process weekly chart data when insights change
-  useEffect(() => {
-    if (!insights?.weeklyTips) return
-
-    const chartData = insights.weeklyTips.map(week => {
-      const weekDate = new Date(week.weekStart)
-      const formattedWeek = `${weekDate.getMonth() + 1}/${weekDate.getDate()}`
-      return {
-        week: formattedWeek,
-        totalTips: week.totalAmount,
-        uniqueAudience: week.uniqueTippers
-      }
-    })
-
-    setWeeklyChartData(chartData)
-
-    // Calculate trend line
-    const validDataPoints = chartData.filter(d => d.totalTips > 0)
-    if (validDataPoints.length >= 2) {
-      const n = validDataPoints.length
-      const sumX = validDataPoints.reduce((sum, _, i) => sum + i, 0)
-      const sumY = validDataPoints.reduce((sum, d) => sum + d.totalTips, 0)
-      const sumXY = validDataPoints.reduce((sum, d, i) => sum + i * d.totalTips, 0)
-      const sumX2 = validDataPoints.reduce((sum, _, i) => sum + i * i, 0)
-
-      const slope = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX)
-      const intercept = (sumY - slope * sumX) / n
-
-      const trend = chartData.map((d, i) => ({
-        week: d.week,
-        trend: slope * i + intercept
-      }))
-
-      setTrendData(trend)
-    }
-  }, [insights])
-
-  // Set default date/time range (last 10 hours)
-  useEffect(() => {
-    if (startDateTime || endDateTime) return
-
-    const now = new Date()
-    const tenHoursAgo = new Date(now.getTime() - 10 * 60 * 60 * 1000)
-
-    const formatDateTime = (date: Date) => {
-      const year = date.getFullYear()
-      const month = String(date.getMonth() + 1).padStart(2, '0')
-      const day = String(date.getDate()).padStart(2, '0')
-      const hours = String(date.getHours()).padStart(2, '0')
-      const minutes = String(date.getMinutes()).padStart(2, '0')
-      return `${year}-${month}-${day}T${hours}:${minutes}`
-    }
-
-    setStartDateTime(formatDateTime(tenHoursAgo))
-    setEndDateTime(formatDateTime(now))
-  }, [startDateTime, endDateTime])
-
-  // Filter tip points by selected date/time window
-  useEffect(() => {
-    if (!tipTimelinePoints.length) {
-      setFilteredTipPoints([])
-      return
-    }
-
-    if (!startDateTime || !endDateTime) {
-      setFilteredTipPoints(tipTimelinePoints)
-      return
-    }
-
-    const start = new Date(startDateTime).getTime()
-    const end = new Date(endDateTime).getTime()
-
-    const filtered = tipTimelinePoints.filter(point =>
-      point.timestamp >= start && point.timestamp <= end
-    )
-
-    setFilteredTipPoints(filtered)
-  }, [tipTimelinePoints, startDateTime, endDateTime])
 
   const handleLogout = () => {
     localStorage.removeItem('token')
@@ -570,7 +515,7 @@ const Dashboard: React.FC = () => {
         setRecentTips(tipsResp.data.map((tip: any) => ({
           id: tip.id,
           amount: tip.amount,
-          deviceNickname: 'Device',
+          deviceId: tip.deviceId,
           createdAt: tip.createdAt,
           status: tip.status
         })))
@@ -625,13 +570,6 @@ const Dashboard: React.FC = () => {
 
   const dismissStripeAlert = () => {
     setShowStripeAlert(false)
-  }
-
-  const dismissSongCatalogAlert = () => {
-    if (userProfile?.id) {
-      localStorage.setItem(`songCatalogAlertDismissed_${userProfile.id}`, 'true')
-    }
-    setShowSongCatalogAlert(false)
   }
 
   // Add Device Functions
@@ -728,7 +666,7 @@ const Dashboard: React.FC = () => {
     setShowAddDeviceForm(false)
     setShowStripeSetup(false)
     setActiveTab('overview')
-    setAddDeviceForm({ serialNumber: '', nickname: '', isAllowSongRequest: null })
+    setAddDeviceForm({ serialNumber: '', nickname: '', isAllowSongRequest: false })
     setAddDeviceErrors({})
     setAddDeviceValidationComplete(false)
     setIsValidatingAddDevice(false)
@@ -884,7 +822,7 @@ const Dashboard: React.FC = () => {
       
       // Clear form first
       setShowAddDeviceForm(false)
-      setAddDeviceForm({ serialNumber: '', nickname: '', isAllowSongRequest: null })
+      setAddDeviceForm({ serialNumber: '', nickname: '', isAllowSongRequest: false })
       setAddDeviceErrors({})
       setAddDeviceValidationComplete(false)
       setIsValidatingAddDevice(false)
@@ -914,13 +852,13 @@ const Dashboard: React.FC = () => {
       // Always fetch QR as a blob from API to avoid cross-origin issues
       const qrBlob = await apiService.downloadQRCode(deviceId)
       if (!qrBlob) {
-        alert('Could not download QR code. Please try again or check your connection.')
+        toast('Could not download QR code. Please try again or check your connection.', 'error')
         setDownloadingDeviceId(null)
         return
       }
 
       if (!qrBlob.type.startsWith('image/')) {
-        alert(`QR download returned a non-image content-type: ${qrBlob.type || 'unknown'}`)
+        toast(`QR download returned a non-image content-type: ${qrBlob.type || 'unknown'}`, 'error')
         setDownloadingDeviceId(null)
         return
       }
@@ -968,7 +906,7 @@ const Dashboard: React.FC = () => {
         a.click()
         document.body.removeChild(a)
         URL.revokeObjectURL(rawUrl)
-        alert('Could not generate the branded card because the QR image could not be decoded. Downloaded the raw QR instead.')
+        toast('Could not generate the branded card because the QR image could not be decoded. Downloaded the raw QR instead.', 'info')
         setDownloadingDeviceId(null)
         return
       }
@@ -1057,7 +995,7 @@ const Dashboard: React.FC = () => {
         a.click()
         document.body.removeChild(a)
         URL.revokeObjectURL(rawUrl)
-        alert('Could not render the branded card. Downloaded the raw QR instead.')
+        toast('Could not render the branded card. Downloaded the raw QR instead.', 'info')
         setDownloadingDeviceId(null)
         return
       }
@@ -1125,13 +1063,13 @@ const Dashboard: React.FC = () => {
           document.body.removeChild(a)
           setDownloadingDeviceId(null)
         } else {
-          alert('Failed to create download file')
+          toast('Failed to create download file', 'error')
           setDownloadingDeviceId(null)
         }
       }, 'image/png')
     } catch (error) {
       logger.error('Error generating QR card:', error)
-      alert(`Could not generate the QR card. ${error instanceof Error ? error.message : 'Please try again.'}`)
+      toast(`Could not generate the QR card. ${error instanceof Error ? error.message : 'Please try again.'}`, 'error')
       setDownloadingDeviceId(null)
     }
   }
@@ -1164,11 +1102,11 @@ const Dashboard: React.FC = () => {
         setShowDeleteModal(false)
         setDeviceToDelete(null)
       } else {
-        alert('Failed to delete device: ' + (response.error || 'Unknown error'))
+        toast('Failed to delete device: ' + (response.error || 'Unknown error'), 'error')
       }
     } catch (error) {
       logger.error('Error deleting device:', error)
-      alert('Error deleting device')
+      toast('Error deleting device', 'error')
     } finally {
       setIsDeletingDevice(null)
     }
@@ -1187,11 +1125,11 @@ const Dashboard: React.FC = () => {
         // Refresh both active and deleted devices
         await refreshDashboard()
       } else {
-        alert('Failed to restore device: ' + (response.error || 'Unknown error'))
+        toast('Failed to restore device: ' + (response.error || 'Unknown error'), 'error')
       }
     } catch (error) {
       logger.error('Error restoring device:', error)
-      alert('Error restoring device')
+      toast('Error restoring device', 'error')
     } finally {
       setIsRestoringDevice(null)
     }
@@ -1225,13 +1163,36 @@ const Dashboard: React.FC = () => {
           }
         })
       } else {
-        alert('Failed to update song request setting: ' + (response.error || 'Unknown error'))
+        toast('Failed to update song request setting: ' + (response.error || 'Unknown error'), 'error')
       }
     } catch (error) {
       logger.error('Error updating song request setting:', error)
-      alert('Error updating song request setting')
+      toast('Error updating song request setting', 'error')
     } finally {
       setUpdatingSongRequest(null)
+    }
+  }
+
+  const toggleDevicePause = async (deviceId: string) => {
+    const device = stats?.devices.find(d => d.id === deviceId)
+    if (!device) return
+    const newPaused = !device.isPaused
+    setPausingDeviceId(deviceId)
+    try {
+      const response = await apiService.updateDevicePause(deviceId, newPaused)
+      if (response.data?.success) {
+        setStats(prevStats => prevStats && {
+          ...prevStats,
+          devices: prevStats.devices.map(d => (d.id === deviceId ? { ...d, isPaused: newPaused } : d))
+        })
+      } else {
+        toast('Failed to update device: ' + (response.error || 'Unknown error'), 'error')
+      }
+    } catch (error) {
+      logger.error('Error updating device pause state:', error)
+      toast('Error updating device pause state', 'error')
+    } finally {
+      setPausingDeviceId(null)
     }
   }
 
@@ -1239,7 +1200,9 @@ const Dashboard: React.FC = () => {
     deviceId: string,
     isSoundEnabled: boolean,
     isRandomLightEffect: boolean,
-    effectConfig: Record<string, string>
+    effectConfig: Record<string, string>,
+    soundId: number = DEFAULT_SOUND_ID,
+    soundVolume: string = DEFAULT_SOUND_VOLUME
   ) => {
     setUpdatingDeviceConfig(deviceId)
     try {
@@ -1247,6 +1210,8 @@ const Dashboard: React.FC = () => {
       const response = await apiService.updateDeviceConfiguration(deviceId, {
         isSoundEnabled,
         isRandomLightEffect,
+        soundId,
+        soundVolume,
         effectConfiguration: JSON.stringify(effectConfig)
       })
 
@@ -1260,7 +1225,7 @@ const Dashboard: React.FC = () => {
           const newDevices = prevStats.devices.map(d => {
             if (d.id === deviceId) {
               logger.log(`✏️ Updating device ${d.id}: sound ${d.isSoundEnabled} → ${isSoundEnabled}, random ${d.isRandomLightEffect} → ${isRandomLightEffect}`)
-              return { ...d, isSoundEnabled, isRandomLightEffect, effectConfiguration: JSON.stringify(effectConfig) }
+              return { ...d, isSoundEnabled, isRandomLightEffect, soundId, soundVolume, effectConfiguration: JSON.stringify(effectConfig) }
             } else {
               logger.log(`⏭️ Skipping device ${d.id} (not matching ${deviceId})`)
               return d
@@ -1279,38 +1244,67 @@ const Dashboard: React.FC = () => {
         logger.error('Response data:', response.data)
         logger.error('Response error:', response.error)
         logger.error('Response status:', response.status)
-        alert('Failed to update device configuration: ' + (response.error || 'Unknown error'))
+        toast('Failed to update device configuration: ' + (response.error || 'Unknown error'), 'error')
       }
     } catch (error) {
       logger.error('❌ Error updating device configuration:', error)
       logger.error('Error details:', error instanceof Error ? error.message : 'Unknown error')
-      alert('Error updating device configuration: ' + (error instanceof Error ? error.message : 'Unknown error'))
+      toast('Error updating device configuration: ' + (error instanceof Error ? error.message : 'Unknown error'), 'error')
     } finally {
       setUpdatingDeviceConfig(null)
     }
   }
 
+  // Saves one changed setting while keeping the device's other current settings
+  const saveDeviceConfig = (
+    device: DeviceSummary,
+    patch: { isSoundEnabled?: boolean; isRandomLightEffect?: boolean; effectConfig?: Record<string, string>; soundId?: number; soundVolume?: string }
+  ) => updateDeviceConfiguration(
+    device.id,
+    patch.isSoundEnabled ?? device.isSoundEnabled ?? false,
+    patch.isRandomLightEffect ?? device.isRandomLightEffect ?? false,
+    buildEffectConfig(patch.effectConfig ?? getEffectConfig(device), tipAmounts),
+    patch.soundId ?? device.soundId ?? DEFAULT_SOUND_ID,
+    patch.soundVolume ?? device.soundVolume ?? DEFAULT_SOUND_VOLUME
+  )
+
+  const saveTipAmounts = async (amounts: number[]) => {
+    setTipAmountsSaving(true)
+    try {
+      const response = await apiService.put('/api/profiles/me/tip-amounts', { amounts })
+      if (response.data?.amounts) {
+        setUserProfile((prev: any) => ({ ...prev, tipAmounts: response.data.amounts }))
+      } else {
+        toast('Failed to save tip amounts: ' + (response.error || 'Unknown error'), 'error')
+      }
+    } finally {
+      setTipAmountsSaving(false)
+    }
+  }
+
+  const resetTipAmounts = async () => {
+    setTipAmountsSaving(true)
+    try {
+      const response = await apiService.delete('/api/profiles/me/tip-amounts')
+      if (response.data?.amounts) {
+        setUserProfile((prev: any) => ({ ...prev, tipAmounts: response.data.amounts }))
+      } else {
+        toast('Failed to reset tip amounts: ' + (response.error || 'Unknown error'), 'error')
+      }
+    } finally {
+      setTipAmountsSaving(false)
+    }
+  }
+
   const getEffectConfig = (device: DeviceSummary): Record<string, string> => {
-    logger.log(`🎨 Getting effect config for device ${device.id}:`, device.effectConfiguration)
     try {
       if (device.effectConfiguration) {
-        const parsed = JSON.parse(device.effectConfiguration)
-        logger.log(`✅ Parsed effect config:`, parsed)
-        return parsed
+        return normalizeEffectConfig(JSON.parse(device.effectConfiguration))
       }
     } catch (e) {
       logger.error('❌ Error parsing effect configuration:', e, 'Raw value:', device.effectConfiguration)
     }
-    // Default configuration
-    logger.log('⚠️ Using default effect config for device', device.id)
-    return {
-      "2": "effect1",
-      "5": "effect1",
-      "10": "effect2",
-      "20": "effect2",
-      "50": "effect3",
-      "100": "effect3"
-    }
+    return { ...DEFAULT_EFFECT_CONFIG }
   }
 
   const loadSongRequests = async () => {
@@ -1360,20 +1354,15 @@ const Dashboard: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-8 h-8 border-4 border-primary-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading dashboard...</p>
-        </div>
-      </div>
+      <PageLoader label="Loading your portal…" />
     )
   }
 
   if (!stats) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-surface flex items-center justify-center">
         <div className="text-center">
-          <p className="text-gray-600">Failed to load dashboard data</p>
+          <p className="text-ink-500">Failed to load dashboard data</p>
           <button
             onClick={refreshDashboard}
             className="mt-4 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
@@ -1387,8 +1376,110 @@ const Dashboard: React.FC = () => {
 
   const hasSongRequestEnabled = stats?.devices?.some(device => device.isAllowSongRequest) ?? false
 
+  const displayName = userProfile?.stageName || `${userProfile?.firstName || ''} ${userProfile?.lastName || ''}`.trim() || 'Performer'
+
+  const navItems: PortalNavItem[] = [
+    { id: 'overview', label: 'Home', icon: 'home' },
+    { id: 'devices', label: 'Devices', icon: 'device' },
+    { id: 'tips', label: 'Tips', icon: 'coin' },
+    { id: 'songs', label: 'Songs', icon: 'music' },
+    ...(hasSongRequestEnabled ? [{ id: 'monitor', label: 'Live', icon: 'mic' } as PortalNavItem] : []),
+    ...(userProfile?.role === 'root_admin' ? [{ id: 'admin', label: 'Admin', icon: 'shield' } as PortalNavItem] : [])
+  ]
+
+  const handleNavSelect = (id: string) => {
+    if (id === 'admin') {
+      navigate('/admin')
+      return
+    }
+    setShowAddDeviceForm(false)
+    setActiveTab(id)
+    window.scrollTo({ top: 0 })
+  }
+
+  const PAGE_TITLES: Record<string, { title: string; subtitle?: string }> = {
+    devices: { title: 'Devices', subtitle: 'Your Tipwave devices, tip amounts and QR codes.' },
+    tips: { title: 'Tips', subtitle: 'Your latest tips and whether they have been charged.' },
+    songs: { title: 'Song catalog', subtitle: 'The songs your audience can pick from.' },
+    monitor: { title: 'Live requests', subtitle: 'Song requests as they come in.' }
+  }
+
+  const deviceList = stats.devices ?? []
+  const weekRows = (insights?.weeklyTips ?? []).slice(-8).map(w => {
+    const d = new Date(w.weekStart)
+    return { week: `${d.getMonth() + 1}/${d.getDate()}`, total: w.totalAmount }
+  })
+  const homeData: HomeData = {
+    firstName: userProfile?.firstName || userProfile?.stageName || '',
+    today: { amount: metrics ? metrics.todaysTips : stats.todayTipsReceived, count: stats.todayTipsCount },
+    month: {
+      amount: metrics ? metrics.thisMonthTips : stats.thisMonthTipsReceived,
+      count: stats.thisMonthTipsCount,
+      trendPercent: metrics?.trendPercentage ?? 0,
+      trendDirection: metrics?.trendDirection ?? 'up'
+    },
+    pendingTips: metrics?.pendingTips ?? 0,
+    failedTips: metrics?.failedTips ?? 0,
+    failedTipsCount: metrics?.failedTipsCount ?? 0,
+    scheduledPayouts: metrics?.stripeFuturePayouts ?? 0,
+    inTransit: metrics?.stripeInTransit ?? 0,
+    available: metrics?.stripeAvailableBalance ?? 0,
+    lifetime: metrics?.stripeLifetimeVolume ?? 0,
+    balancesLoading: stripeMetricsLoading,
+    devices: {
+      total: deviceList.length,
+      paused: deviceList.filter(d => d.isPaused).length,
+      active: deviceList.filter(d => d.isOnline && !d.isPaused).length,
+      offline: deviceList.filter(d => !d.isOnline && !d.isPaused).length
+    },
+    weeks: weekRows,
+    weeksLoading: chartsLoading,
+    nextSteps: [
+      {
+        id: 'device',
+        icon: 'device',
+        title: 'Add your first device',
+        detail: 'Register the Tipwave device you will perform with.',
+        done: stats.totalDevices > 0,
+        actionLabel: 'Add device',
+        onAction: handleAddDeviceClick
+      },
+      {
+        id: 'payouts',
+        icon: 'bank',
+        title: 'Set up payouts',
+        detail: 'Verify your identity with Stripe so tips can reach your bank.',
+        done: !!userProfile?.stripeAccountId,
+        actionLabel: 'Set up',
+        onAction: () => navigate('/profile')
+      },
+      ...(hasSongRequestEnabled
+        ? [
+            {
+              id: 'songs',
+              icon: 'music' as const,
+              title: 'Add songs to your catalog',
+              detail: 'Fans can only request songs that are in your catalog.',
+              done: songCatalogCount > 0,
+              actionLabel: 'Add songs',
+              onAction: () => setActiveTab('songs')
+            }
+          ]
+        : []),
+      {
+        id: 'photo',
+        icon: 'user',
+        title: 'Add a profile photo',
+        detail: 'It appears at the top of your tipping page.',
+        done: !!userProfile?.profilePhotoUrl,
+        actionLabel: 'Add photo',
+        onAction: () => navigate('/profile')
+      }
+    ]
+  }
+
   return (
-    <div className="min-h-screen bg-gray-50 text-gray-900">
+    <div className="min-h-screen bg-surface text-ink-900">
       {/* KYC Result Alert */}
       {/* Removed KYC alert as per edit hint */}
 
@@ -1404,7 +1495,7 @@ const Dashboard: React.FC = () => {
               </div>
               <div className="ml-3 flex-1">
                 <h3 className="text-sm font-medium text-green-800">
-                  Stripe Account Verified! 🎉
+                  Stripe account verified
                 </h3>
                 <div className="mt-2 text-sm text-green-700">
                   <p>
@@ -1434,890 +1525,203 @@ const Dashboard: React.FC = () => {
 
 
 
-      {/* Header */}
-              <div className="bg-white shadow-sm border-b">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex justify-between items-center py-[21px]">
-            {/* Left side - Logo */}
-            <div className="flex items-center">
-              <div className="relative w-12 h-12 overflow-visible rounded-lg">
-                <img
-                  src="/images/logo/tipwave-logo2b.png?v=20260208"
-                  alt="Tipwave Logo"
-                  className="w-full h-full object-contain"
-                  style={{ transform: 'scale(4)', objectPosition: 'center' }}
-                />
-              </div>
-            </div>
-
-            {/* Right side - Actions */}
-            <div className="flex items-center space-x-4">
-              {hasSongRequestEnabled && (
-                <button
-                  onClick={() => setShowMonitorFullscreen(true)}
-                  className="bg-gradient-to-r from-purple-600 to-blue-600 text-white px-3 py-2 sm:px-4 rounded-lg hover:from-purple-700 hover:to-blue-700 transition-all duration-200 font-medium text-sm flex items-center space-x-2 shadow-sm hover:shadow-md"
-                >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                  </svg>
-                  <span className="sm:hidden">Monitor Songs</span>
-                  <span className="hidden sm:inline">Monitor Songs</span>
-                </button>
-              )}
-              {/* Hamburger Menu */}
-              <div className="relative">
-                <button
-                  onClick={() => setShowHeaderMenu((prev) => !prev)}
-                  className="p-2 text-gray-500 hover:text-gray-700 transition-colors"
-                  title="Menu"
-                >
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-                  </svg>
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {showHeaderMenu && (
-        <div className="fixed inset-0 z-50">
-          <div
-            className="absolute inset-0 bg-black/40"
-            onClick={() => setShowHeaderMenu(false)}
-            aria-hidden="true"
-          />
-          <div className="absolute right-0 top-0 h-full w-64 bg-white shadow-xl flex flex-col">
-            <div className="flex items-center justify-between px-4 py-4 border-b border-gray-200">
-              <span className="text-sm font-semibold text-gray-800">Menu</span>
-              <button
-                onClick={() => setShowHeaderMenu(false)}
-                className="p-2 text-gray-500 hover:text-gray-700"
-                aria-label="Close menu"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-            <div className="flex flex-col py-2">
-              <button
-                onClick={() => {
-                  setShowHeaderMenu(false)
-                  navigate('/profile')
-                }}
-                className="w-full flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                </svg>
-                <span>Profile</span>
-              </button>
-              {userProfile?.role === 'root_admin' && (
-                <button
-                  onClick={() => {
-                    setShowHeaderMenu(false)
-                    navigate('/admin')
-                  }}
-                  className="w-full flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50"
-                >
-                  <CrownOutlined className="text-base text-purple-700" />
-                  <span>Admin</span>
-                </button>
-              )}
-              <button
-                onClick={() => {
-                  setShowHeaderMenu(false)
-                  handleLogout()
-                }}
-                className="w-full flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                </svg>
-                <span>Logout</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Welcome Message - Moved outside header */}
-        <div className="mb-8 flex justify-between items-start">
-          <div>
-            <h2 className="text-3xl font-bold text-gray-900 mb-2">
-              Welcome back, {userProfile?.firstName || userProfile?.stageName || 'Performer'}!
-            </h2>
-            <p className="text-gray-600">
-              Here's how you're connecting with your audience and building meaningful social connections today.
-            </p>
-            {stripeMetricsLoading && (
-              <div className="mt-3 inline-flex items-center gap-2 bg-blue-50 text-blue-700 text-sm px-3 py-2 rounded-full border border-blue-100 shadow-sm">
-                <svg className="w-4 h-4 animate-spin text-blue-600" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
-                </svg>
-                <span>Updating payouts and balances...</span>
-              </div>
-            )}
-          </div>
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => refreshDashboard()}
-              className="flex items-center justify-center p-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors duration-200 shadow-sm hover:shadow-md"
-              aria-label="Refresh dashboard data"
-              title="Refresh dashboard data"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-              </svg>
-            </button>
-          </div>
-        </div>
-
-        {/* Song Catalog Alert */}
-        {showSongCatalogAlert && songCatalogCount === 0 && (
-          <div className="mb-6">
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 shadow-sm">
-              <div className="flex items-start">
-                <div className="flex-shrink-0">
-                  <svg className="h-5 w-5 text-blue-400" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-                  </svg>
-                </div>
-                <div className="ml-3 flex-1">
-                  <h3 className="text-sm font-medium text-blue-800">
-                    Add Songs to Your Catalog 🎵
-                  </h3>
-                  <div className="mt-2 text-sm text-blue-700">
-                    <p>
-                      You've enabled song requests for your devices! Get started by adding songs to your catalog so your audience can request their favorites when they tip.
-                    </p>
-                    <button
-                      onClick={() => {
-                        setActiveTab('songs')
-                        // Scroll to songs section after tab change
-                        setTimeout(() => {
-                          const songsSection = document.getElementById('songs-section')
-                          if (songsSection) {
-                            songsSection.scrollIntoView({ behavior: 'smooth', block: 'start' })
-                          }
-                        }, 100) // Small delay to ensure tab change completes
-                      }}
-                      className="mt-2 text-blue-800 hover:text-blue-900 font-medium underline"
-                    >
-                      Add songs now →
-                    </button>
-                  </div>
-                </div>
-                <div className="ml-auto pl-3">
-                  <button
-                    onClick={dismissSongCatalogAlert}
-                    className="inline-flex text-blue-400 hover:text-blue-600 focus:outline-none focus:text-blue-600"
-                  >
-                    <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-                    </svg>
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
+      <PortalShell
+        items={navItems}
+        active={activeTab === 'addDevice' ? 'devices' : activeTab}
+        onSelect={handleNavSelect}
+        userName={displayName}
+        userPhotoUrl={userProfile?.profilePhotoUrl || undefined}
+        onOpenProfile={() => navigate('/profile')}
+        onLogout={handleLogout}
+      >
+        {activeTab !== 'overview' && activeTab !== 'addDevice' && (
+          <PageHeader title={PAGE_TITLES[activeTab]?.title || ''} subtitle={PAGE_TITLES[activeTab]?.subtitle} />
         )}
-
-        {/* Stats Overview */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 mb-8">
-          {/* Pending Tips Card */}
-          <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-4 transform hover:scale-105 transition-all duration-200">
-            <div className="flex flex-col items-center text-center">
-              <div className="flex-shrink-0 mb-3">
-                <div className="w-10 h-10 bg-orange-500 rounded-lg flex items-center justify-center">
-                  <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                </div>
-              </div>
-              <div>
-                <p className="text-xs font-medium text-gray-700 mb-1">Pending Tips</p>
-                <p className="text-lg font-bold text-gray-900 mb-1">
-                  {metrics ? formatCurrency(metrics.pendingTips) : '$0.00'}
-                </p>
-                <p className="text-xs text-gray-600">Awaiting processing</p>
-              </div>
-            </div>
-          </div>
-
-          {/* Today's Tips */}
-          <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-4 transform hover:scale-105 transition-all duration-200">
-            <div className="flex flex-col items-center text-center">
-              <div className="flex-shrink-0 mb-3">
-                <div className="w-10 h-10 bg-cyan-500 rounded-lg flex items-center justify-center">
-                  <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                  </svg>
-                </div>
-              </div>
-              <div>
-                <p className="text-xs font-medium text-gray-700 mb-1">Today's Tips</p>
-                <p className="text-lg font-bold text-gray-900 mb-1">
-                  {metrics ? formatCurrency(metrics.todaysTips) : formatCurrency(stats.todayTipsReceived)}
-                </p>
-                <p className="text-xs text-gray-600">
-                  {metrics ? `${Math.round(metrics.todaysTips)} tips` : `${stats.todayTipsCount} tips`}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* Future Payouts */}
-          <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-4 transform hover:scale-105 transition-all duration-200">
-            <div className="flex flex-col items-center text-center">
-              <div className="flex-shrink-0 mb-3">
-                <div className="w-10 h-10 bg-amber-500 rounded-lg flex items-center justify-center">
-                  <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                </div>
-              </div>
-              <div>
-                <p className="text-xs font-medium text-gray-700 mb-1">Future Payouts</p>
-                <p className="text-lg font-bold text-gray-900 mb-1">
-                  {metrics ? formatCurrency(metrics.stripeFuturePayouts) : '$0.00'}
-                </p>
-                <p className="text-xs text-gray-600">Scheduled</p>
-              </div>
-            </div>
-          </div>
-
-          {/* In Transit to Bank */}
-          <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-4 transform hover:scale-105 transition-all duration-200">
-            <div className="flex flex-col items-center text-center">
-              <div className="flex-shrink-0 mb-3">
-                <div className="w-10 h-10 bg-sky-500 rounded-lg flex items-center justify-center">
-                  <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
-                  </svg>
-                </div>
-              </div>
-              <div>
-                <p className="text-xs font-medium text-gray-700 mb-1">In Transit</p>
-                <p className="text-lg font-bold text-gray-900 mb-1">
-                  {metrics ? formatCurrency(metrics.stripeInTransit) : '$0.00'}
-                </p>
-                <p className="text-xs text-gray-600">To bank</p>
-              </div>
-            </div>
-          </div>
-
-          {/* Total Balance / Available Balance */}
-          <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-4 transform hover:scale-105 transition-all duration-200">
-            <div className="flex flex-col items-center text-center">
-              <div className="flex-shrink-0 mb-3">
-                <div className="w-10 h-10 bg-green-500 rounded-lg flex items-center justify-center">
-                  <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
-                  </svg>
-                </div>
-              </div>
-              <div>
-                <p className="text-xs font-medium text-gray-700 mb-1">Total Balance</p>
-                <p className="text-lg font-bold text-gray-900 mb-1">
-                  {metrics ? formatCurrency(metrics.stripeAvailableBalance) : '$0.00'}
-                </p>
-                <p className="text-xs text-gray-600">Available now</p>
-              </div>
-            </div>
-          </div>
-
-          {/* Lifetime Volume */}
-          <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-4 transform hover:scale-105 transition-all duration-200">
-            <div className="flex flex-col items-center text-center">
-              <div className="flex-shrink-0 mb-3">
-                <div className="w-10 h-10 bg-purple-500 rounded-lg flex items-center justify-center">
-                  <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                  </svg>
-                </div>
-              </div>
-              <div>
-                <p className="text-xs font-medium text-gray-700 mb-1">Lifetime Volume</p>
-                <p className="text-lg font-bold text-gray-900 mb-1">
-                  {metrics ? formatCurrency(metrics.stripeLifetimeVolume) : '$0.00'}
-                </p>
-                <p className="text-xs text-gray-600">All-time</p>
-              </div>
-            </div>
-          </div>
-
-          {/* Audience Count */}
-          <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-4 transform hover:scale-105 transition-all duration-200">
-            <div className="flex flex-col items-center text-center">
-              <div className="flex-shrink-0 mb-3">
-                <div className="w-10 h-10 bg-indigo-500 rounded-lg flex items-center justify-center">
-                  <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-                  </svg>
-                </div>
-              </div>
-              <div>
-                <p className="text-xs font-medium text-gray-700 mb-1">Audience</p>
-                <p className="text-lg font-bold text-gray-900 mb-1">
-                  {metrics ? (metrics.uniqueTippersAllTime || 0).toLocaleString() : '0'}
-                </p>
-                <p className="text-xs text-gray-600">Unique Tippers</p>
-              </div>
-            </div>
-          </div>
-
-          {/* Most Tipped Denomination */}
-          <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-4 transform hover:scale-105 transition-all duration-200">
-            <div className="flex flex-col items-center text-center">
-              <div className="flex-shrink-0 mb-3">
-                <div className="w-10 h-10 bg-pink-500 rounded-lg flex items-center justify-center">
-                  <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
-                  </svg>
-                </div>
-              </div>
-              <div>
-                <p className="text-xs font-medium text-gray-700 mb-1">Most Tipped</p>
-                <p className="text-lg font-bold text-gray-900 mb-1">
-                  {metrics ? formatCurrency(metrics.mostTippedDenomination || 0) : '$0.00'}
-                </p>
-                <p className="text-xs text-gray-600">Denomination</p>
-              </div>
-            </div>
-          </div>
-
-          {/* This Month */}
-          <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-4 transform hover:scale-105 transition-all duration-200">
-            <div className="flex flex-col items-center text-center">
-              <div className="flex-shrink-0 mb-3">
-                <div className="w-10 h-10 bg-yellow-500 rounded-lg flex items-center justify-center">
-                  <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-                  </svg>
-                </div>
-              </div>
-              <div>
-                <div className="flex items-center justify-center space-x-2 mb-1">
-                  <p className="text-xs font-medium text-gray-700">This Month</p>
-                  {metrics && metrics.trendPercentage > 0 && (
-                    <div className={`flex items-center space-x-1 ${
-                      metrics.trendDirection === 'up' ? 'text-green-600' : 'text-red-600'
-                    }`}>
-                      {metrics.trendDirection === 'up' ? (
-                        <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                          <path fillRule="evenodd" d="M3.293 9.707a1 1 0 010-1.414l6-6a1 1 0 011.414 0l6 6a1 1 0 01-1.414 1.414L11 5.414V17a1 1 0 11-2 0V5.414L4.707 9.707a1 1 0 01-1.414 0z" clipRule="evenodd" />
-                        </svg>
-                      ) : (
-                        <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                          <path fillRule="evenodd" d="M16.707 10.293a1 1 0 010 1.414l-6 6a1 1 0 01-1.414 0l-6-6a1 1 0 111.414-1.414L9 14.586V3a1 1 0 012 0v11.586l4.293-4.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                        </svg>
-                      )}
-                      <span className="text-xs font-medium">
-                        {metrics.trendPercentage.toFixed(1)}%
-                      </span>
-                    </div>
-                  )}
-                </div>
-                <p className="text-lg font-bold text-gray-900 mb-1">
-                  {metrics ? formatCurrency(metrics.thisMonthTips) : formatCurrency(stats.thisMonthTipsReceived)}
-                </p>
-                <p className="text-xs text-gray-600">
-                  {metrics ? `${Math.round(metrics.thisMonthTips)} tips` : `${stats.thisMonthTipsCount} tips`}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* Active Devices */}
-          <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-4 transform hover:scale-105 transition-all duration-200">
-            <div className="flex flex-col items-center text-center">
-              <div className="flex-shrink-0 mb-3">
-                <div className="w-10 h-10 bg-fuchsia-500 rounded-lg flex items-center justify-center">
-                  <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-                  </svg>
-                </div>
-              </div>
-              <div>
-                <p className="text-xs font-medium text-gray-700 mb-1">Active Devices</p>
-                <p className="text-lg font-bold text-gray-900 mb-1">{stats.activeDevices}</p>
-                <p className="text-xs text-gray-600">of {stats.totalDevices} total</p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Weekly Performance Chart */}
-        {weeklyChartData.length > 0 && (
-          <div className="bg-white rounded-lg shadow-sm p-6 mb-8">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Last 8 Weeks Performance</h3>
-            <ResponsiveContainer width="100%" height={300}>
-              <LineChart data={weeklyChartData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="week" />
-                    <YAxis yAxisId="left" domain={[0, 'auto']} />
-                    <YAxis yAxisId="right" orientation="right" domain={[0, 'auto']} />
-                <Tooltip 
-                  content={({ active, payload }) => {
-                    if (active && payload && payload.length) {
-                      return (
-                        <div className="bg-white p-3 border border-gray-200 rounded shadow-lg">
-                          <p className="font-medium">{payload[0].payload.week}</p>
-                          <p className="text-sm text-blue-600">Total Tips: ${payload[0].value?.toFixed(2)}</p>
-                          <p className="text-sm text-green-600">Unique Audience: {payload[0].payload.uniqueAudience}</p>
-                        </div>
-                      )
-                    }
-                    return null
-                  }}
-                />
-                <Legend />
-                <Line 
-                  yAxisId="left"
-                  type="monotone" 
-                  dataKey="totalTips" 
-                  stroke="#8b5cf6" 
-                  strokeWidth={2}
-                  name="Total Tips ($)"
-                />
-                {trendData.length > 0 && (
-                  <Line
-                    yAxisId="left"
-                    type="monotone"
-                    data={trendData}
-                    dataKey="trend"
-                    stroke="#d1d5db"
-                    strokeWidth={2}
-                    strokeDasharray="0"
-                    name="Trend"
-                    dot={false}
-                  />
-                )}
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-        )}
-
-        {/* Time Window Tips Chart */}
-        {tipTimelinePoints.length > 0 && (
-          <div className="bg-white rounded-lg shadow-sm p-6 mb-8">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Tips by Time Window</h3>
-            
-            {/* Date/Time Range Selector */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Start Date/Time</label>
-                <input
-                  type="datetime-local"
-                  value={startDateTime}
-                  onChange={(e) => setStartDateTime(e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">End Date/Time</label>
-                <input
-                  type="datetime-local"
-                  value={endDateTime}
-                  onChange={(e) => setEndDateTime(e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
-                />
-              </div>
-            </div>
-
-            <ResponsiveContainer width="100%" height={300}>
-              <ScatterChart>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis 
-                  dataKey="time" 
-                  name="Time"
-                  tick={{ fontSize: 12 }}
-                  angle={-45}
-                  textAnchor="end"
-                  height={80}
-                />
-                <YAxis 
-                  dataKey="amount" 
-                  name="Amount ($)"
-                />
-                <Tooltip 
-                  cursor={{ strokeDasharray: '3 3' }}
-                  content={({ active, payload }) => {
-                    if (active && payload && payload.length) {
-                      return (
-                        <div className="bg-white p-3 border border-gray-200 rounded shadow-lg">
-                          <p className="font-medium">{payload[0].payload.time}</p>
-                          <p className="text-sm text-green-600">Amount: ${payload[0].payload.amount.toFixed(2)}</p>
-                        </div>
-                      )
-                    }
-                    return null
-                  }}
-                />
-                <Scatter 
-                  name="Tips" 
-                  data={filteredTipPoints} 
-                  fill="#8b5cf6"
-                />
-              </ScatterChart>
-            </ResponsiveContainer>
-            
-            <p className="text-sm text-gray-500 mt-4">
-              {filteredTipPoints.length > 0
-                ? `Showing ${filteredTipPoints.length} tips in the selected time window`
-                : 'No tips in the selected time window. Adjust the range to see results.'}
-            </p>
-          </div>
-        )}
-
-        {/* Tabs */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 mb-8">
-          <div className="border-b border-gray-200">
-            <nav className="flex flex-wrap gap-x-6 gap-y-2 px-6">
-              {!showAddDeviceForm ? (
-                <>
-                  <button
-                    onClick={() => setActiveTab('overview')}
-                    className={`py-4 px-1 border-b-2 font-medium text-sm ${
-                      activeTab === 'overview'
-                        ? 'border-primary-500 text-primary-600'
-                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                    }`}
-                  >
-                    Overview
-                  </button>
-                  <button
-                    onClick={() => setActiveTab('devices')}
-                    className={`py-4 px-1 border-b-2 font-medium text-sm ${
-                      activeTab === 'devices'
-                        ? 'border-primary-500 text-primary-600'
-                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                    }`}
-                  >
-                    Devices
-                  </button>
-                  <button
-                    onClick={() => setActiveTab('tips')}
-                    className={`py-4 px-1 border-b-2 font-medium text-sm ${
-                      activeTab === 'tips'
-                        ? 'border-primary-500 text-primary-600'
-                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                    }`}
-                  >
-                    Recent Tips
-                  </button>
-                  <button
-                    onClick={() => setActiveTab('songs')}
-                    className={`py-4 px-1 border-b-2 font-medium text-sm ${
-                      activeTab === 'songs'
-                        ? 'border-primary-500 text-primary-600'
-                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                    }`}
-                  >
-                    Song Requests
-                  </button>
-                  <button
-                    onClick={() => setActiveTab('monitor')}
-                    className={`py-4 px-1 border-b-2 font-medium text-sm ${
-                      activeTab === 'monitor'
-                        ? 'border-primary-500 text-primary-600'
-                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                    }`}
-                  >
-                    Monitor Song Requests
-                  </button>
-                </>
-              ) : (
-                <div className="flex items-center justify-between w-full">
-                  <div className="flex items-center space-x-4">
-                    <button
-                      onClick={handleBackToDashboard}
-                      className="flex items-center space-x-2 text-gray-500 hover:text-gray-700 transition-colors"
-                    >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-                      </svg>
-                      <span>Back to Dashboard</span>
-                    </button>
-                  </div>
-                  <h3 className="text-lg font-semibold text-gray-900">Add New Device</h3>
-                </div>
-              )}
-            </nav>
-          </div>
-
-          <div className="p-6">
+        <div>
             {activeTab === 'overview' && (
-              <div className="space-y-6">
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-6">
-                    <h3 className="text-lg font-semibold text-gray-900 mb-4">Weekly Performance</h3>
-                    <div className="space-y-3">
-                      <div className="flex justify-between items-center">
-                        <span className="text-gray-600">This Week</span>
-                        <span className="font-semibold">
-                          {metrics ? formatCurrency(metrics.thisWeekTips || 0) : formatCurrency(stats.thisWeekTipsReceived)}
-                        </span>
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <span className="text-gray-600">Tips Count</span>
-                        <span className="font-semibold">
-                          {metrics ? (metrics.thisWeekTipsCount || 0) : stats.thisWeekTipsCount}
-                        </span>
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <span className="text-gray-600">Average per Tip</span>
-                        <span className="font-semibold">
-                          {metrics && metrics.thisWeekTipsCount && metrics.thisWeekTipsCount > 0 
-                            ? formatCurrency(metrics.thisWeekTips / metrics.thisWeekTipsCount)
-                            : stats.thisWeekTipsCount > 0 
-                            ? formatCurrency(stats.thisWeekTipsReceived / stats.thisWeekTipsCount)
-                            : '$0.00'
-                          }
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl p-6">
-                    <h3 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h3>
-                    <div className="space-y-3">
-                      <button
-                        onClick={handleAddDeviceClick}
-                        className="w-full text-left p-3 bg-white rounded-lg border border-green-200 hover:border-green-300 transition-colors"
-                      >
-                        <div className="flex items-center space-x-3">
-                          <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
-                            <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                            </svg>
-                          </div>
-                          <div>
-                            <p className="font-medium text-gray-900">Add New Device</p>
-                            <p className="text-sm text-gray-500">Register another Tipwave device</p>
-                          </div>
-                        </div>
-                      </button>
-
-                      <button
-                        onClick={() => setActiveTab('devices')}
-                        className="w-full text-left p-3 bg-white rounded-lg border border-green-200 hover:border-green-300 transition-colors"
-                      >
-                        <div className="flex items-center space-x-3">
-                          <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
-                            <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                            </svg>
-                          </div>
-                          <div>
-                            <p className="font-medium text-gray-900">Download QR Codes</p>
-                            <p className="text-sm text-gray-500">Get QR codes for your devices</p>
-                          </div>
-                        </div>
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
+              <HomeTab
+                data={homeData}
+                formatCurrency={formatCurrency}
+                onGoToDevices={() => (stats.totalDevices === 0 ? handleAddDeviceClick() : setActiveTab('devices'))}
+                onGoToTips={() => setActiveTab('tips')}
+              />
             )}
 
             {activeTab === 'devices' && (
-              <div className="space-y-6">
-                <div className="flex justify-between items-center">
-                  <h3 className="text-lg font-semibold text-gray-900">Your Devices</h3>
-                  <div className="flex space-x-3">
-                    <button
-                      onClick={refreshDashboard}
-                      className="p-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors flex items-center justify-center"
-                      aria-label="Refresh device status"
-                      title="Refresh device status"
-                    >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                      </svg>
-                    </button>
-                    <button
-                      onClick={() => window.open(getDeviceSetupUrl(), '_blank')}
-                      className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-semibold"
-                    >
-                      Connect Device To Wifi
-                    </button>
-                    <button
-                      onClick={handleAddDeviceClick}
-                      className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
-                    >
-                      Add Device
-                    </button>
-                  </div>
+              <div className="space-y-5">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button icon="plus" onClick={handleAddDeviceClick}>
+                    Add device
+                  </Button>
+                  <Button variant="secondary" icon="wifi" onClick={() => window.open(getDeviceSetupUrl(), '_blank')}>
+                    Connect a device to Wi-Fi
+                  </Button>
+                  <Button variant="ghost" icon="refresh" onClick={refreshDashboard} aria-label="Refresh device status" title="Refresh device status" />
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {stats.devices.map((device) => {
+                {stats.devices.length === 0 && (
+                  <Card>
+                    <EmptyState
+                      icon="device"
+                      title="No devices yet"
+                      action={<Button onClick={handleAddDeviceClick}>Add your first device</Button>}
+                    >
+                      Add the Tipwave device you perform with. You will get a QR code for your audience.
+                    </EmptyState>
+                  </Card>
+                )}
+
+                <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+                  {stats.devices.map(device => {
+                    const chip: ChipKind = device.isPaused ? 'paused' : device.isOnline ? 'active' : 'offline'
+                    const busyConfig = updatingDeviceConfig === device.id
                     return (
-                      <div key={device.id} className="bg-gray-50 rounded-xl p-6 border border-gray-200">
-                        <div className="flex items-start justify-between mb-4">
-                          <div className="flex-1">
-                            <div className="flex items-center space-x-2 mb-1">
-                              <h4 className="font-semibold text-gray-900">
-                                {device.nickname || 'Unnamed Device'}
-                              </h4>
-                            </div>
-                            <p className="text-sm text-gray-500">{device.uuid}</p>
+                      <Card key={device.id}>
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <h3 className="truncate text-lg font-bold text-ink-900">{device.nickname || 'Unnamed device'}</h3>
+                            <p className="mt-0.5 truncate text-xs text-ink-400">ID {device.uuid}</p>
                           </div>
-                          <div className={`w-3 h-3 rounded-full ${device.isOnline ? 'bg-green-500' : 'bg-gray-400'}`}></div>
+                          <StatusChip kind={chip} />
                         </div>
 
-                        <div className="space-y-3 mb-4">
-                          <div className="flex justify-between text-sm">
-                            <span className="text-gray-600">Total Tips</span>
-                            <span className="font-medium">{device.totalTipsCount}</span>
+                        <dl className="mt-4 grid grid-cols-3 gap-3 rounded-xl bg-surface p-3 text-center">
+                          <div>
+                            <dt className="text-xs text-ink-500">Tips</dt>
+                            <dd className="text-base font-bold text-ink-900">{device.totalTipsCount}</dd>
                           </div>
-                          <div className="flex justify-between text-sm">
-                            <span className="text-gray-600">Total Earned</span>
-                            <span className="font-medium">{formatCurrency(device.totalTipsReceived)}</span>
+                          <div>
+                            <dt className="text-xs text-ink-500">Earned</dt>
+                            <dd className="text-base font-bold text-ink-900">{formatCurrency(device.totalTipsReceived)}</dd>
                           </div>
-                          <div className="flex justify-between text-sm">
-                            <span className="text-gray-600">Last Tip</span>
-                            <span className="font-medium">{formatDate(device.lastTipReceived)}</span>
+                          <div>
+                            <dt className="text-xs text-ink-500">Last tip</dt>
+                            <dd className="text-sm font-semibold text-ink-900">
+                              {device.totalTipsCount > 0 ? formatDate(device.lastTipReceived) : 'No tips yet'}
+                            </dd>
                           </div>
-                          {/* Device status hidden for now */}
-                        </div>
+                        </dl>
 
-                        <div className="space-y-2">
-                          <div className="flex space-x-2">
-                            <button
-                              onClick={() => downloadQRCode(device.id, device.nickname)}
-                              disabled={downloadingDeviceId === device.id}
-                              className={`flex-1 px-3 py-2 text-white text-sm rounded-lg transition-colors ${
-                                downloadingDeviceId === device.id
-                                  ? 'bg-primary-400 cursor-not-allowed'
-                                  : 'bg-primary-600 hover:bg-primary-700'
-                              }`}
-                            >
-                              {downloadingDeviceId === device.id ? (
-                                <span className="flex items-center justify-center gap-2">
-                                  <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                  </svg>
-                                  Generating...
-                                </span>
-                              ) : 'Download QR'}
-                            </button>
-                            <button
-                              onClick={() => window.open(device.qrCodeUrl, '_blank')}
-                              className="px-3 py-2 bg-gray-200 text-gray-700 text-sm rounded-lg hover:bg-gray-300 transition-colors"
-                            >
-                              View
-                            </button>
-                            <button
-                              onClick={() => handleSoftDeleteDevice(device)}
-                              disabled={isDeletingDevice === device.id}
-                              className="px-3 py-2 bg-red-100 text-red-700 text-sm rounded-lg hover:bg-red-200 transition-colors disabled:opacity-50"
-                            >
-                              {isDeletingDevice === device.id ? 'Deleting...' : 'Delete'}
-                            </button>
-                          </div>
-                          <button
-                            onClick={() => toggleSongRequestSetting(device)}
-                            disabled={updatingSongRequest === device.id}
-                            className={`w-full px-3 py-2 text-sm rounded-lg transition-colors disabled:opacity-50 ${
-                              device.isAllowSongRequest
-                                ? 'bg-orange-100 text-orange-700 hover:bg-orange-200'
-                                : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
-                            }`}
+                        <div className="mt-4 flex flex-wrap gap-2">
+                          <Button
+                            icon="download"
+                            loading={downloadingDeviceId === device.id}
+                            onClick={() => downloadQRCode(device.id, device.nickname)}
                           >
-                            {updatingSongRequest === device.id
-                              ? 'Updating...'
-                              : device.isAllowSongRequest
-                              ? 'Disable Song Request'
-                              : 'Enable Song Request'
+                            Download QR code
+                          </Button>
+                          <Button variant="secondary" icon="qr" onClick={() => window.open(device.qrCodeUrl, '_blank')}>
+                            Open tip page
+                          </Button>
+                          <Button
+                            variant="secondary"
+                            icon={device.isPaused ? 'play' : 'pause'}
+                            loading={pausingDeviceId === device.id}
+                            onClick={() => toggleDevicePause(device.id)}
+                            title={
+                              device.isPaused
+                                ? 'Turn the light and sound back on'
+                                : 'Stops light and sound. Tips still go through.'
                             }
-                          </button>
-                          
-                          {/* Device Configuration Section */}
-                          <button
-                            onClick={() => setExpandedDeviceConfig(expandedDeviceConfig === device.id ? null : device.id)}
-                            className="w-full px-3 py-2 bg-purple-100 text-purple-700 text-sm rounded-lg hover:bg-purple-200 transition-colors flex items-center justify-between"
                           >
-                            <span>Device Configuration</span>
-                            <svg 
-                              className={`w-4 h-4 transition-transform ${expandedDeviceConfig === device.id ? 'rotate-180' : ''}`} 
-                              fill="none" 
-                              stroke="currentColor" 
-                              viewBox="0 0 24 24"
-                            >
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                            </svg>
-                          </button>
+                            {device.isPaused ? 'Resume' : 'Pause'}
+                          </Button>
+                        </div>
 
-                          {/* Expanded Configuration Panel */}
-                          {expandedDeviceConfig === device.id && (
-                            <div className="mt-3 p-4 bg-white rounded-lg border border-purple-200 space-y-4">
-                              {/* Sound Toggle */}
-                              <div className="flex items-center justify-between">
-                                <span className="text-sm font-medium text-gray-700">Sound Enabled</span>
-                                <label className="relative inline-flex items-center cursor-pointer">
-                                  <input
-                                    type="checkbox"
-                                    checked={device.isSoundEnabled ?? false}
-                                    onChange={(e) => {
-                                      const effectConfig = getEffectConfig(device)
-                                      updateDeviceConfiguration(device.id, e.target.checked, device.isRandomLightEffect ?? false, effectConfig)
-                                    }}
-                                    disabled={updatingDeviceConfig === device.id}
-                                    className="sr-only peer"
-                                  />
-                                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-purple-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-600"></div>
-                                </label>
-                              </div>
+                        <div className="mt-4 flex items-center justify-between gap-4 border-t border-slate-100 pt-4">
+                          <div>
+                            <div className="text-sm font-semibold text-ink-900">Song requests</div>
+                            <div className="text-xs text-ink-500">Let people pick a song when they tip.</div>
+                          </div>
+                          <Switch
+                            checked={device.isAllowSongRequest}
+                            disabled={updatingSongRequest === device.id}
+                            label="Song requests"
+                            onChange={() => toggleSongRequestSetting(device)}
+                          />
+                        </div>
 
-                              {/* Random Light Effect Toggle */}
-                              <div className="flex items-center justify-between">
-                                <span className="text-sm font-medium text-gray-700">Random Light Effect</span>
-                                <label className="relative inline-flex items-center cursor-pointer">
-                                  <input
-                                    type="checkbox"
-                                    checked={device.isRandomLightEffect ?? false}
-                                    onChange={(e) => {
-                                      const effectConfig = getEffectConfig(device)
-                                      updateDeviceConfiguration(device.id, device.isSoundEnabled ?? false, e.target.checked, effectConfig)
-                                    }}
-                                    disabled={updatingDeviceConfig === device.id}
-                                    className="sr-only peer"
-                                  />
-                                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-purple-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-600"></div>
-                                </label>
-                              </div>
+                        <button
+                          onClick={() => setExpandedDeviceConfig(expandedDeviceConfig === device.id ? null : device.id)}
+                          aria-expanded={expandedDeviceConfig === device.id}
+                          className="mt-4 flex w-full items-center justify-between border-t border-slate-100 pt-4 text-left"
+                        >
+                          <span>
+                            <span className="block text-sm font-semibold text-ink-900">Sound and lights</span>
+                            <span className="block text-xs text-ink-500">Volume, tones and light effects for each tip amount</span>
+                          </span>
+                          <BrandIcon name={expandedDeviceConfig === device.id ? 'chevron-down' : 'chevron-right'} size={18} tone="muted" />
+                        </button>
 
-                              {/* Effect Configuration */}
+                        {expandedDeviceConfig === device.id && (
+                          <div className="mt-3 space-y-4 rounded-xl bg-surface p-4">
+                            <div className="flex items-center justify-between">
+                              <span className="text-sm font-medium text-ink-700">Sound</span>
+                              <Switch
+                                checked={device.isSoundEnabled ?? false}
+                                disabled={busyConfig}
+                                label="Sound"
+                                onChange={() => saveDeviceConfig(device, { isSoundEnabled: !(device.isSoundEnabled ?? false) })}
+                              />
+                            </div>
+                            <div className="flex items-center justify-between gap-3">
+                              <span className="text-sm font-medium text-ink-700">Tone</span>
+                              <select
+                                value={device.soundId ?? DEFAULT_SOUND_ID}
+                                onChange={e => saveDeviceConfig(device, { soundId: Number(e.target.value) })}
+                                disabled={busyConfig || !(device.isSoundEnabled ?? false)}
+                                className="h-9 rounded-lg border border-slate-300 bg-white px-2 text-sm disabled:bg-slate-100 disabled:text-ink-400"
+                              >
+                                {SOUND_OPTIONS.map(option => (
+                                  <option key={option.value} value={option.value}>
+                                    {option.label}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                            <div className="flex items-center justify-between gap-3">
+                              <span className="text-sm font-medium text-ink-700">Volume</span>
+                              <select
+                                value={device.soundVolume ?? DEFAULT_SOUND_VOLUME}
+                                onChange={e => saveDeviceConfig(device, { soundVolume: e.target.value })}
+                                disabled={busyConfig || !(device.isSoundEnabled ?? false)}
+                                className="h-9 rounded-lg border border-slate-300 bg-white px-2 text-sm disabled:bg-slate-100 disabled:text-ink-400"
+                              >
+                                {VOLUME_OPTIONS.map(option => (
+                                  <option key={option.value} value={option.value}>
+                                    {option.label}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                            <div className="flex items-center justify-between">
+                              <span className="text-sm font-medium text-ink-700">Random light effect</span>
+                              <Switch
+                                checked={device.isRandomLightEffect ?? false}
+                                disabled={busyConfig}
+                                label="Random light effect"
+                                onChange={() => saveDeviceConfig(device, { isRandomLightEffect: !(device.isRandomLightEffect ?? false) })}
+                              />
+                            </div>
+                            <div className="border-t border-slate-200 pt-3">
+                              <div className="mb-2 text-sm font-semibold text-ink-900">Light effect for each tip amount</div>
                               <div className="space-y-2">
-                                <h4 className="text-sm font-medium text-gray-700 mb-2">Light Effects by Amount</h4>
                                 {(() => {
                                   const effectConfig = getEffectConfig(device)
-                                  const amounts = [2, 5, 10, 20, 50, 100]
-                                  const effects = ['effect1', 'effect2', 'effect3']
-                                  
-                                  return amounts.map(amount => (
+                                  return tipAmounts.map(amount => (
                                     <div key={amount} className="flex items-center justify-between text-sm">
-                                      <span className="text-gray-600">${amount}</span>
+                                      <span className="font-medium text-ink-700">${amount}</span>
                                       <select
-                                        value={effectConfig[amount.toString()] || 'effect1'}
-                                        onChange={(e) => {
-                                          const newConfig = { ...effectConfig, [amount.toString()]: e.target.value }
-                                          updateDeviceConfiguration(device.id, device.isSoundEnabled ?? false, device.isRandomLightEffect ?? false, newConfig)
-                                        }}
-                                        disabled={updatingDeviceConfig === device.id}
-                                        className="px-2 py-1 border border-gray-300 rounded text-xs focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                                        value={effectForAmount(effectConfig, amount)}
+                                        onChange={e =>
+                                          saveDeviceConfig(device, { effectConfig: { ...effectConfig, [amount.toString()]: e.target.value } })
+                                        }
+                                        disabled={busyConfig}
+                                        className="h-9 rounded-lg border border-slate-300 bg-white px-2 text-sm"
                                       >
-                                        {effects.map(effect => (
-                                          <option key={effect} value={effect}>
-                                            {effect === 'effect1' ? 'Flash' : effect === 'effect2' ? 'Swirl' : 'Breathing'}
+                                        {LIGHT_EFFECTS.map(effect => (
+                                          <option key={effect.value} value={effect.value}>
+                                            {effect.label}
                                           </option>
                                         ))}
                                       </select>
@@ -2325,354 +1729,233 @@ const Dashboard: React.FC = () => {
                                   ))
                                 })()}
                               </div>
-
-                              {updatingDeviceConfig === device.id && (
-                                <div className="text-xs text-purple-600 text-center">Updating configuration...</div>
-                              )}
                             </div>
-                          )}
+                            {busyConfig && <div className="text-center text-xs text-brand-700">Saving…</div>}
+                          </div>
+                        )}
+
+                        <div className="mt-4 border-t border-slate-100 pt-3">
+                          <Button
+                            variant="danger"
+                            size="sm"
+                            icon="trash"
+                            loading={isDeletingDevice === device.id}
+                            onClick={() => handleSoftDeleteDevice(device)}
+                          >
+                            Remove device
+                          </Button>
                         </div>
-                      </div>
+                      </Card>
                     )
                   })}
                 </div>
 
-                {/* Deleted Devices Section */}
-                <div className="mt-8">
-                  <div className="flex justify-between items-center mb-4">
-                    <h3 className="text-lg font-semibold text-gray-900">Deleted Devices</h3>
-                    <button
-                      onClick={toggleDeletedDevices}
-                      className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors flex items-center space-x-2"
-                    >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                      </svg>
-                      <span>{showDeletedDevices ? 'Hide' : 'Show'} Deleted Devices</span>
-                    </button>
-                  </div>
+                <TipAmountsEditor
+                  amounts={tipAmounts}
+                  saving={tipAmountsSaving}
+                  onSave={saveTipAmounts}
+                  onReset={resetTipAmounts}
+                />
+
+                {/* Removed devices */}
+                <div>
+                  <button
+                    onClick={toggleDeletedDevices}
+                    aria-expanded={showDeletedDevices}
+                    className="flex items-center gap-2 text-sm font-semibold text-ink-500 hover:text-ink-700"
+                  >
+                    <BrandIcon name={showDeletedDevices ? 'chevron-down' : 'chevron-right'} size={16} tone="muted" />
+                    {showDeletedDevices ? 'Hide' : 'Show'} removed devices
+                  </button>
 
                   {showDeletedDevices && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <div className="mt-3 grid grid-cols-1 gap-4 lg:grid-cols-2">
                       {deletedDevices.length === 0 ? (
-                        <div className="col-span-full text-center py-8">
-                          <p className="text-gray-500">No deleted devices found.</p>
-                        </div>
+                        <p className="text-sm text-ink-500">No removed devices.</p>
                       ) : (
-                        deletedDevices.map((device) => (
-                          <div key={device.id} className="bg-gray-50 rounded-xl p-6 border border-gray-200 opacity-75">
-                            <div className="flex items-start justify-between mb-4">
-                              <div className="flex-1">
-                                <div className="flex items-center space-x-2 mb-1">
-                                  <h4 className="font-semibold text-gray-900">
-                                    {device.nickname || 'Unnamed Device'}
-                                  </h4>
-                                  <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                                    <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                                      <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
-                                    </svg>
-                                    Deleted
-                                  </span>
-                                </div>
-                                <p className="text-sm text-gray-500">{device.uuid}</p>
+                        deletedDevices.map(device => (
+                          <Card key={device.id}>
+                            <div className="flex items-center justify-between gap-3">
+                              <div className="min-w-0">
+                                <div className="truncate font-bold text-ink-900">{device.nickname || 'Unnamed device'}</div>
+                                <div className="truncate text-xs text-ink-400">ID {device.uuid}</div>
                                 {device.deletedAt && (
-                                  <p className="text-xs text-gray-400 mt-1">
-                                    Deleted on {formatDate(device.deletedAt)}
-                                  </p>
+                                  <div className="mt-1 text-xs text-ink-500">Removed {formatDate(device.deletedAt)}</div>
                                 )}
                               </div>
-                            </div>
-
-                            <div className="flex space-x-2">
-                              <button
+                              <Button
+                                variant="secondary"
+                                size="sm"
+                                icon="refresh"
+                                loading={isRestoringDevice === device.id}
                                 onClick={() => handleRestoreDevice(device.id)}
-                                disabled={isRestoringDevice === device.id}
-                                className="flex-1 px-3 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50"
                               >
-                                {isRestoringDevice === device.id ? 'Restoring...' : 'Restore'}
-                              </button>
+                                Restore
+                              </Button>
                             </div>
-                          </div>
+                          </Card>
                         ))
                       )}
                     </div>
                   )}
                 </div>
-
-                {stats.devices.length === 0 && (
-                  <div className="text-center py-12">
-                    <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                      <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                      </svg>
-                    </div>
-                    <h3 className="text-lg font-medium text-gray-900 mb-2">No devices yet</h3>
-                    <p className="text-gray-500 mb-4">Get started by adding your first Tipwave device</p>
-                    <button
-                      onClick={handleAddDeviceClick}
-                      className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
-                    >
-                      Add Your First Device
-                    </button>
-                  </div>
-                )}
               </div>
             )}
 
             {activeTab === 'tips' && (
-              <div className="space-y-6">
-                <h3 className="text-lg font-semibold text-gray-900">Recent Tips (Today)</h3>
-
-                <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
-                  <div className="overflow-x-auto">
-                    <table className="min-w-full divide-y divide-gray-200">
-                      <thead className="bg-gray-50">
-                        <tr>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Amount
-                          </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Device
-                          </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Date
-                          </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Status
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody className="bg-white divide-y divide-gray-200">
-                        {recentTips.map((tip) => (
-                          <tr key={tip.id} className="hover:bg-gray-50">
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <span className="text-lg font-semibold text-gray-900">
-                                {formatCurrency(tip.amount)}
-                              </span>
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <span className="text-sm text-gray-900">{tip.deviceNickname}</span>
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <span className="text-sm text-gray-500">{formatDate(tip.createdAt)}</span>
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                                tip.status === 'processed'
-                                  ? 'bg-green-100 text-green-800'
-                                  : tip.status === 'pending'
-                                  ? 'bg-yellow-100 text-yellow-800'
-                                  : 'bg-red-100 text-red-800'
-                              }`}>
-                                {tip.status}
-                              </span>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-
-                {recentTips.length === 0 && (
-                  <div className="text-center py-12">
-                    <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                      <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
-                      </svg>
-                    </div>
-                    <h3 className="text-lg font-medium text-gray-900 mb-2">No tips today</h3>
-                    <p className="text-gray-500">Tips from today (both pending and processed) will appear here once you start receiving them</p>
-                  </div>
+              <Card
+                title="Last 24 hours"
+                subtitle="Your 10 most recent tips. Waiting tips are charged in the next batch."
+                flush
+              >
+                {recentTips.length === 0 ? (
+                  <EmptyState icon="coin" title="No tips in the last 24 hours">
+                    New tips show up here the moment someone sends one.
+                  </EmptyState>
+                ) : (
+                  <ul className="divide-y divide-slate-100 px-5 pb-2">
+                    {recentTips.map(tip => {
+                      const device = (stats.devices ?? []).find(d => d.id === tip.deviceId || d.uuid === tip.deviceId)
+                      const kind = tip.status === 'processed' ? 'paid' : tip.status === 'pending' ? 'processing' : 'failed'
+                      const label = tip.status === 'processed' ? 'Charged' : tip.status === 'pending' ? 'Waiting' : 'Not charged'
+                      return (
+                        <li key={tip.id} className="flex items-center gap-3 py-3">
+                          <div className="min-w-0 flex-1">
+                            <div className="text-base font-bold text-ink-900">{formatCurrency(tip.amount)}</div>
+                            <div className="truncate text-xs text-ink-500">
+                              {device?.nickname || 'Tipwave device'} · {new Date(tip.createdAt).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
+                            </div>
+                          </div>
+                          <StatusChip kind={kind} label={label} />
+                        </li>
+                      )
+                    })}
+                  </ul>
                 )}
+              </Card>
+            )}
+
+            {activeTab === 'tips' && (
+              <div className="mt-5">
+                <TipsTimeline points={tipTimelinePoints} loading={chartsLoading} />
               </div>
             )}
 
             {activeTab === 'addDevice' && (
-              <div className="space-y-6">
+              <div className="max-w-2xl space-y-5">
                 {!showStripeSetup ? (
-                  // Add Device Form
-                  <div>
-                    <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-                      <div className="mb-6">
-                        <h3 className="text-lg font-semibold text-gray-900 mb-2">Add New Device</h3>
-                        <p className="text-gray-600">Enter your device details to add it to your account.</p>
-                      </div>
-
-                      <form onSubmit={(e) => { e.preventDefault(); handleAddDeviceSubmit(); }} className="space-y-6">
-                        <div>
-                          <label htmlFor="serialNumber" className="block text-sm font-medium text-gray-700 mb-2">
-                            Serial Number *
-                          </label>
-                          <div className="relative">
-                            <input
-                              type="text"
-                              id="serialNumber"
-                              value={addDeviceForm.serialNumber}
-                              onChange={(e) => handleAddDeviceInputChange('serialNumber', e.target.value)}
-                              onBlur={async () => {
-                                if (addDeviceForm.serialNumber.trim()) {
-                                  await validateAddDeviceDetectedDevice()
-                                }
-                              }}
-                              className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all duration-200 ${
-                                addDeviceErrors.serialNumber ? 'border-red-500 focus:ring-red-200' : 'border-gray-300'
-                              }`}
-                              placeholder="e.g., TPY-5C07-K73"
-                            />
-                            {isValidatingAddDevice && (
-                              <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
-                                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-primary-600"></div>
-                              </div>
-                            )}
-                          </div>
-                          {addDeviceErrors.serialNumber && (
-                            <p className="text-red-500 text-sm mt-1">{addDeviceErrors.serialNumber}</p>
-                          )}
-                          {addDeviceValidationComplete && !addDeviceErrors.serialNumber && addDeviceForm.serialNumber.trim() && (
-                            <p className="text-green-500 text-sm mt-1">✓ Serial Number validated successfully</p>
-                          )}
-                          <p className="text-sm text-gray-500 mt-1">
-                            Enter the serial number from your Tipwave device (e.g., TPY-5C07-K73)
-                          </p>
-                        </div>
-
-                        <div>
-                          <label htmlFor="nickname" className="block text-sm font-medium text-gray-700 mb-2">
-                            Device Nickname *
-                          </label>
+                  <Card
+                    title="Add a device"
+                    subtitle="Enter the serial number printed on your Tipwave device."
+                  >
+                    <form onSubmit={(e) => { e.preventDefault(); handleAddDeviceSubmit(); }} className="space-y-5">
+                      <div>
+                        <label htmlFor="serialNumber" className="mb-1.5 block text-sm font-semibold text-ink-700">
+                          Serial number
+                        </label>
+                        <div className="relative">
                           <input
                             type="text"
-                            id="nickname"
-                            value={addDeviceForm.nickname}
-                            onChange={(e) => handleAddDeviceInputChange('nickname', e.target.value)}
-                            className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all duration-200 ${
-                              addDeviceErrors.nickname ? 'border-red-500 focus:ring-red-200' : 'border-gray-300'
-                            }`}
-                            placeholder="e.g., Main Stage, Bar Counter, VIP Room"
+                            id="serialNumber"
+                            value={addDeviceForm.serialNumber}
+                            onChange={(e) => handleAddDeviceInputChange('serialNumber', e.target.value)}
+                            onBlur={async () => {
+                              if (addDeviceForm.serialNumber.trim()) {
+                                await validateAddDeviceDetectedDevice()
+                              }
+                            }}
+                            autoCapitalize="characters"
+                            autoCorrect="off"
+                            spellCheck={false}
+                            className={`${INPUT} pr-11 uppercase placeholder:normal-case ${addDeviceErrors.serialNumber ? 'border-red-400' : 'border-slate-300'}`}
+                            placeholder="TPY-5C07-K73"
                           />
-                          {addDeviceErrors.nickname && (
-                            <p className="text-red-500 text-sm mt-1">{addDeviceErrors.nickname}</p>
-                          )}
-                          <p className="text-sm text-gray-500 mt-1">
-                            Give your device a friendly name for easy identification
-                          </p>
-                        </div>
-                        
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-3">
-                            Would you like to enable song requests from your audience? *
-                          </label>
-                          <p className="text-sm text-gray-500 mb-4">
-                            If you select "Yes", you'll be able to create a song catalog for your audience to choose from. This allows your audience to request specific songs when they tip you.
-                          </p>
-                          <div className="space-y-3">
-                            <label className="flex items-center cursor-pointer p-4 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
-                              <input
-                                type="radio"
-                                name="addDeviceIsAllowSongRequest"
-                                checked={addDeviceForm.isAllowSongRequest === true}
-                                onChange={() => setAddDeviceForm(prev => ({ ...prev, isAllowSongRequest: true }))}
-                                className="mr-4 h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300"
-                              />
-                              <div>
-                                <span className="text-sm font-medium text-gray-700">Yes, enable song requests</span>
-                                <p className="text-xs text-gray-500 mt-1">Your audience can request songs when they tip</p>
-                              </div>
-                            </label>
-                            <label className="flex items-center cursor-pointer p-4 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
-                              <input
-                                type="radio"
-                                name="addDeviceIsAllowSongRequest"
-                                checked={addDeviceForm.isAllowSongRequest === false}
-                                onChange={() => setAddDeviceForm(prev => ({ ...prev, isAllowSongRequest: false }))}
-                                className="mr-4 h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300"
-                              />
-                              <div>
-                                <span className="text-sm font-medium text-gray-700">No, disable song requests</span>
-                                <p className="text-xs text-gray-500 mt-1">Standard tipping without song requests</p>
-                              </div>
-                            </label>
-                          </div>
-                          {addDeviceErrors.isAllowSongRequest && (
-                            <p className="text-red-500 text-sm mt-1">{addDeviceErrors.isAllowSongRequest}</p>
-                          )}
-                        </div>
-
-                        {addDeviceErrors.submit && (
-                          <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-                            <p className="text-red-600 text-sm">{addDeviceErrors.submit}</p>
-                          </div>
-                        )}
-
-                        <div className="flex space-x-4 pt-4">
-                          <button
-                            type="button"
-                            onClick={handleBackToDashboard}
-                            className="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
-                          >
-                            Cancel
-                          </button>
-                          <button
-                            type="submit"
-                            disabled={isAddingDevice}
-                            className="px-6 py-3 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
-                          >
-                            {isAddingDevice ? (
-                              <>
-                                <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
-                                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                </svg>
-                                <span>Adding Device...</span>
-                              </>
-                            ) : (
-                              <span>Add Device</span>
+                          <div className="absolute inset-y-0 right-3 flex items-center">
+                            {isValidatingAddDevice && (
+                              <span className="h-5 w-5 animate-spin rounded-full border-2 border-brand-600 border-t-transparent" />
                             )}
-                          </button>
-                        </div>
-                      </form>
-                    </div>
-                  </div>
-                ) : (
-                  // Stripe Setup Required
-                  <div>
-                    <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-6">
-                      <div className="flex items-start space-x-4">
-                        <div className="flex-shrink-0">
-                          <svg className="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
-                          </svg>
-                        </div>
-                        <div className="flex-1">
-                          <h3 className="text-lg font-semibold text-yellow-800 mb-2">Stripe Setup Required</h3>
-                          <p className="text-yellow-700 mb-4">
-                            Before adding a new device, you need to complete your Stripe Connect account setup and KYC verification.
-                          </p>
-                          {addDeviceErrors.submit && (
-                            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
-                              <p className="text-red-700 text-sm">{addDeviceErrors.submit}</p>
-                            </div>
-                          )}
-                          <div className="flex space-x-4">
-                            <button
-                              onClick={handleStripeConnect}
-                              disabled={isAddingDevice}
-                              className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                              {isAddingDevice ? 'Setting up...' : 'Complete Stripe Setup'}
-                            </button>
-                            <button
-                              onClick={handleBackToDashboard}
-                              className="px-4 py-2 bg-yellow-100 text-yellow-800 rounded-lg hover:bg-yellow-200 transition-colors"
-                            >
-                              Back to Dashboard
-                            </button>
+                            {!isValidatingAddDevice && addDeviceValidationComplete && !addDeviceErrors.serialNumber && addDeviceForm.serialNumber.trim() && (
+                              <BrandIcon name="check-circle" size={22} color="#15803D" />
+                            )}
                           </div>
                         </div>
+                        {addDeviceErrors.serialNumber ? (
+                          <p className="mt-1.5 text-sm text-red-600">{addDeviceErrors.serialNumber}</p>
+                        ) : addDeviceValidationComplete && addDeviceForm.serialNumber.trim() ? (
+                          <p className="mt-1.5 text-sm text-green-700">Device found</p>
+                        ) : (
+                          <p className="mt-1.5 text-sm text-ink-500">It looks like TPY-5C07-K73 and is on the back of the device.</p>
+                        )}
                       </div>
-                    </div>
-                  </div>
+
+                      <div>
+                        <label htmlFor="nickname" className="mb-1.5 block text-sm font-semibold text-ink-700">
+                          Nickname
+                        </label>
+                        <input
+                          type="text"
+                          id="nickname"
+                          value={addDeviceForm.nickname}
+                          onChange={(e) => handleAddDeviceInputChange('nickname', e.target.value)}
+                          className={`${INPUT} ${addDeviceErrors.nickname ? 'border-red-400' : 'border-slate-300'}`}
+                          placeholder="Main stage"
+                        />
+                        {addDeviceErrors.nickname ? (
+                          <p className="mt-1.5 text-sm text-red-600">{addDeviceErrors.nickname}</p>
+                        ) : (
+                          <p className="mt-1.5 text-sm text-ink-500">Helps you tell devices apart, like Main stage or Bar counter.</p>
+                        )}
+                      </div>
+
+                      <div className="flex items-center justify-between gap-4 rounded-2xl border border-slate-200 p-4">
+                        <div className="flex items-center gap-3">
+                          <IconTile name="music" size={40} />
+                          <div>
+                            <div className="font-semibold text-ink-900">Let people request songs</div>
+                            <div className="text-sm text-ink-500">Fans can pick a song when they tip. You can change this any time.</div>
+                          </div>
+                        </div>
+                        <Switch
+                          checked={addDeviceForm.isAllowSongRequest === true}
+                          label="Let people request songs"
+                          onChange={() => setAddDeviceForm(prev => ({ ...prev, isAllowSongRequest: !prev.isAllowSongRequest }))}
+                        />
+                      </div>
+
+                      {addDeviceErrors.submit && (
+                        <Banner tone="error" title="We could not add the device">
+                          {addDeviceErrors.submit}
+                        </Banner>
+                      )}
+
+                      <div className="flex flex-col-reverse gap-3 border-t border-slate-100 pt-5 sm:flex-row sm:justify-end">
+                        <Button variant="secondary" size="lg" onClick={handleBackToDashboard}>
+                          Cancel
+                        </Button>
+                        <Button type="submit" size="lg" loading={isAddingDevice}>
+                          Add device
+                        </Button>
+                      </div>
+                    </form>
+                  </Card>
+                ) : (
+                  <Banner
+                    tone="warning"
+                    title="Set up payouts first"
+                    action={
+                      <div className="flex flex-wrap gap-3">
+                        <Button onClick={handleStripeConnect} loading={isAddingDevice}>
+                          Complete Stripe setup
+                        </Button>
+                        <Button variant="secondary" onClick={handleBackToDashboard}>
+                          Back to Home
+                        </Button>
+                      </div>
+                    }
+                  >
+                    Before you add another device, finish your Stripe account setup and identity verification.
+                    {addDeviceErrors.submit && <span className="mt-2 block font-semibold text-red-700">{addDeviceErrors.submit}</span>}
+                  </Banner>
                 )}
               </div>
             )}
@@ -2684,104 +1967,78 @@ const Dashboard: React.FC = () => {
             )}
 
             {activeTab === 'monitor' && (
-              <div className="space-y-6">
-                <div className="bg-white rounded-lg shadow p-6">
-                  <div className="flex items-center justify-between mb-6">
-                    <h2 className="text-xl font-semibold text-gray-900">Monitor Song Requests</h2>
-                  </div>
-                  
-                  <div className="space-y-4">
-                    {songRequests.length === 0 ? (
-                      <div className="text-center py-8">
-                        <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                          <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
-                          </svg>
-                        </div>
-                        <h3 className="text-lg font-medium text-gray-800 mb-2">No song requests today</h3>
-                        <p className="text-gray-600">Song requests will appear here when participants make them through the tip interface</p>
-                      </div>
-                    ) : (
-                      <div className="space-y-3">
-                        {songRequests.map((request) => (
-                          <div
-                            key={request.songId}
-                            className={`border rounded-lg p-4 ${
-                              request.status === 'completed' 
-                                ? 'bg-green-50 border-green-200' 
-                                : request.status === 'performing'
-                                ? 'bg-blue-50 border-blue-200'
-                                : 'bg-white border-gray-200'
-                            }`}
-                          >
-                            <div className="flex items-center justify-between">
-                              <div className="flex-1">
-                                <h4 className="font-semibold text-gray-900">{request.songTitle}</h4>
-                                <p className="text-gray-600 text-sm">by {request.artist}</p>
-                                <div className="flex items-center space-x-4 mt-2 text-sm text-gray-500">
-                                  <span className="font-medium text-green-600">${request.totalTipAmount.toFixed(2)}</span>
-                                  <span>{request.requestCount} request{request.requestCount > 1 ? 's' : ''}</span>
-                                  <span>{new Date(request.firstRequestTime).toLocaleTimeString()}</span>
-                                </div>
-                              </div>
-                              <div className="flex items-center space-x-2">
-                                <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                                  request.status === 'completed' 
-                                    ? 'bg-green-100 text-green-800' 
-                                    : request.status === 'performing'
-                                    ? 'bg-blue-100 text-blue-800'
-                                    : 'bg-yellow-100 text-yellow-800'
-                                }`}>
-                                  {request.status === 'completed' ? 'Completed' : 
-                                   request.status === 'performing' ? 'Performing' : 'Pending'}
-                                </span>
-                              </div>
+              <div className="space-y-5">
+                <div className="flex flex-wrap items-center gap-3">
+                  <Button icon="mic" onClick={() => setShowMonitorFullscreen(true)}>
+                    Open full-screen view
+                  </Button>
+                  <Button variant="secondary" icon="qr" onClick={() => window.open('/monitor', '_blank')}>
+                    Open in its own window
+                  </Button>
+                </div>
+                <p className="text-sm text-ink-500">
+                  On a tablet, open it in its own window to keep it beside your charts or sheet music. Bookmark /monitor or add it to your home screen to jump straight in.
+                </p>
+                <Card title="Today's requests" subtitle="The most-tipped songs come first." flush>
+                  {songRequests.length === 0 ? (
+                    <EmptyState icon="music" title="No song requests today">
+                      When someone tips and picks a song, it shows up here.
+                    </EmptyState>
+                  ) : (
+                    <ul className="divide-y divide-slate-100 px-5 pb-2">
+                      {songRequests.map(request => (
+                        <li key={request.songId} className="flex items-center gap-3 py-3">
+                          <div className="min-w-0 flex-1">
+                            <div className="truncate font-bold text-ink-900">{request.songTitle}</div>
+                            <div className="truncate text-sm text-ink-500">{request.artist}</div>
+                            <div className="mt-0.5 text-xs text-ink-400">
+                              {formatCurrency(request.totalTipAmount)} · {request.requestCount} {request.requestCount === 1 ? 'request' : 'requests'} ·{' '}
+                              {new Date(request.firstRequestTime).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
                             </div>
                           </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </div>
+                          <StatusChip
+                            kind={request.status === 'completed' ? 'paid' : request.status === 'performing' ? 'active' : 'processing'}
+                            label={request.status === 'completed' ? 'Played' : request.status === 'performing' ? 'Playing' : 'Waiting'}
+                          />
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </Card>
               </div>
             )}
-          </div>
         </div>
-      </div>
+      </PortalShell>
 
-      {/* Delete Confirmation Modal */}
-      {showDeleteModal && deviceToDelete && (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50">
-          <div className="relative p-8 border w-96 shadow-lg rounded-md bg-white">
-            <div className="text-center">
-              <h3 className="text-lg font-semibold text-gray-900">Confirm Deletion</h3>
-              <p className="text-gray-600 mt-2">
-                Are you sure you want to delete the device "{deviceToDelete.nickname || deviceToDelete.uuid}"? This action cannot be undone.
-              </p>
-            </div>
-            <div className="items-center px-4 py-3">
-              <button
-                onClick={confirmDeleteDevice}
-                className="px-4 py-2 bg-red-600 text-white text-base font-medium rounded-md w-full shadow-sm hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500"
-              >
-                Delete
-              </button>
-              <button
-                onClick={cancelDeleteDevice}
-                className="mt-3 px-4 py-2 bg-gray-200 text-gray-800 text-base font-medium rounded-md w-full shadow-sm hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-500"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Remove device confirmation */}
+      <Modal
+        open={showDeleteModal && !!deviceToDelete}
+        onClose={cancelDeleteDevice}
+        title="Remove this device?"
+        footer={
+          <>
+            <Button variant="secondary" onClick={cancelDeleteDevice}>
+              Keep device
+            </Button>
+            <Button variant="danger" icon="trash" onClick={confirmDeleteDevice}>
+              Remove device
+            </Button>
+          </>
+        }
+      >
+        <p className="text-ink-700">
+          <strong>{deviceToDelete?.nickname || deviceToDelete?.uuid}</strong> will stop taking tips. You can restore it later from Devices, under removed devices.
+        </p>
+      </Modal>
 
       {/* Full-Screen Song Request Monitor */}
       <SongRequestMonitor
         profileId={userProfile?.id || ''}
         isVisible={showMonitorFullscreen}
         onClose={() => setShowMonitorFullscreen(false)}
+        devices={(stats?.devices ?? []).filter(d => d.isAllowSongRequest)}
+        pausingDeviceId={pausingDeviceId}
+        onTogglePause={toggleDevicePause}
       />
     </div>
   )

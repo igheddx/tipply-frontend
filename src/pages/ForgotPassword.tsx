@@ -168,20 +168,13 @@ const ForgotPassword: React.FC = () => {
 
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-surface flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full">
         {/* Logo and Header */}
         <div className="text-center mb-8">
-          <div className="mx-auto w-32 h-32 overflow-visible rounded-2xl mb-4">
-            <img 
-              src="/images/logo/tipwave-logo2.png" 
-              alt="Tipwave Logo" 
-              className="w-full h-full object-contain"
-              style={{ transform: 'scale(1.25)', objectPosition: 'center' }}
-            />
-          </div>
+          <img src="/images/logo/tipwave-logo-v2.png" alt="Tipwave" className="mx-auto mb-6 h-14 w-auto" />
           <h2 className="text-3xl font-bold text-gray-900 mb-2">
-            Reset Your Password
+            Reset your password
           </h2>
           <p className="text-gray-600">
             {step === 'email' && 'Enter your email to receive a verification code'}

@@ -1,8 +1,52 @@
 import logger from "../utils/logger";
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import apiService from '../services/api'
 import { getEncryptDecryptNoUserName } from '../utils/encryption'
+import { BrandIcon, IconTile, type BrandIconName } from '../components/icons/BrandIcons'
+import { Banner, Button, Modal, PageLoader } from '../components/ui'
+
+const RESEND_SECONDS = 30
+
+const STEPS: { id: number; title: string; subtitle: string; icon: BrandIconName }[] = [
+  { id: 1, title: 'Create account', subtitle: 'Your name, email and password', icon: 'user' },
+  { id: 2, title: 'Verify email', subtitle: 'Enter the 6-digit code', icon: 'mail' },
+  { id: 3, title: 'Add your device', subtitle: 'Serial number and nickname', icon: 'device' },
+  { id: 4, title: 'Get paid', subtitle: 'Verify your identity with Stripe', icon: 'bank' }
+]
+const FINISH_STEP = STEPS.length + 1
+
+const inputClass = (hasError?: boolean) =>
+  `w-full h-12 px-4 rounded-xl border bg-white text-ink-900 placeholder:text-ink-400 transition-colors focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent ${
+    hasError ? 'border-red-400' : 'border-slate-300'
+  }`
+
+const Field: React.FC<{
+  id: string
+  label: string
+  error?: string
+  hint?: string
+  optional?: boolean
+  children: React.ReactNode
+}> = ({ id, label, error, hint, optional, children }) => (
+  <div>
+    <label htmlFor={id} className="mb-1.5 block text-sm font-semibold text-ink-700">
+      {label}
+      {optional && <span className="ml-1 font-normal text-ink-500">(optional)</span>}
+    </label>
+    {children}
+    {error ? (
+      <p className="mt-1.5 text-sm text-red-600">{error}</p>
+    ) : (
+      hint && <p className="mt-1.5 text-sm text-ink-500">{hint}</p>
+    )}
+  </div>
+)
+
+const passwordChecks = (password: string) => [
+  { label: 'At least 8 characters', ok: password.length >= 8 },
+  { label: 'A letter and a number', ok: /[A-Za-z]/.test(password) && /\d/.test(password) }
+]
 
 const Onboarding: React.FC = () => {
   const [formData, setFormData] = useState({
@@ -14,9 +58,9 @@ const Onboarding: React.FC = () => {
     stageName: '',
     password: '',
     confirmPassword: '',
-    serialNumber: '', // Changed from deviceId to serialNumber
+    serialNumber: '',
     deviceNickname: '',
-    isAllowSongRequest: null as boolean | null
+    isAllowSongRequest: false
   })
 
   const [errors, setErrors] = useState<{[key: string]: string}>({})
@@ -27,16 +71,14 @@ const Onboarding: React.FC = () => {
   const [isValidatingDevice, setIsValidatingDevice] = useState(false)
   const [deviceValidationComplete, setDeviceValidationComplete] = useState(false)
   const [verificationCode, setVerificationCode] = useState('')
-  const [verificationSent, setVerificationSent] = useState(false)
+  const [, setVerificationSent] = useState(false)
   const [profileCreated, setProfileCreated] = useState(false)
   const [onboardingUrl, setOnboardingUrl] = useState<string | null>(null)
-  const [passwordVisibility, setPasswordVisibility] = useState({
-    password: false,
-    confirmPassword: false
-  })
-  const [strengthScore, setStrengthScore] = useState(0)
-  const [strengthLevel, setStrengthLevel] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
+  const [resendIn, setResendIn] = useState(0)
+  const [deviceConflict, setDeviceConflict] = useState<string | null>(null)
   const navigate = useNavigate()
+  const verifyingRef = useRef(false)
   const isIOS = typeof navigator !== 'undefined' && (/iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.userAgent.includes('Mac') && 'ontouchend' in (document as any)))
 
   // Generate API key on component mount
@@ -52,50 +94,12 @@ const Onboarding: React.FC = () => {
     generateApiKey()
   }, [])
 
-  const steps = [
-    {
-      id: 1,
-      title: 'Personal Info',
-      subtitle: 'Tell us about yourself',
-      icon: '👤',
-      description: 'Basic contact information and bio'
-    },
-    {
-      id: 2,
-      title: 'Create Password',
-      subtitle: 'Set up your account security',
-      icon: '🔒',
-      description: 'Create a secure password for login (creates your profile)'
-    },
-    {
-      id: 3,
-      title: 'Email Verification',
-      subtitle: 'Verify your email address',
-      icon: '📧',
-      description: 'Enter the verification code sent to your email'
-    },
-    {
-      id: 4,
-      title: 'Device Setup',
-      subtitle: 'Register your Tipwave device',
-      icon: '📱',
-      description: 'Device ID and nickname'
-    },
-    {
-      id: 5,
-      title: 'KYC Verification',
-      subtitle: 'Identity verification with Stripe',
-      icon: '🔐',
-      description: 'Security & compliance'
-    },
-    {
-      id: 6,
-      title: 'Complete Setup',
-      subtitle: 'Finish onboarding',
-      icon: '✅',
-      description: 'Ready to start accepting tips'
-    }
-  ]
+  // Resend countdown
+  useEffect(() => {
+    if (resendIn <= 0) return
+    const t = setTimeout(() => setResendIn(s => s - 1), 1000)
+    return () => clearTimeout(t)
+  }, [resendIn])
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target
@@ -108,114 +112,38 @@ const Onboarding: React.FC = () => {
     // If the user edits email, allow profile creation to run again for the new address
     if (name === 'email') {
       setProfileCreated(false)
+      setErrors(prev => ({ ...prev, accountError: '' }))
     }
-    
+
     // Reset device validation state when serial number changes
     if (name === 'serialNumber') {
       setDeviceValidationComplete(false)
       setIsValidatingDevice(false)
+      setDeviceConflict(null)
     }
-  }
-
-  // Calculate password strength in real-time
-  const calculatePasswordStrength = (password: string) => {
-    if (!password) {
-      setStrengthScore(0)
-      setStrengthLevel('')
-      return
-    }
-
-    let score = 0
-    
-    // Length bonus (up to 25 points)
-    if (password.length >= 10) score += 25
-    else if (password.length >= 8) score += 15
-    else if (password.length >= 6) score += 10
-    
-    // Character variety bonus (up to 40 points)
-    if (/[a-z]/.test(password)) score += 10
-    if (/[A-Z]/.test(password)) score += 10
-    if (/[0-9]/.test(password)) score += 10
-    if (/[^A-Za-z0-9]/.test(password)) score += 10
-    
-    // Entropy bonus (up to 35 points)
-    const uniqueChars = new Set(password).size
-    score += Math.min(35, uniqueChars * 2)
-    
-    setStrengthScore(Math.min(100, score))
-    
-    if (score >= 80) setStrengthLevel('Very Strong')
-    else if (score >= 60) setStrengthLevel('Strong')
-    else if (score >= 40) setStrengthLevel('Medium')
-    else if (score >= 20) setStrengthLevel('Weak')
-    else setStrengthLevel('Very Weak')
-  }
-
-  const getStrengthColor = (score: number) => {
-    if (score >= 80) return 'text-green-600'
-    if (score >= 60) return 'text-yellow-600'
-    if (score >= 40) return 'text-orange-600'
-    return 'text-red-600'
-  }
-
-  const validatePassword = () => {
-    if (formData.password.length < 8) {
-      return 'Password must be at least 8 characters'
-    }
-    if (formData.password !== formData.confirmPassword) {
-      return 'Passwords do not match'
-    }
-    return null
-  }
-
-  const handlePasswordFieldBlur = (field: string) => {
-    const newErrors = { ...errors }
-    
-    if (field === 'password') {
-      if (formData.password.length < 8) {
-        newErrors.password = 'Password must be at least 8 characters'
-      } else {
-        delete newErrors.password
-      }
-    } else if (field === 'confirmPassword') {
-      if (formData.password !== formData.confirmPassword) {
-        newErrors.confirmPassword = 'Passwords do not match'
-      } else {
-        delete newErrors.confirmPassword
-      }
-    }
-    
-    setErrors(newErrors)
   }
 
   const sendVerificationCode = async () => {
-    logger.log('sendVerificationCode called with email:', formData.email)
-    
     if (!formData.email.trim()) {
-      logger.log('sendVerificationCode: Email is empty')
-      setErrors(prev => ({ ...prev, email: 'Email is required to send verification code' }))
+      setErrors(prev => ({ ...prev, email: 'Email is required to send a verification code' }))
       return false
     }
-    
+
     try {
       setIsLoading(true)
-      logger.log('sendVerificationCode: Calling API...')
       const result = await apiService.sendOnboardingVerification(formData.email)
-      logger.log('sendVerificationCode: API result:', result)
-      
+
       if (result.error) {
-        logger.log('sendVerificationCode: API returned error:', result.error)
-        setErrors(prev => ({ ...prev, email: result.error || 'Failed to send verification code' }))
+        setErrors(prev => ({ ...prev, email: result.error || 'We could not send the code' }))
         return false
       }
-      
-      logger.log('sendVerificationCode: Setting verificationSent to true')
+
       setVerificationSent(true)
-      logger.log('sendVerificationCode: verificationSent is now:', true)
+      setResendIn(RESEND_SECONDS)
       return true
     } catch (err) {
       logger.log('sendVerificationCode: Exception occurred:', err)
-      setErrors(prev => ({ ...prev, email: 'Failed to send verification code. Please try again.' }))
+      setErrors(prev => ({ ...prev, email: 'We could not send the code. Please try again.' }))
       return false
     } finally {
       setIsLoading(false)
@@ -224,48 +152,45 @@ const Onboarding: React.FC = () => {
 
   const verifyEmail = async () => {
     if (!verificationCode.trim()) {
-      setErrors(prev => ({ ...prev, verificationCode: 'Verification code is required' }))
+      setErrors(prev => ({ ...prev, verificationCode: 'Enter the code from your email' }))
       return false
     }
-    
-        try {
+
+    try {
       const result = await apiService.validateOnboardingCode(formData.email, verificationCode)
-      
+
       if (result.error) {
-        setErrors(prev => ({ ...prev, verificationCode: result.error || 'Failed to verify code' }))
+        setErrors(prev => ({ ...prev, verificationCode: result.error || 'That code is not right' }))
         return false
       }
-      
-      // Clear verification errors
+
       setErrors(prev => ({ ...prev, verificationCode: '' }))
       return true
     } catch (err) {
-      setErrors(prev => ({ ...prev, verificationCode: 'Failed to verify code. Please try again.' }))
+      setErrors(prev => ({ ...prev, verificationCode: 'We could not check the code. Please try again.' }))
       return false
     }
   }
 
-
-
   const validateSerialNumberUniqueness = async () => {
     const serialNumber = formData.serialNumber.trim()
-    
+
     if (!serialNumber) {
-      return { isValid: false, error: 'Serial Number is required' }
+      return { isValid: false, error: 'Enter the serial number printed on your device' }
     }
-    
+
     try {
       const result = await apiService.checkDeviceExists(serialNumber)
-      
+
       if (result.error) {
         return { isValid: false, error: result.error }
       }
-      
+
       if (result.data?.exists) {
         const device = result.data.device
         return {
           isValid: false,
-          error: `Serial Number already exists`,
+          error: 'This device is already registered',
           details: {
             ownerName: device.ownerName,
             ownerEmail: device.ownerEmail,
@@ -274,49 +199,48 @@ const Onboarding: React.FC = () => {
           }
         }
       }
-      
+
       return { isValid: true, error: null }
     } catch (err) {
-      return { isValid: false, error: 'Failed to validate serial number' }
+      return { isValid: false, error: 'We could not check the serial number' }
     }
   }
 
   const validateDetectedDevice = async () => {
     const serialNumber = formData.serialNumber.trim()
-    
+
     if (!serialNumber) {
-      return { isValid: false, error: 'Serial Number is required' }
+      return { isValid: false, error: 'Enter the serial number printed on your device' }
     }
-    
+
     setIsValidatingDevice(true)
     setDeviceValidationComplete(false)
-    
+
     try {
       const result = await apiService.checkDetectedDeviceBySerialNumber(serialNumber)
-      
+
       if (result.error) {
-        const errorMessage = result.error || 'Failed to validate serial number'
+        const errorMessage = result.error || 'We could not check the serial number'
         setErrors(prev => ({ ...prev, serialNumber: errorMessage }))
         setDeviceValidationComplete(true)
         setIsValidatingDevice(false)
         return { isValid: false, error: errorMessage }
       }
-      
+
       if (!result.data?.exists) {
-        const errorMessage = result.data?.message || 'Serial Number not found or device is not available for registration'
+        const errorMessage = result.data?.message || 'We could not find that serial number. Check it and try again.'
         setErrors(prev => ({ ...prev, serialNumber: errorMessage }))
         setDeviceValidationComplete(true)
         setIsValidatingDevice(false)
         return { isValid: false, error: errorMessage }
       }
-      
-      // Clear any existing errors
+
       setErrors(prev => ({ ...prev, serialNumber: '' }))
       setDeviceValidationComplete(true)
       setIsValidatingDevice(false)
       return { isValid: true, error: null }
     } catch (err) {
-      const errorMessage = 'Failed to validate serial number'
+      const errorMessage = 'We could not check the serial number'
       setErrors(prev => ({ ...prev, serialNumber: errorMessage }))
       setDeviceValidationComplete(true)
       setIsValidatingDevice(false)
@@ -324,175 +248,106 @@ const Onboarding: React.FC = () => {
     }
   }
 
-  const validateStep1 = () => {
+  // Step 1 holds the name, email and password together; the account is created when it is submitted.
+  const validateAccount = () => {
     const newErrors: {[key: string]: string} = {}
-    
-    if (!formData.firstName.trim()) {
-      newErrors.firstName = 'First name is required'
-    }
-    if (!formData.lastName.trim()) {
-      newErrors.lastName = 'Last name is required'
-    }
-    if (!formData.stageName.trim()) {
-      newErrors.stageName = 'Public name is required'
-    }
+
+    if (!formData.firstName.trim()) newErrors.firstName = 'Enter your first name'
+    if (!formData.lastName.trim()) newErrors.lastName = 'Enter your last name'
+    if (!formData.stageName.trim()) newErrors.stageName = 'Enter the name your audience will see'
     if (!formData.email.trim()) {
-      newErrors.email = 'Email is required'
+      newErrors.email = 'Enter your email'
     } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
-      newErrors.email = 'Please enter a valid email address'
+      newErrors.email = 'Enter a valid email address'
     }
-    
+    if (formData.password.length < 8) {
+      newErrors.password = 'Use at least 8 characters'
+    }
+    if (formData.password !== formData.confirmPassword) {
+      newErrors.confirmPassword = 'Passwords do not match'
+    }
+
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
   }
 
   const handleNext = async () => {
-    if (step < 6) {
-      if (step === 1) {
-        // Validate step 1
-        if (!validateStep1()) {
-          return
-        }
-        // Save personal info (just validation, no API call needed)
-        await savePersonalInfo()
-        setStep(step + 1)
-      } else if (step === 2) {
-        // Validate password and create profile
-        const passwordError = validatePassword()
-        if (passwordError) {
-          setErrors(prev => ({ ...prev, password: passwordError }))
-          return
-        }
-        setErrors(prev => ({ ...prev, password: '', confirmPassword: '', email: '' }))
-        
-        // Create profile once; avoid re-creating on retries (e.g., verification resend)
-        if (!profileCreated) {
-          const created = await createProfile()
-          if (!created) {
-            // Profile creation failed, show error and stop
-            logger.log('Step 2: Profile creation failed, stopping flow')
-            return
-          }
-          setProfileCreated(true)
-        }
-        
-        // Send verification code immediately after profile creation
-        logger.log('Step 2: Profile created, sending verification code...')
-        const sent = await sendVerificationCode()
-        if (!sent) {
-          logger.log('Step 2: Failed to send verification code')
-          return
-        }
-        logger.log('Step 2: Verification code sent successfully, advancing to step 3')
-        setStep(step + 1)
-      } else if (step === 3) {
-        // Verify email code (verification code already sent in step 2)
-        logger.log('Step 3: verificationSent =', verificationSent, 'verificationCode =', verificationCode)
-        
-        if (!verificationCode.trim()) {
-          logger.log('Step 3: No verification code entered')
-          setErrors(prev => ({ ...prev, verificationCode: 'Please enter the verification code sent to your email' }))
-          return
-        }
-        
-        // Verify the entered code
-        logger.log('Step 3: Verifying email code...')
-        const verified = await verifyEmail()
-        if (!verified) {
-          logger.log('Step 3: Failed to verify email code')
-          return
-        }
-        
-        logger.log('Step 3: Email verified successfully, advancing to next step')
-        setStep(step + 1)
-      } else if (step === 4) {
-        // Register device using the created profile
-        if (!deviceValidationComplete || !!errors.serialNumber) {
-          // Re-validate if not already validated
-          if (formData.serialNumber.trim()) {
-            const validation = await validateDetectedDevice()
-            if (!validation.isValid) {
-              return
-            }
-          } else {
-            setErrors(prev => ({ ...prev, serialNumber: 'Serial Number is required' }))
-            return
-          }
-        }
-        
-        // Validate song request selection
-        if (formData.isAllowSongRequest === null) {
-          setErrors(prev => ({ 
-            ...prev, 
-            isAllowSongRequest: 'Please select whether you want to enable song requests from your audience.' 
-          }))
-          return
-        }
-        setErrors(prev => ({ ...prev, isAllowSongRequest: '' }))
-        
-        try {
-          await registerDevice()
-          // Only advance to next step if device registration succeeded
-          setStep(step + 1)
-        } catch (err) {
-          // Error already handled in registerDevice, just don't advance
-          logger.error('Device registration failed, not advancing to next step')
-        }
-      } else if (step === 5) {
-        // Step 5 is the KYC Verification step - user clicks button to continue to Stripe
-        // Don't automatically start KYC here - let user click the button in renderStep5
-        // The button will call startKYC() when clicked
+    if (step === 1) {
+      if (!validateAccount()) return
+
+      // Create the profile once; do not re-create it when the user comes back to this step
+      if (!profileCreated) {
+        const created = await createProfile()
+        if (!created) return
+        setProfileCreated(true)
       }
-    } else {
-      handleSubmit()
+
+      const sent = await sendVerificationCode()
+      if (!sent) return
+      setStep(2)
+    } else if (step === 2) {
+      if (verifyingRef.current) return
+      verifyingRef.current = true
+      setIsLoading(true)
+      try {
+        const verified = await verifyEmail()
+        if (!verified) return
+        setStep(3)
+      } finally {
+        verifyingRef.current = false
+        setIsLoading(false)
+      }
+    } else if (step === 3) {
+      if (!deviceValidationComplete || !!errors.serialNumber) {
+        if (formData.serialNumber.trim()) {
+          const validation = await validateDetectedDevice()
+          if (!validation.isValid) return
+        } else {
+          setErrors(prev => ({ ...prev, serialNumber: 'Enter the serial number printed on your device' }))
+          return
+        }
+      }
+
+      try {
+        await registerDevice()
+        setStep(4)
+      } catch (err) {
+        // The error is already shown by registerDevice; stay on this step
+        logger.error('Device registration failed, not advancing to next step')
+      }
     }
   }
 
   const handleBack = () => {
     if (step > 1) {
       setStep(step - 1)
-      // Clear errors when going back
       setErrors({})
-    }
-  }
-
-  const savePersonalInfo = async () => {
-    setIsLoading(true)
-    try {
-      // During onboarding, we don't need to update profile separately
-      // The profile will be created when we set the password
-      logger.log('Personal info saved for onboarding')
-    } catch (err) {
-      logger.error('Failed to save personal info:', err)
-    } finally {
-      setIsLoading(false)
     }
   }
 
   const createProfile = async (): Promise<boolean> => {
     setIsLoading(true)
     try {
-      // Create profile and set password in one step
       const result = await apiService.createProfileOnboarding({
         firstName: formData.firstName,
         lastName: formData.lastName,
         stageName: formData.stageName,
+        bio: formData.bio,
         email: formData.email,
         phone: formData.phone,
         password: formData.password
       })
-      
+
       if (result.error) {
-        setErrors(prev => ({ ...prev, email: result.error || 'Failed to create profile. Email may already be in use.' }))
+        setErrors(prev => ({ ...prev, accountError: result.error || 'We could not create your account. That email may already be in use.' }))
         logger.error('Failed to create profile:', result.error)
         return false
       }
-      
-      logger.log('Profile created and password set successfully for onboarding')
+
       return true
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to create profile. Email may already be in use.'
-      setErrors(prev => ({ ...prev, email: errorMessage }))
+      const errorMessage = err instanceof Error ? err.message : 'We could not create your account. That email may already be in use.'
+      setErrors(prev => ({ ...prev, accountError: errorMessage }))
       logger.error('Failed to create profile:', err)
       return false
     } finally {
@@ -503,66 +358,51 @@ const Onboarding: React.FC = () => {
   const registerDevice = async () => {
     setIsLoading(true)
     try {
-      // First validate UUID uniqueness
       const uniquenessCheck = await validateSerialNumberUniqueness()
       if (!uniquenessCheck.isValid) {
-        setErrors(prev => ({ 
-          ...prev, 
-          serialNumber: uniquenessCheck.error || 'Device validation failed'
+        setErrors(prev => ({
+          ...prev,
+          serialNumber: uniquenessCheck.error || 'We could not register this device'
         }))
-        
-        // Show detailed alert if device exists
+
         if (uniquenessCheck.details) {
           const device = uniquenessCheck.details
-          const alertMessage = `⚠️ Serial Number Already Exists
-
-This serial number is already registered to:
-• Owner: ${device.ownerName}
-• Email: ${device.ownerEmail}
-• Nickname: ${device.nickname || 'No nickname'}
-• Registered: ${new Date(device.createdAt).toLocaleDateString()}
-
-Please use a different serial number or contact support if this is your device.`
-          
-          alert(alertMessage)
+          setDeviceConflict(
+            `Registered to ${device.ownerName} (${device.ownerEmail}) on ${new Date(device.createdAt).toLocaleDateString()}. ` +
+              'If this is your device, contact support.'
+          )
         }
-        
-        return
+        throw new Error(uniquenessCheck.error || 'Device validation failed')
       }
 
       const result = await apiService.registerDeviceOnboarding({
-        serialNumber: formData.serialNumber, // Changed from deviceUuid to serialNumber
+        serialNumber: formData.serialNumber,
         firstName: formData.firstName,
         lastName: formData.lastName,
         email: formData.email,
         phone: formData.phone,
         nickname: formData.deviceNickname,
-        isAllowSongRequest: formData.isAllowSongRequest || false
+        isAllowSongRequest: formData.isAllowSongRequest
       })
 
       if (result.error) {
-        // Check if it's a duplicate device error
         if (result.error.includes('already exists')) {
-          setErrors(prev => ({ 
-            ...prev, 
-            serialNumber: 'This device is already registered. Please use a different serial number or contact support if this is your device.' 
+          setErrors(prev => ({
+            ...prev,
+            serialNumber: 'This device is already registered. If it is yours, contact support.'
           }))
-          return
+          throw new Error(result.error)
         }
         throw new Error(result.error)
       }
-      
-      logger.log('Device registered successfully for onboarding')
-      
-      // Clear any previous errors
+
       setErrors(prev => ({ ...prev, serialNumber: '' }))
     } catch (err) {
       logger.error('Failed to register device:', err)
-      setErrors(prev => ({ 
-        ...prev, 
-        serialNumber: err instanceof Error ? err.message : 'Failed to register device. Please try again.' 
+      setErrors(prev => ({
+        ...prev,
+        serialNumber: prev.serialNumber || (err instanceof Error ? err.message : 'We could not register your device. Please try again.')
       }))
-      // Don't advance to next step if registration failed
       throw err
     } finally {
       setIsLoading(false)
@@ -652,9 +492,9 @@ Please use a different serial number or contact support if this is your device.`
       const errorMessage = err instanceof Error ? err.message : String(err)
       
       // Show user-friendly error message
-      let userMessage = 'Failed to start KYC process. '
+      let userMessage = 'We could not start identity verification. '
       if (errorMessage.includes('not found') || errorMessage.includes('Device')) {
-        userMessage += 'Device not found. Please ensure your device was registered successfully in the previous step.'
+        userMessage += 'We could not find your device. Go back and add it again.'
       } else if (errorMessage.includes('already has')) {
         userMessage += 'This device already has a Stripe account. You can proceed to the dashboard.'
       } else if (errorMessage.includes('required') || errorMessage.includes('Missing')) {
@@ -667,19 +507,6 @@ Please use a different serial number or contact support if this is your device.`
       
       setErrors(prev => ({ ...prev, general: userMessage }))
       setShowKycSupportActions(true)
-      
-      // Check if this is a retryable error
-      if (errorMessage.includes('timeout') || errorMessage.includes('network') || errorMessage.includes('creation_error')) {
-        // Show retry option
-        if (window.confirm('The KYC process encountered an issue. Would you like to try again?')) {
-          setIsLoading(false)
-          // Wait a moment before retrying
-          setTimeout(() => {
-            startKYC()
-          }, 2000)
-          return
-        }
-      }
       
       setIsLoading(false) // Only set loading to false on error
     }
@@ -809,414 +636,223 @@ Please use a different serial number or contact support if this is your device.`
     }
   }
 
-  const renderStep1 = () => (
-    <div className="space-y-8">
-      <div className="text-center">
-        <div className="text-6xl mb-4">👤</div>
-        <h3 className="text-2xl font-bold text-gray-900 mb-2">Personal Information</h3>
-        <p className="text-gray-600">Let's start with your basic details and tell us about yourself</p>
-      </div>
+  // Submit the code as soon as all six digits are in
+  useEffect(() => {
+    if (step === 2 && verificationCode.length === 6 && !isLoading) {
+      handleNext()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [verificationCode, step])
 
-      {/* Note: Profile Photo upload moved to Profile page after authentication */}
-      
-      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-        <div className="space-y-2">
-          <label htmlFor="firstName" className="block text-sm font-semibold text-gray-700">
-            First Name *
-          </label>
-          <input
-            type="text"
-            id="firstName"
-            name="firstName"
-            required
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all duration-200"
-            placeholder="Enter your first name"
-            value={formData.firstName}
-            onChange={handleInputChange}
-          />
-          {errors.firstName && <p className="text-red-500 text-xs mt-1">{errors.firstName}</p>}
-        </div>
-        <div className="space-y-2">
-          <label htmlFor="lastName" className="block text-sm font-semibold text-gray-700">
-            Last Name *
-          </label>
-          <input
-            type="text"
-            id="lastName"
-            name="lastName"
-            required
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all duration-200"
-            placeholder="Enter your last name"
-            value={formData.lastName}
-            onChange={handleInputChange}
-          />
-          {errors.lastName && <p className="text-red-500 text-xs mt-1">{errors.lastName}</p>}
-        </div>
-      </div>
-      
-      <div className="space-y-2">
-        <label htmlFor="stageName" className="block text-sm font-semibold text-gray-700">
-          Public Name *
-        </label>
-        <input
-          type="text"
-          id="stageName"
-          name="stageName"
-          required
-          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all duration-200"
-          placeholder="Your public name or artist name"
-          value={formData.stageName}
-          onChange={handleInputChange}
-        />
-        {errors.stageName && <p className="text-red-500 text-xs mt-1">{errors.stageName}</p>}
-        <p className="text-sm text-gray-500">This is how you'll appear to your audience</p>
-      </div>
-      
-      <div className="space-y-2">
-        <label htmlFor="email" className="block text-sm font-semibold text-gray-700">
-          Email Address *
-        </label>
-        <input
-          type="email"
-          id="email"
-          name="email"
-          required
-          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all duration-200"
-          placeholder="your.email@example.com"
-          value={formData.email}
-          onChange={handleInputChange}
-        />
-        {errors.email && <p className="text-red-500 text-xs mt-1">{errors.email}</p>}
-      </div>
-      
-      <div className="space-y-2">
-        <label htmlFor="phone" className="block text-sm font-semibold text-gray-700">
-          Phone Number
-        </label>
-        <input
-          type="tel"
-          id="phone"
-          name="phone"
-          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all duration-200"
-          placeholder="+1 (555) 123-4567"
-          value={formData.phone}
-          onChange={handleInputChange}
-        />
-        {errors.phone && <p className="text-red-500 text-xs mt-1">{errors.phone}</p>}
-      </div>
+  const checks = passwordChecks(formData.password)
 
-      <div className="space-y-2">
-        <label htmlFor="bio" className="block text-sm font-semibold text-gray-700">
-          Bio
-        </label>
-        <textarea
-          id="bio"
-          name="bio"
-          rows={4}
-          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all duration-200"
-          placeholder="Tell your audience a bit about yourself..."
-          value={formData.bio}
-          onChange={handleInputChange}
-        />
-        {errors.bio && <p className="text-red-500 text-xs mt-1">{errors.bio}</p>}
-        <p className="text-sm text-gray-500">A short description that will appear on your tipping page</p>
-      </div>
+  const renderStepHeading = (title: string, subtitle: string) => (
+    <div className="mb-6">
+      <h2 className="text-2xl font-bold text-ink-900">{title}</h2>
+      <p className="mt-1 text-ink-500">{subtitle}</p>
     </div>
   )
 
-  const renderStep2 = () => (
-    <div className="space-y-8">
-      <div className="text-center">
-        <div className="text-6xl mb-4">🔒</div>
-        <h3 className="text-2xl font-bold text-gray-900 mb-2">Create Your Password</h3>
-        <p className="text-gray-600">Set up a secure password to protect your account</p>
-      </div>
-      
-      {/* General error message display for step 2 */}
-      {errors.email && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-          <div className="flex items-start space-x-3">
-            <div className="flex-shrink-0">
-              <svg className="w-5 h-5 text-red-600" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-              </svg>
-            </div>
-            <div className="flex-1">
-              <h4 className="text-sm font-semibold text-red-800 mb-1">Error</h4>
-              <p className="text-sm text-red-700">{errors.email}</p>
-            </div>
-          </div>
-        </div>
+  const renderAccount = () => (
+    <div>
+      {renderStepHeading('Create your account', 'This is how you will sign in to your Tipwave portal.')}
+
+      {errors.accountError && step === 1 && (
+        <Banner tone="error" title="We could not create your account" className="mb-5">
+          {errors.accountError}
+        </Banner>
       )}
-      
-      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-6">
-        <div className="flex items-start space-x-4">
-          <div className="flex-shrink-0">
-            <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-              <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            </div>
-          </div>
-          <div className="flex-1">
-            <h4 className="text-lg font-semibold text-blue-900 mb-2">
-              Password Requirements
-            </h4>
-            <p className="text-blue-700 mb-4">
-              Your password will be used to log into your Tipwave dashboard and manage your account.
-            </p>
-            <div className="space-y-3">
-              <div className="flex items-center space-x-3">
-                <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                <span className="text-blue-800">Use at least 8 characters</span>
-              </div>
-            </div>
-          </div>
+
+      <div className="space-y-5">
+        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+          <Field id="firstName" label="First name" error={errors.firstName}>
+            <input
+              id="firstName"
+              name="firstName"
+              autoComplete="given-name"
+              className={inputClass(!!errors.firstName)}
+              value={formData.firstName}
+              onChange={handleInputChange}
+            />
+          </Field>
+          <Field id="lastName" label="Last name" error={errors.lastName}>
+            <input
+              id="lastName"
+              name="lastName"
+              autoComplete="family-name"
+              className={inputClass(!!errors.lastName)}
+              value={formData.lastName}
+              onChange={handleInputChange}
+            />
+          </Field>
         </div>
-      </div>
-      
-      <div className="space-y-6">
-        <div className="space-y-2">
-          <label htmlFor="password" className="block text-sm font-semibold text-gray-700">
-            Password *
-          </label>
+
+        <Field
+          id="stageName"
+          label="Stage name"
+          error={errors.stageName}
+          hint="The name your audience sees on your tipping page."
+        >
+          <input
+            id="stageName"
+            name="stageName"
+            className={inputClass(!!errors.stageName)}
+            placeholder="Your artist or performer name"
+            value={formData.stageName}
+            onChange={handleInputChange}
+          />
+        </Field>
+
+        <Field id="email" label="Email" error={errors.email}>
+          <input
+            id="email"
+            name="email"
+            type="email"
+            autoComplete="email"
+            inputMode="email"
+            className={inputClass(!!errors.email)}
+            placeholder="you@example.com"
+            value={formData.email}
+            onChange={handleInputChange}
+          />
+        </Field>
+
+        <Field id="password" label="Password" error={errors.password}>
           <div className="relative">
             <input
-              type={passwordVisibility.password ? 'text' : 'password'}
               id="password"
               name="password"
-              required
-              className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all duration-200 ${
-                errors.password ? 'border-red-500 focus:ring-red-200' : 'border-gray-300'
-              }`}
-              placeholder="Enter your password"
+              type={showPassword ? 'text' : 'password'}
+              autoComplete="new-password"
+              className={`${inputClass(!!errors.password)} pr-12`}
               value={formData.password}
-              onChange={(e) => {
-                handleInputChange(e)
-                calculatePasswordStrength(e.target.value)
-              }}
-              onBlur={() => handlePasswordFieldBlur('password')}
-            />
-            <button
-              type="button"
-              onClick={() => setPasswordVisibility((prev) => ({ ...prev, password: !prev.password }))}
-              className="absolute inset-y-0 right-3 flex items-center text-gray-500 hover:text-gray-700"
-              aria-label={passwordVisibility.password ? 'Hide password' : 'Show password'}
-            >
-              {passwordVisibility.password ? (
-                <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-5 0-9-4-9-7 0-.88.21-1.715.58-2.47m3.15-3.15A9.956 9.956 0 0112 5c5 0 9 4 9 7 0 1.07-.34 2.07-.94 3m-3.28 3.28L4.22 4.22" />
-                </svg>
-              ) : (
-                <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                </svg>
-              )}
-            </button>
-          </div>
-          {formData.password && (
-            <div className="mt-2">
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-gray-500">Password Strength:</span>
-                <span className={`font-medium ${getStrengthColor(strengthScore)}`}>
-                  {strengthLevel}
-                </span>
-              </div>
-              <div className="mt-1 w-full bg-gray-200 rounded-full h-2">
-                <div
-                  className={`h-2 rounded-full transition-all duration-300 ${getStrengthColor(strengthScore).replace('text-', 'bg-')}`}
-                  style={{ width: `${strengthScore}%` }}
-                ></div>
-              </div>
-            </div>
-          )}
-          {errors.password && <p className="text-red-500 text-xs mt-1">{errors.password}</p>}
-          <p className="text-sm text-gray-500">Use at least 8 characters</p>
-        </div>
-        
-        <div className="space-y-2">
-          <label htmlFor="confirmPassword" className="block text-sm font-semibold text-gray-700">
-            Confirm Password *
-          </label>
-          <div className="relative">
-            <input
-              type={passwordVisibility.confirmPassword ? 'text' : 'password'}
-              id="confirmPassword"
-              name="confirmPassword"
-              required
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all duration-200"
-              placeholder="Confirm your password"
-              value={formData.confirmPassword}
               onChange={handleInputChange}
-              onBlur={() => handlePasswordFieldBlur('confirmPassword')}
             />
             <button
               type="button"
-              onClick={() => setPasswordVisibility((prev) => ({ ...prev, confirmPassword: !prev.confirmPassword }))}
-              className="absolute inset-y-0 right-3 flex items-center text-gray-500 hover:text-gray-700"
-              aria-label={passwordVisibility.confirmPassword ? 'Hide password' : 'Show password'}
+              onClick={() => setShowPassword(v => !v)}
+              className="absolute inset-y-0 right-1 flex w-10 items-center justify-center text-sm font-semibold text-brand-700"
+              aria-label={showPassword ? 'Hide password' : 'Show password'}
             >
-              {passwordVisibility.confirmPassword ? (
-                <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-5 0-9-4-9-7 0-.88.21-1.715.58-2.47m3.15-3.15A9.956 9.956 0 0112 5c5 0 9 4 9 7 0 1.07-.34 2.07-.94 3m-3.28 3.28L4.22 4.22" />
-                </svg>
-              ) : (
-                <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                </svg>
-              )}
+              {showPassword ? 'Hide' : 'Show'}
             </button>
           </div>
-          {errors.confirmPassword && <p className="text-red-500 text-xs mt-1">{errors.confirmPassword}</p>}
-        </div>
-      </div>
-    </div>
-  )
+          <ul className="mt-2 space-y-1">
+            {checks.map(c => (
+              <li key={c.label} className={`flex items-center gap-2 text-sm ${c.ok ? 'text-green-700' : 'text-ink-500'}`}>
+                <BrandIcon name="check" size={14} color={c.ok ? '#15803D' : '#CBD5E1'} strokeWidth={2.4} />
+                {c.label}
+              </li>
+            ))}
+          </ul>
+        </Field>
 
-  const renderStep3 = () => (
-    <div className="space-y-8">
-      <div className="text-center">
-        <div className="text-6xl mb-4">📧</div>
-        <h3 className="text-2xl font-bold text-gray-900 mb-2">Verify Your Email</h3>
-        <p className="text-gray-600">We've sent a verification code to your email address</p>
-      </div>
-      
-      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-6">
-        <div className="flex items-start space-x-4">
-          <div className="flex-shrink-0">
-            <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-              <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 4.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-              </svg>
-            </div>
-          </div>
-          <div className="flex-1">
-            <h4 className="text-lg font-semibold text-blue-900 mb-2">
-              Check Your Email
-            </h4>
-            <p className="text-blue-700 mb-4">
-              We've sent a 6-digit verification code to <strong>{formData.email}</strong>. 
-              Please check your inbox and enter the code below.
-            </p>
-            <div className="space-y-3">
-              <div className="flex items-center space-x-3">
-                <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                <span className="text-blue-800">Check your email inbox (and spam folder)</span>
-              </div>
-              <div className="flex items-center space-x-3">
-                <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                <span className="text-blue-800">Enter the 6-digit code below</span>
-              </div>
-              <div className="flex items-center space-x-3">
-                <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                <span className="text-blue-800">Code expires in 5 minutes</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-      
-      <div className="space-y-6">
-        <div className="space-y-2">
-          <label htmlFor="verificationCode" className="block text-sm font-semibold text-gray-700">
-            Verification Code *
-          </label>
+        <Field id="confirmPassword" label="Confirm password" error={errors.confirmPassword}>
           <input
-            type="text"
-            id="verificationCode"
-            name="verificationCode"
-            required
-            maxLength={6}
-            className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all duration-200 text-center text-2xl font-mono tracking-widest ${
-              errors.verificationCode ? 'border-red-500 focus:ring-red-200' : 'border-gray-300'
-            }`}
-            placeholder="000000"
-            value={verificationCode}
-            onChange={(e) => {
-              setVerificationCode(e.target.value.replace(/\D/g, ''))
-              setErrors(prev => ({ ...prev, verificationCode: '' }))
-            }}
+            id="confirmPassword"
+            name="confirmPassword"
+            type={showPassword ? 'text' : 'password'}
+            autoComplete="new-password"
+            className={inputClass(!!errors.confirmPassword)}
+            value={formData.confirmPassword}
+            onChange={handleInputChange}
           />
-          {errors.verificationCode && <p className="text-red-500 text-xs mt-1">{errors.verificationCode}</p>}
-          <p className="text-sm text-gray-500">Enter the 6-digit code from your email</p>
-        </div>
-        
-        <div className="flex items-center justify-between">
-          <button
-            type="button"
-            onClick={sendVerificationCode}
-            disabled={isLoading}
-            className="text-primary-600 hover:text-primary-700 font-medium transition-colors duration-200 disabled:opacity-50"
-          >
-            {isLoading ? 'Sending...' : 'Resend Code'}
-          </button>
-          <p className="text-sm text-gray-500">
-            Didn't receive the code? Check your spam folder
-          </p>
-        </div>
+        </Field>
+
+        <details className="rounded-xl border border-slate-200 px-4 py-3">
+          <summary className="cursor-pointer text-sm font-semibold text-ink-700">Add a phone number and bio (optional)</summary>
+          <div className="mt-4 space-y-5">
+            <Field id="phone" label="Phone number" optional error={errors.phone}>
+              <input
+                id="phone"
+                name="phone"
+                type="tel"
+                autoComplete="tel"
+                className={inputClass(!!errors.phone)}
+                placeholder="+1 (555) 123-4567"
+                value={formData.phone}
+                onChange={handleInputChange}
+              />
+            </Field>
+            <Field id="bio" label="Bio" optional hint="A short line about you, shown on your tipping page.">
+              <textarea
+                id="bio"
+                name="bio"
+                rows={3}
+                className={`${inputClass(false)} h-auto py-3`}
+                value={formData.bio}
+                onChange={handleInputChange}
+              />
+            </Field>
+          </div>
+        </details>
       </div>
     </div>
   )
 
-  const renderStep4 = () => (
-    <div className="space-y-8">
-      <div className="text-center">
-        <div className="text-6xl mb-4">📱</div>
-        <h3 className="text-2xl font-bold text-gray-900 mb-2">Device Registration</h3>
-        <p className="text-gray-600">Register your Tipwave device to start accepting tips</p>
+  const renderVerify = () => (
+    <div>
+      {renderStepHeading('Check your email', `We sent a 6-digit code to ${formData.email}.`)}
+
+      <Field id="verificationCode" label="Verification code" error={errors.verificationCode}>
+        <input
+          id="verificationCode"
+          name="verificationCode"
+          autoComplete="one-time-code"
+          inputMode="numeric"
+          maxLength={6}
+          autoFocus
+          className={`${inputClass(!!errors.verificationCode)} h-14 text-center font-mono text-2xl tracking-[0.5em]`}
+          placeholder="000000"
+          value={verificationCode}
+          onChange={e => {
+            setVerificationCode(e.target.value.replace(/\D/g, ''))
+            setErrors(prev => ({ ...prev, verificationCode: '' }))
+          }}
+        />
+      </Field>
+
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-2 text-sm">
+        <button
+          type="button"
+          onClick={sendVerificationCode}
+          disabled={isLoading || resendIn > 0}
+          className="font-semibold text-brand-700 disabled:text-ink-400"
+        >
+          {resendIn > 0 ? `Resend code in ${resendIn}s` : 'Resend code'}
+        </button>
+        <button type="button" onClick={handleBack} className="font-semibold text-ink-500 hover:text-ink-700">
+          Wrong email? Change it
+        </button>
       </div>
-      
-      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-6">
-        <div className="flex items-start space-x-4">
-          <div className="flex-shrink-0">
-            <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-              <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            </div>
-          </div>
-          <div className="flex-1">
-            <h4 className="text-lg font-semibold text-blue-900 mb-2">
-              Device Setup Instructions
-            </h4>
-            <p className="text-blue-700 mb-4">
-              You'll need your Tipwave device ID to complete this step. This is typically found on the device itself or in the device documentation.
-            </p>
-            <div className="space-y-3">
-              <div className="flex items-center space-x-3">
-                <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                <span className="text-blue-800">Locate your device ID (usually a UUID)</span>
-              </div>
-              <div className="flex items-center space-x-3">
-                <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                <span className="text-blue-800">Give your device a memorable nickname</span>
-              </div>
-              <div className="flex items-center space-x-3">
-                <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                <span className="text-blue-800">We'll generate a QR code for your audience</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-      
-      <div className="space-y-6">
-        <div className="space-y-2">
-          <label htmlFor="serialNumber" className="block text-sm font-semibold text-gray-700">
-            Serial Number *
-          </label>
+      <p className="mt-3 text-sm text-ink-500">Can't find it? Check your spam folder. The code expires in 5 minutes.</p>
+    </div>
+  )
+
+  const renderDevice = () => (
+    <div>
+      {renderStepHeading('Add your device', 'Enter the serial number printed on your Tipwave device.')}
+
+      <div className="space-y-5">
+        <Field
+          id="serialNumber"
+          label="Serial number"
+          error={errors.serialNumber}
+          hint={
+            deviceValidationComplete && !errors.serialNumber && formData.serialNumber.trim()
+              ? undefined
+              : 'It looks like TPY-5C07-K73 and is on the back of the device.'
+          }
+        >
           <div className="relative">
             <input
-              type="text"
               id="serialNumber"
               name="serialNumber"
-              required
-              className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all duration-200 ${
-                errors.serialNumber ? 'border-red-500 focus:ring-red-200' : 'border-gray-300'
-              }`}
-              placeholder="e.g., TPY-5C07-K73"
+              autoCapitalize="characters"
+              autoCorrect="off"
+              spellCheck={false}
+              className={`${inputClass(!!errors.serialNumber)} pr-11 uppercase placeholder:normal-case`}
+              placeholder="TPY-5C07-K73"
               value={formData.serialNumber}
               onChange={handleInputChange}
               onBlur={async () => {
@@ -1225,478 +861,268 @@ Please use a different serial number or contact support if this is your device.`
                 }
               }}
             />
-            {isValidatingDevice && (
-              <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
-                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-primary-600"></div>
-              </div>
-            )}
+            <div className="absolute inset-y-0 right-3 flex items-center">
+              {isValidatingDevice && (
+                <span className="h-5 w-5 animate-spin rounded-full border-2 border-brand-600 border-t-transparent" />
+              )}
+              {!isValidatingDevice && deviceValidationComplete && !errors.serialNumber && formData.serialNumber.trim() && (
+                <BrandIcon name="check-circle" size={22} color="#15803D" />
+              )}
+            </div>
           </div>
-          {errors.serialNumber && <p className="text-red-500 text-xs mt-1">{errors.serialNumber}</p>}
           {deviceValidationComplete && !errors.serialNumber && formData.serialNumber.trim() && (
-            <p className="text-green-500 text-xs mt-1">✓ Serial Number validated successfully</p>
+            <p className="mt-1.5 text-sm text-green-700">Device found</p>
           )}
-          <p className="text-sm text-gray-500 mt-1">
-            Enter the serial number from your Tipwave device (e.g., TPY-5C07-K73)
-          </p>
-        </div>
-        
-        <div className="space-y-2">
-          <label htmlFor="deviceNickname" className="block text-sm font-semibold text-gray-700">
-            Device Nickname
-          </label>
+        </Field>
+
+        {deviceConflict && (
+          <Banner tone="warning" title="This serial number is already registered">
+            {deviceConflict}
+          </Banner>
+        )}
+
+        <Field id="deviceNickname" label="Nickname" optional hint="Helps you tell devices apart, like Main stage or Bar counter.">
           <input
-            type="text"
             id="deviceNickname"
             name="deviceNickname"
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all duration-200"
-            placeholder="e.g., Main Stage, Bar Counter, etc."
+            className={inputClass(false)}
+            placeholder="Main stage"
             value={formData.deviceNickname}
             onChange={handleInputChange}
           />
-          {errors.deviceNickname && <p className="text-red-500 text-xs mt-1">{errors.deviceNickname}</p>}
-          <p className="text-sm text-gray-500">A friendly name to help you identify this device</p>
-        </div>
-        
-        <div className="space-y-3">
-          <label className="block text-sm font-semibold text-gray-700">
-            Would you like to enable song requests from your audience? *
-          </label>
-          <p className="text-sm text-gray-500 mb-4">
-            If you select "Yes", you'll be able to create a song catalog for your audience to choose from once you're logged in. This allows your audience to request specific songs when they tip you.
-          </p>
-          <div className="space-y-3">
-            <label className="flex items-center cursor-pointer p-4 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
-              <input
-                type="radio"
-                name="isAllowSongRequest"
-                checked={formData.isAllowSongRequest === true}
-                onChange={() => setFormData(prev => ({ ...prev, isAllowSongRequest: true }))}
-                className="mr-4 h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300"
-              />
-              <div>
-                <span className="text-sm font-medium text-gray-700">Yes, enable song requests</span>
-                <p className="text-xs text-gray-500 mt-1">Your audience can request songs when they tip</p>
-              </div>
-            </label>
-            <label className="flex items-center cursor-pointer p-4 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
-              <input
-                type="radio"
-                name="isAllowSongRequest"
-                checked={formData.isAllowSongRequest === false}
-                onChange={() => setFormData(prev => ({ ...prev, isAllowSongRequest: false }))}
-                className="mr-4 h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300"
-              />
-              <div>
-                <span className="text-sm font-medium text-gray-700">No, disable song requests</span>
-                <p className="text-xs text-gray-500 mt-1">Standard tipping without song requests</p>
-              </div>
-            </label>
+        </Field>
+
+        <div className="flex items-center justify-between gap-4 rounded-2xl border border-slate-200 p-4">
+          <div className="flex items-center gap-3">
+            <IconTile name="music" size={40} />
+            <div>
+              <div className="font-semibold text-ink-900">Let people request songs</div>
+              <div className="text-sm text-ink-500">Fans can pick a song when they tip. You can change this any time.</div>
+            </div>
           </div>
-          {errors.isAllowSongRequest && <p className="text-red-500 text-xs mt-1">{errors.isAllowSongRequest}</p>}
+          <button
+            type="button"
+            role="switch"
+            aria-checked={formData.isAllowSongRequest}
+            aria-label="Let people request songs"
+            onClick={() => setFormData(prev => ({ ...prev, isAllowSongRequest: !prev.isAllowSongRequest }))}
+            className={`relative h-7 w-12 shrink-0 rounded-full transition-colors ${formData.isAllowSongRequest ? 'bg-brand-700' : 'bg-slate-300'}`}
+          >
+            <span
+              className={`absolute top-0.5 h-6 w-6 rounded-full bg-white shadow transition-all ${formData.isAllowSongRequest ? 'left-[22px]' : 'left-0.5'}`}
+            />
+          </button>
         </div>
       </div>
     </div>
   )
 
-  const renderStep5 = () => (
-    <div className="space-y-8">
-      <div className="text-center">
-        <div className="text-6xl mb-4">🔐</div>
-        <h3 className="text-2xl font-bold text-gray-900 mb-2">KYC Verification</h3>
-        <p className="text-gray-600">Complete identity verification with Stripe to receive payments</p>
-      </div>
+  const renderPayouts = () => (
+    <div>
+      {renderStepHeading('Get paid', 'Stripe handles payouts. They will ask you to verify who you are.')}
 
-      {/* General Error Message Display */}
       {errors.general && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-center space-x-3">
-          <svg className="w-5 h-5 text-red-600" fill="currentColor" viewBox="0 0 20 20">
-            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-          </svg>
-          <p className="text-red-800 text-sm font-medium">{errors.general}</p>
-        </div>
+        <Banner
+          tone="error"
+          title="We couldn't start identity verification"
+          className="mb-5"
+          action={
+            <Button size="sm" variant="secondary" onClick={startKYC} loading={isLoading}>
+              Try again
+            </Button>
+          }
+        >
+          {errors.general}
+        </Banner>
       )}
 
       {showKycSupportActions && (
-        <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 space-y-3">
-          <p className="text-amber-900 text-sm font-medium">
-            Please call Tipwave Support for help completing Stripe verification. You can return to the login page and continue later.
-          </p>
-          <button
-            onClick={() => navigate('/login')}
-            className="px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-colors"
-          >
-            Return to Login
-          </button>
-        </div>
+        <Banner
+          tone="warning"
+          title="Need a hand?"
+          className="mb-5"
+          action={
+            <Button size="sm" variant="secondary" onClick={() => navigate('/login')}>
+              Back to sign in
+            </Button>
+          }
+        >
+          Call Tipwave Support to finish verification. You can sign in later and pick up where you left off.
+        </Banner>
       )}
-      
-      <div className="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-xl p-6">
-        <div className="flex items-start space-x-4">
-          <div className="flex-shrink-0">
-            <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
-              <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            </div>
-          </div>
-          <div className="flex-1">
-            <h4 className="text-lg font-semibold text-green-900 mb-2">
-              Stripe Connect KYC Process
-            </h4>
-            <p className="text-green-700 mb-4">
-              To comply with financial regulations and ensure secure transactions, we need to verify your identity through Stripe Connect. 
-              This process is quick, secure, and required to receive payments.
-            </p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="bg-white rounded-lg p-3 border border-green-200">
-                <div className="flex items-center space-x-2">
-                  <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                  <span className="text-sm font-medium text-green-800">Government ID verification</span>
-                </div>
-              </div>
-              <div className="bg-white rounded-lg p-3 border border-green-200">
-                <div className="flex items-center space-x-2">
-                  <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                  <span className="text-sm font-medium text-green-800">Address verification</span>
-                </div>
-              </div>
-              <div className="bg-white rounded-lg p-3 border border-green-200">
-                <div className="flex items-center space-x-2">
-                  <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                  <span className="text-sm font-medium text-green-800">Business verification</span>
-                </div>
-              </div>
-              <div className="bg-white rounded-lg p-3 border border-green-200">
-                <div className="flex items-center space-x-2">
-                  <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                  <span className="text-sm font-medium text-green-800">Secure payment processing</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-      
-      <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4">
-        <div className="flex items-center space-x-3">
-          <div className="flex-shrink-0">
-            <svg className="w-5 h-5 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-          </div>
-          <p className="text-yellow-800 text-sm">
-            <strong>Note:</strong> You'll complete your identity verification through Stripe's secure platform. 
-            This is required to receive tips and payouts. Click the button below to get started.
-          </p>
-        </div>
-      </div>
 
-      {/* Help: Troubleshooting Stripe verification (hCaptcha) */}
-      <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
-        <div className="flex items-start space-x-3">
-          <div className="flex-shrink-0">
-            <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-          </div>
-          <div>
-            <p className="text-blue-900 text-sm font-medium">Having trouble opening Stripe or passing the verification challenge?</p>
-            <ul className="mt-2 text-blue-800 text-sm list-disc pl-5 space-y-1">
-              <li>Use a non-disposable email and try an Incognito/Private window</li>
-              <li>Temporarily disable ad/tracker blockers and allow third‑party cookies for stripe.com and hcaptcha.com</li>
-              <li>Turn off VPN/Private Relay and try a different network if possible</li>
-              <li>On iPhone Safari, temporarily disable “Prevent Cross‑Site Tracking” in Settings → Safari</li>
-            </ul>
-          </div>
-        </div>
-      </div>
+      <ul className="space-y-3">
+        {[
+          { icon: 'id-card' as BrandIconName, text: 'A government photo ID' },
+          { icon: 'home' as BrandIconName, text: 'Your home address' },
+          { icon: 'bank' as BrandIconName, text: 'The bank account where payouts go' }
+        ].map(item => (
+          <li key={item.text} className="flex items-center gap-3 rounded-2xl border border-slate-200 p-3">
+            <IconTile name={item.icon} size={36} />
+            <span className="font-medium text-ink-900">{item.text}</span>
+          </li>
+        ))}
+      </ul>
+      <p className="mt-4 text-sm text-ink-500">It takes about 3 minutes. Your details go to Stripe, not Tipwave.</p>
+
+      <details className="mt-5 rounded-xl border border-slate-200 px-4 py-3">
+        <summary className="cursor-pointer text-sm font-semibold text-ink-700">Trouble opening Stripe?</summary>
+        <ul className="mt-3 list-disc space-y-1 pl-5 text-sm text-ink-700">
+          <li>Try a private or incognito window</li>
+          <li>Turn off ad blockers, VPN and iCloud Private Relay</li>
+          <li>On iPhone, turn off Settings → Safari → Prevent Cross-Site Tracking for now</li>
+        </ul>
+      </details>
     </div>
   )
 
-  const renderStep6 = () => (
-    <div className="space-y-8">
-      <div className="text-center">
-        <div className="text-6xl mb-4">✅</div>
-        <h3 className="text-2xl font-bold text-gray-900 mb-2">Setup Complete!</h3>
-        <p className="text-gray-600">You're all set to start accepting tips</p>
+  const renderFinish = () => (
+    <div className="text-center">
+      <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-brand-50">
+        <BrandIcon name="check-circle" size={34} />
       </div>
-      
-      <div className="bg-gradient-to-r from-purple-50 to-pink-50 border border-purple-200 rounded-xl p-6">
-        <div className="flex items-start space-x-4">
-          <div className="flex-shrink-0">
-            <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center">
-              <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
-              </svg>
-            </div>
-          </div>
-          <div className="flex-1">
-            <h4 className="text-lg font-semibold text-purple-900 mb-2">
-              Welcome to Tipwave!
-            </h4>
-            <p className="text-purple-700 mb-4">
-              Your account is now fully set up and ready to accept tips. You can access your dashboard to view analytics, 
-              manage your devices, and download QR codes for your audience.
-            </p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="bg-white rounded-lg p-3 border border-purple-200">
-                <div className="flex items-center space-x-2">
-                  <svg className="w-4 h-4 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                  <span className="text-sm font-medium text-purple-800">View your dashboard</span>
-                </div>
-              </div>
-              <div className="bg-white rounded-lg p-3 border border-purple-200">
-                <div className="flex items-center space-x-2">
-                  <svg className="w-4 h-4 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                  <span className="text-sm font-medium text-purple-800">Download QR codes</span>
-                </div>
-              </div>
-              <div className="bg-white rounded-lg p-3 border border-purple-200">
-                <div className="flex items-center space-x-2">
-                  <svg className="w-4 h-4 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                  <span className="text-sm font-medium text-purple-800">Manage devices</span>
-                </div>
-              </div>
-              <div className="bg-white rounded-lg p-3 border border-purple-200">
-                <div className="flex items-center space-x-2">
-                  <svg className="w-4 h-4 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                  <span className="text-sm font-medium text-purple-800">Track earnings</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
+      <h2 className="text-2xl font-bold text-ink-900">You're all set</h2>
+      <p className="mt-1 text-ink-500">Your device is ready to take tips.</p>
     </div>
   )
 
   const renderCurrentStep = () => {
     switch (step) {
       case 1:
-        return renderStep1()
+        return renderAccount()
       case 2:
-        return renderStep2()
+        return renderVerify()
       case 3:
-        return renderStep3()
+        return renderDevice()
       case 4:
-        return renderStep4()
-      case 5:
-        return renderStep5()
-      case 6:
-        return renderStep6()
+        return renderPayouts()
       default:
-        return renderStep1()
+        return renderFinish()
     }
   }
 
-  const getNextStepInfo = () => {
-    if (step < 5) {
-      return steps[step]
-    }
-    return null
-  }
+  const primaryLabel =
+    step === 1 ? 'Create account' : step === 2 ? 'Verify' : step === 3 ? 'Add device' : step === 4 ? 'Verify identity with Stripe' : 'Go to your portal'
+
+  const primaryDisabled =
+    isLoading ||
+    (step === 2 && verificationCode.length < 6) ||
+    (step === 3 && (isValidatingDevice || !formData.serialNumber.trim()))
+
+  const onPrimary = step === 4 ? startKYC : step === FINISH_STEP ? handleSubmit : handleNext
 
   if (!apiKeyGenerated) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Initializing secure connection...</p>
-        </div>
-      </div>
+      <PageLoader label="Setting things up…" themed={false} />
     )
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
-      <div className="max-w-4xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
-        {/* Header */}
-        <div className="text-center mb-12">
-          <div className="mx-auto w-36 h-36 overflow-visible rounded-2xl mb-6">
-            <img 
-              src="/images/logo/tipwave-logo2b.png" 
-              alt="Tipwave Logo" 
-              className="w-full h-full object-contain"
-              style={{ transform: 'scale(1.25)', objectPosition: 'center' }}
-            />
-          </div>
-          <h1 className="text-4xl font-bold text-gray-900 mb-4">
-            Welcome to Tipwave
-          </h1>
-          <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-            Let's get you set up to start accepting tips in just a few minutes
-          </p>
-        </div>
+    <div className="min-h-screen bg-surface">
+      <div className="mx-auto max-w-4xl px-4 pb-10 pt-6 sm:px-6 lg:px-8">
+        <header className="mb-6 flex items-center justify-between">
+          <img src="/images/logo/tipwave-logo-v2.png" alt="Tipwave" className="h-10 w-auto" />
+          <button onClick={() => navigate('/login')} className="text-sm font-semibold text-brand-700">
+            Sign in
+          </button>
+        </header>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Progress Sidebar */}
-          <div className="lg:col-span-1">
-            <div className="bg-white rounded-2xl shadow-lg p-6 sticky top-8">
-              <h3 className="text-lg font-semibold text-gray-900 mb-6">Setup Progress</h3>
-              <div className="space-y-4">
-                {steps.map((stepInfo) => (
-                  <div key={stepInfo.id} className="flex items-center space-x-4">
-                    <div className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center text-lg font-medium transition-all duration-200 ${
-                      stepInfo.id < step
-                        ? 'bg-green-100 text-green-600'
-                        : stepInfo.id === step
-                        ? 'bg-primary-100 text-primary-600'
-                        : 'bg-gray-100 text-gray-400'
-                    }`}>
-                      {stepInfo.id < step ? '✓' : stepInfo.icon}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className={`text-sm font-medium ${
-                        stepInfo.id <= step ? 'text-gray-900' : 'text-gray-500'
-                      }`}>
-                        {stepInfo.title}
-                      </p>
-                      <p className={`text-xs ${
-                        stepInfo.id <= step ? 'text-gray-600' : 'text-gray-400'
-                      }`}>
-                        {stepInfo.subtitle}
-                      </p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-              
-              {/* Progress bar */}
-              <div className="mt-6">
-                <div className="flex justify-between text-xs text-gray-500 mb-2">
-                  <span>Progress</span>
-                  <span>{Math.round((step / 6) * 100)}%</span>
-                </div>
-                <div className="w-full bg-gray-200 rounded-full h-2">
-                  <div 
-                    className="bg-gradient-to-r from-primary-500 to-primary-600 h-2 rounded-full transition-all duration-500"
-                    style={{ width: `${(step / 6) * 100}%` }}
-                  ></div>
-                </div>
-              </div>
+        {step === 1 && (
+          <div className="mb-6">
+            <h1 className="text-3xl font-bold text-ink-900">Set up Tipwave</h1>
+            <p className="mt-1 text-ink-500">About 5 minutes. You'll need your device and a photo ID.</p>
+          </div>
+        )}
+
+        {/* Phones: a slim progress bar */}
+        {step <= STEPS.length && (
+          <div className="mb-4 lg:hidden">
+            <div className="mb-1.5 flex justify-between text-sm">
+              <span className="font-semibold text-ink-900">{STEPS[step - 1].title}</span>
+              <span className="text-ink-500">
+                Step {step} of {STEPS.length}
+              </span>
+            </div>
+            <div className="h-1.5 w-full rounded-full bg-slate-200">
+              <div
+                className="h-1.5 rounded-full bg-brand-600 transition-all duration-300"
+                style={{ width: `${(step / STEPS.length) * 100}%` }}
+              />
             </div>
           </div>
+        )}
 
-          {/* Main Content */}
-          <div className="lg:col-span-2">
-            <div className="bg-white rounded-2xl shadow-lg p-8">
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+          {/* Desktop: the step list */}
+          <aside className="hidden lg:block">
+            <ol className="sticky top-6 space-y-5 rounded-2xl bg-white p-6 shadow-card">
+              {STEPS.map(s => (
+                <li key={s.id} className="flex items-center gap-3">
+                  <IconTile name={s.icon} size={40} state={s.id < step ? 'done' : s.id === step ? 'current' : 'upcoming'} />
+                  <div className="min-w-0">
+                    <p className={`text-sm font-semibold ${s.id <= step ? 'text-ink-900' : 'text-ink-500'}`}>{s.title}</p>
+                    <p className="text-xs text-ink-500">{s.subtitle}</p>
+                  </div>
+                </li>
+              ))}
+            </ol>
+          </aside>
+
+          <main className="lg:col-span-2">
+            <div className="rounded-2xl bg-white p-6 shadow-card sm:p-8">
               {renderCurrentStep()}
 
-              {/* Next Step Preview */}
-              {getNextStepInfo() && (
-                <div className="mt-8 p-4 bg-blue-50 border border-blue-200 rounded-xl">
-                  <div className="flex items-center space-x-3">
-                    <div className="text-2xl">{getNextStepInfo()?.icon}</div>
-                    <div>
-                      <p className="text-sm font-medium text-blue-900">
-                        Next: {getNextStepInfo()?.title}
-                      </p>
-                      <p className="text-xs text-blue-700">
-                        {getNextStepInfo()?.description}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Navigation */}
-              <div className="flex justify-between items-center mt-8 pt-6 border-t border-gray-200">
-                <button
-                  type="button"
-                  onClick={handleBack}
-                  disabled={step === 1}
-                  className="px-6 py-3 text-gray-600 hover:text-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
-                >
-                  ← Back
-                </button>
-                <button
-                  type="button"
-                  onClick={step === 5 ? startKYC : handleNext}
-                  disabled={isLoading || 
-                    (step === 3 && (!verificationCode.trim() || !!errors.verificationCode)) ||
-                    (step === 4 && (isValidatingDevice || !deviceValidationComplete || !!errors.serialNumber))
-                  }
-                  className="px-8 py-3 bg-gradient-to-r from-primary-600 to-primary-700 text-white font-medium rounded-lg hover:from-primary-700 hover:to-primary-800 focus:ring-4 focus:ring-primary-200 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {isLoading ? (
-                    <div className="flex items-center space-x-2">
-                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                      <span>Processing...</span>
-                    </div>
-                  ) : step === 6 ? (
-                    'Go to Dashboard'
-                  ) : step === 5 ? (
-                    'Start Stripe Verification'
-                  ) : (
-                    'Continue'
-                  )}
-                </button>
+              <div className="mt-8 flex flex-col-reverse gap-3 border-t border-slate-100 pt-6 sm:flex-row sm:items-center sm:justify-between">
+                {step > 1 && step <= STEPS.length && step !== 2 ? (
+                  <Button variant="ghost" onClick={handleBack} icon="chevron-left" disabled={isLoading}>
+                    Back
+                  </Button>
+                ) : (
+                  <span />
+                )}
+                <Button size="lg" onClick={onPrimary} disabled={primaryDisabled} loading={isLoading}>
+                  {primaryLabel}
+                </Button>
               </div>
             </div>
-          </div>
-        </div>
-
-      {onboardingUrl && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="bg-white rounded-2xl shadow-xl p-6 max-w-md w-full mx-4">
-            <h3 className="text-xl font-semibold text-gray-900">Open Stripe Verification</h3>
-            <p className="text-gray-600 mt-2">
-              We’ll open Stripe in a new tab to avoid iOS restrictions that can block the verification challenge (hCaptcha).
-            </p>
-            <div className="mt-5 space-y-3">
-              <a
-                href={onboardingUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="block w-full text-center px-4 py-3 rounded-lg bg-primary-600 text-white hover:bg-primary-700"
-              >
-                Open in new tab
-              </a>
-              <button
-                onClick={() => { if (onboardingUrl) window.location.href = onboardingUrl }}
-                className="w-full px-4 py-3 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50"
-              >
-                Continue here
-              </button>
-            </div>
-            <button
-              onClick={() => setOnboardingUrl(null)}
-              className="mt-4 text-sm text-gray-500 hover:text-gray-700"
-            >
-              Cancel
-            </button>
-          </div>
-        </div>
-      )}
-
-        {/* Back to Login */}
-        <div className="mt-8 text-center">
-          <button
-            onClick={() => navigate('/login')}
-            className="text-primary-600 hover:text-primary-700 font-medium transition-colors duration-200"
-          >
-            ← Back to Sign In
-          </button>
+          </main>
         </div>
       </div>
+
+      <Modal
+        open={!!onboardingUrl}
+        title="Open Stripe verification"
+        onClose={() => setOnboardingUrl(null)}
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setOnboardingUrl(null)}>
+              Cancel
+            </Button>
+            <Button
+              variant="secondary"
+              onClick={() => {
+                if (onboardingUrl) window.location.href = onboardingUrl
+              }}
+            >
+              Continue here
+            </Button>
+            <a
+              href={onboardingUrl ?? '#'}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex h-11 items-center justify-center rounded-xl bg-brand-700 px-4 text-sm font-semibold text-white hover:bg-brand-800"
+            >
+              Open in new tab
+            </a>
+          </>
+        }
+      >
+        <p className="text-ink-700">
+          We recommend opening Stripe in a new tab. iPhones can block the security check when it opens inside this page.
+        </p>
+      </Modal>
     </div>
   )
 }
 
-export default Onboarding 
+export default Onboarding

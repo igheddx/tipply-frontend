@@ -1,7 +1,9 @@
 import logger from "../utils/logger";
-import React, { useState, useEffect, useRef } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { API_BASE_URL } from '../utils/config'
+import { BrandIcon } from './icons/BrandIcons'
+import { StatusChip } from './ui'
+import { usePortalTheme, useTheme } from '../theme/ThemeContext'
 
 interface SongRequest {
   songId: string
@@ -17,98 +19,205 @@ interface SongRequest {
   note?: string
 }
 
+type RequestStatus = SongRequest['status']
+
+interface MonitorDevice {
+  id: string
+  nickname?: string
+  isPaused?: boolean
+}
+
 interface SongRequestMonitorProps {
   profileId: string
   isVisible: boolean
   onClose: () => void
+  // Song-request-enabled devices, so the performer can pause/resume them from this screen
+  devices?: MonitorDevice[]
+  pausingDeviceId?: string | null
+  onTogglePause?: (deviceId: string) => void
+}
+
+const REFRESH_MS = 5000
+const requestKey = (r: SongRequest) => r.requestIds.join('-')
+
+// Three reading sizes, for a tablet on a stand a few feet away
+const SIZES = [
+  { title: 'text-xl', now: 'text-3xl md:text-4xl', artist: 'text-base', chip: 'text-sm' },
+  { title: 'text-2xl', now: 'text-4xl md:text-5xl', artist: 'text-lg', chip: 'text-base' },
+  { title: 'text-3xl', now: 'text-5xl md:text-6xl', artist: 'text-xl', chip: 'text-lg' }
+]
+
+const ago = (iso: string, now: number) => {
+  const mins = Math.max(0, Math.round((now - new Date(iso).getTime()) / 60000))
+  if (mins < 1) return 'just now'
+  if (mins < 60) return `${mins} min ago`
+  const h = Math.floor(mins / 60)
+  return `${h}h ${mins % 60}m ago`
+}
+
+const readPref = (key: string, fallback: string) => {
+  try {
+    return localStorage.getItem(key) ?? fallback
+  } catch {
+    return fallback
+  }
+}
+const writePref = (key: string, value: string) => {
+  try {
+    localStorage.setItem(key, value)
+  } catch {
+    /* preference just won't persist */
+  }
 }
 
 const SongRequestMonitor: React.FC<SongRequestMonitorProps> = ({
   profileId,
   isVisible,
-  onClose
+  onClose,
+  devices = [],
+  pausingDeviceId = null,
+  onTogglePause
 }) => {
   const [songRequests, setSongRequests] = useState<SongRequest[]>([])
   const [loading, setLoading] = useState(false)
+  const [loadFailed, setLoadFailed] = useState(false)
   const [updatingStatus, setUpdatingStatus] = useState<string | null>(null)
-  const [lastRefresh, setLastRefresh] = useState<Date>(new Date())
-  const refreshIntervalRef = useRef<number | null>(null)
+  const [now, setNow] = useState(() => Date.now())
+  const [sizeIdx, setSizeIdx] = useState(() => Math.min(2, Math.max(0, Number(readPref('monitor_size', '1')) || 1)))
+  const [chime, setChime] = useState(() => readPref('monitor_chime', 'off') === 'on')
+  const [showDone, setShowDone] = useState(false)
+  const [freshKeys, setFreshKeys] = useState<Set<string>>(new Set())
+  const [pauseDeviceId, setPauseDeviceId] = useState('')
+  const knownKeys = useRef<Set<string> | null>(null)
+  const chimeRef = useRef<HTMLAudioElement | null>(null)
+  const wakeLockRef = useRef<any>(null)
+  const pauseInitRef = useRef(false)
 
-  // Auto-refresh every 5 seconds for live updates
+  const size = SIZES[sizeIdx]
+  const { dark, className: themeClass } = usePortalTheme()
+  const { setPreference } = useTheme()
+
+  // One device: always selected. Several: the performer picks one first, unless some are paused.
+  const selectedPauseDevice = devices.length === 1 ? devices[0] : devices.find(d => d.id === pauseDeviceId)
+  const pausedCount = devices.filter(d => d.isPaused).length
+
+  // When the monitor opens with a paused device, preselect it so it can be resumed right away
   useEffect(() => {
-    if (isVisible) {
-      loadSongRequests()
-      
-      refreshIntervalRef.current = setInterval(() => {
-        loadSongRequests()
-        setLastRefresh(new Date())
-      }, 5000)
-      
-      return () => {
-        if (refreshIntervalRef.current) {
-          clearInterval(refreshIntervalRef.current)
-        }
-      }
+    if (!isVisible) {
+      pauseInitRef.current = false
+      setPauseDeviceId('')
+      return
     }
-  }, [isVisible, profileId])
-
-  // Prevent body scroll when visible
-  useEffect(() => {
-    if (isVisible) {
-      document.body.style.overflow = 'hidden'
-      return () => {
-        document.body.style.overflow = 'auto'
-      }
+    if (pauseInitRef.current) return
+    pauseInitRef.current = true
+    const paused = devices.filter(d => d.isPaused)
+    if (devices.length > 1 && paused.length > 0) {
+      setPauseDeviceId(paused[Math.floor(Math.random() * paused.length)].id)
     }
-  }, [isVisible])
+  }, [isVisible, devices])
 
-  const loadSongRequests = async () => {
+  const loadSongRequests = useCallback(async () => {
     if (!profileId) return
-    
     setLoading(true)
     try {
       const token = localStorage.getItem('token')
-      // Add cache-busting query parameter to ensure fresh data
-      const cacheBuster = Date.now()
-      const response = await fetch(`${API_BASE_URL}/api/SongCatalog/monitor/${profileId}?_t=${cacheBuster}`, {
+      const response = await fetch(`${API_BASE_URL}/api/SongCatalog/monitor/${profileId}?_t=${Date.now()}`, {
         method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
+        headers: { Authorization: `Bearer ${token}` }
       })
       if (response.ok) {
         const data = await response.json()
-        setSongRequests(data.songRequests || [])
+        const list: SongRequest[] = data.songRequests || []
+        setSongRequests(list)
+        setLoadFailed(false)
+
+        // Highlight (and optionally chime for) requests that were not there on the previous refresh
+        const keys = new Set(list.filter(r => r.status === 'pending').map(requestKey))
+        if (knownKeys.current) {
+          const added = [...keys].filter(k => !knownKeys.current!.has(k))
+          if (added.length > 0) {
+            setFreshKeys(prev => new Set([...prev, ...added]))
+            window.setTimeout(() => setFreshKeys(prev => new Set([...prev].filter(k => !added.includes(k)))), 6000)
+            if (chimeRef.current && readPref('monitor_chime', 'off') === 'on') {
+              chimeRef.current.currentTime = 0
+              chimeRef.current.play().catch(() => undefined)
+            }
+          }
+        }
+        knownKeys.current = keys
       } else {
-        const errorText = await response.text()
-        logger.error(`🔴 [Monitor] Failed to load song requests: ${response.status} ${response.statusText}`, errorText)
+        setLoadFailed(true)
+        logger.error(`[Monitor] Failed to load song requests: ${response.status} ${response.statusText}`)
       }
     } catch (error) {
-      logger.error('🔴 [Monitor] Error loading song requests:', error)
+      setLoadFailed(true)
+      logger.error('[Monitor] Error loading song requests:', error)
     } finally {
       setLoading(false)
     }
-  }
+  }, [profileId])
 
-  const updateSongStatus = async (request: SongRequest, newStatus: 'pending' | 'performing' | 'completed' | 'cancelled' | 'skipped') => {
-    const requestKey = request.requestIds.join('-')
-    setUpdatingStatus(requestKey)
-    
+  // Live updates while open, plus a clock for the "x min ago" labels
+  useEffect(() => {
+    if (!isVisible) {
+      knownKeys.current = null
+      return
+    }
+    loadSongRequests()
+    const refresh = window.setInterval(loadSongRequests, REFRESH_MS)
+    const tick = window.setInterval(() => setNow(Date.now()), 30000)
+    return () => {
+      window.clearInterval(refresh)
+      window.clearInterval(tick)
+    }
+  }, [isVisible, loadSongRequests])
+
+  // Stop the tablet from dimming or locking while the monitor is up on stage
+  useEffect(() => {
+    if (!isVisible) return
+    let cancelled = false
+    const acquire = async () => {
+      try {
+        const lock = await (navigator as any).wakeLock?.request('screen')
+        if (cancelled) {
+          lock?.release()
+        } else {
+          wakeLockRef.current = lock
+        }
+      } catch {
+        /* not supported or denied: the screen may dim, nothing else breaks */
+      }
+    }
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') acquire()
+    }
+    acquire()
+    document.addEventListener('visibilitychange', onVisible)
+    return () => {
+      cancelled = true
+      document.removeEventListener('visibilitychange', onVisible)
+      wakeLockRef.current?.release?.()
+      wakeLockRef.current = null
+    }
+  }, [isVisible])
+
+  // Prevent the page behind from scrolling
+  useEffect(() => {
+    if (!isVisible) return
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.body.style.overflow = 'auto'
+    }
+  }, [isVisible])
+
+  const updateSongStatus = async (request: SongRequest, newStatus: RequestStatus) => {
+    const key = requestKey(request)
+    setUpdatingStatus(key)
     try {
-      logger.log('Updating song status:', { 
-        songId: request.songId, 
-        status: newStatus, 
-        requestIds: request.requestIds,
-        profileId 
-      })
-      
       const token = localStorage.getItem('token')
       const response = await fetch(`${API_BASE_URL}/api/SongCatalog/monitor/update-status`, {
         method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({
           profileId,
           songId: request.songId,
@@ -117,26 +226,12 @@ const SongRequestMonitor: React.FC<SongRequestMonitorProps> = ({
         })
       })
 
-      logger.log('Response status:', response.status, response.statusText)
-
       if (response.ok) {
-        const result = await response.json()
-        logger.log('Update successful:', result)
-        
-        // Update local state immediately for responsive UI
-        setSongRequests(prev => prev.map(r => 
-          r.requestIds.join('-') === request.requestIds.join('-')
-            ? { ...r, status: newStatus }
-            : r
-        ))
-        
-        // Refresh to get latest data
-        setTimeout(() => {
-          loadSongRequests()
-        }, 1000)
+        // Update immediately so the screen feels instant, then confirm with the server
+        setSongRequests(prev => prev.map(r => (requestKey(r) === key ? { ...r, status: newStatus } : r)))
+        window.setTimeout(loadSongRequests, 1000)
       } else {
-        const errorText = await response.text()
-        logger.error('Failed to update status:', response.status, errorText)
+        logger.error('Failed to update status:', response.status, await response.text())
       }
     } catch (error) {
       logger.error('Error updating song status:', error)
@@ -145,253 +240,286 @@ const SongRequestMonitor: React.FC<SongRequestMonitorProps> = ({
     }
   }
 
-  // Sort requests: performing at the top, then pending by tip amount (highest first), then completed
-  const sortedRequests = [...songRequests].sort((a, b) => {
-    const statusOrder = { performing: 0, pending: 1, completed: 2, cancelled: 3, skipped: 4 }
-    
-    if (statusOrder[a.status] !== statusOrder[b.status]) {
-      return statusOrder[a.status] - statusOrder[b.status]
-    }
-    
-    // For same status, sort by tip amount (highest first)
-    if (a.totalTipAmount !== b.totalTipAmount) {
-      return b.totalTipAmount - a.totalTipAmount
-    }
-    
-    return new Date(a.firstRequestTime).getTime() - new Date(b.firstRequestTime).getTime()
-  })
+  const changeSize = (delta: number) => {
+    const next = Math.min(2, Math.max(0, sizeIdx + delta))
+    setSizeIdx(next)
+    writePref('monitor_size', String(next))
+  }
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'completed': return 'bg-green-50 border-green-200 text-green-800'
-      case 'performing': return 'bg-blue-50 border-blue-200 text-blue-800'
-      case 'cancelled': return 'bg-gray-50 border-gray-200 text-gray-800'
-      case 'skipped': return 'bg-red-50 border-red-200 text-red-800'
-      default: return 'bg-yellow-50 border-yellow-200 text-yellow-800'
+  const toggleChime = () => {
+    const next = !chime
+    setChime(next)
+    writePref('monitor_chime', next ? 'on' : 'off')
+    // Playing once on enabling both previews the sound and satisfies the browser's autoplay rule
+    if (next && chimeRef.current) {
+      chimeRef.current.currentTime = 0
+      chimeRef.current.play().catch(() => undefined)
     }
   }
 
-  const getStatusBadgeColor = (status: string) => {
-    switch (status) {
-      case 'completed': return 'bg-green-100 text-green-800'
-      case 'performing': return 'bg-blue-100 text-blue-800'
-      case 'cancelled': return 'bg-gray-100 text-gray-800'
-      case 'skipped': return 'bg-red-100 text-red-800'
-      default: return 'bg-yellow-100 text-yellow-800'
-    }
-  }
+  if (!isVisible) return null
+
+  // Playing first, then waiting by tip (highest first) and age, then everything finished
+  const byTipThenAge = (a: SongRequest, b: SongRequest) =>
+    b.totalTipAmount - a.totalTipAmount || new Date(a.firstRequestTime).getTime() - new Date(b.firstRequestTime).getTime()
+  const performing = songRequests.filter(r => r.status === 'performing').sort(byTipThenAge)
+  const pending = songRequests.filter(r => r.status === 'pending').sort(byTipThenAge)
+  const done = songRequests
+    .filter(r => r.status === 'completed' || r.status === 'skipped' || r.status === 'cancelled')
+    .sort((a, b) => new Date(b.lastRequestTime).getTime() - new Date(a.lastRequestTime).getTime())
+
+  const btn =
+    'inline-flex h-14 items-center justify-center gap-2 rounded-2xl px-6 text-lg font-bold transition-colors active:scale-[0.98] disabled:opacity-50'
+  const sectionLabel = 'mb-3 flex items-center gap-2 text-sm font-bold uppercase tracking-wider text-brand-700'
+  const soft = 'inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-slate-100 px-4 text-sm font-semibold text-ink-700 hover:bg-slate-200 disabled:opacity-50'
+
+  const Note = ({ r }: { r: SongRequest }) =>
+    r.requestorName || r.note ? (
+      <div className="mt-3 rounded-xl bg-slate-50 px-4 py-3 text-ink-700">
+        {r.requestorName && (
+          <div className="flex items-center gap-2 font-semibold text-ink-900">
+            <BrandIcon name="user" size={16} />
+            {r.requestorName}
+          </div>
+        )}
+        {r.note && <div className={`${r.requestorName ? 'mt-1' : ''} leading-snug`}>{r.note}</div>}
+      </div>
+    ) : null
+
+  const TipBadge = ({ r }: { r: SongRequest }) => (
+    <span className={`inline-flex items-center rounded-full bg-accent-500 px-3 py-1 font-bold text-white ${size.chip}`}>
+      ${r.totalTipAmount.toFixed(2)}
+      {r.requestCount > 1 && <span className="ml-2 font-semibold text-white/85">· {r.requestCount} requests</span>}
+    </span>
+  )
 
   return (
-    <AnimatePresence>
-      {isVisible && (
-        <motion.div
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          exit={{ opacity: 0, scale: 0.95 }}
-          transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-          className="fixed inset-0 bg-gradient-to-br from-gray-50 to-blue-50 z-50 flex flex-col"
-        >
-          {/* Header */}
-          <div className="bg-white/90 backdrop-blur-sm shadow-sm border-b border-gray-200">
-            <div className="px-6 py-4">
-              <div className="flex items-center justify-between mb-4">
-                <motion.button
-                  whileTap={{ scale: 0.95 }}
-                  onClick={onClose}
-                  className="flex items-center space-x-2 text-gray-600 hover:text-gray-800 transition-colors"
+    <div
+      className={`fixed inset-0 z-50 flex flex-col bg-surface text-ink-900 ${themeClass}`}
+      style={{ paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}
+      role="dialog"
+      aria-label="Live song requests"
+    >
+      <audio ref={chimeRef} src="/cash-register.mp3" preload="auto" />
+
+      {/* Top bar: kept slim so the queue gets the screen, and usable in a narrow side window */}
+      <header className="flex flex-none flex-wrap items-center gap-x-3 gap-y-2 border-b border-slate-200 bg-white px-4 py-3">
+        <button onClick={onClose} className={`${soft} pl-2`} aria-label="Close live requests">
+          <BrandIcon name="chevron-left" size={20} tone="current" />
+          Close
+        </button>
+
+        <div className="mr-auto flex items-center gap-2">
+          <h1 className="text-lg font-bold">Live requests</h1>
+          <span
+            className={`flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${loadFailed ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-ink-700'}`}
+            role="status"
+          >
+            <span className={`h-2 w-2 rounded-full ${loadFailed ? 'bg-amber-400' : 'animate-pulse bg-emerald-500'}`} />
+            {loadFailed ? 'Reconnecting…' : loading && songRequests.length === 0 ? 'Loading…' : 'Live'}
+          </span>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          {onTogglePause && devices.length > 0 && (
+            <div className="flex items-center gap-2">
+              {devices.length > 1 && (
+                <select
+                  value={selectedPauseDevice?.id ?? ''}
+                  onChange={e => setPauseDeviceId(e.target.value)}
+                  className="h-11 rounded-xl border border-slate-300 bg-white px-3 text-sm font-semibold text-ink-900"
+                  aria-label="Choose a device to pause"
                 >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                  </svg>
-                  <span className="font-medium">Return to Dashboard</span>
-                </motion.button>
-
-                <div className="text-right">
-                  <div className="text-sm text-gray-500">Auto-refresh</div>
-                  <div className="font-semibold text-blue-600 text-xs">
-                    {lastRefresh.toLocaleTimeString()}
-                  </div>
-                </div>
-              </div>
-
-              <div className="text-center">
-                <h1 className="text-2xl font-bold text-gray-900 mb-2">
-                  🎵 Song Request Monitor
-                </h1>
-                <div className="flex items-center justify-center space-x-6 text-sm">
-                  <div className="flex items-center space-x-2">
-                    <div className="w-3 h-3 bg-yellow-400 rounded-full"></div>
-                    <span className="text-gray-600">
-                      Pending ({sortedRequests.filter(r => r.status === 'pending').length})
-                    </span>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <div className="w-3 h-3 bg-blue-400 rounded-full"></div>
-                    <span className="text-gray-600">
-                      Performing ({sortedRequests.filter(r => r.status === 'performing').length})
-                    </span>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <div className="w-3 h-3 bg-green-400 rounded-full"></div>
-                    <span className="text-gray-600">
-                      Completed ({sortedRequests.filter(r => r.status === 'completed').length})
-                    </span>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <div className="w-3 h-3 bg-gray-400 rounded-full"></div>
-                    <span className="text-gray-600">
-                      Cancelled ({sortedRequests.filter(r => r.status === 'cancelled').length})
-                    </span>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <div className="w-3 h-3 bg-red-400 rounded-full"></div>
-                    <span className="text-gray-600">
-                      Skipped ({sortedRequests.filter(r => r.status === 'skipped').length})
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Content */}
-          <div className="flex-1 overflow-auto">
-            <div className="p-6">
-              {loading && sortedRequests.length === 0 ? (
-                <div className="text-center py-16">
-                  <div className="w-8 h-8 border-4 border-purple-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-                  <p className="text-gray-600">Loading song requests...</p>
-                </div>
-              ) : sortedRequests.length === 0 ? (
-                <div className="text-center py-16">
-                  <div className="w-20 h-20 bg-gradient-to-br from-purple-100 to-blue-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                    <svg className="w-10 h-10 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
-                    </svg>
-                  </div>
-                  <h3 className="text-xl font-semibold text-gray-800 mb-2">No song requests today</h3>
-                  <p className="text-gray-600 max-w-sm mx-auto">
-                    Song requests will appear here when participants make them through the tip interface
-                  </p>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  <AnimatePresence>
-                    {sortedRequests.map((request, index) => {
-                      const requestKey = request.requestIds.join('-')
-                      return (
-                        <motion.div
-                          key={requestKey}
-                          initial={{ opacity: 0, y: 20 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          transition={{ delay: index * 0.05 }}
-                          className={`border rounded-xl shadow-sm overflow-hidden ${getStatusColor(request.status)}`}
-                        >
-                          <div className="p-6">
-                            <div className="flex items-start justify-between mb-4">
-                            <div className="flex-1">
-                              <h3 className="text-lg font-semibold text-gray-900 mb-1">
-                                {request.songTitle}
-                              </h3>
-                              <p className="text-gray-700 mb-3">by {request.artist}</p>
-                              
-                              <div className="flex items-center space-x-4 text-sm text-gray-600">
-                                <div className="flex items-center space-x-1">
-                                  <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
-                                  </svg>
-                                  <span className="font-semibold text-green-700">
-                                    ${request.totalTipAmount.toFixed(2)}
-                                  </span>
-                                </div>
-                                <div className="flex items-center space-x-1">
-                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-                                  </svg>
-                                  <span>{request.requestCount} request{request.requestCount > 1 ? 's' : ''}</span>
-                                </div>
-                                <div className="flex items-center space-x-1">
-                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                  </svg>
-                                  <span>{new Date(request.firstRequestTime).toLocaleTimeString()}</span>
-                                </div>
-                              </div>
-                            </div>
-                            
-                            <div className="flex flex-col items-end space-y-2">
-                              <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusBadgeColor(request.status)}`}>
-                                {request.status === 'completed' ? 'Completed' : 
-                                 request.status === 'performing' ? 'Performing' : 
-                                 request.status === 'cancelled' ? 'Cancelled' :
-                                 request.status === 'skipped' ? 'Skipped' : 'Pending'}
-                              </span>
-                            </div>
-                            </div>
-
-                            {/* Optional Requestor Info */}
-                            {(request.requestorName || request.note) && (
-                              <div className="mt-4 p-3 bg-gray-50 rounded-lg border border-gray-100">
-                                {request.requestorName && (
-                                  <div className="flex items-center space-x-2 mb-2">
-                                    <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                                    </svg>
-                                    <span className="text-sm font-medium text-gray-700">From: {request.requestorName}</span>
-                                  </div>
-                                )}
-                                {request.note && (
-                                  <div className="flex items-start space-x-2">
-                                    <svg className="w-4 h-4 text-gray-500 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
-                                    </svg>
-                                    <span className="text-sm text-gray-600 leading-relaxed">{request.note}</span>
-                                  </div>
-                                )}
-                              </div>
-                            )}
-
-                            {/* Action Buttons - Simplified Logic */}
-                            <div className="mt-4 flex justify-center">
-                            {request.status === 'pending' && (
-                              <motion.button
-                                onClick={() => updateSongStatus(request, 'performing')}
-                                disabled={updatingStatus === requestKey}
-                                className="bg-blue-500 hover:bg-blue-600 text-white px-6 py-2 rounded-lg font-medium transition-colors disabled:opacity-50"
-                                whileHover={{ scale: 1.05 }}
-                                whileTap={{ scale: 0.95 }}
-                              >
-                                {updatingStatus === requestKey ? 'Updating...' : 'Start Performing'}
-                              </motion.button>
-                            )}
-                            
-                            {request.status === 'performing' && (
-                              <motion.button
-                                onClick={() => updateSongStatus(request, 'completed')}
-                                disabled={updatingStatus === requestKey}
-                                className="bg-green-500 hover:bg-green-600 text-white px-6 py-2 rounded-lg font-medium transition-colors disabled:opacity-50"
-                                whileHover={{ scale: 1.05 }}
-                                whileTap={{ scale: 0.95 }}
-                              >
-                                {updatingStatus === requestKey ? 'Updating...' : 'Mark Completed'}
-                              </motion.button>
-                            )}
-                            
-                            {/* No buttons for completed status */}
-                            </div>
-                          </div>
-                        </motion.div>
-                      )
-                    })}
-                  </AnimatePresence>
-                </div>
+                  <option value="">Choose device</option>
+                  {devices.map(d => (
+                    <option key={d.id} value={d.id}>
+                      {d.nickname || 'Device'}
+                      {d.isPaused ? ' (paused)' : ''}
+                    </option>
+                  ))}
+                </select>
               )}
+              {selectedPauseDevice && (
+                <button
+                  onClick={() => onTogglePause(selectedPauseDevice.id)}
+                  disabled={pausingDeviceId === selectedPauseDevice.id}
+                  title={selectedPauseDevice.isPaused ? 'Turn the light and sound back on' : 'Stops light and sound. Tips still go through.'}
+                  className={`${soft} font-bold ${selectedPauseDevice.isPaused ? '!bg-amber-400 !text-ink-900 hover:!bg-amber-300' : ''}`}
+                >
+                  <BrandIcon name={selectedPauseDevice.isPaused ? 'play' : 'pause'} size={18} tone="current" />
+                  {selectedPauseDevice.isPaused ? 'Resume device' : devices.length === 1 ? `Pause ${devices[0].nickname || 'device'}` : 'Pause device'}
+                </button>
+              )}
+              {pausedCount > 1 && <span className="text-sm font-semibold text-amber-700">Several devices paused</span>}
             </div>
+          )}
+
+          <div className="flex items-center rounded-xl bg-slate-100" role="group" aria-label="Text size">
+            <button onClick={() => changeSize(-1)} disabled={sizeIdx === 0} className="h-11 w-11 text-lg font-bold text-ink-700 disabled:opacity-30" aria-label="Smaller text">
+              A−
+            </button>
+            <button onClick={() => changeSize(1)} disabled={sizeIdx === 2} className="h-11 w-11 text-xl font-bold text-ink-700 disabled:opacity-30" aria-label="Larger text">
+              A+
+            </button>
           </div>
-        </motion.div>
-      )}
-    </AnimatePresence>
+
+          <button
+            onClick={toggleChime}
+            aria-pressed={chime}
+            aria-label="Play a sound for new requests"
+            title="Play a sound for new requests"
+            className={`flex h-11 w-11 items-center justify-center rounded-xl ${chime ? 'bg-brand-700 text-white' : 'bg-slate-100 text-ink-700'}`}
+          >
+            <BrandIcon name="volume" size={22} tone="current" />
+          </button>
+
+          <button
+            onClick={() => setPreference(dark ? 'light' : 'dark')}
+            aria-label={dark ? 'Switch to light theme' : 'Switch to dark theme'}
+            title={dark ? 'Light theme' : 'Dark theme'}
+            className="flex h-11 w-11 items-center justify-center rounded-xl bg-slate-100"
+          >
+            <BrandIcon name={dark ? 'sun' : 'moon'} size={22} />
+          </button>
+        </div>
+      </header>
+
+      {/* Queue */}
+      <main className="min-h-0 flex-1 overflow-y-auto px-4 py-5">
+        <div className="mx-auto grid max-w-6xl gap-5 lg:grid-cols-[1.1fr_1fr]">
+          {/* Playing now */}
+          <section aria-label="Playing now">
+            <h2 className={sectionLabel}>Playing now</h2>
+            {performing.length === 0 ? (
+              <div className="rounded-3xl border border-dashed border-slate-300 p-8 text-center text-ink-500">
+                <p className="text-lg font-semibold text-ink-900">Nothing playing</p>
+                <p className="mt-1">Tap “Play this” on a request when you start it.</p>
+              </div>
+            ) : (
+              performing.map(r => {
+                const key = requestKey(r)
+                return (
+                  <article key={key} className="mb-4 rounded-3xl border border-slate-100 bg-white p-6 shadow-lift">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <StatusChip kind="active" label="Playing" />
+                      <TipBadge r={r} />
+                    </div>
+                    <h3 className={`mt-4 font-extrabold leading-tight text-ink-900 ${size.now}`}>{r.songTitle}</h3>
+                    <p className={`mt-1 text-ink-500 ${size.artist}`}>{r.artist}</p>
+                    <Note r={r} />
+                    <button
+                      onClick={() => updateSongStatus(r, 'completed')}
+                      disabled={updatingStatus === key}
+                      className={`${btn} mt-5 w-full bg-brand-700 text-white hover:bg-brand-800`}
+                    >
+                      <BrandIcon name="check" size={22} color="#FFFFFF" strokeWidth={2.4} />
+                      {updatingStatus === key ? 'Saving…' : 'Done playing'}
+                    </button>
+                  </article>
+                )
+              })
+            )}
+          </section>
+
+          {/* Up next */}
+          <section aria-label="Up next">
+            <h2 className={sectionLabel}>
+              Up next
+              <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-ink-700">{pending.length}</span>
+            </h2>
+
+            {pending.length === 0 ? (
+              <div className="rounded-3xl border border-slate-100 bg-white p-8 text-center">
+                <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-brand-50">
+                  <BrandIcon name="music" size={28} />
+                </span>
+                <p className="mt-4 text-lg font-semibold text-ink-900">No requests waiting</p>
+                <p className="mt-1 text-ink-500">New requests appear here the moment someone tips.</p>
+              </div>
+            ) : (
+              <ul className="space-y-3">
+                {pending.map((r, i) => {
+                  const key = requestKey(r)
+                  const fresh = freshKeys.has(key)
+                  return (
+                    <li
+                      key={key}
+                      className={`rounded-3xl border p-5 transition-colors ${
+                        fresh ? 'border-accent-400 bg-accent-50 ring-2 ring-accent-400' : 'border-slate-100 bg-white'
+                      }`}
+                      style={fresh && dark ? { backgroundColor: 'rgba(229,84,140,0.18)' } : undefined}
+                    >
+                      <div className="flex items-start gap-3">
+                        <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-100 text-sm font-bold text-ink-700">{i + 1}</span>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <TipBadge r={r} />
+                            {fresh && <span className="rounded-full bg-accent-600 px-2.5 py-1 text-xs font-extrabold text-white">NEW</span>}
+                            <span className="text-sm text-ink-500">{ago(r.firstRequestTime, now)}</span>
+                          </div>
+                          <h3 className={`mt-2 font-bold leading-tight text-ink-900 ${size.title}`}>{r.songTitle}</h3>
+                          <p className={`text-ink-500 ${size.artist}`}>{r.artist}</p>
+                          <Note r={r} />
+                        </div>
+                      </div>
+                      <div className="mt-4 flex gap-3">
+                        <button
+                          onClick={() => updateSongStatus(r, 'performing')}
+                          disabled={updatingStatus === key}
+                          className={`${btn} flex-1 bg-brand-700 text-white hover:bg-brand-800`}
+                        >
+                          <BrandIcon name="play" size={22} color="#FFFFFF" />
+                          {updatingStatus === key ? 'Saving…' : 'Play this'}
+                        </button>
+                        <button
+                          onClick={() => updateSongStatus(r, 'skipped')}
+                          disabled={updatingStatus === key}
+                          className={`${btn} border border-slate-300 bg-white px-5 text-ink-700 hover:bg-slate-50`}
+                          aria-label={`Skip ${r.songTitle}`}
+                        >
+                          Skip
+                        </button>
+                      </div>
+                    </li>
+                  )
+                })}
+              </ul>
+            )}
+
+            {/* Finished requests stay out of the way until asked for */}
+            {done.length > 0 && (
+              <div className="mt-6">
+                <button
+                  onClick={() => setShowDone(s => !s)}
+                  aria-expanded={showDone}
+                  className="flex h-11 items-center gap-2 text-sm font-semibold text-ink-500 hover:text-ink-700"
+                >
+                  <BrandIcon name={showDone ? 'chevron-down' : 'chevron-right'} size={18} tone="current" />
+                  {showDone ? 'Hide' : 'Show'} finished ({done.length})
+                </button>
+                {showDone && (
+                  <ul className="mt-2 space-y-2">
+                    {done.map(r => (
+                      <li key={requestKey(r)} className="flex items-center gap-3 rounded-2xl border border-slate-100 bg-white px-4 py-3">
+                        <div className="min-w-0 flex-1">
+                          <div className="truncate font-semibold text-ink-900">{r.songTitle}</div>
+                          <div className="truncate text-sm text-ink-500">{r.artist}</div>
+                        </div>
+                        <StatusChip
+                          kind={r.status === 'completed' ? 'paid' : 'offline'}
+                          label={r.status === 'completed' ? 'Played' : r.status === 'skipped' ? 'Skipped' : 'Cancelled'}
+                        />
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
+          </section>
+        </div>
+      </main>
+    </div>
   )
 }
 
-export default SongRequestMonitor 
+export default SongRequestMonitor

@@ -15,6 +15,7 @@ const StripeReturn = lazy(() => import('./pages/StripeReturn'))
 const KYCReturn = lazy(() => import('./pages/KYCReturn'))
 const StripeStatus = lazy(() => import('./pages/StripeStatus'))
 const Onboarding = lazy(() => import('./pages/Onboarding'))
+const MonitorPage = lazy(() => import('./pages/MonitorPage'))
 const DeviceWifiSetup = lazy(() => import('./pages/DeviceWifiSetup'))
 const NotFound = lazy(() => import('./pages/NotFound'))
 
@@ -29,6 +30,7 @@ function App() {
           <Route path="/onboarding" element={<Onboarding />} />
           <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
           <Route path="/admin" element={<ProtectedRoute requiredRole="root_admin"><AdminDashboard /></ProtectedRoute>} />
+          <Route path="/monitor" element={<ProtectedRoute><MonitorPage /></ProtectedRoute>} />
           <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
           <Route path="/add-device" element={<ProtectedRoute><DeviceRegistration /></ProtectedRoute>} />
           <Route path="/manage-devices" element={<ProtectedRoute><ManageDevices /></ProtectedRoute>} />
@@ -40,7 +42,13 @@ function App() {
           <Route path="*" element={<NotFound />} />
         </Routes>
       </Suspense>
-      <Toaster position="top-center" richColors />
+      <Toaster
+        position="top-center"
+        theme="dark"
+        toastOptions={{
+          style: { background: '#1B2530', color: '#FFFFFF', border: 'none', borderRadius: 16, fontWeight: 600, boxShadow: '0 12px 32px rgba(15,23,42,0.25)' }
+        }}
+      />
     </div>
   )
 }

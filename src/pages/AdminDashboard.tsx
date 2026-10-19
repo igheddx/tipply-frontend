@@ -1,16 +1,10 @@
 import logger from "../utils/logger";
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Row, Col, Statistic, Table, Button, Input, Modal, message, Spin, Card, Tag, Select, DatePicker, Space, Divider, Alert, Tabs, Radio } from 'antd';
+import { Row, Col, Table, Button, Input, InputNumber, message, Spin, Card, Select, DatePicker, Space, Divider, Alert, Tabs } from 'antd';
 import { 
-  UserOutlined, 
-  DesktopOutlined, 
-  DollarOutlined, 
   ReloadOutlined,
   PlayCircleOutlined,
-  ArrowLeftOutlined,
-  CheckCircleOutlined,
-  CloseCircleOutlined,
   SyncOutlined,
   DownloadOutlined,
   SearchOutlined
@@ -18,11 +12,21 @@ import {
 import { apiService } from '../services/api';
 import { isRefundEligible } from '../utils/refunds';
 import AggregatedChargesTable from '../components/AggregatedChargesTable';
+import RecoverChargedTips from '../components/RecoverChargedTips';
 import PerformerInsights from '../components/PerformerInsights';
 import dayjs from 'dayjs';
+import { PortalShell, type PortalNavItem } from '../components/portal/PortalShell';
+import { Banner, Button as UiButton, Card as UiCard, Modal, PageHeader, PageLoader, StatCard, StatusChip, useFeedback, type ChipKind } from '../components/ui';
+import { BrandIcon } from '../components/icons/BrandIcons';
 
 const { Search } = Input;
 const { RangePicker } = DatePicker;
+
+interface PaymentSecurityLimits {
+  maxChargesPerHourPerUser: number;
+  maxChargesPerDayPerUser: number;
+  maxChargesPerHourPerPaymentMethod: number;
+}
 
 interface AdminDashboardStats {
   totalUsers: number;
@@ -93,6 +97,7 @@ interface TipDetail {
   duration: number;
   platformFee: number;
   performerEarnings: number;
+  failureReason?: string | null;
 }
 
 interface PerformerDeviceSummary {
@@ -131,7 +136,58 @@ interface SimulationTipperSelection {
   manualTippers: SimulationTipper[];
 }
 
+// Plain-language versions of the technical reasons a charge can fail
+const friendlyReason = (raw?: string | null): string | null => {
+  if (!raw) return null;
+  if (/No balance transaction found/i.test(raw)) return 'Stripe did not return the fee details. The card may have been charged.';
+  if (/Missing Stripe customer or payment method/i.test(raw)) return 'No saved card for this tip.';
+  if (/does not belong to the Customer|PaymentMethod mismatch/i.test(raw)) return 'The saved card does not match the customer.';
+  if (/declin/i.test(raw)) return 'The card was declined.';
+  if (/rate.?limit|too many/i.test(raw)) return 'Blocked by the payment security limits.';
+  return raw;
+};
+
+const friendlyBatchNote = (raw?: string | null): string | null => {
+  if (!raw) return null;
+  const marker = 'Charge failures: ';
+  const i = raw.indexOf(marker);
+  if (i < 0) return friendlyReason(raw);
+  return raw
+    .slice(i + marker.length)
+    .split(' | ')
+    .map(r => friendlyReason(r))
+    .filter(Boolean)
+    .join(' · ');
+};
+
+const shortDate = (iso?: string | null) =>
+  iso ? new Date(iso).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : '—';
+
+// Status chips: an icon plus a word, in the Tipwave status colors
+const tipStatusChip = (status: string) => {
+  const map: Record<string, { kind: ChipKind; label: string }> = {
+    processed: { kind: 'paid', label: 'Charged' },
+    pending: { kind: 'processing', label: 'Waiting' },
+    failed: { kind: 'failed', label: 'Failed' },
+    error: { kind: 'failed', label: 'Error' },
+    refunded: { kind: 'info', label: 'Refunded' }
+  };
+  const c = map[status] || { kind: 'offline' as ChipKind, label: status };
+  return <StatusChip kind={c.kind} label={c.label} />;
+};
+
+const runStatusChip = (status?: string) => {
+  const map: Record<string, { kind: ChipKind; label: string }> = {
+    success: { kind: 'paid', label: 'Success' },
+    failed: { kind: 'failed', label: 'Failed' },
+    running: { kind: 'processing', label: 'Running' }
+  };
+  const c = (status && map[status]) || { kind: 'offline' as ChipKind, label: status || 'Unknown' };
+  return <StatusChip kind={c.kind} label={c.label} />;
+};
+
 const AdminDashboard: React.FC = () => {
+  const { confirm } = useFeedback();
   const navigate = useNavigate();
   const [stats, setStats] = useState<AdminDashboardStats | null>(null);
   const [performers, setPerformers] = useState<PerformerSummary[]>([]);
@@ -145,8 +201,15 @@ const AdminDashboard: React.FC = () => {
   const [canToggleStripe, setCanToggleStripe] = useState(false);
   const [stripeModeLoading, setStripeModeLoading] = useState(false);
   const [stripeModeConfirming, setStripeModeConfirming] = useState(false);
+  const [liveConfirmText, setLiveConfirmText] = useState('');
   const [stripeModeError, setStripeModeError] = useState<string | null>(null);
   const [stripeModeNotice, setStripeModeNotice] = useState<{ type: 'success' | 'warning' | 'error' | 'info'; text: string } | null>(null);
+
+  // Payment security rate limits (stored per environment)
+  const [rateLimits, setRateLimits] = useState<PaymentSecurityLimits>({ maxChargesPerHourPerUser: 0, maxChargesPerDayPerUser: 0, maxChargesPerHourPerPaymentMethod: 0 });
+  const [rateLimitDefaults, setRateLimitDefaults] = useState<PaymentSecurityLimits | null>(null);
+  const [rateLimitsLoading, setRateLimitsLoading] = useState(false);
+  const [rateLimitsSaving, setRateLimitsSaving] = useState(false);
 
   const [updateFeeModal, setUpdateFeeModal] = useState(false);
   const [selectedPerformer, setSelectedPerformer] = useState<PerformerSummary | null>(null);
@@ -235,6 +298,7 @@ const AdminDashboard: React.FC = () => {
       loadBatchStatus();
       loadTips();
       loadStripeMode();
+      loadRateLimits();
 
       // Auto-refresh batch status every 3 minutes
       const batchRefreshInterval = setInterval(() => {
@@ -342,7 +406,65 @@ const AdminDashboard: React.FC = () => {
     }
   };
 
+  const applyRateLimitResponse = (data: { current: PaymentSecurityLimits; defaults: PaymentSecurityLimits }) => {
+    setRateLimits(data.current);
+    setRateLimitDefaults(data.defaults);
+  };
+
+  const loadRateLimits = async () => {
+    try {
+      setRateLimitsLoading(true);
+      const response = await apiService.get('/api/payment-security-config/rate-limits');
+      if (response.data) {
+        applyRateLimitResponse(response.data);
+      } else if (response.error) {
+        message.error(`Failed to load payment security limits: ${response.error}`);
+      }
+    } catch (error) {
+      logger.error('Error loading payment security limits:', error);
+    } finally {
+      setRateLimitsLoading(false);
+    }
+  };
+
+  const saveRateLimits = async () => {
+    try {
+      setRateLimitsSaving(true);
+      const response = await apiService.put('/api/payment-security-config/rate-limits', rateLimits);
+      if (response.error) {
+        message.error(response.error);
+      } else if (response.data) {
+        applyRateLimitResponse(response.data);
+        message.success('Payment security limits saved');
+      }
+    } catch (error) {
+      logger.error('Error saving payment security limits:', error);
+      message.error('Failed to save payment security limits');
+    } finally {
+      setRateLimitsSaving(false);
+    }
+  };
+
+  const resetRateLimits = async () => {
+    try {
+      setRateLimitsSaving(true);
+      const response = await apiService.delete('/api/payment-security-config/rate-limits');
+      if (response.error) {
+        message.error(response.error);
+      } else if (response.data) {
+        applyRateLimitResponse(response.data);
+        message.success('Payment security limits reset to defaults');
+      }
+    } catch (error) {
+      logger.error('Error resetting payment security limits:', error);
+      message.error('Failed to reset payment security limits');
+    } finally {
+      setRateLimitsSaving(false);
+    }
+  };
+
   const handleToggleStripeMode = () => {
+    setLiveConfirmText('');
     setStripeModeError(null);
     setStripeModeNotice(null);
     setStripeModeConfirming(true);
@@ -800,18 +922,11 @@ const AdminDashboard: React.FC = () => {
     }
   };
 
-  const getBatchStatusColor = () => {
-    if (!batchStatus) return 'default';
-    if (batchStatus.status === 'success') return 'success';
-    if (batchStatus.status === 'failed') return 'error';
-    if (batchStatus.status === 'running') return 'processing';
-    return 'default';
-  };
 
   const getBatchStatusIcon = () => {
     if (!batchStatus) return null;
-    if (batchStatus.status === 'success') return <CheckCircleOutlined />;
-    if (batchStatus.status === 'failed') return <CloseCircleOutlined />;
+    if (batchStatus.status === 'success') return <BrandIcon name="check-circle" size={20} color="#15803D" />;
+    if (batchStatus.status === 'failed') return <BrandIcon name="error" size={20} color="#DC2626" />;
     if (batchStatus.status === 'running') return <SyncOutlined spin />;
     return null;
   };
@@ -826,7 +941,7 @@ const AdminDashboard: React.FC = () => {
             {record.firstName} {record.lastName}
           </div>
           {record.stageName && (
-            <div className="text-sm text-gray-500">@{record.stageName}</div>
+            <div className="text-sm text-ink-500">@{record.stageName}</div>
           )}
         </div>
       ),
@@ -841,7 +956,7 @@ const AdminDashboard: React.FC = () => {
       key: 'platformFee',
       render: (record: PerformerSummary) => (
         <div className="text-center">
-          <div className="font-medium text-blue-600">{record.platformFeePercentage}%</div>
+          <div className="font-medium text-brand-700">{record.platformFeePercentage}%</div>
           <Button 
             type="link" 
             size="small"
@@ -872,7 +987,7 @@ const AdminDashboard: React.FC = () => {
           <div className="font-medium text-green-600">
             ${record.totalEarnings.toFixed(2)}
           </div>
-          <div className="text-sm text-gray-500">
+          <div className="text-sm text-ink-500">
             Platform: ${record.totalPlatformFees.toFixed(2)}
           </div>
         </div>
@@ -882,312 +997,153 @@ const AdminDashboard: React.FC = () => {
       title: 'Status',
       key: 'status',
       render: (record: PerformerSummary) => (
-        <span className={`px-2 py-1 rounded-full text-xs ${
-          record.isActive 
-            ? 'bg-green-100 text-green-800' 
-            : 'bg-red-100 text-red-800'
-        }`}>
-          {record.isActive ? 'Active' : 'Inactive'}
-        </span>
+        <StatusChip kind={record.isActive ? 'active' : 'offline'} label={record.isActive ? 'Active' : 'Inactive'} />
       ),
     },
   ];
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <Spin size="large" />
-      </div>
+      <PageLoader label="Loading admin…" />
     );
   }
 
+  const adminNav: PortalNavItem[] = [
+    { id: 'overview', label: 'Overview', icon: 'home' },
+    { id: 'performers', label: 'Performers', icon: 'users' },
+    { id: 'tips', label: 'Tips', icon: 'coin' },
+    { id: 'aggregated-charges', label: 'Charges', icon: 'card' },
+    ...(userProfile?.role === 'root_admin' ? [{ id: 'device-management', label: 'Devices', icon: 'device' } as PortalNavItem] : []),
+    { id: 'performer-insights', label: 'Insights', icon: 'trend-up' },
+    ...(isSimulationVisible ? [{ id: 'device-tip-simulation', label: 'Tools', icon: 'bolt' } as PortalNavItem] : []),
+    { id: 'settings', label: 'Settings', icon: 'sliders' },
+    { id: 'performer-view', label: 'Performer view', icon: 'mic' }
+  ];
+
+  const ADMIN_TITLES: Record<string, { title: string; subtitle?: string }> = {
+    overview: { title: 'Overview', subtitle: 'How the platform is doing right now.' },
+    performers: { title: 'Performers', subtitle: 'Everyone who can receive tips, and their fee.' },
+    tips: { title: 'Tips', subtitle: 'Search, export and refund tips.' },
+    'aggregated-charges': { title: 'Charges', subtitle: 'What was charged to each card, combined per batch.' },
+    'device-management': { title: 'Devices', subtitle: 'Add or remove devices on a performer’s behalf.' },
+    'performer-insights': { title: 'Insights', subtitle: 'Tips by time of day and performer.' },
+    'device-tip-simulation': { title: 'Tools', subtitle: 'Send test tips to a device. Only on local and test sites.' },
+    settings: { title: 'Settings', subtitle: 'Stripe mode and payment security limits.' }
+  };
+
+  // Always visible in the corner of every page, so nobody mistakes the mode they are working in
+  const modeNotice =
+    stripeMode === 'live' ? (
+      <Banner tone="error" title="Live mode: real money">
+        Tips are charged to real cards.
+      </Banner>
+    ) : (
+      <Banner tone="info" title="Stripe test mode">
+        No real charges are made.
+      </Banner>
+    );
+
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-[21px]">{/* Left side - Logo */}
-            <div className="flex items-center">
-              <div className="relative w-12 h-12 overflow-visible rounded-lg">
-                <img
-                  src="/images/logo/tipwave-logo2b.png?v=20260208"
-                  alt="Tipwave Logo"
-                  className="w-full h-full object-contain"
-                  style={{ transform: 'scale(4)', objectPosition: 'center' }}
-                />
-              </div>
+    <PortalShell
+      items={adminNav}
+      active={activeTab}
+      onSelect={id => (id === 'performer-view' ? navigate('/dashboard') : setActiveTab(id))}
+      userName={userProfile?.firstName ? `${userProfile.firstName} ${userProfile.lastName || ''}`.trim() : 'Admin'}
+      userPhotoUrl={userProfile?.profilePhotoUrl || undefined}
+      accountHint="Back to my portal"
+      onOpenProfile={() => navigate('/dashboard')}
+      onLogout={() => {
+        localStorage.removeItem('token');
+        localStorage.removeItem('refreshToken');
+        navigate('/login');
+      }}
+      topNotice={modeNotice}
+    >
+      <PageHeader title={ADMIN_TITLES[activeTab]?.title || 'Admin'} subtitle={ADMIN_TITLES[activeTab]?.subtitle} />
+      <div>
+        {activeTab === 'overview' && (
+          <div className="space-y-5">
+            <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+              <StatCard variant="inline" icon="users" label="Audience" value={(stats?.totalUsers || 0).toLocaleString()} caption="People who have tipped" />
+              <StatCard variant="inline" icon="device" label="Devices" value={(stats?.totalDevices || 0).toLocaleString()} caption="Not deleted" />
+              <StatCard variant="inline" icon="coin" label="Tips" value={(stats?.totalTips || 0).toLocaleString()} caption={`${(stats?.pendingTips || 0).toLocaleString()} waiting to be charged`} />
+              <StatCard variant="inline" icon="mic" label="Performers" value={(stats?.activePerformers || 0).toLocaleString()} caption="With at least one device" />
             </div>
 
-            {/* Right side - Buttons */}
-            <div className="flex items-center space-x-4">
-              <Button 
-                icon={<ArrowLeftOutlined />}
-                onClick={() => navigate('/dashboard')}
-                className="flex items-center"
-              >
-                Back to Dashboard
-              </Button>
-              <button
-                onClick={() => {
-                  localStorage.removeItem('token');
-                  localStorage.removeItem('refreshToken');
-                  navigate('/login');
-                }}
-                className="p-2 text-gray-500 hover:text-gray-700 transition-colors"
-                title="Logout"
-              >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                </svg>
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Welcome Message */}
-        <div className="mb-8">
-          <h2 className="text-3xl font-bold text-gray-900 mb-2">
-            Admin Dashboard, Welcome {userProfile?.firstName || userProfile?.stageName || 'Admin'}!
-          </h2>
-          <p className="text-gray-600">
-            System overview and performer management
-          </p>
-        </div>
-
-        {/* Stats Cards */}
-        <Row gutter={[16, 16]} className="mb-8">
-          <Col xs={24} sm={12} lg={6}>
-            <div className="bg-white p-6 rounded-lg shadow-sm border">
-              <Statistic
-                title="Total Audience"
-                value={stats?.totalUsers || 0}
-                prefix={<UserOutlined />}
-                valueStyle={{ color: '#3f8600' }}
-              />
-            </div>
-          </Col>
-          <Col xs={24} sm={12} lg={6}>
-            <div className="bg-white p-6 rounded-lg shadow-sm border">
-              <Statistic
-                title="Total Devices"
-                value={stats?.totalDevices || 0}
-                prefix={<DesktopOutlined />}
-                valueStyle={{ color: '#1890ff' }}
-              />
-            </div>
-          </Col>
-          <Col xs={24} sm={12} lg={6}>
-            <div className="bg-white p-6 rounded-lg shadow-sm border">
-              <Statistic
-                title="Total Tips"
-                value={stats?.totalTips || 0}
-                prefix={<DollarOutlined />}
-                valueStyle={{ color: '#722ed1' }}
-              />
-            </div>
-          </Col>
-          <Col xs={24} sm={12} lg={6}>
-            <div className="bg-white p-6 rounded-lg shadow-sm border">
-              <Statistic
-                title="Active Performers"
-                value={stats?.activePerformers || 0}
-                prefix={<UserOutlined />}
-                valueStyle={{ color: '#13c2c2' }}
-              />
-            </div>
-          </Col>
-        </Row>
-
-        {/* Financial Overview */}
-        <Row gutter={[16, 16]} className="mb-8">
-          <Col xs={24} lg={8}>
-            <div className="bg-white p-6 rounded-lg shadow-sm border h-full">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Revenue Overview</h3>
-              <div className="space-y-4">
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Total Revenue (processed):</span>
-                  <span className="font-semibold text-lg text-green-600">
-                    ${(stats?.totalRevenue || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Performer Payouts:</span>
-                  <span className="font-semibold text-blue-600">
-                    ${(stats?.totalPerformerPayouts || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                  </span>
-                </div>
-              </div>
-            </div>
-          </Col>
-          <Col xs={24} lg={8}>
-            <div className="bg-white p-6 rounded-lg shadow-sm border h-full">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Platform Earnings</h3>
-              <div className="space-y-4">
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Total Platform Fee (YTD):</span>
-                  <span className="font-semibold text-blue-600">
-                    ${(platformEarnings?.totalPlatformFees || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Stripe Fees (actual):</span>
-                  <span className="font-semibold text-orange-600">
-                    ${(platformEarnings?.totalPaymentPartnerFees || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Net Earnings (platform fees - Stripe fees):</span>
-                  <span className="font-semibold text-green-600">
-                    ${(platformEarnings?.netPlatformEarnings || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                  </span>
-                </div>
-              </div>
-            </div>
-          </Col>
-          <Col xs={24} lg={8}>
-            <div className="bg-white p-6 rounded-lg shadow-sm border h-full">
-              {batchResultMessage && (
-                <Alert
-                  className="mb-4"
-                  type={batchResultMessage.type}
-                  message={batchResultMessage.text}
-                  showIcon
-                  closable
-                  onClose={() => setBatchResultMessage(null)}
-                />
-              )}
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h3>
-              <div className="space-y-3">
-                <Button 
-                  type="primary" 
-                  icon={batchProcessing ? <ReloadOutlined spin /> : <PlayCircleOutlined />}
-                  onClick={(e) => {
-                    e.preventDefault();
-                    runBatchProcessing();
-                  }}
-                  loading={batchProcessing}
-                  disabled={batchProcessing}
-                  className="w-full"
-                >
-                  {batchProcessing ? 'Running...' : 'Run Batch Processing'}
-                </Button>
-                <Button 
-                  icon={<ReloadOutlined />}
-                  onClick={() => {
-                    setBatchResultMessage(null);
-                    loadDashboardData();
-                  }}
-                  className="w-full flex items-center justify-center"
-                  aria-label="Refresh data"
-                  title="Refresh data"
-                />
-                <div className="text-sm text-gray-500 text-center">
-                  {stats?.pendingTips || 0} pending tips
-                </div>
-              </div>
-            </div>
-          </Col>
-        </Row>
-
-        {/* Stripe Mode Configuration */}
-        <Row gutter={[16, 16]} className="mb-8">
-          <Col xs={24}>
-            <div className={`p-6 rounded-lg shadow-sm border ${
-              stripeMode === 'live' && isProductionEnv 
-                ? 'bg-red-50 border-red-300' 
-                : stripeMode === 'test' && isProductionEnv 
-                  ? 'bg-green-50 border-green-300'
-                  : 'bg-gray-50 border-gray-300'
-            }`}>
-              {stripeModeNotice && (
-                <Alert
-                  className="mb-4"
-                  type={stripeModeNotice.type}
-                  message={stripeModeNotice.text}
-                  closable
-                  onClose={() => setStripeModeNotice(null)}
-                  showIcon
-                />
-              )}
-              <div className="flex items-center justify-between">
-                <div className="flex-1">
-                  <div className="flex items-center space-x-3 mb-2">
-                    {stripeMode === 'live' && isProductionEnv && (
-                      <>
-                        <span className="flex h-3 w-3">
-                          <span className="animate-ping absolute inline-flex h-3 w-3 rounded-full bg-red-600 opacity-75"></span>
-                          <span className="relative inline-flex rounded-full h-3 w-3 bg-red-600"></span>
-                        </span>
-                        <h3 className="text-xl font-bold text-red-800">⚠️ STRIPE LIVE MODE ACTIVE</h3>
-                      </>
-                    )}
-                    {stripeMode === 'test' && isProductionEnv && (
-                      <>
-                        <span className="inline-flex rounded-full h-3 w-3 bg-green-600"></span>
-                        <h3 className="text-xl font-bold text-green-800">✓ STRIPE TEST MODE</h3>
-                      </>
-                    )}
-                    {!isProductionEnv && (
-                      <>
-                        <span className="inline-flex rounded-full h-3 w-3 bg-gray-600"></span>
-                        <h3 className="text-xl font-bold text-gray-800">🛠️ DEVELOPMENT ENVIRONMENT</h3>
-                      </>
-                    )}
+            <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
+              <UiCard title="Revenue" subtitle="Tips that were charged successfully">
+                <dl className="space-y-3 text-sm">
+                  <div className="flex justify-between gap-3">
+                    <dt className="text-ink-500">Revenue</dt>
+                    <dd className="font-bold text-ink-900">${(stats?.totalRevenue || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</dd>
                   </div>
-                  <div className="space-y-1">
-                    {stripeMode === 'live' && isProductionEnv && (
-                      <>
-                        <p className="text-red-700 font-semibold">All transactions are processing with REAL MONEY</p>
-                        <p className="text-red-600 text-sm">• Customers will be charged actual amounts</p>
-                        <p className="text-red-600 text-sm">• All Stripe fees apply</p>
-                      </>
-                    )}
-                    {stripeMode === 'test' && isProductionEnv && (
-                      <>
-                        <p className="text-green-700 font-semibold">Safe to experiment - No real charges will be made</p>
-                        <p className="text-green-600 text-sm">• Using Stripe test mode keys</p>
-                        <p className="text-green-600 text-sm">• No actual money is processed</p>
-                      </>
-                    )}
-                    {!isProductionEnv && (
-                      <>
-                        <p className="text-gray-700 font-semibold">Local development - Always uses TEST mode</p>
-                        <p className="text-gray-600 text-sm">• Cannot switch to live mode in development</p>
-                        <p className="text-gray-600 text-sm">• Deploy to production to enable live mode</p>
-                      </>
-                    )}
+                  <div className="flex justify-between gap-3">
+                    <dt className="text-ink-500">Owed to performers</dt>
+                    <dd className="font-bold text-ink-900">${(stats?.totalPerformerPayouts || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</dd>
                   </div>
+                </dl>
+              </UiCard>
+              <UiCard title="Platform earnings" subtitle="Estimated from the fee settings">
+                <dl className="space-y-3 text-sm">
+                  <div className="flex justify-between gap-3">
+                    <dt className="text-ink-500">Platform fees</dt>
+                    <dd className="font-bold text-ink-900">${(platformEarnings?.totalPlatformFees || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</dd>
+                  </div>
+                  <div className="flex justify-between gap-3">
+                    <dt className="text-ink-500">Stripe fees (estimated)</dt>
+                    <dd className="font-bold text-ink-900">${(platformEarnings?.totalPaymentPartnerFees || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</dd>
+                  </div>
+                  <div className="flex justify-between gap-3 border-t border-slate-100 pt-3">
+                    <dt className="font-semibold text-ink-700">Net earnings</dt>
+                    <dd className="font-bold text-ink-900">${(platformEarnings?.netPlatformEarnings || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</dd>
+                  </div>
+                </dl>
+              </UiCard>
+              <UiCard title="Charge tips" subtitle={`${stats?.pendingTips || 0} tips are waiting to be charged.`}>
+                {batchResultMessage && (
+                  <Alert
+                    className="mb-3"
+                    type={batchResultMessage.type}
+                    message={batchResultMessage.text}
+                    showIcon
+                    closable
+                    onClose={() => setBatchResultMessage(null)}
+                  />
+                )}
+                <div className="flex gap-2">
+                  <Button
+                    type="primary"
+                    icon={batchProcessing ? <ReloadOutlined spin /> : <PlayCircleOutlined />}
+                    onClick={async () => {
+                      const ok = await confirm({
+                        title: 'Run batch processing now?',
+                        body: `This charges ${stats?.pendingTips || 0} waiting tip(s) in ${stripeMode === 'live' ? 'LIVE mode with real money' : 'test mode'}. It cannot be undone.`,
+                        confirmLabel: 'Run batch',
+                        tone: stripeMode === 'live' ? 'danger' : 'default'
+                      });
+                      if (ok) runBatchProcessing();
+                    }}
+                    loading={batchProcessing}
+                    disabled={batchProcessing}
+                    className="flex-1"
+                  >
+                    {batchProcessing ? 'Running…' : 'Run batch now'}
+                  </Button>
+                  <Button
+                    icon={<ReloadOutlined />}
+                    onClick={() => {
+                      setBatchResultMessage(null);
+                      loadDashboardData();
+                    }}
+                    aria-label="Refresh data"
+                    title="Refresh data"
+                  />
                 </div>
-                <div className="ml-6">
-                  {canToggleStripe && isProductionEnv && (
-                    <Button 
-                      type="primary"
-                      size="large"
-                      danger={stripeMode === 'test'}
-                      ghost={stripeMode === 'live'}
-                      onClick={handleToggleStripeMode}
-                      loading={stripeModeLoading}
-                      className={stripeMode === 'live' ? 'border-red-600 text-red-600 hover:bg-red-50' : ''}
-                    >
-                      {stripeMode === 'test' ? '🔴 Enable Live Mode' : '🟢 Switch to Test Mode'}
-                    </Button>
-                  )}
-                  {!canToggleStripe && (
-                    <div className="text-sm text-gray-500 text-center max-w-xs">
-                      Mode toggle not available
-                      {!isProductionEnv && ' in development'}
-                    </div>
-                  )}
-                </div>
-              </div>
+              </UiCard>
             </div>
-          </Col>
-        </Row>
 
         {/* Batch Processing Status */}
-        <Row gutter={16} className="mb-6">
+        <Row gutter={16}>
           <Col xs={24} lg={12}>
             <Card 
               className="shadow-sm"
@@ -1201,30 +1157,28 @@ const AdminDashboard: React.FC = () => {
               {batchStatus ? (
                 <div className="space-y-3">
                   <div className="flex justify-between items-center">
-                    <span className="text-gray-600">Type:</span>
-                    <Tag color={batchStatus.isManual ? 'blue' : 'purple'}>
-                      {batchStatus.isManual ? 'MANUAL' : 'AUTOMATED'}
-                    </Tag>
+                    <span className="text-ink-500">Type:</span>
+                    <StatusChip kind="info" label={batchStatus.isManual ? 'Manual' : 'Automated'} />
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="text-gray-600">Status:</span>
-                    <Tag color={getBatchStatusColor()}>{batchStatus.status?.toUpperCase() || 'UNKNOWN'}</Tag>
+                    <span className="text-ink-500">Status:</span>
+                    {runStatusChip(batchStatus.status)}
                   </div>
                   {batchStatus.startedAt && (
                     <div className="flex justify-between items-center">
-                      <span className="text-gray-600">Started:</span>
+                      <span className="text-ink-500">Started:</span>
                       <span>{new Date(batchStatus.startedAt).toLocaleString()}</span>
                     </div>
                   )}
                   {batchStatus.completedAt && (
                     <div className="flex justify-between items-center">
-                      <span className="text-gray-600">Completed:</span>
+                      <span className="text-ink-500">Completed:</span>
                       <span>{new Date(batchStatus.completedAt).toLocaleString()}</span>
                     </div>
                   )}
                   {batchStatus.durationSeconds && (
                     <div className="flex justify-between items-center">
-                      <span className="text-gray-600">Duration:</span>
+                      <span className="text-ink-500">Duration:</span>
                       <span>{batchStatus.durationSeconds}s</span>
                     </div>
                   )}
@@ -1232,26 +1186,32 @@ const AdminDashboard: React.FC = () => {
                   <div className="grid grid-cols-3 gap-2">
                     <div className="text-center">
                       <div className="text-xl font-bold text-green-600">{batchStatus.tipsProcessed}</div>
-                      <div className="text-xs text-gray-500">Processed</div>
+                      <div className="text-xs text-ink-500">Processed</div>
                     </div>
                     <div className="text-center">
                       <div className="text-xl font-bold text-red-600">{batchStatus.tipsFailed}</div>
-                      <div className="text-xs text-gray-500">Failed</div>
+                      <div className="text-xs text-ink-500">Failed</div>
                     </div>
                     <div className="text-center">
                       <div className="text-xl font-bold text-yellow-600">{batchStatus.tipsPending}</div>
-                      <div className="text-xs text-gray-500">Pending</div>
+                      <div className="text-xs text-ink-500">Pending</div>
                     </div>
                   </div>
                   <Divider className="my-3" />
                   <div className="flex justify-between items-center">
-                    <span className="text-gray-600">Total Amount:</span>
+                    <span className="text-ink-500">Total Amount:</span>
                     <span className="font-semibold text-lg">${batchStatus.totalAmount?.toFixed(2) || '0.00'}</span>
                   </div>
                   {batchStatus.errorMessage && (
-                    <div className="bg-red-50 p-3 rounded border border-red-200">
-                      <p className="text-xs text-red-700"><strong>Error:</strong> {batchStatus.errorMessage}</p>
-                    </div>
+                    batchStatus.status === 'success' ? (
+                      <div className="bg-slate-50 p-3 rounded border border-slate-200">
+                        <p className="text-xs text-slate-700">{friendlyBatchNote(batchStatus.errorMessage)}</p>
+                      </div>
+                    ) : (
+                      <div className="bg-red-50 p-3 rounded border border-red-200">
+                        <p className="text-xs text-red-700"><strong>Why:</strong> {friendlyBatchNote(batchStatus.errorMessage)}</p>
+                      </div>
+                    )
                   )}
                   {batchStatus.failureDetails && batchStatus.failureDetails.length > 0 && (
                     <div className="bg-yellow-50 p-3 rounded border border-yellow-200 max-h-32 overflow-y-auto">
@@ -1276,7 +1236,7 @@ const AdminDashboard: React.FC = () => {
                   </Button>
                 </div>
               ) : (
-                <p className="text-gray-500">No batch runs yet</p>
+                <p className="text-ink-500">No batch runs yet</p>
               )}
             </Card>
           </Col>
@@ -1288,30 +1248,182 @@ const AdminDashboard: React.FC = () => {
               {batchHistory.length > 0 ? (
                 <div className="space-y-2 max-h-64 overflow-y-auto">
                   {batchHistory.slice(0, 10).map((run, idx) => (
-                    <div key={idx} className="flex justify-between items-center p-2 bg-gray-50 rounded text-sm">
+                    <div key={idx} className="flex justify-between items-center p-2 bg-surface rounded text-sm">
                       <div>
                         <div className="font-medium">{new Date(run.startedAt || '').toLocaleString()}</div>
-                        <div className="text-xs text-gray-500">{run.tipsProcessed} processed, {run.tipsFailed} failed</div>
+                        <div className="text-xs text-ink-500">{run.tipsProcessed} processed, {run.tipsFailed} failed</div>
                       </div>
-                      <Tag color={run.status === 'success' ? 'green' : run.status === 'failed' ? 'red' : 'orange'}>
-                        {run.status}
-                      </Tag>
+                      {runStatusChip(run.status)}
                     </div>
                   ))}
                 </div>
               ) : (
-                <p className="text-gray-500 text-center py-4">No history available</p>
+                <p className="text-ink-500 text-center py-4">No history available</p>
               )}
             </Card>
           </Col>
         </Row>
 
-        {/* Main Content Tabs */}
-        <Tabs activeKey={activeTab} onChange={setActiveTab}>
-          <Tabs.TabPane tab="Overview" key="overview">
+          </div>
+        )}
+
+
+        {activeTab === 'settings' && (
+          <div className="space-y-5">
+        {/* Stripe Mode Configuration */}
+        <Row gutter={[16, 16]} className="mb-8">
+          <Col xs={24}>
+            <div className={`p-6 rounded-lg shadow-sm border ${
+              stripeMode === 'live' && isProductionEnv 
+                ? 'bg-red-50 border-red-300' 
+                : stripeMode === 'test' && isProductionEnv 
+                  ? 'bg-green-50 border-green-300'
+                  : 'bg-surface border-slate-300'
+            }`}>
+              {stripeModeNotice && (
+                <Alert
+                  className="mb-4"
+                  type={stripeModeNotice.type}
+                  message={stripeModeNotice.text}
+                  closable
+                  onClose={() => setStripeModeNotice(null)}
+                  showIcon
+                />
+              )}
+              <div className="flex items-center justify-between">
+                <div className="flex-1">
+                  <div className="flex items-center space-x-3 mb-2">
+                    {stripeMode === 'live' && isProductionEnv && (
+                      <>
+                        <span className="flex h-3 w-3">
+                          <span className="animate-ping absolute inline-flex h-3 w-3 rounded-full bg-red-600 opacity-75"></span>
+                          <span className="relative inline-flex rounded-full h-3 w-3 bg-red-600"></span>
+                        </span>
+                        <h3 className="text-xl font-bold text-red-800">Stripe live mode is on</h3>
+                      </>
+                    )}
+                    {stripeMode === 'test' && isProductionEnv && (
+                      <>
+                        <span className="inline-flex rounded-full h-3 w-3 bg-green-600"></span>
+                        <h3 className="text-xl font-bold text-green-800">Stripe test mode</h3>
+                      </>
+                    )}
+                    {!isProductionEnv && (
+                      <>
+                        <span className="inline-flex rounded-full h-3 w-3 bg-slate-600"></span>
+                        <h3 className="text-xl font-bold text-ink-900">Development environment</h3>
+                      </>
+                    )}
+                  </div>
+                  <div className="space-y-1">
+                    {stripeMode === 'live' && isProductionEnv && (
+                      <>
+                        <p className="text-red-700 font-semibold">All transactions are processing with REAL MONEY</p>
+                        <p className="text-red-600 text-sm">• Customers will be charged actual amounts</p>
+                        <p className="text-red-600 text-sm">• All Stripe fees apply</p>
+                      </>
+                    )}
+                    {stripeMode === 'test' && isProductionEnv && (
+                      <>
+                        <p className="text-green-700 font-semibold">Safe to experiment - No real charges will be made</p>
+                        <p className="text-green-600 text-sm">• Using Stripe test mode keys</p>
+                        <p className="text-green-600 text-sm">• No actual money is processed</p>
+                      </>
+                    )}
+                    {!isProductionEnv && (
+                      <>
+                        <p className="text-ink-700 font-semibold">Local development - Always uses TEST mode</p>
+                        <p className="text-ink-500 text-sm">• Cannot switch to live mode in development</p>
+                        <p className="text-ink-500 text-sm">• Deploy to production to enable live mode</p>
+                      </>
+                    )}
+                  </div>
+                </div>
+                <div className="ml-6">
+                  {canToggleStripe && isProductionEnv && (
+                    <Button 
+                      type="primary"
+                      size="large"
+                      danger={stripeMode === 'test'}
+                      ghost={stripeMode === 'live'}
+                      onClick={handleToggleStripeMode}
+                      loading={stripeModeLoading}
+                      className={stripeMode === 'live' ? 'border-red-600 text-red-600 hover:bg-red-50' : ''}
+                    >
+                      {stripeMode === 'test' ? 'Enable live mode' : 'Switch to test mode'}
+                    </Button>
+                  )}
+                  {!canToggleStripe && (
+                    <div className="text-sm text-ink-500 text-center max-w-xs">
+                      Mode toggle not available
+                      {!isProductionEnv && ' in development'}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </Col>
+        </Row>
+
+        {/* Payment Security Limits (per environment) */}
+        <Row gutter={[16, 16]} className="mb-8">
+          <Col xs={24}>
+            <Card title="Payment Security Limits" loading={rateLimitsLoading}>
+              <p className="text-ink-500 mb-4">
+                Maximum charge attempts allowed before a tip is blocked. These values apply to this environment only;
+                resetting restores the defaults{rateLimitDefaults ? ` (${rateLimitDefaults.maxChargesPerHourPerUser} / ${rateLimitDefaults.maxChargesPerDayPerUser} / ${rateLimitDefaults.maxChargesPerHourPerPaymentMethod})` : ''}.
+              </p>
+              <Row gutter={[16, 16]}>
+                <Col xs={24} md={8}>
+                  <div className="mb-1 text-sm font-medium text-ink-700">Charges per user per hour</div>
+                  <InputNumber
+                    min={1}
+                    max={1000000}
+                    style={{ width: '100%' }}
+                    value={rateLimits.maxChargesPerHourPerUser}
+                    onChange={(value) => setRateLimits(prev => ({ ...prev, maxChargesPerHourPerUser: Number(value) || 1 }))}
+                    disabled={rateLimitsSaving}
+                  />
+                </Col>
+                <Col xs={24} md={8}>
+                  <div className="mb-1 text-sm font-medium text-ink-700">Charges per user per day</div>
+                  <InputNumber
+                    min={1}
+                    max={1000000}
+                    style={{ width: '100%' }}
+                    value={rateLimits.maxChargesPerDayPerUser}
+                    onChange={(value) => setRateLimits(prev => ({ ...prev, maxChargesPerDayPerUser: Number(value) || 1 }))}
+                    disabled={rateLimitsSaving}
+                  />
+                </Col>
+                <Col xs={24} md={8}>
+                  <div className="mb-1 text-sm font-medium text-ink-700">Charges per card per hour</div>
+                  <InputNumber
+                    min={1}
+                    max={1000000}
+                    style={{ width: '100%' }}
+                    value={rateLimits.maxChargesPerHourPerPaymentMethod}
+                    onChange={(value) => setRateLimits(prev => ({ ...prev, maxChargesPerHourPerPaymentMethod: Number(value) || 1 }))}
+                    disabled={rateLimitsSaving}
+                  />
+                </Col>
+              </Row>
+              <Space className="mt-4">
+                <Button type="primary" onClick={saveRateLimits} loading={rateLimitsSaving}>Save limits</Button>
+                <Button onClick={resetRateLimits} disabled={rateLimitsSaving}>Reset to defaults</Button>
+              </Space>
+            </Card>
+          </Col>
+        </Row>
+
+          </div>
+        )}
+
+        {/* Batch Procnt Tabs */}
+        <Tabs activeKey={activeTab} renderTabBar={() => <></>}>
+          <Tabs.TabPane tab="Tips" key="tips">
             {/* Tips Management */}
-            <div className="bg-white p-6 rounded-lg shadow-sm border mb-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Tips Management</h3>
+            <div className="rounded-2xl border border-slate-100 bg-white p-6 shadow-card mb-6">
           
           {/* Filters */}
           <div className="space-y-4 mb-4">
@@ -1381,84 +1493,68 @@ const AdminDashboard: React.FC = () => {
             <Table
               columns={[
                 {
-                  title: 'Refund',
-                  key: 'refund',
-                  width: 90,
-                  render: (_: unknown, record: TipDetail) =>
-                    isRefundEligible(record) ? (
-                      <Button type="link" danger onClick={() => openRefundModal(record)}>
-                        Refund
-                      </Button>
-                    ) : (
-                      '-'
-                    )
-                },
-                {
-                  title: 'Created At',
+                  title: 'When',
                   dataIndex: 'createdAt',
                   key: 'createdAt',
-                  render: (date) => new Date(date).toLocaleString(),
-                  width: 180
-                },
-                {
-                  title: 'Processed At',
-                  dataIndex: 'processedAt',
-                  key: 'processedAt',
-                  render: (date) => date ? new Date(date).toLocaleString() : '-',
-                  width: 180
+                  render: (date: string) => <span className="whitespace-nowrap">{shortDate(date)}</span>,
+                  width: 140
                 },
                 {
                   title: 'Amount',
                   dataIndex: 'amount',
                   key: 'amount',
-                  render: (amount) => `$${amount.toFixed(2)}`,
-                  width: 100
-                },
-                {
-                  title: 'Device',
-                  dataIndex: 'deviceNickname',
-                  key: 'deviceNickname',
-                  width: 150
-                },
-                {
-                  title: 'Performer',
-                  key: 'performer',
-                  render: (_, record: TipDetail) => `${record.performerFirstName} ${record.performerLastName}`,
-                  width: 150
-                },
-                {
-                  title: 'Email',
-                  dataIndex: 'performerEmail',
-                  key: 'performerEmail',
-                  width: 200,
-                  ellipsis: true
+                  render: (amount: number) => <span className="font-bold text-ink-900">${amount.toFixed(2)}</span>,
+                  width: 90
                 },
                 {
                   title: 'Status',
                   dataIndex: 'status',
                   key: 'status',
-                  render: (status) => {
-                    let color = 'default';
-                    if (status === 'processed') color = 'green';
-                    if (status === 'failed' || status === 'error') color = 'red';
-                    if (status === 'pending') color = 'orange';
-                    if (status === 'refunded') color = 'blue';
-                    return <Tag color={color}>{status.toUpperCase()}</Tag>;
-                  },
-                  width: 100
+                  render: (status: string, record: TipDetail) => (
+                    <div>
+                      {tipStatusChip(status)}
+                      {status === 'processed' && record.processedAt && (
+                        <div className="mt-1.5 text-xs text-ink-500">{shortDate(record.processedAt)}</div>
+                      )}
+                      {status === 'failed' && record.failureReason && (
+                        <div className="mt-1.5 max-w-[260px] text-xs leading-snug text-ink-500" title={record.failureReason}>
+                          {friendlyReason(record.failureReason)}
+                        </div>
+                      )}
+                    </div>
+                  ),
+                  width: 250
                 },
                 {
-                  title: 'Effect',
-                  dataIndex: 'effect',
-                  key: 'effect',
-                  width: 80
+                  title: 'Performer',
+                  key: 'performer',
+                  render: (_: unknown, record: TipDetail) => (
+                    <div className="min-w-0">
+                      <div className="font-semibold text-ink-900">{record.performerFirstName} {record.performerLastName}</div>
+                      <div className="truncate text-xs text-ink-500">{record.deviceNickname} · {record.performerEmail}</div>
+                    </div>
+                  ),
+                  width: 240
                 },
                 {
-                  title: 'Performer Earnings',
+                  title: 'Performer gets',
                   dataIndex: 'performerEarnings',
                   key: 'performerEarnings',
-                  render: (earnings) => `$${earnings.toFixed(2)}`,
-                  width: 130
+                  align: 'right' as const,
+                  render: (earnings: number) => `$${earnings.toFixed(2)}`,
+                  width: 120
+                },
+                {
+                  title: '',
+                  key: 'refund',
+                  width: 90,
+                  align: 'right' as const,
+                  render: (_: unknown, record: TipDetail) =>
+                    isRefundEligible(record) ? (
+                      <Button type="link" danger onClick={() => openRefundModal(record)}>
+                        Refund
+                      </Button>
+                    ) : null
                 }
               ]}
               dataSource={tips}
@@ -1471,41 +1567,54 @@ const AdminDashboard: React.FC = () => {
                 showSizeChanger: false,
                 pageSizeOptions: ['20']
               }}
-              scroll={{ x: 1500 }}
-              size="small"
+              scroll={{ x: 880 }}
             />
           </Spin>
           <Modal
-            title="Confirm refund"
             open={refundModalOpen}
-            onOk={handleRefundConfirm}
-            onCancel={() => {
+            title="Refund this tip?"
+            onClose={() => {
               if (!refundLoading) {
                 setRefundModalOpen(false);
                 setRefundTip(null);
               }
             }}
-            confirmLoading={refundLoading}
-            okText="Refund"
-            okButtonProps={{ danger: true }}
+            footer={
+              <>
+                <UiButton
+                  variant="secondary"
+                  disabled={refundLoading}
+                  onClick={() => {
+                    setRefundModalOpen(false);
+                    setRefundTip(null);
+                  }}
+                >
+                  Keep tip
+                </UiButton>
+                <UiButton variant="dangerSolid" loading={refundLoading} onClick={handleRefundConfirm}>
+                  Refund
+                </UiButton>
+              </>
+            }
           >
             {refundTip && (
-              <div className="text-gray-700">
+              <div className="text-ink-700">
                 <p>
-                  Refund ${refundTip.amount.toFixed(2)} to {refundTip.performerFirstName} {refundTip.performerLastName}?
+                  Refund <strong className="text-ink-900">${refundTip.amount.toFixed(2)}</strong> to the card that paid for this tip. It counts against{' '}
+                  {refundTip.performerFirstName} {refundTip.performerLastName}.
                 </p>
-                <p className="text-sm text-gray-500">
-                  Created: {new Date(refundTip.createdAt).toLocaleString()}
-                </p>
+                <p className="mt-2 text-sm text-ink-500">Tipped {new Date(refundTip.createdAt).toLocaleString()}</p>
               </div>
             )}
           </Modal>
         </div>
 
+          </Tabs.TabPane>
+          <Tabs.TabPane tab="Performers" key="performers">
         {/* Performers Management */}
-        <div className="bg-white p-6 rounded-lg shadow-sm border">
+        <div className="rounded-2xl border border-slate-100 bg-white p-6 shadow-card">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold text-gray-900">Performers Management</h3>
+            <h3 className="text-base font-bold text-ink-900">All performers</h3>
             <Search
               placeholder="Search performers..."
               onSearch={handleSearch}
@@ -1536,11 +1645,11 @@ const AdminDashboard: React.FC = () => {
 
           {userProfile?.role === 'root_admin' && (
             <Tabs.TabPane tab="Device Management" key="device-management">
-              <div className="bg-white p-6 rounded-lg shadow-sm border mb-6">
+              <div className="rounded-2xl border border-slate-100 bg-white p-6 shadow-card mb-6">
               <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-4">
                 <div>
-                  <h3 className="text-lg font-semibold text-gray-900">Performer Device Management</h3>
-                  <p className="text-sm text-gray-500">
+                  <h3 className="text-base font-bold text-ink-900">Performer Device Management</h3>
+                  <p className="text-sm text-ink-500">
                     Search by first name, last name, public name, or device serial number.
                   </p>
                 </div>
@@ -1560,7 +1669,7 @@ const AdminDashboard: React.FC = () => {
 
               <Spin spinning={deviceSearchLoading}>
                 {deviceSearchResults.length === 0 ? (
-                  <p className="text-gray-500">
+                  <p className="text-ink-500">
                     {deviceSearchTerm.trim()
                       ? 'No performers or devices found for that search.'
                       : 'No results yet. Run a search to see devices.'}
@@ -1573,16 +1682,16 @@ const AdminDashboard: React.FC = () => {
                         className="shadow-sm"
                         title={
                           <div className="flex flex-col">
-                            <span className="font-semibold text-gray-900">
+                            <span className="font-semibold text-ink-900">
                               {performer.firstName} {performer.lastName}
                             </span>
-                            <span className="text-xs text-gray-500">
+                            <span className="text-xs text-ink-500">
                               {performer.stageName ? `Public Name: ${performer.stageName}` : 'Public Name: —'}
                             </span>
                           </div>
                         }
                       >
-                        <div className="text-sm text-gray-600 mb-4">
+                        <div className="text-sm text-ink-500 mb-4">
                           Email: {performer.email}
                         </div>
 
@@ -1679,15 +1788,15 @@ const AdminDashboard: React.FC = () => {
 
           {isSimulationVisible && (
             <Tabs.TabPane tab="Device Tip Simulation" key="device-tip-simulation">
-              <div className="bg-white p-6 rounded-lg shadow-sm border">
+              <div className="rounded-2xl border border-slate-100 bg-white p-6 shadow-card">
                 <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-4">
                   <div>
-                    <h3 className="text-lg font-semibold text-gray-900">Device Tip Simulation</h3>
-                    <p className="text-sm text-gray-500">
+                    <h3 className="text-base font-bold text-ink-900">Device Tip Simulation</h3>
+                    <p className="text-sm text-ink-500">
                       Available only on local and apptest environments.
                     </p>
                   </div>
-                  <div className="text-sm text-gray-600">
+                  <div className="text-sm text-ink-500">
                     <span className="font-semibold">Elapsed:</span> {formatSimulationTime(simulationElapsed)} ·{' '}
                     <span className="font-semibold">Tips:</span> {simulationTipCount}
                   </div>
@@ -1699,7 +1808,7 @@ const AdminDashboard: React.FC = () => {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Device Serial Number</label>
+                    <label className="block text-sm font-medium text-ink-700 mb-2">Device Serial Number</label>
                     <Select
                       showSearch
                       placeholder="Search device serial or performer..."
@@ -1723,7 +1832,7 @@ const AdminDashboard: React.FC = () => {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Tip Frequency</label>
+                    <label className="block text-sm font-medium text-ink-700 mb-2">Tip Frequency</label>
                     <Select
                       value={simulationFrequency}
                       onChange={(value) => setSimulationFrequency(value)}
@@ -1742,7 +1851,7 @@ const AdminDashboard: React.FC = () => {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Tipper Mode</label>
+                    <label className="block text-sm font-medium text-ink-700 mb-2">Tipper Mode</label>
                     <Select
                       value={simulationPaymentMode}
                       onChange={(value) => {
@@ -1760,7 +1869,7 @@ const AdminDashboard: React.FC = () => {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Denomination</label>
+                    <label className="block text-sm font-medium text-ink-700 mb-2">Denomination</label>
                     <Select
                       value={simulationAmountMode}
                       onChange={(value) => setSimulationAmountMode(value)}
@@ -1795,241 +1904,254 @@ const AdminDashboard: React.FC = () => {
           )}
 
           <Tabs.TabPane tab="Aggregated Charges" key="aggregated-charges">
-            <AggregatedChargesTable />
+            <div className="space-y-5">
+              <RecoverChargedTips />
+              <AggregatedChargesTable />
+            </div>
           </Tabs.TabPane>
         </Tabs>
 
         {/* Update Fee Modal */}
         <Modal
-          title="Update Platform Fee"
           open={updateFeeModal}
-          onOk={handleUpdateFee}
-          onCancel={() => {
+          title="Update platform fee"
+          onClose={() => {
             setUpdateFeeModal(false);
             setSelectedPerformer(null);
           }}
-          confirmLoading={updatingFee}
+          footer={
+            <>
+              <UiButton
+                variant="secondary"
+                onClick={() => {
+                  setUpdateFeeModal(false);
+                  setSelectedPerformer(null);
+                }}
+              >
+                Cancel
+              </UiButton>
+              <UiButton loading={updatingFee} onClick={handleUpdateFee}>
+                Save fee
+              </UiButton>
+            </>
+          }
         >
           {selectedPerformer && (
-            <div className="space-y-4">
+            <div className="space-y-5">
+              <p className="text-ink-700">
+                Platform fee for <strong className="text-ink-900">{selectedPerformer.firstName} {selectedPerformer.lastName}</strong>. It is now{' '}
+                {selectedPerformer.platformFeePercentage}%.
+              </p>
               <div>
-                <p className="text-gray-600 mb-2">
-                  Update platform fee for <strong>{selectedPerformer.firstName} {selectedPerformer.lastName}</strong>
-                </p>
-                <p className="text-sm text-gray-500">
-                  Current fee: {selectedPerformer.platformFeePercentage}%
-                </p>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  New Platform Fee Percentage
-                </label>
-                <Input
+                <label htmlFor="fee-pct" className="mb-1.5 block text-sm font-semibold text-ink-700">New fee (%)</label>
+                <input
+                  id="fee-pct"
                   type="number"
                   min="0.01"
                   max="100"
                   step="0.01"
                   value={newFeePercentage}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewFeePercentage(Number(e.target.value))}
-                  suffix="%"
+                  onChange={(e) => setNewFeePercentage(Number(e.target.value))}
+                  className='h-12 w-full rounded-xl border border-slate-300 bg-white px-4 text-ink-900 placeholder:text-ink-400 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-brand-500'
                 />
-                <p className="text-xs text-gray-500 mt-1">
-                  Enter a value between 0.01% and 100%
-                </p>
+                <p className="mt-1.5 text-sm text-ink-500">A value between 0.01 and 100. It applies to new tips.</p>
               </div>
             </div>
           )}
         </Modal>
 
         <Modal
-          title={pendingDeviceAction?.type === 'add' ? 'Confirm Device Add' : 'Confirm Device Deletion'}
           open={!!pendingDeviceAction}
-          okText="Continue"
-          cancelText="Cancel"
-          confirmLoading={deviceActionLoading}
-          onOk={() => runDeviceAction(notifyPerformer)}
-          onCancel={() => {
-            if (!deviceActionLoading) {
-              setPendingDeviceAction(null);
-            }
+          title={pendingDeviceAction?.type === 'add' ? 'Add this device?' : 'Delete this device?'}
+          onClose={() => {
+            if (!deviceActionLoading) setPendingDeviceAction(null);
           }}
+          footer={
+            <>
+              <UiButton variant="secondary" disabled={deviceActionLoading} onClick={() => setPendingDeviceAction(null)}>
+                Cancel
+              </UiButton>
+              <UiButton
+                variant={pendingDeviceAction?.type === 'add' ? 'primary' : 'dangerSolid'}
+                loading={deviceActionLoading}
+                onClick={() => runDeviceAction(notifyPerformer)}
+              >
+                {pendingDeviceAction?.type === 'add' ? 'Add device' : 'Delete device'}
+              </UiButton>
+            </>
+          }
         >
           {pendingDeviceAction && (
-            <div className="text-gray-700">
-              <p className="mb-2">
-                {pendingDeviceAction.type === 'add'
-                  ? 'You are about to add a device to:'
-                  : 'You are about to delete a device from:'}
+            <div className="space-y-4 text-ink-700">
+              <p>
+                {pendingDeviceAction.type === 'add' ? 'You are adding a device to' : 'You are deleting a device from'}
               </p>
-              <p className="font-semibold">
-                {pendingDeviceAction.performer.firstName} {pendingDeviceAction.performer.lastName}
-              </p>
-              <p className="text-sm text-gray-500">{pendingDeviceAction.performer.email}</p>
-              <p className="mt-3">
-                Device Serial Number: <strong>{pendingDeviceAction.serialNumber}</strong>
-              </p>
-              <div className="mt-4">
-                <Radio.Group
-                  onChange={(e) => setNotifyPerformer(e.target.value === 'notify')}
-                  value={notifyPerformer ? 'notify' : 'no-notify'}
-                >
-                  <Space direction="vertical">
-                    <Radio value="notify">Notify performer</Radio>
-                    <Radio value="no-notify">Do not notify performer</Radio>
-                  </Space>
-                </Radio.Group>
+              <div className="rounded-xl bg-slate-50 px-4 py-3">
+                <div className="font-semibold text-ink-900">
+                  {pendingDeviceAction.performer.firstName} {pendingDeviceAction.performer.lastName}
+                </div>
+                <div className="text-sm text-ink-500">{pendingDeviceAction.performer.email}</div>
+                <div className="mt-2 text-sm">
+                  Serial number <strong className="text-ink-900">{pendingDeviceAction.serialNumber}</strong>
+                </div>
               </div>
+              <fieldset>
+                <legend className="mb-2 text-sm font-semibold text-ink-700">Tell the performer?</legend>
+                {[
+                  { value: true, label: 'Yes, send them an email' },
+                  { value: false, label: 'No, do it quietly' }
+                ].map(opt => (
+                  <label key={String(opt.value)} className="flex cursor-pointer items-center gap-3 py-1.5">
+                    <input
+                      type="radio"
+                      name="notify-performer"
+                      checked={notifyPerformer === opt.value}
+                      onChange={() => setNotifyPerformer(opt.value)}
+                      className="h-5 w-5 accent-brand-700"
+                    />
+                    {opt.label}
+                  </label>
+                ))}
+              </fieldset>
             </div>
           )}
         </Modal>
 
         {/* Batch History Modal */}
         <Modal
-          title="Batch Processing History"
           open={batchHistoryModal}
-          onCancel={() => setBatchHistoryModal(false)}
-          footer={null}
-          width={900}
+          wide
+          title="Batch processing history"
+          onClose={() => setBatchHistoryModal(false)}
+          footer={<UiButton onClick={() => setBatchHistoryModal(false)}>Done</UiButton>}
         >
           <Table
             columns={[
               {
-                title: 'Started At',
+                title: 'Started',
                 dataIndex: 'startedAt',
                 key: 'startedAt',
-                render: (date) => new Date(date).toLocaleString(),
-                width: 180
+                render: (date: string) => <span className="font-semibold text-ink-900">{shortDate(date)}</span>,
+                width: 140
               },
               {
-                title: 'Completed At',
-                dataIndex: 'completedAt',
-                key: 'completedAt',
-                render: (date) => date ? new Date(date).toLocaleString() : '-',
-                width: 180
-              },
-              {
-                title: 'Status',
+                title: 'Result',
                 dataIndex: 'status',
                 key: 'status',
-                render: (status) => {
-                  let color = 'default';
-                  if (status === 'success') color = 'green';
-                  if (status === 'failed') color = 'red';
-                  if (status === 'running') color = 'orange';
-                  return <Tag color={color}>{status.toUpperCase()}</Tag>;
-                }
+                render: (status: string) => runStatusChip(status),
+                width: 110
               },
               {
-                title: 'Processed',
-                dataIndex: 'tipsProcessed',
-                key: 'tipsProcessed',
-                render: (num) => <span className="text-green-600 font-medium">{num}</span>
-              },
-              {
-                title: 'Failed',
-                dataIndex: 'tipsFailed',
-                key: 'tipsFailed',
-                render: (num) => <span className="text-red-600 font-medium">{num}</span>
+                title: 'Tips',
+                key: 'tips',
+                render: (_: unknown, run: { tipsProcessed: number; tipsFailed: number }) => (
+                  <span className="whitespace-nowrap">
+                    <span className="font-semibold text-ink-900">{run.tipsProcessed}</span> charged
+                    {run.tipsFailed > 0 && (
+                      <>
+                        {' · '}
+                        <span className="font-semibold" style={{ color: 'var(--tone-error-fg)' }}>{run.tipsFailed}</span> failed
+                      </>
+                    )}
+                  </span>
+                ),
+                width: 170
               },
               {
                 title: 'Total',
                 dataIndex: 'totalAmount',
                 key: 'totalAmount',
-                render: (amount) => `$${amount.toFixed(2)}`
+                align: 'right' as const,
+                render: (amount: number) => <span className="font-bold text-ink-900">${(amount ?? 0).toFixed(2)}</span>,
+                width: 90
               },
               {
-                title: 'Duration',
+                title: 'Took',
                 dataIndex: 'durationSeconds',
                 key: 'durationSeconds',
-                render: (seconds) => seconds ? `${seconds}s` : '-'
+                render: (seconds: number) => (seconds ? `${seconds}s` : '—'),
+                width: 60
+              },
+              {
+                title: 'Note',
+                dataIndex: 'errorMessage',
+                key: 'errorMessage',
+                render: (msg: string | null) =>
+                  msg ? <span className="text-xs leading-snug text-ink-500" title={msg}>{friendlyBatchNote(msg)}</span> : <span className="text-ink-400">—</span>,
+                width: 240
               }
             ]}
             dataSource={batchHistory}
             rowKey="id"
             pagination={false}
-            size="small"
+            scroll={{ x: 800 }}
           />
         </Modal>
 
         {/* Stripe Mode Toggle Confirmation Modal */}
         <Modal
-          title={stripeMode === 'test' ? '⚠️ Enable Live Mode' : '✓ Switch to Test Mode'}
           open={stripeModeConfirming}
-          onOk={confirmToggleStripeMode}
-          onCancel={() => setStripeModeConfirming(false)}
-          okText={stripeMode === 'test' ? 'Enable Live Mode' : 'Switch to Test Mode'}
-          cancelText="Cancel"
-          okButtonProps={{ 
-            danger: stripeMode === 'test',
-            loading: stripeModeLoading
-          }}
+          title={stripeMode === 'test' ? 'Enable live mode?' : 'Switch to test mode?'}
+          onClose={() => setStripeModeConfirming(false)}
+          footer={
+            <>
+              <UiButton variant="secondary" onClick={() => setStripeModeConfirming(false)}>
+                Cancel
+              </UiButton>
+              <UiButton
+                variant={stripeMode === 'test' ? 'dangerSolid' : 'primary'}
+                loading={stripeModeLoading}
+                disabled={stripeMode === 'test' && liveConfirmText.trim() !== 'LIVE'}
+                onClick={confirmToggleStripeMode}
+              >
+                {stripeMode === 'test' ? 'Enable live mode' : 'Switch to test mode'}
+              </UiButton>
+            </>
+          }
         >
-          {stripeModeError && (
-            <Alert
-              type="error"
-              showIcon
-              message={stripeModeError}
-              style={{ marginBottom: 16 }}
-            />
-          )}
+          <div className="space-y-4">
+            {stripeModeError && (
+              <Banner tone="error" title="That did not work">
+                {stripeModeError}
+              </Banner>
+            )}
 
-          {stripeMode === 'test' ? (
-            <div className="space-y-4">
-              <div className="bg-red-50 border-l-4 border-red-500 p-4">
-                <div className="flex items-start">
-                  <div className="flex-shrink-0">
-                    <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
-                      <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                    </svg>
-                  </div>
-                  <div className="ml-3">
-                    <h3 className="text-sm font-medium text-red-800">Warning: Production Mode</h3>
-                    <div className="mt-2 text-sm text-red-700">
-                      <p>You are about to enable <strong>LIVE MODE</strong>. This means:</p>
-                      <ul className="list-disc list-inside mt-2 space-y-1">
-                        <li>All transactions will process <strong>REAL MONEY</strong></li>
-                        <li>Customers will be charged actual amounts</li>
-                        <li>All Stripe fees will apply</li>
-                        <li>This change affects the entire platform immediately</li>
-                      </ul>
-                    </div>
-                  </div>
+            {stripeMode === 'test' ? (
+              <>
+                <Banner tone="error" title="This uses real money">
+                  <ul className="mt-1 list-disc space-y-1 pl-5">
+                    <li>Every tip is charged to a real card</li>
+                    <li>Stripe fees apply</li>
+                    <li>It changes the whole platform right away</li>
+                  </ul>
+                </Banner>
+                <div>
+                  <label htmlFor="live-confirm" className="mb-1.5 block text-sm font-semibold text-ink-700">
+                    To confirm, type <strong>LIVE</strong>
+                  </label>
+                  <input
+                    id="live-confirm"
+                    value={liveConfirmText}
+                    onChange={(e) => setLiveConfirmText(e.target.value)}
+                    placeholder="LIVE"
+                    autoFocus
+                    className='h-12 w-full rounded-xl border border-slate-300 bg-white px-4 text-ink-900 placeholder:text-ink-400 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-brand-500'
+                  />
                 </div>
-              </div>
-              <p className="text-gray-700">
-                Are you absolutely sure you want to switch to live mode?
-              </p>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              <div className="bg-green-50 border-l-4 border-green-500 p-4">
-                <div className="flex items-start">
-                  <div className="flex-shrink-0">
-                    <svg className="h-5 w-5 text-green-400" viewBox="0 0 20 20" fill="currentColor">
-                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                    </svg>
-                  </div>
-                  <div className="ml-3">
-                    <h3 className="text-sm font-medium text-green-800">Switching to Test Mode</h3>
-                    <div className="mt-2 text-sm text-green-700">
-                      <p>This will switch the system back to test mode where:</p>
-                      <ul className="list-disc list-inside mt-2 space-y-1">
-                        <li>No real charges will be processed</li>
-                        <li>Safe to test and experiment</li>
-                        <li>Test Stripe keys will be used</li>
-                      </ul>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <p className="text-gray-700">
-                Confirm switching to test mode?
-              </p>
-            </div>
-          )}
+              </>
+            ) : (
+              <Banner tone="success" title="Back to test mode">
+                <ul className="mt-1 list-disc space-y-1 pl-5">
+                  <li>No real charges are made</li>
+                  <li>Test Stripe keys are used</li>
+                  <li>Safe for testing</li>
+                </ul>
+              </Banner>
+            )}
+          </div>
         </Modal>
       </div>
-    </div>
+    </PortalShell>
   );
 };
 

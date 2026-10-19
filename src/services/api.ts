@@ -458,7 +458,14 @@ class ApiService {
     })
   }
 
-  async updateDeviceConfiguration(deviceId: string, config: { isSoundEnabled?: boolean, isRandomLightEffect?: boolean, effectConfiguration?: string }): Promise<ApiResponse<any>> {
+  async updateDevicePause(deviceId: string, isPaused: boolean): Promise<ApiResponse<any>> {
+    return this.request(`/api/devices/${deviceId}/pause`, {
+      method: 'PUT',
+      body: JSON.stringify({ isPaused })
+    })
+  }
+
+  async updateDeviceConfiguration(deviceId: string, config: { isSoundEnabled?: boolean, isRandomLightEffect?: boolean, effectConfiguration?: string, soundId?: number, soundVolume?: string }): Promise<ApiResponse<any>> {
     return this.request(`/api/devices/${deviceId}/configuration`, {
       method: 'PUT',
       body: JSON.stringify(config)
@@ -644,7 +651,9 @@ class ApiService {
     }
 
     try {
-      const extension = file.name.split('.').pop() || 'jpg'
+      // Pick the type from the file itself, not its name, so it always matches what the upload link was signed for
+      const isPng = file.type === 'image/png'
+      const extension = isPng ? 'png' : 'jpg'
 
       // 1) Get presigned URL
       const presignResponse = await performAuthedJsonPost('/api/profiles/profile-photo/presigned-url', {
@@ -665,7 +674,7 @@ class ApiService {
       const s3UploadResponse = await fetch(presignedUrl, {
         method: 'PUT',
         headers: {
-          'Content-Type': file.type || 'application/octet-stream',
+          'Content-Type': isPng ? 'image/png' : 'image/jpeg',
         },
         body: file,
       })

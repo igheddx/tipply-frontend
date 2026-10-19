@@ -2,6 +2,8 @@ import logger from "../utils/logger";
 import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import apiService from '../services/api'
+import { BrandIcon } from '../components/icons/BrandIcons'
+import { Banner, Button } from '../components/ui'
 
 const Login: React.FC = () => {
   const [email, setEmail] = useState('')
@@ -89,217 +91,159 @@ const Login: React.FC = () => {
     navigate('/onboarding')
   }
 
+  const inputClass =
+    'w-full h-12 pl-11 pr-4 rounded-xl border border-slate-300 bg-white text-ink-900 placeholder:text-ink-400 transition-colors focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent'
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full">
-        {/* KYC Success Message */}
-        {showKycSuccess && (
-          <div className="mb-8 bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-2xl p-6">
-            <div className="text-center">
-              <div className="mx-auto w-16 h-16 bg-gradient-to-r from-green-500 to-emerald-500 rounded-full flex items-center justify-center mb-4">
-                <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                </svg>
-              </div>
-              <h3 className="text-xl font-bold text-green-800 mb-2">
-                🎉 Congratulations!
-              </h3>
-              <p className="text-green-700 mb-3">
-                You've successfully completed your KYC verification with Stripe!
-              </p>
-              <p className="text-green-600 text-sm">
-                Please sign in below to access your dashboard and start accepting tips.
-              </p>
-            </div>
-          </div>
-        )}
+    <div className="min-h-screen bg-surface lg:grid lg:grid-cols-[1.05fr_1fr]">
+      {/* Brand panel: a header band on phones, a full side panel on desktop */}
+      <aside
+        className="relative overflow-hidden px-6 pb-16 pt-8 text-white lg:flex lg:min-h-screen lg:flex-col lg:justify-between lg:px-14 lg:py-14"
+        style={{
+          background:
+            'radial-gradient(70% 55% at 100% 0%, rgba(6,182,200,0.35), transparent 70%),' +
+            'radial-gradient(60% 50% at 0% 100%, rgba(229,84,140,0.28), transparent 70%),' +
+            'linear-gradient(160deg,#0a2533,#0d4254 60%,#0f3447)'
+        }}
+      >
+        {/* Oversized monogram as a quiet background shape */}
+        <img
+          src="/images/logo/tipwave-monogram.png"
+          alt=""
+          aria-hidden
+          className="pointer-events-none absolute -bottom-10 -right-16 hidden w-[520px] max-w-none opacity-[0.07] lg:block"
+        />
+        <img src="/images/logo/tipwave-logo-v2-light.png" alt="Tipwave" className="relative h-10 w-auto self-start lg:h-12" />
 
-        {/* Password Reset Success Message */}
-        {passwordResetMessage && (
-          <div className="mb-8 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-2xl p-6">
-            <div className="text-center">
-              <div className="mx-auto w-16 h-16 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-full flex items-center justify-center mb-4">
-                <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                </svg>
-              </div>
-              <h3 className="text-xl font-bold text-blue-800 mb-2">
-                🔐 Password Reset Complete!
-              </h3>
-              <p className="text-blue-700 mb-3">
-                Your password has been successfully reset.
-              </p>
-              <p className="text-blue-600 text-sm">
-                Please sign in below with your new password.
-              </p>
-            </div>
-          </div>
-        )}
-
-        {/* Logo and Header */}
-        <div className="text-center mb-8">
-          <div className="mx-auto flex items-center justify-center mb-4">
-            <div className="w-36 h-36 overflow-visible rounded-2xl">
-              <img 
-                src="/images/logo/tipwave-logo2b.png"
-                alt="Tipwave Logo" 
-                className="w-full h-full object-contain"
-                style={{ transform: 'scale(1.25)', objectPosition: 'center' }}
-              />
-            </div>
-          </div>
-          <h2 className="text-3xl font-bold text-gray-900 mb-2">
-            Welcome back
+        <div className="relative mt-8 lg:mt-0">
+          <h2 className="text-3xl font-bold leading-tight lg:text-5xl">
+            Get tipped.
+            <br />
+            Get paid.
           </h2>
-          <p className="text-gray-600">
-            Sign in to your performer dashboard
+          <p className="mt-3 max-w-md text-white/75 lg:text-lg">
+            Your audience scans, picks an amount and tips. You see it the moment it happens.
           </p>
+          <ul className="mt-8 hidden space-y-4 lg:block">
+            {[
+              { icon: 'qr' as const, text: 'One scan to tip. No app to download.' },
+              { icon: 'music' as const, text: 'Take song requests with every tip.' },
+              { icon: 'bank' as const, text: 'Payouts go straight to your bank.' }
+            ].map(item => (
+              <li key={item.text} className="flex items-center gap-3 text-white/90">
+                <span className="flex h-10 w-10 items-center justify-center rounded-full bg-white/10">
+                  <BrandIcon name={item.icon} size={20} color="#7EE3EF" />
+                </span>
+                {item.text}
+              </li>
+            ))}
+          </ul>
         </div>
 
-        {/* Login Form */}
-        <div className="bg-white rounded-2xl shadow-xl p-8">
-          <form onSubmit={handleSubmit} className="space-y-6">
+        <p className="relative hidden text-sm text-white/50 lg:block">© Tipwave</p>
+      </aside>
+
+      {/* Form */}
+      <main className="relative z-10 -mt-8 px-4 pb-10 lg:mt-0 lg:flex lg:items-center lg:justify-center lg:px-12">
+        <div className="mx-auto w-full max-w-md rounded-2xl bg-white p-6 shadow-card lg:bg-transparent lg:p-0 lg:shadow-none">
+          <h1 className="text-2xl font-bold text-ink-900 lg:text-3xl">Welcome back</h1>
+          <p className="mb-6 mt-1 text-ink-500">Sign in to your Tipwave portal</p>
+
+          {showKycSuccess && (
+            <Banner tone="success" title="Identity verified" className="mb-5">
+              Stripe has what it needs. Sign in to start getting paid.
+            </Banner>
+          )}
+
+          {passwordResetMessage && (
+            <Banner tone="success" title="Password reset" className="mb-5">
+              Sign in with your new password.
+            </Banner>
+          )}
+
+          <form onSubmit={handleSubmit} className="space-y-5">
+            {error && (
+              <Banner tone="error" title="We could not sign you in">
+                {error}
+              </Banner>
+            )}
+
             <div>
-              <label htmlFor="email" className="block text-sm font-semibold text-gray-700 mb-2">
-                Email address
+              <label htmlFor="email" className="mb-1.5 block text-sm font-semibold text-ink-700">
+                Email
               </label>
               <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 12a4 4 0 10-8 0 4 4 0 008 0zm0 0v1.5a2.5 2.5 0 005 0V12a9 9 0 10-9 9m4.5-1.206a8.959 8.959 0 01-4.5 1.207" />
-                  </svg>
-                </div>
+                <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center">
+                  <BrandIcon name="mail" size={20} tone="muted" />
+                </span>
                 <input
                   id="email"
                   name="email"
                   type="email"
                   autoComplete="email"
+                  inputMode="email"
                   required
-                  className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all duration-200"
-                  placeholder="Enter your email"
+                  className={inputClass}
+                  placeholder="you@example.com"
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  onChange={e => setEmail(e.target.value)}
                 />
               </div>
             </div>
 
             <div>
-              <label htmlFor="password" className="block text-sm font-semibold text-gray-700 mb-2">
-                Password
-              </label>
+              <div className="mb-1.5 flex items-center justify-between">
+                <label htmlFor="password" className="block text-sm font-semibold text-ink-700">
+                  Password
+                </label>
+                <button
+                  type="button"
+                  onClick={() => navigate('/forgot-password')}
+                  className="text-sm font-semibold text-brand-700 hover:text-brand-800"
+                >
+                  Forgot password?
+                </button>
+              </div>
               <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                  </svg>
-                </div>
+                <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center">
+                  <BrandIcon name="lock" size={20} tone="muted" />
+                </span>
                 <input
                   id="password"
                   name="password"
                   type={showPassword ? 'text' : 'password'}
                   autoComplete="current-password"
                   required
-                  className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all duration-200"
-                  placeholder="Enter your password"
+                  className={`${inputClass} pr-16`}
                   value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  onChange={e => setPassword(e.target.value)}
                 />
                 <button
                   type="button"
-                  onClick={() => setShowPassword((prev) => !prev)}
-                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-500 hover:text-gray-700"
+                  onClick={() => setShowPassword(prev => !prev)}
+                  className="absolute inset-y-0 right-1 flex w-14 items-center justify-center text-sm font-semibold text-brand-700"
                   aria-label={showPassword ? 'Hide password' : 'Show password'}
                 >
-                  {showPassword ? (
-                    <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-5 0-9-4-9-7 0-.88.21-1.715.58-2.47m3.15-3.15A9.956 9.956 0 0112 5c5 0 9 4 9 7 0 1.07-.34 2.07-.94 3m-3.28 3.28L4.22 4.22" />
-                    </svg>
-                  ) : (
-                    <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                    </svg>
-                  )}
+                  {showPassword ? 'Hide' : 'Show'}
                 </button>
               </div>
-              <p className="mt-2 text-xs text-gray-500">Your information is encrypted and secure.</p>
             </div>
 
-            {/* Forgot Password Link */}
-            <div className="flex justify-end">
-              <button
-                type="button"
-                onClick={() => navigate('/forgot-password')}
-                className="text-sm text-primary-600 hover:text-primary-700 font-medium transition-colors duration-200"
-              >
-                Forgot your password?
-              </button>
-            </div>
-
-            {error && (
-              <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-                <div className="flex items-center space-x-2">
-                  <svg className="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                  <span className="text-red-600 text-sm">{error}</span>
-                </div>
-              </div>
-            )}
-
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="w-full bg-gradient-to-r from-primary-600 to-primary-700 text-white font-semibold py-3 px-4 rounded-lg hover:from-primary-700 hover:to-primary-800 focus:ring-4 focus:ring-primary-200 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isLoading ? (
-                <div className="flex items-center justify-center space-x-2">
-                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                  <span>Signing in...</span>
-                </div>
-              ) : (
-                'Sign in'
-              )}
-            </button>
+            <Button type="submit" size="lg" block loading={isLoading}>
+              Sign in
+            </Button>
           </form>
 
-          {/* Divider */}
-          <div className="mt-8">
-            <div className="relative">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-gray-200" />
-              </div>
-              <div className="relative flex justify-center text-sm">
-                <span className="px-4 bg-white text-gray-500">New to Tipwave?</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Get Started Button */}
-          <div className="mt-6">
-            <button
-              onClick={handleGetStarted}
-              className="w-full border border-gray-300 text-gray-700 font-semibold py-3 px-4 rounded-lg hover:bg-gray-50 focus:ring-4 focus:ring-primary-100 transition-all duration-200"
-            >
-              <div className="flex items-center justify-center space-x-2">
-                <span>Get Started</span>
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
-                </svg>
-              </div>
-            </button>
+          <div className="mt-6 border-t border-slate-100 pt-6 text-center">
+            <p className="mb-3 text-sm text-ink-500">New to Tipwave?</p>
+            <Button variant="secondary" size="lg" block onClick={handleGetStarted}>
+              Set up your account
+            </Button>
           </div>
         </div>
-
-        {/* Footer */}
-        <div className="mt-8 text-center">
-          <p className="text-sm text-gray-500">
-            Fast • Secure • Made for Performers
-          </p>
-        </div>
-      </div>
+      </main>
     </div>
   )
 }
 
-export default Login 
+export default Login

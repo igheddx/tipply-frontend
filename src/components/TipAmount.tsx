@@ -107,7 +107,7 @@ const TipAmount: React.FC<TipAmountProps> = ({ onAmountSelect }) => {
                   target.nextElementSibling?.classList.remove('hidden')
                 }}
               />
-              <div className={`text-2xl font-bold text-gray-800 ${selectedAmount === amount ? 'hidden' : ''}`}>
+              <div className={`text-2xl font-bold text-ink-900 ${selectedAmount === amount ? 'hidden' : ''}`}>
                 ${amount}
               </div>
             </div>

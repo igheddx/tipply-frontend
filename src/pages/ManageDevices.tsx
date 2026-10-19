@@ -52,21 +52,21 @@ const ManageDevices: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-surface flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading devices...</p>
+          <p className="mt-4 text-ink-500">Loading devices...</p>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-surface">
       <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
         <div className="px-4 py-6 sm:px-0">
           <div className="flex justify-between items-center mb-8">
-            <h1 className="text-3xl font-bold text-gray-900">Manage Devices</h1>
+            <h1 className="text-3xl font-bold text-ink-900">Manage Devices</h1>
             <button
               onClick={() => navigate('/add-device')}
               className="btn-primary"
@@ -83,10 +83,10 @@ const ManageDevices: React.FC = () => {
 
           {devices.length === 0 ? (
             <div className="card text-center py-12">
-              <h3 className="text-lg font-medium text-gray-900 mb-2">
+              <h3 className="text-lg font-medium text-ink-900 mb-2">
                 No devices found
               </h3>
-              <p className="text-gray-500 mb-4">
+              <p className="text-ink-500 mb-4">
                 Get started by creating your first tipping device
               </p>
               <button
@@ -101,7 +101,7 @@ const ManageDevices: React.FC = () => {
               {devices.map((device) => (
                 <div key={device.id} className="card">
                   <div className="flex justify-between items-start mb-4">
-                    <h3 className="text-lg font-medium text-gray-900">
+                    <h3 className="text-lg font-medium text-ink-900">
                       {device.name}
                     </h3>
                     <span
@@ -115,7 +115,7 @@ const ManageDevices: React.FC = () => {
                     </span>
                   </div>
                   
-                  <div className="space-y-2 text-sm text-gray-600">
+                  <div className="space-y-2 text-sm text-ink-500">
                     <p>ID: {device.id}</p>
                     <p>Created: {new Date(device.createdAt).toLocaleDateString()}</p>
                   </div>

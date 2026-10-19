@@ -3,8 +3,11 @@ import { LineChart, Line, ScatterChart, Scatter, XAxis, YAxis, CartesianGrid, To
 import { AutoComplete } from 'antd'
 import type { BaseOptionType } from 'antd/es/select'
 import logger from '../utils/logger'
+import { Button, Modal, Switch, useFeedback } from './ui'
 import { API_BASE_URL } from '../utils/config'
 import apiService from '../services/api'
+import { DEFAULT_TIP_AMOUNTS, LIGHT_EFFECTS, SOUND_OPTIONS, VOLUME_OPTIONS, DEFAULT_SOUND_ID, DEFAULT_SOUND_VOLUME, normalizeEffectConfig, effectForAmount, buildEffectConfig } from '../utils/deviceConfig'
+import TipAmountsEditor from './TipAmountsEditor'
 
 interface PerformerDevice {
   id: string
@@ -14,6 +17,8 @@ interface PerformerDevice {
   createdAt: string
   isSoundEnabled?: boolean
   isRandomLightEffect?: boolean
+  soundId?: number
+  soundVolume?: string
   effectConfiguration?: string
 }
 
@@ -82,10 +87,13 @@ interface TipPoint {
 }
 
 const PerformerInsights: React.FC = () => {
+  const { toast } = useFeedback()
   const [searchTerm, setSearchTerm] = useState('')
   const [searchOptions, setSearchOptions] = useState<BaseOptionType[]>([])
   const [isSearching, setIsSearching] = useState(false)
   const [selectedPerformer, setSelectedPerformer] = useState<PerformerSearchResult | null>(null)
+  const [performerTipAmounts, setPerformerTipAmounts] = useState<number[]>(DEFAULT_TIP_AMOUNTS)
+  const [tipAmountsSaving, setTipAmountsSaving] = useState(false)
   const [insights, setInsights] = useState<PerformerInsights | null>(null)
   const [isLoadingInsights, setIsLoadingInsights] = useState(false)
   const [showConfigModal, setShowConfigModal] = useState(false)
@@ -129,11 +137,11 @@ const PerformerInsights: React.FC = () => {
           value: performer.id,
           label: (
             <div className="py-1">
-              <div className="font-medium text-gray-900">
+              <div className="font-medium text-ink-900">
                 {performer.firstName} {performer.lastName}
-                {performer.stageName && <span className="text-purple-600 ml-2">({performer.stageName})</span>}
+                {performer.stageName && <span className="text-brand-700 ml-2">({performer.stageName})</span>}
               </div>
-              <div className="text-sm text-gray-500">{performer.email}</div>
+              <div className="text-sm text-ink-500">{performer.email}</div>
             </div>
           ),
           searchText: `${performer.firstName} ${performer.lastName} ${performer.stageName || ''} ${performer.email}`.toLowerCase()
@@ -164,6 +172,41 @@ const PerformerInsights: React.FC = () => {
     }, 300) // 300ms debounce
   }
 
+  const loadPerformerTipAmounts = async (performerId: string) => {
+    const response = await apiService.get(`/api/admin/performers/${performerId}/tip-amounts`)
+    setPerformerTipAmounts(response.data?.amounts ?? DEFAULT_TIP_AMOUNTS)
+  }
+
+  const savePerformerTipAmounts = async (amounts: number[]) => {
+    if (!selectedPerformer) return
+    setTipAmountsSaving(true)
+    try {
+      const response = await apiService.put(`/api/admin/performers/${selectedPerformer.id}/tip-amounts`, { amounts })
+      if (response.data?.amounts) {
+        setPerformerTipAmounts(response.data.amounts)
+      } else {
+        toast('Failed to save tip amounts: ' + (response.error || 'Unknown error'), 'error')
+      }
+    } finally {
+      setTipAmountsSaving(false)
+    }
+  }
+
+  const resetPerformerTipAmounts = async () => {
+    if (!selectedPerformer) return
+    setTipAmountsSaving(true)
+    try {
+      const response = await apiService.delete(`/api/admin/performers/${selectedPerformer.id}/tip-amounts`)
+      if (response.data?.amounts) {
+        setPerformerTipAmounts(response.data.amounts)
+      } else {
+        toast('Failed to reset tip amounts: ' + (response.error || 'Unknown error'), 'error')
+      }
+    } finally {
+      setTipAmountsSaving(false)
+    }
+  }
+
   const handleSelect = (value: string) => {
     const performer = allPerformers.find(p => p.id === value)
     if (performer) {
@@ -175,6 +218,7 @@ const PerformerInsights: React.FC = () => {
       setFilteredTipPoints([])
       setTipTimelinePoints([])
       loadPerformerInsights(performer.id)
+      loadPerformerTipAmounts(performer.id)
     }
   }
 
@@ -232,6 +276,7 @@ const PerformerInsights: React.FC = () => {
 
   const handleBack = () => {
     setSelectedPerformer(null)
+    setPerformerTipAmounts(DEFAULT_TIP_AMOUNTS)
     setInsights(null)
     setSearchTerm('')
     setSearchOptions([])
@@ -247,7 +292,7 @@ const PerformerInsights: React.FC = () => {
       
       if (!qrBlob) {
         console.error('[QR] Blob is null or undefined')
-        alert('Could not download QR code. Please try again or check your connection.')
+        toast('Could not download QR code. Please try again or check your connection.', 'error')
         setIsDownloadingQR(false)
         return
       }
@@ -255,7 +300,7 @@ const PerformerInsights: React.FC = () => {
       console.info('[QR] Blob received:', { size: qrBlob.size, type: qrBlob.type })
 
       if (!qrBlob.type.startsWith('image/')) {
-        alert(`QR download returned a non-image content-type: ${qrBlob.type || 'unknown'}`)
+        toast(`QR download returned a non-image content-type: ${qrBlob.type || 'unknown'}`, 'error')
         setIsDownloadingQR(false)
         return
       }
@@ -294,7 +339,7 @@ const PerformerInsights: React.FC = () => {
         a.click()
         document.body.removeChild(a)
         URL.revokeObjectURL(rawUrl)
-        alert('Could not generate the branded card. Downloaded the raw QR instead.')
+        toast('Could not generate the branded card. Downloaded the raw QR instead.', 'info')
         setIsDownloadingQR(false)
         return
       }
@@ -381,7 +426,7 @@ const PerformerInsights: React.FC = () => {
         a.click()
         document.body.removeChild(a)
         URL.revokeObjectURL(rawUrl)
-        alert('Could not render the branded card. Downloaded the raw QR instead.')
+        toast('Could not render the branded card. Downloaded the raw QR instead.', 'info')
         setIsDownloadingQR(false)
         return
       }
@@ -447,14 +492,14 @@ const PerformerInsights: React.FC = () => {
           setIsDownloadingQR(false)
         } else {
           console.error('[QR] Blob is null!')
-          alert('Failed to create download file')
+          toast('Failed to create download file', 'error')
           setIsDownloadingQR(false)
         }
       }, 'image/png')
     } catch (error) {
       console.error('[QR] Download error:', error)
       logger.error('[QR] Download error:', error)
-      alert(`QR code download failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
+      toast(`QR code download failed: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error')
       setIsDownloadingQR(false)
     }
   }
@@ -585,7 +630,7 @@ const PerformerInsights: React.FC = () => {
       {/* Search Bar */}
       {!selectedPerformer && (
         <div className="bg-white rounded-lg shadow-sm p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Search Performers</h3>
+          <h3 className="text-lg font-semibold text-ink-900 mb-4">Search Performers</h3>
           <AutoComplete
             value={searchTerm}
             options={searchOptions}
@@ -596,7 +641,7 @@ const PerformerInsights: React.FC = () => {
             size="large"
             notFoundContent={isSearching ? 'Searching...' : searchTerm.length < 2 ? 'Type at least 2 characters' : 'No performers found'}
           />
-          <p className="text-sm text-gray-500 mt-2">
+          <p className="text-sm text-ink-500 mt-2">
             Start typing to search by name, stage name, or email address
           </p>
         </div>
@@ -609,15 +654,15 @@ const PerformerInsights: React.FC = () => {
           <div className="bg-white rounded-lg shadow-sm p-6">
             <button
               onClick={handleBack}
-              className="mb-4 text-purple-600 hover:text-purple-800 flex items-center gap-2"
+              className="mb-4 text-brand-700 hover:text-brand-800 flex items-center gap-2"
             >
               <span>←</span> Back to Search
             </button>
-            <h2 className="text-2xl font-bold text-gray-900">
+            <h2 className="text-2xl font-bold text-ink-900">
               {selectedPerformer.stageName || `${selectedPerformer.firstName} ${selectedPerformer.lastName}`}
             </h2>
-            <p className="text-sm text-gray-500">{selectedPerformer.email}</p>
-            <p className="text-xs text-gray-400 mt-1">
+            <p className="text-sm text-ink-500">{selectedPerformer.email}</p>
+            <p className="text-xs text-ink-400 mt-1">
               {selectedPerformer.devices?.length || 0} device(s)
             </p>
             
@@ -630,8 +675,8 @@ const PerformerInsights: React.FC = () => {
                     disabled={isDownloadingQR}
                     className={`px-4 py-2 text-white rounded-lg transition-all ${
                       isDownloadingQR 
-                        ? 'bg-blue-400 cursor-not-allowed' 
-                        : 'bg-blue-600 hover:bg-blue-700'
+                        ? 'bg-brand-400 cursor-not-allowed' 
+                        : 'bg-brand-700 hover:bg-brand-800'
                     }`}
                   >
                     {isDownloadingQR ? (
@@ -652,63 +697,70 @@ const PerformerInsights: React.FC = () => {
                   </button>
                 </>
               ) : (
-                <div className="text-sm text-gray-500 italic">
+                <div className="text-sm text-ink-500 italic">
                   No devices registered for this performer
                 </div>
               )}
             </div>
           </div>
 
+          <TipAmountsEditor
+            amounts={performerTipAmounts}
+            saving={tipAmountsSaving}
+            onSave={savePerformerTipAmounts}
+            onReset={resetPerformerTipAmounts}
+          />
+
           {isLoadingInsights ? (
             <div className="text-center py-12">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto"></div>
-              <p className="mt-4 text-gray-600">Loading insights...</p>
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand-700 mx-auto"></div>
+              <p className="mt-4 text-ink-500">Loading insights...</p>
             </div>
           ) : insights ? (
             <>
               {/* Metrics Cards */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 <div className="bg-white rounded-lg shadow-sm p-6">
-                  <div className="text-sm text-gray-500">Today's Tips</div>
-                  <div className="text-2xl font-bold text-gray-900">${(insights.metrics?.todaysTips || 0).toFixed(2)}</div>
+                  <div className="text-sm text-ink-500">Today's Tips</div>
+                  <div className="text-2xl font-bold text-ink-900">${(insights.metrics?.todaysTips || 0).toFixed(2)}</div>
                 </div>
                 
                 <div className="bg-white rounded-lg shadow-sm p-6">
-                  <div className="text-sm text-gray-500">Future Payouts</div>
-                  <div className="text-2xl font-bold text-gray-900">${(insights.futurePayouts || 0).toFixed(2)}</div>
+                  <div className="text-sm text-ink-500">Future Payouts</div>
+                  <div className="text-2xl font-bold text-ink-900">${(insights.futurePayouts || 0).toFixed(2)}</div>
                 </div>
                 
                 <div className="bg-white rounded-lg shadow-sm p-6">
-                  <div className="text-sm text-gray-500">In Transit</div>
-                  <div className="text-2xl font-bold text-gray-900">${(insights.inTransit || 0).toFixed(2)}</div>
+                  <div className="text-sm text-ink-500">In Transit</div>
+                  <div className="text-2xl font-bold text-ink-900">${(insights.inTransit || 0).toFixed(2)}</div>
                 </div>
                 
                 <div className="bg-white rounded-lg shadow-sm p-6">
-                  <div className="text-sm text-gray-500">Total Balance</div>
-                  <div className="text-2xl font-bold text-gray-900">${(insights.totalBalance || 0).toFixed(2)}</div>
+                  <div className="text-sm text-ink-500">Total Balance</div>
+                  <div className="text-2xl font-bold text-ink-900">${(insights.totalBalance || 0).toFixed(2)}</div>
                 </div>
                 
                 <div className="bg-white rounded-lg shadow-sm p-6">
-                  <div className="text-sm text-gray-500">Lifetime Volume</div>
-                  <div className="text-2xl font-bold text-gray-900">${(insights.metrics?.stripeLifetimeVolume || 0).toFixed(2)}</div>
+                  <div className="text-sm text-ink-500">Lifetime Volume</div>
+                  <div className="text-2xl font-bold text-ink-900">${(insights.metrics?.stripeLifetimeVolume || 0).toFixed(2)}</div>
                 </div>
                 
                 <div className="bg-white rounded-lg shadow-sm p-6">
-                  <div className="text-sm text-gray-500">Audience</div>
-                  <div className="text-2xl font-bold text-gray-900">{(insights.uniqueTippersAllTime || 0).toLocaleString()}</div>
-                  <div className="text-xs text-gray-400">Unique Tippers</div>
+                  <div className="text-sm text-ink-500">Audience</div>
+                  <div className="text-2xl font-bold text-ink-900">{(insights.uniqueTippersAllTime || 0).toLocaleString()}</div>
+                  <div className="text-xs text-ink-400">Unique Tippers</div>
                 </div>
                 
                 <div className="bg-white rounded-lg shadow-sm p-6">
-                  <div className="text-sm text-gray-500">Most Tipped</div>
-                  <div className="text-2xl font-bold text-gray-900">${(insights.mostTippedDenomination || 0).toFixed(2)}</div>
-                  <div className="text-xs text-gray-400">Denomination</div>
+                  <div className="text-sm text-ink-500">Most Tipped</div>
+                  <div className="text-2xl font-bold text-ink-900">${(insights.mostTippedDenomination || 0).toFixed(2)}</div>
+                  <div className="text-xs text-ink-400">Denomination</div>
                 </div>
               </div>
 
               {/* Weekly Tips Chart */}
               <div className="bg-white rounded-lg shadow-sm p-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Last 8 Weeks Performance</h3>
+                <h3 className="text-lg font-semibold text-ink-900 mb-4">Last 8 Weeks Performance</h3>
                 <ResponsiveContainer width="100%" height={300}>
                   <LineChart data={weeklyChartData}>
                     <CartesianGrid strokeDasharray="3 3" />
@@ -719,9 +771,9 @@ const PerformerInsights: React.FC = () => {
                       content={({ active, payload }) => {
                         if (active && payload && payload.length) {
                           return (
-                            <div className="bg-white p-3 border border-gray-200 rounded shadow-lg">
+                            <div className="bg-white p-3 border border-slate-200 rounded shadow-lg">
                               <p className="font-medium">{payload[0].payload.week}</p>
-                              <p className="text-sm text-blue-600">Total Tips: ${payload[0].value?.toFixed(2)}</p>
+                              <p className="text-sm text-brand-700">Total Tips: ${payload[0].value?.toFixed(2)}</p>
                               <p className="text-sm text-green-600">Unique Audience: {payload[0].payload.uniqueAudience}</p>
                             </div>
                           )
@@ -734,7 +786,7 @@ const PerformerInsights: React.FC = () => {
                       yAxisId="left"
                       type="monotone" 
                       dataKey="totalTips" 
-                      stroke="#8b5cf6" 
+                      stroke="#0891A6" 
                       strokeWidth={2}
                       name="Total Tips ($)"
                     />
@@ -744,7 +796,7 @@ const PerformerInsights: React.FC = () => {
                         type="monotone"
                         data={trendData}
                         dataKey="trend"
-                        stroke="#d1d5db"
+                        stroke="#CBD5E1"
                         strokeWidth={2}
                         strokeDasharray="0"
                         name="Trend"
@@ -757,26 +809,26 @@ const PerformerInsights: React.FC = () => {
 
               {/* Time Window Tips Chart */}
               <div className="bg-white rounded-lg shadow-sm p-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Tips by Time Window</h3>
+                <h3 className="text-lg font-semibold text-ink-900 mb-4">Tips by Time Window</h3>
                 
                 {/* Date/Time Range Selector */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Start Date/Time</label>
+                    <label className="block text-sm font-medium text-ink-700 mb-2">Start Date/Time</label>
                     <input
                       type="datetime-local"
                       value={startDateTime}
                       onChange={(e) => setStartDateTime(e.target.value)}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+                      className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-600"
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">End Date/Time</label>
+                    <label className="block text-sm font-medium text-ink-700 mb-2">End Date/Time</label>
                     <input
                       type="datetime-local"
                       value={endDateTime}
                       onChange={(e) => setEndDateTime(e.target.value)}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+                      className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-600"
                     />
                   </div>
                 </div>
@@ -801,7 +853,7 @@ const PerformerInsights: React.FC = () => {
                       content={({ active, payload }) => {
                         if (active && payload && payload.length) {
                           return (
-                            <div className="bg-white p-3 border border-gray-200 rounded shadow-lg">
+                            <div className="bg-white p-3 border border-slate-200 rounded shadow-lg">
                               <p className="font-medium">{payload[0].payload.time}</p>
                               <p className="text-sm text-green-600">Amount: ${payload[0].payload.amount.toFixed(2)}</p>
                             </div>
@@ -813,12 +865,12 @@ const PerformerInsights: React.FC = () => {
                     <Scatter 
                       name="Tips" 
                       data={filteredTipPoints} 
-                      fill="#8b5cf6"
+                      fill="#0891A6"
                     />
                   </ScatterChart>
                 </ResponsiveContainer>
                 
-                <p className="text-sm text-gray-500 mt-4">
+                <p className="text-sm text-ink-500 mt-4">
                   Showing {filteredTipPoints.length} tips in the selected time window
                 </p>
               </div>
@@ -831,6 +883,7 @@ const PerformerInsights: React.FC = () => {
       {showConfigModal && selectedDevice && (
         <DeviceConfigModal
           device={selectedDevice}
+          tipAmounts={performerTipAmounts}
           onClose={() => {
             setShowConfigModal(false)
             setSelectedDevice(null)
@@ -845,27 +898,24 @@ const PerformerInsights: React.FC = () => {
 // Device Config Modal Component
 const DeviceConfigModal: React.FC<{
   device: PerformerDevice
+  tipAmounts: number[]
   onClose: () => void
   onSave: () => void
-}> = ({ device, onClose, onSave }) => {
+}> = ({ device, tipAmounts, onClose, onSave }) => {
+  const { toast } = useFeedback()
   const [isSoundEnabled, setIsSoundEnabled] = useState(device.isSoundEnabled || false)
   const [isRandomEffect, setIsRandomEffect] = useState(device.isRandomLightEffect || false)
+  const [soundId, setSoundId] = useState(device.soundId ?? DEFAULT_SOUND_ID)
+  const [soundVolume, setSoundVolume] = useState(device.soundVolume ?? DEFAULT_SOUND_VOLUME)
   const [effectConfig, setEffectConfig] = useState<Record<string, string>>(() => {
     try {
       if (device.effectConfiguration) {
-        return JSON.parse(device.effectConfiguration)
+        return normalizeEffectConfig(JSON.parse(device.effectConfiguration))
       }
     } catch (e) {
       logger.error('Error parsing effect configuration:', e)
     }
-    return {
-      "2": "effect1",
-      "5": "effect1",
-      "10": "effect2",
-      "20": "effect2",
-      "50": "effect3",
-      "100": "effect3"
-    }
+    return {}
   })
   const [isSaving, setIsSaving] = useState(false)
 
@@ -877,7 +927,9 @@ const DeviceConfigModal: React.FC<{
       const requestBody = {
         isSoundEnabled,
         isRandomLightEffect: isRandomEffect,
-        effectConfiguration: JSON.stringify(effectConfig)
+        soundId,
+        soundVolume,
+        effectConfiguration: JSON.stringify(buildEffectConfig(effectConfig, tipAmounts))
       }
       console.log('[Config] Request body:', requestBody)
       
@@ -900,87 +952,100 @@ const DeviceConfigModal: React.FC<{
           onSave()
         } else {
           logger.error('Failed to save configuration - no success flag')
-          alert('Failed to update device configuration')
+          toast('Failed to update device configuration', 'error')
         }
       } else {
         const errorText = await response.text()
         console.error('[Config] Error response:', errorText)
         logger.error('Failed to save configuration')
-        alert('Failed to update device configuration: ' + response.statusText)
+        toast('Failed to update device configuration: ' + response.statusText, 'error')
       }
     } catch (error) {
       console.error('[Config] Exception:', error)
       logger.error('Error saving configuration:', error)
-      alert('Error updating device configuration: ' + (error instanceof Error ? error.message : 'Unknown error'))
+      toast('Error updating device configuration: ' + (error instanceof Error ? error.message : 'Unknown error'), 'error')
     } finally {
       setIsSaving(false)
     }
   }
 
-  const amounts = [2, 5, 10, 20, 50, 100]
-  const effects = ['effect1', 'effect2', 'effect3']
-  const effectNames: Record<string, string> = {
-    'effect1': 'Flash',
-    'effect2': 'Swirl',
-    'effect3': 'Breathing'
-  }
-
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-xl max-w-lg w-full mx-4 p-6 max-h-[90vh] overflow-y-auto">
-        <h3 className="text-xl font-bold text-gray-900 mb-4">
-          Configure Device: {device.nickname || device.serialNumber}
-        </h3>
-        
+    <Modal
+      open
+      title={`Configure device: ${device.nickname || device.serialNumber}`}
+      onClose={onClose}
+      footer={
+        <>
+          <Button variant="secondary" onClick={onClose} disabled={isSaving}>
+            Cancel
+          </Button>
+          <Button onClick={handleSave} loading={isSaving}>
+            Save changes
+          </Button>
+        </>
+      }
+    >
         <div className="space-y-6">
           {/* Sound Toggle */}
           <div className="flex items-center justify-between">
-            <span className="text-sm font-medium text-gray-700">Sound Enabled</span>
-            <label className="relative inline-flex items-center cursor-pointer">
-              <input
-                type="checkbox"
-                checked={isSoundEnabled}
-                onChange={(e) => setIsSoundEnabled(e.target.checked)}
-                disabled={isSaving}
-                className="sr-only peer"
-              />
-              <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-purple-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-600"></div>
-            </label>
+            <span className="text-sm font-medium text-ink-700">Sound Enabled</span>
+            <Switch checked={isSoundEnabled} disabled={isSaving} label="Sound enabled" onChange={() => setIsSoundEnabled(!isSoundEnabled)} />
+          </div>
+
+          {/* Sound Selection (Prototype3) */}
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-medium text-ink-700">Sound</span>
+            <select
+              value={soundId}
+              onChange={(e) => setSoundId(Number(e.target.value))}
+              disabled={isSaving || !isSoundEnabled}
+              className="px-3 py-1.5 border border-slate-300 rounded-md text-sm focus:ring-2 focus:ring-brand-600 focus:border-transparent disabled:bg-slate-100 disabled:cursor-not-allowed"
+            >
+              {SOUND_OPTIONS.map(option => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Sound Volume (Prototype3) - disabled while sound is off */}
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-medium text-ink-700">Sound Volume</span>
+            <select
+              value={soundVolume}
+              onChange={(e) => setSoundVolume(e.target.value)}
+              disabled={isSaving || !isSoundEnabled}
+              className="px-3 py-1.5 border border-slate-300 rounded-md text-sm focus:ring-2 focus:ring-brand-600 focus:border-transparent disabled:bg-slate-100 disabled:cursor-not-allowed"
+            >
+              {VOLUME_OPTIONS.map(option => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
+            </select>
           </div>
 
           {/* Random Light Effect Toggle */}
           <div className="flex items-center justify-between">
-            <span className="text-sm font-medium text-gray-700">Random Light Effect</span>
-            <label className="relative inline-flex items-center cursor-pointer">
-              <input
-                type="checkbox"
-                checked={isRandomEffect}
-                onChange={(e) => setIsRandomEffect(e.target.checked)}
-                disabled={isSaving}
-                className="sr-only peer"
-              />
-              <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-purple-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-600"></div>
-            </label>
+            <span className="text-sm font-medium text-ink-700">Random Light Effect</span>
+            <Switch checked={isRandomEffect} disabled={isSaving} label="Random light effect" onChange={() => setIsRandomEffect(!isRandomEffect)} />
           </div>
 
           {/* Effect Configuration */}
           <div className="space-y-3">
-            <h4 className="text-sm font-medium text-gray-700">Light Effects by Amount</h4>
-            <div className="bg-gray-50 rounded-lg p-4 space-y-3">
-              {amounts.map(amount => (
+            <h4 className="text-sm font-medium text-ink-700">Light Effects by Amount</h4>
+            <div className="bg-surface rounded-lg p-4 space-y-3">
+              {tipAmounts.map(amount => (
                 <div key={amount} className="flex items-center justify-between">
-                  <span className="text-sm text-gray-600 font-medium">${amount}</span>
+                  <span className="text-sm text-ink-500 font-medium">${amount}</span>
                   <select
-                    value={effectConfig[amount.toString()] || 'effect1'}
+                    value={effectForAmount(effectConfig, amount)}
                     onChange={(e) => {
                       setEffectConfig(prev => ({ ...prev, [amount.toString()]: e.target.value }))
                     }}
                     disabled={isSaving}
-                    className="px-3 py-1.5 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
+                    className="px-3 py-1.5 border border-slate-300 rounded-md text-sm focus:ring-2 focus:ring-brand-600 focus:border-transparent disabled:bg-slate-100 disabled:cursor-not-allowed"
                   >
-                    {effects.map(effect => (
-                      <option key={effect} value={effect}>
-                        {effectNames[effect]}
+                    {LIGHT_EFFECTS.map(effect => (
+                      <option key={effect.value} value={effect.value}>
+                        {effect.label}
                       </option>
                     ))}
                   </select>
@@ -989,25 +1054,7 @@ const DeviceConfigModal: React.FC<{
             </div>
           </div>
         </div>
-
-        <div className="mt-6 flex gap-3">
-          <button
-            onClick={onClose}
-            disabled={isSaving}
-            className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleSave}
-            disabled={isSaving}
-            className="flex-1 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
-          >
-            {isSaving ? 'Saving...' : 'Save Changes'}
-          </button>
-        </div>
-      </div>
-    </div>
+    </Modal>
   )
 }
 

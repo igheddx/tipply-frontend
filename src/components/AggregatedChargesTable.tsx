@@ -1,7 +1,8 @@
 import logger from "../utils/logger";
 import React, { useState, useEffect } from 'react';
-import { Table, Card, Tag, Select, DatePicker, Space, Button, message, Statistic, Row, Col } from 'antd';
-import { ReloadOutlined, DollarOutlined, CheckCircleOutlined, CloseCircleOutlined, WarningOutlined } from '@ant-design/icons';
+import { Table, Select, DatePicker, Space, Button, message } from 'antd';
+import { ReloadOutlined } from '@ant-design/icons';
+import { Card, StatCard, StatusChip, type ChipKind } from './ui';
 import { apiService } from '../services/api';
 import dayjs from 'dayjs';
 
@@ -87,19 +88,14 @@ const AggregatedChargesTable: React.FC = () => {
   };
 
   const getStatusTag = (status: string) => {
-    const statusConfig: Record<string, { color: string; icon: React.ReactNode }> = {
-      succeeded: { color: 'success', icon: <CheckCircleOutlined /> },
-      pending: { color: 'processing', icon: <WarningOutlined /> },
-      failed: { color: 'error', icon: <CloseCircleOutlined /> },
-      manual_review: { color: 'warning', icon: <WarningOutlined /> },
+    const config: Record<string, { kind: ChipKind; label: string }> = {
+      succeeded: { kind: 'paid', label: 'Succeeded' },
+      pending: { kind: 'processing', label: 'Pending' },
+      failed: { kind: 'failed', label: 'Failed' },
+      manual_review: { kind: 'info', label: 'Needs review' },
     };
-
-    const config = statusConfig[status] || { color: 'default', icon: null };
-    return (
-      <Tag color={config.color} icon={config.icon}>
-        {status.toUpperCase().replace('_', ' ')}
-      </Tag>
-    );
+    const c = config[status] || { kind: 'offline' as ChipKind, label: status.replace('_', ' ') };
+    return <StatusChip kind={c.kind} label={c.label} />;
   };
 
   const columns = [
@@ -133,7 +129,7 @@ const AggregatedChargesTable: React.FC = () => {
       width: 120,
     },
     {
-      title: 'Payment Method',
+      title: 'Card',
       dataIndex: 'paymentMethodId',
       key: 'paymentMethodId',
       render: (id: string) => (
@@ -142,11 +138,11 @@ const AggregatedChargesTable: React.FC = () => {
       width: 180,
     },
     {
-      title: 'Payment Intent',
+      title: 'Stripe charge',
       dataIndex: 'stripePaymentIntentId',
       key: 'stripePaymentIntentId',
       render: (id: string) => (
-        id ? <span className="font-mono text-xs">{id.substring(0, 20)}...</span> : <span className="text-gray-400">—</span>
+        id ? <span className="font-mono text-xs">{id.substring(0, 20)}...</span> : <span className="text-ink-400">—</span>
       ),
       width: 180,
     },
@@ -155,7 +151,7 @@ const AggregatedChargesTable: React.FC = () => {
       dataIndex: 'processedAt',
       key: 'processedAt',
       render: (date?: string) => (
-        date ? dayjs(date).format('YYYY-MM-DD HH:mm:ss') : <span className="text-gray-400">—</span>
+        date ? dayjs(date).format('YYYY-MM-DD HH:mm:ss') : <span className="text-ink-400">—</span>
       ),
       width: 180,
     },
@@ -165,9 +161,9 @@ const AggregatedChargesTable: React.FC = () => {
       key: 'failureReason',
       render: (reason?: string) => (
         reason ? (
-          <span className="text-red-600 text-xs">{reason}</span>
+          <span className="text-xs text-red-700">{reason}</span>
         ) : (
-          <span className="text-gray-400">—</span>
+          <span className="text-ink-400">—</span>
         )
       ),
     },
@@ -177,60 +173,30 @@ const AggregatedChargesTable: React.FC = () => {
     return stats?.grouped.find(g => g.status === status) || { count: 0, totalAmount: 0 };
   };
 
+  const money = (n: number) => `$${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  const succeeded = getStatByStatus('succeeded');
+  const review = getStatByStatus('manual_review');
+  const failed = getStatByStatus('failed');
+
   return (
-    <div className="space-y-4">
-      {/* Stats Cards */}
+    <div className="space-y-5">
+      <p className="text-sm text-ink-500">
+        When one card tips more than once in a batch, the tips are combined into a single charge. Each row below is one combined charge.
+      </p>
+
       {stats && (
-        <Row gutter={16}>
-          <Col span={6}>
-            <Card>
-              <Statistic
-                title="Total Aggregations"
-                value={stats.overall.count}
-                prefix={<DollarOutlined />}
-                valueStyle={{ color: '#3f8600' }}
-              />
-            </Card>
-          </Col>
-          <Col span={6}>
-            <Card>
-              <Statistic
-                title="Total Amount"
-                value={stats.overall.totalAmount}
-                precision={2}
-                prefix="$"
-                valueStyle={{ color: '#3f8600' }}
-              />
-            </Card>
-          </Col>
-          <Col span={6}>
-            <Card>
-              <Statistic
-                title="Succeeded"
-                value={getStatByStatus('succeeded').count}
-                suffix={`($${getStatByStatus('succeeded').totalAmount.toFixed(2)})`}
-                valueStyle={{ color: '#52c41a' }}
-              />
-            </Card>
-          </Col>
-          <Col span={6}>
-            <Card>
-              <Statistic
-                title="Manual Review"
-                value={getStatByStatus('manual_review').count}
-                suffix={`($${getStatByStatus('manual_review').totalAmount.toFixed(2)})`}
-                valueStyle={{ color: '#faad14' }}
-              />
-            </Card>
-          </Col>
-        </Row>
+        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+          <StatCard variant="inline" icon="card" label="All charges" value={stats.overall.count.toLocaleString()} caption={`${money(stats.overall.totalAmount)} in total`} />
+          <StatCard variant="inline" icon="check-circle" label="Succeeded" value={succeeded.count.toLocaleString()} caption={money(succeeded.totalAmount)} />
+          <StatCard variant="inline" icon="warning" label="Needs review" value={review.count.toLocaleString()} caption={money(review.totalAmount)} />
+          <StatCard variant="inline" icon="error" label="Failed" value={failed.count.toLocaleString()} caption={money(failed.totalAmount)} />
+        </div>
       )}
 
-      {/* Filters */}
       <Card>
         <Space size="middle" wrap>
           <Select
-            placeholder="Filter by status"
+            placeholder="All statuses"
             style={{ width: 200 }}
             allowClear
             value={filterStatus}
@@ -242,7 +208,7 @@ const AggregatedChargesTable: React.FC = () => {
             <Select.Option value="succeeded">Succeeded</Select.Option>
             <Select.Option value="pending">Pending</Select.Option>
             <Select.Option value="failed">Failed</Select.Option>
-            <Select.Option value="manual_review">Manual Review</Select.Option>
+            <Select.Option value="manual_review">Needs review</Select.Option>
           </Select>
 
           <RangePicker
@@ -266,23 +232,24 @@ const AggregatedChargesTable: React.FC = () => {
         </Space>
       </Card>
 
-      {/* Table */}
-      <Card title="Aggregated Charges">
-        <Table
-          columns={columns}
-          dataSource={charges}
-          rowKey="id"
-          loading={loading}
-          pagination={{
-            current: currentPage,
-            pageSize: pageSize,
-            total: totalCount,
-            onChange: (page) => setCurrentPage(page),
-            showSizeChanger: false,
-            showTotal: (total) => `Total ${total} aggregated charges`,
-          }}
-          scroll={{ x: 1400 }}
-        />
+      <Card flush>
+        <div className="px-2 pb-2">
+          <Table
+            columns={columns}
+            dataSource={charges}
+            rowKey="id"
+            loading={loading}
+            pagination={{
+              current: currentPage,
+              pageSize: pageSize,
+              total: totalCount,
+              onChange: (page) => setCurrentPage(page),
+              showSizeChanger: false,
+              showTotal: (total) => `${total} charges`,
+            }}
+            scroll={{ x: 1400 }}
+          />
+        </div>
       </Card>
     </div>
   );
