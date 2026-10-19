@@ -96,6 +96,7 @@ interface TipDetail {
   duration: number;
   platformFee: number;
   performerEarnings: number;
+  failureReason?: string | null;
 }
 
 interface PerformerDeviceSummary {
@@ -133,6 +134,33 @@ interface SimulationTipperSelection {
   paywalletTippers: SimulationTipper[];
   manualTippers: SimulationTipper[];
 }
+
+// Plain-language versions of the technical reasons a charge can fail
+const friendlyReason = (raw?: string | null): string | null => {
+  if (!raw) return null;
+  if (/No balance transaction found/i.test(raw)) return 'Stripe did not return the fee details. The card may have been charged.';
+  if (/Missing Stripe customer or payment method/i.test(raw)) return 'No saved card for this tip.';
+  if (/does not belong to the Customer|PaymentMethod mismatch/i.test(raw)) return 'The saved card does not match the customer.';
+  if (/declin/i.test(raw)) return 'The card was declined.';
+  if (/rate.?limit|too many/i.test(raw)) return 'Blocked by the payment security limits.';
+  return raw;
+};
+
+const friendlyBatchNote = (raw?: string | null): string | null => {
+  if (!raw) return null;
+  const marker = 'Charge failures: ';
+  const i = raw.indexOf(marker);
+  if (i < 0) return friendlyReason(raw);
+  return raw
+    .slice(i + marker.length)
+    .split(' | ')
+    .map(r => friendlyReason(r))
+    .filter(Boolean)
+    .join(' · ');
+};
+
+const shortDate = (iso?: string | null) =>
+  iso ? new Date(iso).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : '—';
 
 // Status chips: an icon plus a word, in the Tipwave status colors
 const tipStatusChip = (status: string) => {
@@ -1176,11 +1204,11 @@ const AdminDashboard: React.FC = () => {
                   {batchStatus.errorMessage && (
                     batchStatus.status === 'success' ? (
                       <div className="bg-slate-50 p-3 rounded border border-slate-200">
-                        <p className="text-xs text-slate-700">{batchStatus.errorMessage}</p>
+                        <p className="text-xs text-slate-700">{friendlyBatchNote(batchStatus.errorMessage)}</p>
                       </div>
                     ) : (
                       <div className="bg-red-50 p-3 rounded border border-red-200">
-                        <p className="text-xs text-red-700"><strong>Error:</strong> {batchStatus.errorMessage}</p>
+                        <p className="text-xs text-red-700"><strong>Why:</strong> {friendlyBatchNote(batchStatus.errorMessage)}</p>
                       </div>
                     )
                   )}
@@ -1464,77 +1492,68 @@ const AdminDashboard: React.FC = () => {
             <Table
               columns={[
                 {
-                  title: 'Created At',
+                  title: 'When',
                   dataIndex: 'createdAt',
                   key: 'createdAt',
-                  render: (date) => new Date(date).toLocaleString(),
-                  width: 180
+                  render: (date: string) => <span className="whitespace-nowrap">{shortDate(date)}</span>,
+                  width: 140
                 },
                 {
                   title: 'Amount',
                   dataIndex: 'amount',
                   key: 'amount',
-                  render: (amount) => `$${amount.toFixed(2)}`,
-                  width: 100
+                  render: (amount: number) => <span className="font-bold text-ink-900">${amount.toFixed(2)}</span>,
+                  width: 90
                 },
                 {
                   title: 'Status',
                   dataIndex: 'status',
                   key: 'status',
-                  render: (status) => tipStatusChip(status),
-                  width: 100
-                },
-                {
-                  title: 'Device',
-                  dataIndex: 'deviceNickname',
-                  key: 'deviceNickname',
-                  width: 150
+                  render: (status: string, record: TipDetail) => (
+                    <div>
+                      {tipStatusChip(status)}
+                      {status === 'processed' && record.processedAt && (
+                        <div className="mt-1.5 text-xs text-ink-500">{shortDate(record.processedAt)}</div>
+                      )}
+                      {status === 'failed' && record.failureReason && (
+                        <div className="mt-1.5 max-w-[260px] text-xs leading-snug text-ink-500" title={record.failureReason}>
+                          {friendlyReason(record.failureReason)}
+                        </div>
+                      )}
+                    </div>
+                  ),
+                  width: 250
                 },
                 {
                   title: 'Performer',
                   key: 'performer',
-                  render: (_, record: TipDetail) => `${record.performerFirstName} ${record.performerLastName}`,
-                  width: 150
-                },
-                {
-                  title: 'Email',
-                  dataIndex: 'performerEmail',
-                  key: 'performerEmail',
-                  width: 200,
-                  ellipsis: true
-                },
-                {
-                  title: 'Light effect',
-                  dataIndex: 'effect',
-                  key: 'effect',
-                  width: 80
+                  render: (_: unknown, record: TipDetail) => (
+                    <div className="min-w-0">
+                      <div className="font-semibold text-ink-900">{record.performerFirstName} {record.performerLastName}</div>
+                      <div className="truncate text-xs text-ink-500">{record.deviceNickname} · {record.performerEmail}</div>
+                    </div>
+                  ),
+                  width: 240
                 },
                 {
                   title: 'Performer gets',
                   dataIndex: 'performerEarnings',
                   key: 'performerEarnings',
-                  render: (earnings) => `$${earnings.toFixed(2)}`,
-                  width: 130
+                  align: 'right' as const,
+                  render: (earnings: number) => `$${earnings.toFixed(2)}`,
+                  width: 120
                 },
                 {
-                  title: 'Processed At',
-                  dataIndex: 'processedAt',
-                  key: 'processedAt',
-                  render: (date) => date ? new Date(date).toLocaleString() : '-',
-                  width: 180
-                },
-                {
-                  title: 'Refund',
+                  title: '',
                   key: 'refund',
-                  width: 100,
+                  width: 90,
+                  align: 'right' as const,
                   render: (_: unknown, record: TipDetail) =>
                     isRefundEligible(record) ? (
                       <Button type="link" danger onClick={() => openRefundModal(record)}>
                         Refund
                       </Button>
-                    ) : (
-                      '-'
-                    )
+                    ) : null
                 }
               ]}
               dataSource={tips}
@@ -1547,8 +1566,7 @@ const AdminDashboard: React.FC = () => {
                 showSizeChanger: false,
                 pageSizeOptions: ['20']
               }}
-              scroll={{ x: 1500 }}
-              size="small"
+              scroll={{ x: 880 }}
             />
           </Spin>
           <Modal
@@ -2006,54 +2024,63 @@ const AdminDashboard: React.FC = () => {
           <Table
             columns={[
               {
-                title: 'Started At',
+                title: 'Started',
                 dataIndex: 'startedAt',
                 key: 'startedAt',
-                render: (date) => new Date(date).toLocaleString(),
-                width: 180
+                render: (date: string) => <span className="font-semibold text-ink-900">{shortDate(date)}</span>,
+                width: 140
               },
               {
-                title: 'Completed At',
-                dataIndex: 'completedAt',
-                key: 'completedAt',
-                render: (date) => date ? new Date(date).toLocaleString() : '-',
-                width: 180
-              },
-              {
-                title: 'Status',
+                title: 'Result',
                 dataIndex: 'status',
                 key: 'status',
-                render: (status) => runStatusChip(status)
+                render: (status: string) => runStatusChip(status),
+                width: 110
               },
               {
-                title: 'Processed',
-                dataIndex: 'tipsProcessed',
-                key: 'tipsProcessed',
-                render: (num) => <span className="text-green-600 font-medium">{num}</span>
-              },
-              {
-                title: 'Failed',
-                dataIndex: 'tipsFailed',
-                key: 'tipsFailed',
-                render: (num) => <span className="text-red-600 font-medium">{num}</span>
+                title: 'Tips',
+                key: 'tips',
+                render: (_: unknown, run: { tipsProcessed: number; tipsFailed: number }) => (
+                  <span className="whitespace-nowrap">
+                    <span className="font-semibold text-ink-900">{run.tipsProcessed}</span> charged
+                    {run.tipsFailed > 0 && (
+                      <>
+                        {' · '}
+                        <span className="font-semibold" style={{ color: 'var(--tone-error-fg)' }}>{run.tipsFailed}</span> failed
+                      </>
+                    )}
+                  </span>
+                ),
+                width: 170
               },
               {
                 title: 'Total',
                 dataIndex: 'totalAmount',
                 key: 'totalAmount',
-                render: (amount) => `$${amount.toFixed(2)}`
+                align: 'right' as const,
+                render: (amount: number) => <span className="font-bold text-ink-900">${(amount ?? 0).toFixed(2)}</span>,
+                width: 90
               },
               {
-                title: 'Duration',
+                title: 'Took',
                 dataIndex: 'durationSeconds',
                 key: 'durationSeconds',
-                render: (seconds) => seconds ? `${seconds}s` : '-'
+                render: (seconds: number) => (seconds ? `${seconds}s` : '—'),
+                width: 60
+              },
+              {
+                title: 'Note',
+                dataIndex: 'errorMessage',
+                key: 'errorMessage',
+                render: (msg: string | null) =>
+                  msg ? <span className="text-xs leading-snug text-ink-500" title={msg}>{friendlyBatchNote(msg)}</span> : <span className="text-ink-400">—</span>,
+                width: 240
               }
             ]}
             dataSource={batchHistory}
             rowKey="id"
             pagination={false}
-            size="small"
+            scroll={{ x: 800 }}
           />
         </Modal>
 

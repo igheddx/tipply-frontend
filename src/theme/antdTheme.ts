@@ -17,7 +17,7 @@ export const antdTheme: ThemeConfig = {
   },
   components: {
     Tabs: { itemSelectedColor: '#0E7490', inkBarColor: '#0E7490' },
-    Table: { headerBg: '#F8FAFC', headerColor: '#475569' }
+    Table: { headerBg: '#F8FAFC', headerColor: '#64748B', borderColor: '#F1F5F9', rowHoverBg: '#F8FAFC', headerSplitColor: 'transparent' }
   }
 }
 
@@ -44,6 +44,6 @@ export const antdDarkTheme: ThemeConfig = {
   },
   components: {
     Tabs: { itemSelectedColor: '#62D3E3', inkBarColor: '#22AABE' },
-    Table: { headerBg: '#0e2533', headerColor: '#94ABB6' }
+    Table: { headerBg: '#0e2533', headerColor: '#94ABB6', borderColor: 'rgba(255,255,255,0.08)', rowHoverBg: '#16384a', headerSplitColor: 'transparent' }
   }
 }
