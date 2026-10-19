@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react'
+import { photoSrc } from '../utils/photoUrl'
 import apiService from '../services/api'
 import { BrandIcon } from './icons/BrandIcons'
 
@@ -15,7 +16,7 @@ const PhotoUpload: React.FC<PhotoUploadProps> = ({
   isLoading = false,
   variant = 'profile'
 }) => {
-  const [preview, setPreview] = useState<string | null>(photoUrl || null)
+  const [preview, setPreview] = useState<string | null>(photoSrc(photoUrl) || null)
   const [error, setError] = useState('')
   const [uploading, setUploading] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -23,7 +24,7 @@ const PhotoUpload: React.FC<PhotoUploadProps> = ({
   // Sync preview when photoUrl prop changes
   useEffect(() => {
     if (photoUrl) {
-      setPreview(photoUrl)
+      setPreview(photoSrc(photoUrl))
     }
   }, [photoUrl])
 

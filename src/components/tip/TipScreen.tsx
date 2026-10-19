@@ -1,4 +1,5 @@
 import { BrandIcon } from '../icons/BrandIcons'
+import { photoSrc } from '../../utils/photoUrl'
 
 /** Gradient behind each of the six amounts, in order. They match the light colors the device shows. */
 const AMOUNT_STYLES: { background: string; color: string }[] = [
@@ -91,7 +92,7 @@ export function TipScreen({
     >
       <header className="flex flex-none items-center gap-3">
         {photoUrl ? (
-          <img src={photoUrl} alt="" className="h-10 w-10 flex-none rounded-full border-2 border-white/30 object-cover" />
+          <img src={photoSrc(photoUrl)} alt="" className="h-10 w-10 flex-none rounded-full border-2 border-white/30 object-cover" />
         ) : (
           <div
             aria-hidden

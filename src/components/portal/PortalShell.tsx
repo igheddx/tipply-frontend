@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { photoSrc } from '../../utils/photoUrl'
 import { BrandIcon, type BrandIconName } from '../icons/BrandIcons'
 
 export interface PortalNavItem {
@@ -27,7 +28,7 @@ interface PortalShellProps {
 
 function Avatar({ name, photoUrl, size = 36 }: { name: string; photoUrl?: string; size?: number }) {
   if (photoUrl) {
-    return <img src={photoUrl} alt="" className="shrink-0 rounded-full object-cover" style={{ width: size, height: size }} />
+    return <img src={photoSrc(photoUrl)} alt="" className="shrink-0 rounded-full object-cover" style={{ width: size, height: size }} />
   }
   return (
     <span
