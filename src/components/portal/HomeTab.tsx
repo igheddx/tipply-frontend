@@ -28,6 +28,8 @@ export interface HomeData {
   balancesLoading: boolean
   devices: { active: number; paused: number; offline: number; total: number }
   weeks: { week: string; total: number }[]
+  /** True until the weekly totals have arrived */
+  weeksLoading?: boolean
   nextSteps: HomeNextStep[]
 }
 
@@ -151,7 +153,9 @@ export function HomeTab({ data, onGoToDevices, onGoToTips, formatCurrency }: Hom
 
       {/* Weekly chart, always from zero */}
       <Card title="Tips per week" subtitle="Last 8 weeks">
-        {data.weeks.every(w => w.total === 0) ? (
+        {data.weeksLoading ? (
+          <div className="h-[220px] animate-pulse rounded-2xl bg-slate-100" aria-busy="true" />
+        ) : data.weeks.every(w => w.total === 0) ? (
           <p className="py-8 text-center text-sm text-ink-500">Tips will show up here as soon as you get your first one.</p>
         ) : (
           <div style={{ width: '100%', height: 220 }}>

@@ -144,6 +144,8 @@ const Dashboard: React.FC = () => {
   const [stripeMetricsLoading, setStripeMetricsLoading] = useState(true)
   const [insights, setInsights] = useState<PerformerInsights | null>(null)
   const [tipTimelinePoints, setTipTimelinePoints] = useState<TipPoint[]>([])
+  // True until the charts' data (weekly totals and every tip) has arrived
+  const [chartsLoading, setChartsLoading] = useState(true)
   
   const getDeviceSetupUrl = () => {
     const host = window.location.hostname.toLowerCase()
@@ -304,30 +306,32 @@ const Dashboard: React.FC = () => {
         setLoading(false)
         logger.log(`🎉 [PERF] Dashboard init complete in ${(performance.now() - startTime).toFixed(0)}ms`)
 
-        // Background fetch: load Stripe metrics and merge into state when ready
-        try {
-          const stripeStart = performance.now()
-          setStripeMetricsLoading(true)
-          const fullMetrics = await apiService.getDashboardMetrics(profileId, { skipStripe: false })
-          if (fullMetrics.data) {
-            setMetrics(prev => prev ? {
-              ...prev,
-              stripeAvailableBalance: fullMetrics.data.stripeAvailableBalance ?? prev.stripeAvailableBalance,
-              stripeFuturePayouts: fullMetrics.data.stripeFuturePayouts ?? prev.stripeFuturePayouts,
-              stripeInTransit: fullMetrics.data.stripeInTransit ?? prev.stripeInTransit,
-              stripeLifetimeVolume: fullMetrics.data.stripeLifetimeVolume ?? prev.stripeLifetimeVolume,
-              totalEarnings: fullMetrics.data.totalEarnings ?? prev.totalEarnings,
-              pendingPayouts: fullMetrics.data.pendingPayouts ?? prev.pendingPayouts,
-              uniqueTippersAllTime: fullMetrics.data.uniqueTippersAllTime ?? prev.uniqueTippersAllTime,
-              mostTippedDenomination: fullMetrics.data.mostTippedDenomination ?? prev.mostTippedDenomination,
-            } : fullMetrics.data)
-            logger.log(`⏱️ [PERF] Background Stripe metrics loaded in ${(performance.now() - stripeStart).toFixed(0)}ms`)
+        // Background fetch: load Stripe balances and merge them in when ready. This is slow, so the charts below do not wait for it.
+        void (async () => {
+          try {
+            const stripeStart = performance.now()
+            setStripeMetricsLoading(true)
+            const fullMetrics = await apiService.getDashboardMetrics(profileId, { skipStripe: false })
+            if (fullMetrics.data) {
+              setMetrics(prev => prev ? {
+                ...prev,
+                stripeAvailableBalance: fullMetrics.data.stripeAvailableBalance ?? prev.stripeAvailableBalance,
+                stripeFuturePayouts: fullMetrics.data.stripeFuturePayouts ?? prev.stripeFuturePayouts,
+                stripeInTransit: fullMetrics.data.stripeInTransit ?? prev.stripeInTransit,
+                stripeLifetimeVolume: fullMetrics.data.stripeLifetimeVolume ?? prev.stripeLifetimeVolume,
+                totalEarnings: fullMetrics.data.totalEarnings ?? prev.totalEarnings,
+                pendingPayouts: fullMetrics.data.pendingPayouts ?? prev.pendingPayouts,
+                uniqueTippersAllTime: fullMetrics.data.uniqueTippersAllTime ?? prev.uniqueTippersAllTime,
+                mostTippedDenomination: fullMetrics.data.mostTippedDenomination ?? prev.mostTippedDenomination,
+              } : fullMetrics.data)
+              logger.log(`⏱️ [PERF] Background Stripe metrics loaded in ${(performance.now() - stripeStart).toFixed(0)}ms`)
+            }
+          } catch (e) {
+            logger.warn('Skipping Stripe metrics due to error:', e)
+          } finally {
+            setStripeMetricsLoading(false)
           }
-        } catch (e) {
-          logger.warn('Skipping Stripe metrics due to error:', e)
-        } finally {
-          setStripeMetricsLoading(false)
-        }
+        })()
 
         // Background fetch: load insights data for charts
         try {
@@ -374,6 +378,8 @@ const Dashboard: React.FC = () => {
           }
         } catch (e) {
           logger.warn('Skipping insights data due to error:', e)
+        } finally {
+          setChartsLoading(false)
         }
       } catch (error) {
         logger.error('Error initializing dashboard:', error)
@@ -1426,6 +1432,7 @@ const Dashboard: React.FC = () => {
       offline: deviceList.filter(d => !d.isOnline && !d.isPaused).length
     },
     weeks: weekRows,
+    weeksLoading: chartsLoading,
     nextSteps: [
       {
         id: 'device',
@@ -1827,9 +1834,9 @@ const Dashboard: React.FC = () => {
               </Card>
             )}
 
-            {activeTab === 'tips' && tipTimelinePoints.length > 0 && (
+            {activeTab === 'tips' && (
               <div className="mt-5">
-                <TipsTimeline points={tipTimelinePoints} />
+                <TipsTimeline points={tipTimelinePoints} loading={chartsLoading} />
               </div>
             )}
 
