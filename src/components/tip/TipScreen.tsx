@@ -131,10 +131,12 @@ export function TipScreen({
         height: '100dvh',
         paddingTop: 'calc(env(safe-area-inset-top) + 0.75rem)',
         paddingBottom: 'calc(env(safe-area-inset-bottom) + 0.5rem)',
+        // The top and bottom edges are plain #0a2533 and #0f3447, the same colors the phone's bars are given,
+        // so the screen runs into them with no visible seam. The soft glows sit inside, away from the edges.
         background:
-          'radial-gradient(60% 40% at 90% 0%, rgba(6,182,200,0.28), transparent 70%),' +
-          'radial-gradient(60% 40% at 0% 100%, rgba(229,84,140,0.22), transparent 70%),' +
-          'linear-gradient(160deg,#0a2533,#0d4254 55%,#0f3447)'
+          'radial-gradient(60% 30% at 88% 22%, rgba(6,182,200,0.26), transparent 70%),' +
+          'radial-gradient(60% 30% at 12% 78%, rgba(229,84,140,0.2), transparent 70%),' +
+          'linear-gradient(180deg,#0a2533 0%,#0d4254 55%,#0f3447 100%)'
       }}
     >
       <header className="flex flex-none items-center gap-3">
