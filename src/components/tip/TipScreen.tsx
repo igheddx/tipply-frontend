@@ -83,22 +83,44 @@ export function TipScreen({
 }: TipScreenProps) {
   // Phones paint the area behind their status bar and address bar from the page background and the theme color.
   // Match both to this screen while it is open, so there is no light strip at the top or bottom.
+  // Safari on iPhone only picks up a changed theme color when the tag is replaced, so replace it rather than edit it.
   useEffect(() => {
     const root = document.documentElement
     const body = document.body
-    const meta = document.querySelector('meta[name="theme-color"]')
-    const before = {
-      rootBg: root.style.background,
-      bodyBg: body.style.background,
-      theme: meta?.getAttribute('content') ?? null
+    const previousTheme = document.querySelector('meta[name="theme-color"]')?.getAttribute('content') ?? null
+    const setThemeColor = (color: string | null) => {
+      document.querySelectorAll('meta[name="theme-color"]').forEach(m => m.remove())
+      if (color) {
+        const meta = document.createElement('meta')
+        meta.name = 'theme-color'
+        meta.content = color
+        document.head.appendChild(meta)
+      }
     }
-    root.style.background = 'linear-gradient(180deg,#0a2533 0%,#0d4254 55%,#0f3447 100%)'
+    const before = {
+      rootColor: root.style.backgroundColor,
+      rootImage: root.style.backgroundImage,
+      rootRepeat: root.style.backgroundRepeat,
+      rootBounce: root.style.overscrollBehavior,
+      bodyBg: body.style.background,
+      bodyBounce: body.style.overscrollBehavior
+    }
+    // A solid color under the gradient covers anything the gradient does not (rubber-band pull, bars that are see-through)
+    root.style.backgroundColor = '#0d4254'
+    root.style.backgroundImage = 'linear-gradient(180deg,#0a2533 0%,#0d4254 55%,#0f3447 100%)'
+    root.style.backgroundRepeat = 'no-repeat'
     body.style.background = 'transparent'
-    meta?.setAttribute('content', '#0a2533')
+    root.style.overscrollBehavior = 'none'
+    body.style.overscrollBehavior = 'none'
+    setThemeColor('#0a2533')
     return () => {
-      root.style.background = before.rootBg
+      root.style.backgroundColor = before.rootColor
+      root.style.backgroundImage = before.rootImage
+      root.style.backgroundRepeat = before.rootRepeat
+      root.style.overscrollBehavior = before.rootBounce
       body.style.background = before.bodyBg
-      if (meta && before.theme !== null) meta.setAttribute('content', before.theme)
+      body.style.overscrollBehavior = before.bodyBounce
+      setThemeColor(previousTheme)
     }
   }, [])
 
