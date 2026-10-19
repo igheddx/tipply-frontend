@@ -175,3 +175,10 @@ html.theme-dark, html.theme-dark body { background-color: #0a1c27; color-scheme:
 .portal-dark .recharts-default-tooltip { background-color: #112b3a !important; border-color: rgba(255,255,255,.15) !important; }
 .portal-dark .recharts-tooltip-label, .portal-dark .recharts-tooltip-item { color: #EAF3F7 !important; }
 .portal-dark .recharts-tooltip-cursor { fill: rgba(255,255,255,.06); }
+
+/* Ant Design pop-ups (modals, messages) in the Tipwave style, for any that are still in use */
+.ant-modal .ant-modal-content { border-radius: 16px; padding: 24px; box-shadow: 0 12px 32px rgba(15, 23, 42, 0.18); }
+.ant-modal .ant-modal-title { font-size: 20px; font-weight: 700; }
+.ant-modal .ant-modal-footer .ant-btn { height: 44px; border-radius: 12px; font-weight: 600; padding-inline: 20px; }
+.ant-message .ant-message-notice-content { background: #1B2530; color: #FFFFFF; border-radius: 16px; padding: 12px 16px; font-weight: 600; box-shadow: 0 12px 32px rgba(15, 23, 42, 0.25); }
+.ant-message .ant-message-custom-content { color: #FFFFFF; }

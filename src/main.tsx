@@ -5,6 +5,7 @@ import { ConfigProvider } from 'antd'
 import App from './App.tsx'
 import { antdTheme, antdDarkTheme } from './theme/antdTheme'
 import { ThemeProvider, useTheme } from './theme/ThemeContext'
+import { FeedbackProvider } from './components/ui/Feedback'
 import 'antd/dist/reset.css'
 import './index.css'
 
@@ -21,9 +22,11 @@ function ThemedApp() {
   const { resolved, inPortal } = useTheme()
   return (
     <ConfigProvider theme={inPortal && resolved === 'dark' ? antdDarkTheme : antdTheme}>
-      <BrowserRouter>
-        <App />
-      </BrowserRouter>
+      <FeedbackProvider>
+        <BrowserRouter>
+          <App />
+        </BrowserRouter>
+      </FeedbackProvider>
     </ConfigProvider>
   )
 }

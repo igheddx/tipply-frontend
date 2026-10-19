@@ -42,7 +42,13 @@ function App() {
           <Route path="*" element={<NotFound />} />
         </Routes>
       </Suspense>
-      <Toaster position="top-center" richColors />
+      <Toaster
+        position="top-center"
+        theme="dark"
+        toastOptions={{
+          style: { background: '#1B2530', color: '#FFFFFF', border: 'none', borderRadius: 16, fontWeight: 600, boxShadow: '0 12px 32px rgba(15,23,42,0.25)' }
+        }}
+      />
     </div>
   )
 }

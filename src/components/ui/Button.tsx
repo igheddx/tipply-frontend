@@ -1,7 +1,7 @@
 import type { ButtonHTMLAttributes, ReactNode } from 'react'
 import { BrandIcon, type BrandIconName, type IconTone } from '../icons/BrandIcons'
 
-type Variant = 'primary' | 'secondary' | 'ghost' | 'danger'
+type Variant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'dangerSolid'
 type Size = 'sm' | 'md' | 'lg'
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
@@ -22,7 +22,8 @@ const VARIANTS: Record<Variant, string> = {
   primary: 'bg-brand-700 text-white hover:bg-brand-800',
   secondary: 'bg-white text-ink-700 border border-slate-300 hover:bg-slate-50',
   ghost: 'text-ink-700 hover:bg-slate-100',
-  danger: 'bg-white text-red-700 border border-red-200 hover:bg-red-50'
+  danger: 'bg-white text-red-700 border border-red-200 hover:bg-red-50',
+  dangerSolid: 'bg-red-600 text-white hover:bg-red-700'
 }
 
 const SIZES: Record<Size, { className: string; icon: number }> = {
@@ -43,7 +44,7 @@ export function Button({
   type = 'button',
   ...rest
 }: ButtonProps) {
-  const tone: IconTone = variant === 'primary' ? 'inverse' : 'brand'
+  const tone: IconTone = variant === 'primary' || variant === 'dangerSolid' ? 'inverse' : 'brand'
   return (
     <button
       type={type}

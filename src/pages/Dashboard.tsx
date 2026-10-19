@@ -2,7 +2,7 @@ import logger from "../utils/logger";
 import { PortalShell, type PortalNavItem } from '../components/portal/PortalShell'
 import { HomeTab, type HomeData } from '../components/portal/HomeTab'
 import { TipsTimeline } from '../components/charts/TipsTimeline'
-import { Banner, Button, Card, EmptyState, Modal, PageHeader, PageLoader, StatusChip, type ChipKind } from '../components/ui'
+import { Banner, Button, Card, EmptyState, Modal, PageHeader, PageLoader, StatusChip, useFeedback, type ChipKind } from '../components/ui'
 import { BrandIcon, IconTile } from '../components/icons/BrandIcons'
 import { Switch } from '../components/ui/Switch'
 import React, { useState, useEffect } from 'react'
@@ -125,6 +125,7 @@ interface TipPoint {
 const INPUT = 'h-12 w-full rounded-xl border bg-white px-4 text-ink-900 placeholder:text-ink-400 transition-colors focus:border-transparent focus:outline-none focus:ring-2 focus:ring-brand-500'
 
 const Dashboard: React.FC = () => {
+  const { toast } = useFeedback()
   const [stats, setStats] = useState<DashboardStats | null>(null)
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null)
   const [recentTips, setRecentTips] = useState<TipSummary[]>([])
@@ -851,13 +852,13 @@ const Dashboard: React.FC = () => {
       // Always fetch QR as a blob from API to avoid cross-origin issues
       const qrBlob = await apiService.downloadQRCode(deviceId)
       if (!qrBlob) {
-        alert('Could not download QR code. Please try again or check your connection.')
+        toast('Could not download QR code. Please try again or check your connection.', 'error')
         setDownloadingDeviceId(null)
         return
       }
 
       if (!qrBlob.type.startsWith('image/')) {
-        alert(`QR download returned a non-image content-type: ${qrBlob.type || 'unknown'}`)
+        toast(`QR download returned a non-image content-type: ${qrBlob.type || 'unknown'}`, 'error')
         setDownloadingDeviceId(null)
         return
       }
@@ -905,7 +906,7 @@ const Dashboard: React.FC = () => {
         a.click()
         document.body.removeChild(a)
         URL.revokeObjectURL(rawUrl)
-        alert('Could not generate the branded card because the QR image could not be decoded. Downloaded the raw QR instead.')
+        toast('Could not generate the branded card because the QR image could not be decoded. Downloaded the raw QR instead.', 'info')
         setDownloadingDeviceId(null)
         return
       }
@@ -994,7 +995,7 @@ const Dashboard: React.FC = () => {
         a.click()
         document.body.removeChild(a)
         URL.revokeObjectURL(rawUrl)
-        alert('Could not render the branded card. Downloaded the raw QR instead.')
+        toast('Could not render the branded card. Downloaded the raw QR instead.', 'info')
         setDownloadingDeviceId(null)
         return
       }
@@ -1062,13 +1063,13 @@ const Dashboard: React.FC = () => {
           document.body.removeChild(a)
           setDownloadingDeviceId(null)
         } else {
-          alert('Failed to create download file')
+          toast('Failed to create download file', 'error')
           setDownloadingDeviceId(null)
         }
       }, 'image/png')
     } catch (error) {
       logger.error('Error generating QR card:', error)
-      alert(`Could not generate the QR card. ${error instanceof Error ? error.message : 'Please try again.'}`)
+      toast(`Could not generate the QR card. ${error instanceof Error ? error.message : 'Please try again.'}`, 'error')
       setDownloadingDeviceId(null)
     }
   }
@@ -1101,11 +1102,11 @@ const Dashboard: React.FC = () => {
         setShowDeleteModal(false)
         setDeviceToDelete(null)
       } else {
-        alert('Failed to delete device: ' + (response.error || 'Unknown error'))
+        toast('Failed to delete device: ' + (response.error || 'Unknown error'), 'error')
       }
     } catch (error) {
       logger.error('Error deleting device:', error)
-      alert('Error deleting device')
+      toast('Error deleting device', 'error')
     } finally {
       setIsDeletingDevice(null)
     }
@@ -1124,11 +1125,11 @@ const Dashboard: React.FC = () => {
         // Refresh both active and deleted devices
         await refreshDashboard()
       } else {
-        alert('Failed to restore device: ' + (response.error || 'Unknown error'))
+        toast('Failed to restore device: ' + (response.error || 'Unknown error'), 'error')
       }
     } catch (error) {
       logger.error('Error restoring device:', error)
-      alert('Error restoring device')
+      toast('Error restoring device', 'error')
     } finally {
       setIsRestoringDevice(null)
     }
@@ -1162,11 +1163,11 @@ const Dashboard: React.FC = () => {
           }
         })
       } else {
-        alert('Failed to update song request setting: ' + (response.error || 'Unknown error'))
+        toast('Failed to update song request setting: ' + (response.error || 'Unknown error'), 'error')
       }
     } catch (error) {
       logger.error('Error updating song request setting:', error)
-      alert('Error updating song request setting')
+      toast('Error updating song request setting', 'error')
     } finally {
       setUpdatingSongRequest(null)
     }
@@ -1185,11 +1186,11 @@ const Dashboard: React.FC = () => {
           devices: prevStats.devices.map(d => (d.id === deviceId ? { ...d, isPaused: newPaused } : d))
         })
       } else {
-        alert('Failed to update device: ' + (response.error || 'Unknown error'))
+        toast('Failed to update device: ' + (response.error || 'Unknown error'), 'error')
       }
     } catch (error) {
       logger.error('Error updating device pause state:', error)
-      alert('Error updating device pause state')
+      toast('Error updating device pause state', 'error')
     } finally {
       setPausingDeviceId(null)
     }
@@ -1243,12 +1244,12 @@ const Dashboard: React.FC = () => {
         logger.error('Response data:', response.data)
         logger.error('Response error:', response.error)
         logger.error('Response status:', response.status)
-        alert('Failed to update device configuration: ' + (response.error || 'Unknown error'))
+        toast('Failed to update device configuration: ' + (response.error || 'Unknown error'), 'error')
       }
     } catch (error) {
       logger.error('❌ Error updating device configuration:', error)
       logger.error('Error details:', error instanceof Error ? error.message : 'Unknown error')
-      alert('Error updating device configuration: ' + (error instanceof Error ? error.message : 'Unknown error'))
+      toast('Error updating device configuration: ' + (error instanceof Error ? error.message : 'Unknown error'), 'error')
     } finally {
       setUpdatingDeviceConfig(null)
     }
@@ -1274,7 +1275,7 @@ const Dashboard: React.FC = () => {
       if (response.data?.amounts) {
         setUserProfile((prev: any) => ({ ...prev, tipAmounts: response.data.amounts }))
       } else {
-        alert('Failed to save tip amounts: ' + (response.error || 'Unknown error'))
+        toast('Failed to save tip amounts: ' + (response.error || 'Unknown error'), 'error')
       }
     } finally {
       setTipAmountsSaving(false)
@@ -1288,7 +1289,7 @@ const Dashboard: React.FC = () => {
       if (response.data?.amounts) {
         setUserProfile((prev: any) => ({ ...prev, tipAmounts: response.data.amounts }))
       } else {
-        alert('Failed to reset tip amounts: ' + (response.error || 'Unknown error'))
+        toast('Failed to reset tip amounts: ' + (response.error || 'Unknown error'), 'error')
       }
     } finally {
       setTipAmountsSaving(false)

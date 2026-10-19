@@ -21,7 +21,7 @@ export function Toast({ tone = 'info', message, onDismiss }: ToastProps) {
     <div
       role="status"
       aria-live="polite"
-      className="fixed inset-x-4 bottom-24 z-[60] mx-auto flex max-w-md items-center gap-3 rounded-2xl bg-ink-900 px-4 py-3 text-white shadow-lift lg:bottom-8"
+      className="fixed inset-x-4 top-4 z-[70] mx-auto flex max-w-md items-center gap-3 rounded-2xl bg-ink-900 px-4 py-3 text-white shadow-lift"
     >
       <BrandIcon name={t.icon} size={22} color={t.color} />
       <span className="min-w-0 flex-1 text-sm font-semibold">{message}</span>

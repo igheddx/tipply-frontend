@@ -3,6 +3,7 @@ import { LineChart, Line, ScatterChart, Scatter, XAxis, YAxis, CartesianGrid, To
 import { AutoComplete } from 'antd'
 import type { BaseOptionType } from 'antd/es/select'
 import logger from '../utils/logger'
+import { Button, Modal, Switch, useFeedback } from './ui'
 import { API_BASE_URL } from '../utils/config'
 import apiService from '../services/api'
 import { DEFAULT_TIP_AMOUNTS, LIGHT_EFFECTS, SOUND_OPTIONS, VOLUME_OPTIONS, DEFAULT_SOUND_ID, DEFAULT_SOUND_VOLUME, normalizeEffectConfig, effectForAmount, buildEffectConfig } from '../utils/deviceConfig'
@@ -86,6 +87,7 @@ interface TipPoint {
 }
 
 const PerformerInsights: React.FC = () => {
+  const { toast } = useFeedback()
   const [searchTerm, setSearchTerm] = useState('')
   const [searchOptions, setSearchOptions] = useState<BaseOptionType[]>([])
   const [isSearching, setIsSearching] = useState(false)
@@ -183,7 +185,7 @@ const PerformerInsights: React.FC = () => {
       if (response.data?.amounts) {
         setPerformerTipAmounts(response.data.amounts)
       } else {
-        alert('Failed to save tip amounts: ' + (response.error || 'Unknown error'))
+        toast('Failed to save tip amounts: ' + (response.error || 'Unknown error'), 'error')
       }
     } finally {
       setTipAmountsSaving(false)
@@ -198,7 +200,7 @@ const PerformerInsights: React.FC = () => {
       if (response.data?.amounts) {
         setPerformerTipAmounts(response.data.amounts)
       } else {
-        alert('Failed to reset tip amounts: ' + (response.error || 'Unknown error'))
+        toast('Failed to reset tip amounts: ' + (response.error || 'Unknown error'), 'error')
       }
     } finally {
       setTipAmountsSaving(false)
@@ -290,7 +292,7 @@ const PerformerInsights: React.FC = () => {
       
       if (!qrBlob) {
         console.error('[QR] Blob is null or undefined')
-        alert('Could not download QR code. Please try again or check your connection.')
+        toast('Could not download QR code. Please try again or check your connection.', 'error')
         setIsDownloadingQR(false)
         return
       }
@@ -298,7 +300,7 @@ const PerformerInsights: React.FC = () => {
       console.info('[QR] Blob received:', { size: qrBlob.size, type: qrBlob.type })
 
       if (!qrBlob.type.startsWith('image/')) {
-        alert(`QR download returned a non-image content-type: ${qrBlob.type || 'unknown'}`)
+        toast(`QR download returned a non-image content-type: ${qrBlob.type || 'unknown'}`, 'error')
         setIsDownloadingQR(false)
         return
       }
@@ -337,7 +339,7 @@ const PerformerInsights: React.FC = () => {
         a.click()
         document.body.removeChild(a)
         URL.revokeObjectURL(rawUrl)
-        alert('Could not generate the branded card. Downloaded the raw QR instead.')
+        toast('Could not generate the branded card. Downloaded the raw QR instead.', 'info')
         setIsDownloadingQR(false)
         return
       }
@@ -424,7 +426,7 @@ const PerformerInsights: React.FC = () => {
         a.click()
         document.body.removeChild(a)
         URL.revokeObjectURL(rawUrl)
-        alert('Could not render the branded card. Downloaded the raw QR instead.')
+        toast('Could not render the branded card. Downloaded the raw QR instead.', 'info')
         setIsDownloadingQR(false)
         return
       }
@@ -490,14 +492,14 @@ const PerformerInsights: React.FC = () => {
           setIsDownloadingQR(false)
         } else {
           console.error('[QR] Blob is null!')
-          alert('Failed to create download file')
+          toast('Failed to create download file', 'error')
           setIsDownloadingQR(false)
         }
       }, 'image/png')
     } catch (error) {
       console.error('[QR] Download error:', error)
       logger.error('[QR] Download error:', error)
-      alert(`QR code download failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
+      toast(`QR code download failed: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error')
       setIsDownloadingQR(false)
     }
   }
@@ -900,6 +902,7 @@ const DeviceConfigModal: React.FC<{
   onClose: () => void
   onSave: () => void
 }> = ({ device, tipAmounts, onClose, onSave }) => {
+  const { toast } = useFeedback()
   const [isSoundEnabled, setIsSoundEnabled] = useState(device.isSoundEnabled || false)
   const [isRandomEffect, setIsRandomEffect] = useState(device.isRandomLightEffect || false)
   const [soundId, setSoundId] = useState(device.soundId ?? DEFAULT_SOUND_ID)
@@ -949,44 +952,44 @@ const DeviceConfigModal: React.FC<{
           onSave()
         } else {
           logger.error('Failed to save configuration - no success flag')
-          alert('Failed to update device configuration')
+          toast('Failed to update device configuration', 'error')
         }
       } else {
         const errorText = await response.text()
         console.error('[Config] Error response:', errorText)
         logger.error('Failed to save configuration')
-        alert('Failed to update device configuration: ' + response.statusText)
+        toast('Failed to update device configuration: ' + response.statusText, 'error')
       }
     } catch (error) {
       console.error('[Config] Exception:', error)
       logger.error('Error saving configuration:', error)
-      alert('Error updating device configuration: ' + (error instanceof Error ? error.message : 'Unknown error'))
+      toast('Error updating device configuration: ' + (error instanceof Error ? error.message : 'Unknown error'), 'error')
     } finally {
       setIsSaving(false)
     }
   }
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-xl max-w-lg w-full mx-4 p-6 max-h-[90vh] overflow-y-auto">
-        <h3 className="text-xl font-bold text-ink-900 mb-4">
-          Configure Device: {device.nickname || device.serialNumber}
-        </h3>
-        
+    <Modal
+      open
+      title={`Configure device: ${device.nickname || device.serialNumber}`}
+      onClose={onClose}
+      footer={
+        <>
+          <Button variant="secondary" onClick={onClose} disabled={isSaving}>
+            Cancel
+          </Button>
+          <Button onClick={handleSave} loading={isSaving}>
+            Save changes
+          </Button>
+        </>
+      }
+    >
         <div className="space-y-6">
           {/* Sound Toggle */}
           <div className="flex items-center justify-between">
             <span className="text-sm font-medium text-ink-700">Sound Enabled</span>
-            <label className="relative inline-flex items-center cursor-pointer">
-              <input
-                type="checkbox"
-                checked={isSoundEnabled}
-                onChange={(e) => setIsSoundEnabled(e.target.checked)}
-                disabled={isSaving}
-                className="sr-only peer"
-              />
-              <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-brand-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-brand-700"></div>
-            </label>
+            <Switch checked={isSoundEnabled} disabled={isSaving} label="Sound enabled" onChange={() => setIsSoundEnabled(!isSoundEnabled)} />
           </div>
 
           {/* Sound Selection (Prototype3) */}
@@ -1022,16 +1025,7 @@ const DeviceConfigModal: React.FC<{
           {/* Random Light Effect Toggle */}
           <div className="flex items-center justify-between">
             <span className="text-sm font-medium text-ink-700">Random Light Effect</span>
-            <label className="relative inline-flex items-center cursor-pointer">
-              <input
-                type="checkbox"
-                checked={isRandomEffect}
-                onChange={(e) => setIsRandomEffect(e.target.checked)}
-                disabled={isSaving}
-                className="sr-only peer"
-              />
-              <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-brand-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-brand-700"></div>
-            </label>
+            <Switch checked={isRandomEffect} disabled={isSaving} label="Random light effect" onChange={() => setIsRandomEffect(!isRandomEffect)} />
           </div>
 
           {/* Effect Configuration */}
@@ -1060,25 +1054,7 @@ const DeviceConfigModal: React.FC<{
             </div>
           </div>
         </div>
-
-        <div className="mt-6 flex gap-3">
-          <button
-            onClick={onClose}
-            disabled={isSaving}
-            className="flex-1 px-4 py-2 border border-slate-300 rounded-lg hover:bg-surface disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleSave}
-            disabled={isSaving}
-            className="flex-1 px-4 py-2 bg-brand-700 text-white rounded-lg hover:bg-brand-800 disabled:bg-slate-400 disabled:cursor-not-allowed"
-          >
-            {isSaving ? 'Saving...' : 'Save Changes'}
-          </button>
-        </div>
-      </div>
-    </div>
+    </Modal>
   )
 }
 

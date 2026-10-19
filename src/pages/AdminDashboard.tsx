@@ -1,7 +1,7 @@
 import logger from "../utils/logger";
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Row, Col, Table, Button, Input, InputNumber, Modal, message, Spin, Card, Select, DatePicker, Space, Divider, Alert, Tabs, Radio } from 'antd';
+import { Row, Col, Table, Button, Input, InputNumber, message, Spin, Card, Select, DatePicker, Space, Divider, Alert, Tabs } from 'antd';
 import { 
   ReloadOutlined,
   PlayCircleOutlined,
@@ -15,7 +15,7 @@ import AggregatedChargesTable from '../components/AggregatedChargesTable';
 import PerformerInsights from '../components/PerformerInsights';
 import dayjs from 'dayjs';
 import { PortalShell, type PortalNavItem } from '../components/portal/PortalShell';
-import { Banner, Card as UiCard, PageHeader, PageLoader, StatCard, StatusChip, type ChipKind } from '../components/ui';
+import { Banner, Button as UiButton, Card as UiCard, Modal, PageHeader, PageLoader, StatCard, StatusChip, useFeedback, type ChipKind } from '../components/ui';
 import { BrandIcon } from '../components/icons/BrandIcons';
 
 const { Search } = Input;
@@ -158,6 +158,7 @@ const runStatusChip = (status?: string) => {
 };
 
 const AdminDashboard: React.FC = () => {
+  const { confirm } = useFeedback();
   const navigate = useNavigate();
   const [stats, setStats] = useState<AdminDashboardStats | null>(null);
   const [performers, setPerformers] = useState<PerformerSummary[]>([]);
@@ -1084,15 +1085,15 @@ const AdminDashboard: React.FC = () => {
                   <Button
                     type="primary"
                     icon={batchProcessing ? <ReloadOutlined spin /> : <PlayCircleOutlined />}
-                    onClick={() =>
-                      Modal.confirm({
+                    onClick={async () => {
+                      const ok = await confirm({
                         title: 'Run batch processing now?',
-                        content: `This charges ${stats?.pendingTips || 0} waiting tip(s) in ${stripeMode === 'live' ? 'LIVE mode with real money' : 'test mode'}. It cannot be undone.`,
-                        okText: 'Run batch',
-                        okButtonProps: { danger: stripeMode === 'live' },
-                        onOk: () => runBatchProcessing()
-                      })
-                    }
+                        body: `This charges ${stats?.pendingTips || 0} waiting tip(s) in ${stripeMode === 'live' ? 'LIVE mode with real money' : 'test mode'}. It cannot be undone.`,
+                        confirmLabel: 'Run batch',
+                        tone: stripeMode === 'live' ? 'danger' : 'default'
+                      });
+                      if (ok) runBatchProcessing();
+                    }}
                     loading={batchProcessing}
                     disabled={batchProcessing}
                     className="flex-1"
@@ -1551,27 +1552,39 @@ const AdminDashboard: React.FC = () => {
             />
           </Spin>
           <Modal
-            title="Confirm refund"
             open={refundModalOpen}
-            onOk={handleRefundConfirm}
-            onCancel={() => {
+            title="Refund this tip?"
+            onClose={() => {
               if (!refundLoading) {
                 setRefundModalOpen(false);
                 setRefundTip(null);
               }
             }}
-            confirmLoading={refundLoading}
-            okText="Refund"
-            okButtonProps={{ danger: true }}
+            footer={
+              <>
+                <UiButton
+                  variant="secondary"
+                  disabled={refundLoading}
+                  onClick={() => {
+                    setRefundModalOpen(false);
+                    setRefundTip(null);
+                  }}
+                >
+                  Keep tip
+                </UiButton>
+                <UiButton variant="dangerSolid" loading={refundLoading} onClick={handleRefundConfirm}>
+                  Refund
+                </UiButton>
+              </>
+            }
           >
             {refundTip && (
               <div className="text-ink-700">
                 <p>
-                  Refund ${refundTip.amount.toFixed(2)} to {refundTip.performerFirstName} {refundTip.performerLastName}?
+                  Refund <strong className="text-ink-900">${refundTip.amount.toFixed(2)}</strong> to the card that paid for this tip. It counts against{' '}
+                  {refundTip.performerFirstName} {refundTip.performerLastName}.
                 </p>
-                <p className="text-sm text-ink-500">
-                  Created: {new Date(refundTip.createdAt).toLocaleString()}
-                </p>
+                <p className="mt-2 text-sm text-ink-500">Tipped {new Date(refundTip.createdAt).toLocaleString()}</p>
               </div>
             )}
           </Modal>
@@ -1878,95 +1891,117 @@ const AdminDashboard: React.FC = () => {
 
         {/* Update Fee Modal */}
         <Modal
-          title="Update Platform Fee"
           open={updateFeeModal}
-          onOk={handleUpdateFee}
-          onCancel={() => {
+          title="Update platform fee"
+          onClose={() => {
             setUpdateFeeModal(false);
             setSelectedPerformer(null);
           }}
-          confirmLoading={updatingFee}
+          footer={
+            <>
+              <UiButton
+                variant="secondary"
+                onClick={() => {
+                  setUpdateFeeModal(false);
+                  setSelectedPerformer(null);
+                }}
+              >
+                Cancel
+              </UiButton>
+              <UiButton loading={updatingFee} onClick={handleUpdateFee}>
+                Save fee
+              </UiButton>
+            </>
+          }
         >
           {selectedPerformer && (
-            <div className="space-y-4">
+            <div className="space-y-5">
+              <p className="text-ink-700">
+                Platform fee for <strong className="text-ink-900">{selectedPerformer.firstName} {selectedPerformer.lastName}</strong>. It is now{' '}
+                {selectedPerformer.platformFeePercentage}%.
+              </p>
               <div>
-                <p className="text-ink-500 mb-2">
-                  Update platform fee for <strong>{selectedPerformer.firstName} {selectedPerformer.lastName}</strong>
-                </p>
-                <p className="text-sm text-ink-500">
-                  Current fee: {selectedPerformer.platformFeePercentage}%
-                </p>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-ink-700 mb-2">
-                  New Platform Fee Percentage
-                </label>
-                <Input
+                <label htmlFor="fee-pct" className="mb-1.5 block text-sm font-semibold text-ink-700">New fee (%)</label>
+                <input
+                  id="fee-pct"
                   type="number"
                   min="0.01"
                   max="100"
                   step="0.01"
                   value={newFeePercentage}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewFeePercentage(Number(e.target.value))}
-                  suffix="%"
+                  onChange={(e) => setNewFeePercentage(Number(e.target.value))}
+                  className='h-12 w-full rounded-xl border border-slate-300 bg-white px-4 text-ink-900 placeholder:text-ink-400 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-brand-500'
                 />
-                <p className="text-xs text-ink-500 mt-1">
-                  Enter a value between 0.01% and 100%
-                </p>
+                <p className="mt-1.5 text-sm text-ink-500">A value between 0.01 and 100. It applies to new tips.</p>
               </div>
             </div>
           )}
         </Modal>
 
         <Modal
-          title={pendingDeviceAction?.type === 'add' ? 'Confirm Device Add' : 'Confirm Device Deletion'}
           open={!!pendingDeviceAction}
-          okText="Continue"
-          cancelText="Cancel"
-          confirmLoading={deviceActionLoading}
-          onOk={() => runDeviceAction(notifyPerformer)}
-          onCancel={() => {
-            if (!deviceActionLoading) {
-              setPendingDeviceAction(null);
-            }
+          title={pendingDeviceAction?.type === 'add' ? 'Add this device?' : 'Delete this device?'}
+          onClose={() => {
+            if (!deviceActionLoading) setPendingDeviceAction(null);
           }}
+          footer={
+            <>
+              <UiButton variant="secondary" disabled={deviceActionLoading} onClick={() => setPendingDeviceAction(null)}>
+                Cancel
+              </UiButton>
+              <UiButton
+                variant={pendingDeviceAction?.type === 'add' ? 'primary' : 'dangerSolid'}
+                loading={deviceActionLoading}
+                onClick={() => runDeviceAction(notifyPerformer)}
+              >
+                {pendingDeviceAction?.type === 'add' ? 'Add device' : 'Delete device'}
+              </UiButton>
+            </>
+          }
         >
           {pendingDeviceAction && (
-            <div className="text-ink-700">
-              <p className="mb-2">
-                {pendingDeviceAction.type === 'add'
-                  ? 'You are about to add a device to:'
-                  : 'You are about to delete a device from:'}
+            <div className="space-y-4 text-ink-700">
+              <p>
+                {pendingDeviceAction.type === 'add' ? 'You are adding a device to' : 'You are deleting a device from'}
               </p>
-              <p className="font-semibold">
-                {pendingDeviceAction.performer.firstName} {pendingDeviceAction.performer.lastName}
-              </p>
-              <p className="text-sm text-ink-500">{pendingDeviceAction.performer.email}</p>
-              <p className="mt-3">
-                Device Serial Number: <strong>{pendingDeviceAction.serialNumber}</strong>
-              </p>
-              <div className="mt-4">
-                <Radio.Group
-                  onChange={(e) => setNotifyPerformer(e.target.value === 'notify')}
-                  value={notifyPerformer ? 'notify' : 'no-notify'}
-                >
-                  <Space direction="vertical">
-                    <Radio value="notify">Notify performer</Radio>
-                    <Radio value="no-notify">Do not notify performer</Radio>
-                  </Space>
-                </Radio.Group>
+              <div className="rounded-xl bg-slate-50 px-4 py-3">
+                <div className="font-semibold text-ink-900">
+                  {pendingDeviceAction.performer.firstName} {pendingDeviceAction.performer.lastName}
+                </div>
+                <div className="text-sm text-ink-500">{pendingDeviceAction.performer.email}</div>
+                <div className="mt-2 text-sm">
+                  Serial number <strong className="text-ink-900">{pendingDeviceAction.serialNumber}</strong>
+                </div>
               </div>
+              <fieldset>
+                <legend className="mb-2 text-sm font-semibold text-ink-700">Tell the performer?</legend>
+                {[
+                  { value: true, label: 'Yes, send them an email' },
+                  { value: false, label: 'No, do it quietly' }
+                ].map(opt => (
+                  <label key={String(opt.value)} className="flex cursor-pointer items-center gap-3 py-1.5">
+                    <input
+                      type="radio"
+                      name="notify-performer"
+                      checked={notifyPerformer === opt.value}
+                      onChange={() => setNotifyPerformer(opt.value)}
+                      className="h-5 w-5 accent-brand-700"
+                    />
+                    {opt.label}
+                  </label>
+                ))}
+              </fieldset>
             </div>
           )}
         </Modal>
 
         {/* Batch History Modal */}
         <Modal
-          title="Batch Processing History"
           open={batchHistoryModal}
-          onCancel={() => setBatchHistoryModal(false)}
-          footer={null}
-          width={900}
+          wide
+          title="Batch processing history"
+          onClose={() => setBatchHistoryModal(false)}
+          footer={<UiButton onClick={() => setBatchHistoryModal(false)}>Done</UiButton>}
         >
           <Table
             columns={[
@@ -2024,84 +2059,65 @@ const AdminDashboard: React.FC = () => {
 
         {/* Stripe Mode Toggle Confirmation Modal */}
         <Modal
-          title={stripeMode === 'test' ? 'Enable live mode' : 'Switch to test mode'}
           open={stripeModeConfirming}
-          onOk={confirmToggleStripeMode}
-          onCancel={() => setStripeModeConfirming(false)}
-          okText={stripeMode === 'test' ? 'Enable Live Mode' : 'Switch to Test Mode'}
-          cancelText="Cancel"
-          okButtonProps={{ 
-            danger: stripeMode === 'test',
-            loading: stripeModeLoading,
-            disabled: stripeMode === 'test' && liveConfirmText.trim() !== 'LIVE'
-          }}
+          title={stripeMode === 'test' ? 'Enable live mode?' : 'Switch to test mode?'}
+          onClose={() => setStripeModeConfirming(false)}
+          footer={
+            <>
+              <UiButton variant="secondary" onClick={() => setStripeModeConfirming(false)}>
+                Cancel
+              </UiButton>
+              <UiButton
+                variant={stripeMode === 'test' ? 'dangerSolid' : 'primary'}
+                loading={stripeModeLoading}
+                disabled={stripeMode === 'test' && liveConfirmText.trim() !== 'LIVE'}
+                onClick={confirmToggleStripeMode}
+              >
+                {stripeMode === 'test' ? 'Enable live mode' : 'Switch to test mode'}
+              </UiButton>
+            </>
+          }
         >
-          {stripeModeError && (
-            <Alert
-              type="error"
-              showIcon
-              message={stripeModeError}
-              style={{ marginBottom: 16 }}
-            />
-          )}
+          <div className="space-y-4">
+            {stripeModeError && (
+              <Banner tone="error" title="That did not work">
+                {stripeModeError}
+              </Banner>
+            )}
 
-          {stripeMode === 'test' ? (
-            <div className="space-y-4">
-              <div className="bg-red-50 border-l-4 border-red-500 p-4">
-                <div className="flex items-start">
-                  <div className="flex-shrink-0">
-                    <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
-                      <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                    </svg>
-                  </div>
-                  <div className="ml-3">
-                    <h3 className="text-sm font-medium text-red-800">Warning: Production Mode</h3>
-                    <div className="mt-2 text-sm text-red-700">
-                      <p>You are about to enable <strong>LIVE MODE</strong>. This means:</p>
-                      <ul className="list-disc list-inside mt-2 space-y-1">
-                        <li>All transactions will process <strong>REAL MONEY</strong></li>
-                        <li>Customers will be charged actual amounts</li>
-                        <li>All Stripe fees will apply</li>
-                        <li>This change affects the entire platform immediately</li>
-                      </ul>
-                    </div>
-                  </div>
+            {stripeMode === 'test' ? (
+              <>
+                <Banner tone="error" title="This uses real money">
+                  <ul className="mt-1 list-disc space-y-1 pl-5">
+                    <li>Every tip is charged to a real card</li>
+                    <li>Stripe fees apply</li>
+                    <li>It changes the whole platform right away</li>
+                  </ul>
+                </Banner>
+                <div>
+                  <label htmlFor="live-confirm" className="mb-1.5 block text-sm font-semibold text-ink-700">
+                    To confirm, type <strong>LIVE</strong>
+                  </label>
+                  <input
+                    id="live-confirm"
+                    value={liveConfirmText}
+                    onChange={(e) => setLiveConfirmText(e.target.value)}
+                    placeholder="LIVE"
+                    autoFocus
+                    className='h-12 w-full rounded-xl border border-slate-300 bg-white px-4 text-ink-900 placeholder:text-ink-400 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-brand-500'
+                  />
                 </div>
-              </div>
-              <div>
-                <p className="mb-2 text-ink-700">
-                  To confirm, type <strong>LIVE</strong> below.
-                </p>
-                <Input value={liveConfirmText} onChange={(e) => setLiveConfirmText(e.target.value)} placeholder="LIVE" autoFocus />
-              </div>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              <div className="bg-green-50 border-l-4 border-green-500 p-4">
-                <div className="flex items-start">
-                  <div className="flex-shrink-0">
-                    <svg className="h-5 w-5 text-green-400" viewBox="0 0 20 20" fill="currentColor">
-                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                    </svg>
-                  </div>
-                  <div className="ml-3">
-                    <h3 className="text-sm font-medium text-green-800">Switching to Test Mode</h3>
-                    <div className="mt-2 text-sm text-green-700">
-                      <p>This will switch the system back to test mode where:</p>
-                      <ul className="list-disc list-inside mt-2 space-y-1">
-                        <li>No real charges will be processed</li>
-                        <li>Safe to test and experiment</li>
-                        <li>Test Stripe keys will be used</li>
-                      </ul>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <p className="text-ink-700">
-                Confirm switching to test mode?
-              </p>
-            </div>
-          )}
+              </>
+            ) : (
+              <Banner tone="success" title="Back to test mode">
+                <ul className="mt-1 list-disc space-y-1 pl-5">
+                  <li>No real charges are made</li>
+                  <li>Test Stripe keys are used</li>
+                  <li>Safe for testing</li>
+                </ul>
+              </Banner>
+            )}
+          </div>
         </Modal>
       </div>
     </PortalShell>

@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import apiService from '../services/api'
 import { getEncryptDecryptNoUserName } from '../utils/encryption'
 import { BrandIcon, IconTile, type BrandIconName } from '../components/icons/BrandIcons'
-import { Banner, Button, PageLoader } from '../components/ui'
+import { Banner, Button, Modal, PageLoader } from '../components/ui'
 
 const RESEND_SECONDS = 30
 
@@ -1089,39 +1089,38 @@ const Onboarding: React.FC = () => {
         </div>
       </div>
 
-      {onboardingUrl && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
-          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
-            <h3 className="text-xl font-bold text-ink-900">Open Stripe verification</h3>
-            <p className="mt-2 text-ink-500">
-              We'll open Stripe in a new tab. iPhones can block the security check when it opens inside this page.
-            </p>
-            <div className="mt-5 space-y-3">
-              <a
-                href={onboardingUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex h-12 w-full items-center justify-center rounded-xl bg-brand-700 font-semibold text-white hover:bg-brand-800"
-              >
-                Open in new tab
-              </a>
-              <Button
-                variant="secondary"
-                size="lg"
-                block
-                onClick={() => {
-                  if (onboardingUrl) window.location.href = onboardingUrl
-                }}
-              >
-                Continue here
-              </Button>
-            </div>
-            <button onClick={() => setOnboardingUrl(null)} className="mt-4 text-sm font-semibold text-ink-500 hover:text-ink-700">
+      <Modal
+        open={!!onboardingUrl}
+        title="Open Stripe verification"
+        onClose={() => setOnboardingUrl(null)}
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setOnboardingUrl(null)}>
               Cancel
-            </button>
-          </div>
-        </div>
-      )}
+            </Button>
+            <Button
+              variant="secondary"
+              onClick={() => {
+                if (onboardingUrl) window.location.href = onboardingUrl
+              }}
+            >
+              Continue here
+            </Button>
+            <a
+              href={onboardingUrl ?? '#'}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex h-11 items-center justify-center rounded-xl bg-brand-700 px-4 text-sm font-semibold text-white hover:bg-brand-800"
+            >
+              Open in new tab
+            </a>
+          </>
+        }
+      >
+        <p className="text-ink-700">
+          We recommend opening Stripe in a new tab. iPhones can block the security check when it opens inside this page.
+        </p>
+      </Modal>
     </div>
   )
 }

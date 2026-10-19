@@ -1,4 +1,5 @@
 import logger from "../utils/logger";
+import { photoSrc } from '../utils/photoUrl'
 import React, { useState, useEffect } from 'react'
 import { loadStripe, type Stripe } from '@stripe/stripe-js'
 import { Elements, CardElement, useStripe, useElements } from '@stripe/react-stripe-js'
@@ -91,14 +92,14 @@ export default function PaymentSetupModal({
   if (!isOpen) return null
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl max-w-md w-full max-h-[90vh] overflow-y-auto shadow-2xl">
+    <div className="fixed inset-0 z-[60] flex items-end justify-center bg-ink-900/50 p-0 sm:items-center sm:p-4" role="dialog" aria-modal="true">
+      <div className="max-h-[92vh] w-full max-w-md overflow-y-auto rounded-t-2xl bg-white shadow-lift sm:rounded-2xl">
         {/* ========== PERFORMER HERO SECTION ========== */}
         <div className="bg-gradient-to-b from-brand-50 via-brand-50 to-white px-6 pt-10 pb-8 text-center">
           <div className="flex flex-col items-center space-y-4">
             {performerPhotoUrl && (
               <img
-                src={performerPhotoUrl}
+                src={photoSrc(performerPhotoUrl)}
                 alt="Performer"
                 className="w-24 h-24 rounded-full object-cover border-4 border-white shadow-lg"
               />
