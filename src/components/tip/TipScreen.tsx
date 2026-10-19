@@ -1,5 +1,6 @@
 import { BrandIcon } from '../icons/BrandIcons'
 import { photoSrc } from '../../utils/photoUrl'
+import { useEffect } from 'react'
 
 /** Gradient behind each of the six amounts, in order. They match the light colors the device shows. */
 const AMOUNT_STYLES: { background: string; color: string }[] = [
@@ -80,6 +81,27 @@ export function TipScreen({
   onChangeCard,
   total
 }: TipScreenProps) {
+  // Phones paint the area behind their status bar and address bar from the page background and the theme color.
+  // Match both to this screen while it is open, so there is no light strip at the top or bottom.
+  useEffect(() => {
+    const root = document.documentElement
+    const body = document.body
+    const meta = document.querySelector('meta[name="theme-color"]')
+    const before = {
+      rootBg: root.style.background,
+      bodyBg: body.style.background,
+      theme: meta?.getAttribute('content') ?? null
+    }
+    root.style.background = 'linear-gradient(180deg,#0a2533 0%,#0d4254 55%,#0f3447 100%)'
+    body.style.background = 'transparent'
+    meta?.setAttribute('content', '#0a2533')
+    return () => {
+      root.style.background = before.rootBg
+      body.style.background = before.bodyBg
+      if (meta && before.theme !== null) meta.setAttribute('content', before.theme)
+    }
+  }, [])
+
   return (
     <div
       className="fixed inset-0 flex flex-col gap-2.5 overflow-hidden px-4 text-white"

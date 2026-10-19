@@ -19,6 +19,16 @@ const base: TipScreenProps = {
 }
 
 describe('TipScreen', () => {
+  it('colors the page and the browser bar to match while it is open, then restores them', () => {
+    document.head.insertAdjacentHTML('beforeend', '<meta name="theme-color" content="#0E7490">')
+    const { unmount } = render(<TipScreen {...base} />)
+    expect(document.documentElement.style.background).toContain('#0a2533')
+    expect(document.querySelector('meta[name="theme-color"]')?.getAttribute('content')).toBe('#0a2533')
+    unmount()
+    expect(document.documentElement.style.background).toBe('')
+    expect(document.querySelector('meta[name="theme-color"]')?.getAttribute('content')).toBe('#0E7490')
+  })
+
   it('shows the performer, all six amounts, the saved card and the running total', () => {
     render(<TipScreen {...base} />)
     expect(screen.getByRole('heading', { name: 'Tip DJ Prototype' })).toBeInTheDocument()
