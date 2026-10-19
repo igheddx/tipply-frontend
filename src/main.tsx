@@ -3,7 +3,8 @@ import ReactDOM from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'
 import { ConfigProvider } from 'antd'
 import App from './App.tsx'
-import { antdTheme } from './theme/antdTheme'
+import { antdTheme, antdDarkTheme } from './theme/antdTheme'
+import { ThemeProvider, useTheme } from './theme/ThemeContext'
 import 'antd/dist/reset.css'
 import './index.css'
 
@@ -15,12 +16,22 @@ if (hostname.includes('apptest.tipwave.live')) {
   document.title = 'App-Tipwave'
 }
 
-ReactDOM.createRoot(document.getElementById('root')!).render(
-  <React.StrictMode>
-    <ConfigProvider theme={antdTheme}>
+// Ant Design components follow the dark theme only while a portal, admin or monitor screen is showing
+function ThemedApp() {
+  const { resolved, inPortal } = useTheme()
+  return (
+    <ConfigProvider theme={inPortal && resolved === 'dark' ? antdDarkTheme : antdTheme}>
       <BrowserRouter>
         <App />
       </BrowserRouter>
     </ConfigProvider>
+  )
+}
+
+ReactDOM.createRoot(document.getElementById('root')!).render(
+  <React.StrictMode>
+    <ThemeProvider>
+      <ThemedApp />
+    </ThemeProvider>
   </React.StrictMode>,
 ) 

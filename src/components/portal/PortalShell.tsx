@@ -1,5 +1,7 @@
 import type { ReactNode } from 'react'
 import { photoSrc } from '../../utils/photoUrl'
+import { usePortalTheme } from '../../theme/ThemeContext'
+import { ThemeToggle, ThemeQuickToggle } from '../ui/ThemeToggle'
 import { BrandIcon, type BrandIconName } from '../icons/BrandIcons'
 
 export interface PortalNavItem {
@@ -54,12 +56,14 @@ export function PortalShell({
   topNotice,
   children
 }: PortalShellProps) {
+  const { className: themeClass, dark } = usePortalTheme()
+  const logoSrc = dark ? '/images/logo/tipwave-logo-v2-light.png' : '/images/logo/tipwave-logo-v2.png'
   return (
-    <div className="min-h-screen bg-surface">
+    <div className={`min-h-screen bg-surface ${themeClass}`}>
       {/* Desktop sidebar */}
       <aside className="fixed inset-y-0 left-0 hidden w-60 flex-col border-r border-slate-200 bg-white lg:flex">
         <div className="px-5 pb-4 pt-5">
-          <img src="/images/logo/tipwave-logo-v2.png" alt="Tipwave" className="h-9 w-auto" />
+          <img src={logoSrc} alt="Tipwave" className="h-9 w-auto" />
         </div>
         <nav className="flex-1 space-y-1 px-3" aria-label="Main">
           {items.map(item => {
@@ -83,6 +87,7 @@ export function PortalShell({
           })}
         </nav>
         <div className="border-t border-slate-100 p-3">
+          <ThemeToggle className="mb-2" />
           <button
             onClick={onOpenProfile}
             aria-current={profileActive ? 'page' : undefined}
@@ -108,10 +113,13 @@ export function PortalShell({
 
       {/* Phone top bar */}
       <header className="sticky top-0 z-30 flex h-14 items-center justify-between border-b border-slate-200 bg-white px-4 lg:hidden">
-        <img src="/images/logo/tipwave-logo-v2.png" alt="Tipwave" className="h-8 w-auto" />
-        <button onClick={onOpenProfile} aria-label="Profile and payouts" className="rounded-full">
-          <Avatar name={userName} photoUrl={userPhotoUrl} size={34} />
-        </button>
+        <img src={logoSrc} alt="Tipwave" className="h-8 w-auto" />
+        <div className="flex items-center gap-1">
+          <ThemeQuickToggle />
+          <button onClick={onOpenProfile} aria-label="Profile and payouts" className="rounded-full">
+            <Avatar name={userName} photoUrl={userPhotoUrl} size={34} />
+          </button>
+        </div>
       </header>
 
       <main className="lg:pl-60">

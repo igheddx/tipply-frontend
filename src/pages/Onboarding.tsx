@@ -1013,7 +1013,7 @@ const Onboarding: React.FC = () => {
 
   if (!apiKeyGenerated) {
     return (
-      <PageLoader label="Setting things up…" />
+      <PageLoader label="Setting things up…" themed={false} />
     )
   }
 

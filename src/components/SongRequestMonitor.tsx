@@ -3,6 +3,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { API_BASE_URL } from '../utils/config'
 import { BrandIcon } from './icons/BrandIcons'
 import { StatusChip } from './ui'
+import { usePortalTheme, useTheme } from '../theme/ThemeContext'
 
 interface SongRequest {
   songId: string
@@ -93,6 +94,8 @@ const SongRequestMonitor: React.FC<SongRequestMonitorProps> = ({
   const pauseInitRef = useRef(false)
 
   const size = SIZES[sizeIdx]
+  const { dark, className: themeClass } = usePortalTheme()
+  const { setPreference } = useTheme()
 
   // One device: always selected. Several: the performer picks one first, unless some are paused.
   const selectedPauseDevice = devices.length === 1 ? devices[0] : devices.find(d => d.id === pauseDeviceId)
@@ -267,13 +270,15 @@ const SongRequestMonitor: React.FC<SongRequestMonitorProps> = ({
 
   const btn =
     'inline-flex h-14 items-center justify-center gap-2 rounded-2xl px-6 text-lg font-bold transition-colors active:scale-[0.98] disabled:opacity-50'
+  const sectionLabel = 'mb-3 flex items-center gap-2 text-sm font-bold uppercase tracking-wider text-brand-700'
+  const soft = 'inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-slate-100 px-4 text-sm font-semibold text-ink-700 hover:bg-slate-200 disabled:opacity-50'
 
   const Note = ({ r }: { r: SongRequest }) =>
     r.requestorName || r.note ? (
-      <div className="mt-3 rounded-xl bg-white/5 px-4 py-3 text-white/80">
+      <div className="mt-3 rounded-xl bg-slate-50 px-4 py-3 text-ink-700">
         {r.requestorName && (
-          <div className="flex items-center gap-2 font-semibold">
-            <BrandIcon name="user" size={16} color="#7EE3EF" />
+          <div className="flex items-center gap-2 font-semibold text-ink-900">
+            <BrandIcon name="user" size={16} />
             {r.requestorName}
           </div>
         )}
@@ -290,52 +295,44 @@ const SongRequestMonitor: React.FC<SongRequestMonitorProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex flex-col text-white"
-      style={{
-        background: 'linear-gradient(160deg,#0a2533,#0d4254 60%,#0f3447)',
-        paddingTop: 'env(safe-area-inset-top)',
-        paddingBottom: 'env(safe-area-inset-bottom)'
-      }}
+      className={`fixed inset-0 z-50 flex flex-col bg-surface text-ink-900 ${themeClass}`}
+      style={{ paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}
       role="dialog"
       aria-label="Live song requests"
     >
       <audio ref={chimeRef} src="/cash-register.mp3" preload="auto" />
 
       {/* Top bar: kept slim so the queue gets the screen, and usable in a narrow side window */}
-      <header className="flex flex-none flex-wrap items-center gap-x-3 gap-y-2 border-b border-white/10 px-4 py-3">
-        <button
-          onClick={onClose}
-          className="flex h-11 items-center gap-1.5 rounded-xl bg-white/10 pl-2 pr-4 font-semibold hover:bg-white/15"
-          aria-label="Close live requests"
-        >
-          <BrandIcon name="chevron-left" size={20} color="#FFFFFF" />
+      <header className="flex flex-none flex-wrap items-center gap-x-3 gap-y-2 border-b border-slate-200 bg-white px-4 py-3">
+        <button onClick={onClose} className={`${soft} pl-2`} aria-label="Close live requests">
+          <BrandIcon name="chevron-left" size={20} tone="current" />
           Close
         </button>
 
         <div className="mr-auto flex items-center gap-2">
           <h1 className="text-lg font-bold">Live requests</h1>
           <span
-            className={`flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${loadFailed ? 'bg-amber-400/20 text-amber-200' : 'bg-white/10 text-white/80'}`}
+            className={`flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${loadFailed ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-ink-700'}`}
             role="status"
           >
-            <span className={`h-2 w-2 rounded-full ${loadFailed ? 'bg-amber-300' : 'animate-pulse bg-emerald-400'}`} />
+            <span className={`h-2 w-2 rounded-full ${loadFailed ? 'bg-amber-400' : 'animate-pulse bg-emerald-500'}`} />
             {loadFailed ? 'Reconnecting…' : loading && songRequests.length === 0 ? 'Loading…' : 'Live'}
           </span>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {onTogglePause && devices.length > 0 && (
             <div className="flex items-center gap-2">
               {devices.length > 1 && (
                 <select
                   value={selectedPauseDevice?.id ?? ''}
                   onChange={e => setPauseDeviceId(e.target.value)}
-                  className="h-11 rounded-xl border border-white/20 bg-white/10 px-3 text-sm font-semibold text-white"
+                  className="h-11 rounded-xl border border-slate-300 bg-white px-3 text-sm font-semibold text-ink-900"
                   aria-label="Choose a device to pause"
                 >
-                  <option value="" className="text-ink-900">Choose device</option>
+                  <option value="">Choose device</option>
                   {devices.map(d => (
-                    <option key={d.id} value={d.id} className="text-ink-900">
+                    <option key={d.id} value={d.id}>
                       {d.nickname || 'Device'}
                       {d.isPaused ? ' (paused)' : ''}
                     </option>
@@ -347,23 +344,21 @@ const SongRequestMonitor: React.FC<SongRequestMonitorProps> = ({
                   onClick={() => onTogglePause(selectedPauseDevice.id)}
                   disabled={pausingDeviceId === selectedPauseDevice.id}
                   title={selectedPauseDevice.isPaused ? 'Turn the light and sound back on' : 'Stops light and sound. Tips still go through.'}
-                  className={`flex h-11 items-center gap-2 rounded-xl px-4 text-sm font-bold disabled:opacity-50 ${
-                    selectedPauseDevice.isPaused ? 'bg-amber-400 text-ink-900' : 'bg-white/10 text-white hover:bg-white/15'
-                  }`}
+                  className={`${soft} font-bold ${selectedPauseDevice.isPaused ? '!bg-amber-400 !text-ink-900 hover:!bg-amber-300' : ''}`}
                 >
-                  <BrandIcon name={selectedPauseDevice.isPaused ? 'play' : 'pause'} size={18} color={selectedPauseDevice.isPaused ? '#1B2530' : '#FFFFFF'} />
+                  <BrandIcon name={selectedPauseDevice.isPaused ? 'play' : 'pause'} size={18} tone="current" />
                   {selectedPauseDevice.isPaused ? 'Resume device' : devices.length === 1 ? `Pause ${devices[0].nickname || 'device'}` : 'Pause device'}
                 </button>
               )}
-              {pausedCount > 1 && <span className="text-sm font-semibold text-amber-300">Several devices paused</span>}
+              {pausedCount > 1 && <span className="text-sm font-semibold text-amber-700">Several devices paused</span>}
             </div>
           )}
 
-          <div className="flex items-center rounded-xl bg-white/10" role="group" aria-label="Text size">
-            <button onClick={() => changeSize(-1)} disabled={sizeIdx === 0} className="h-11 w-11 text-lg font-bold disabled:opacity-30" aria-label="Smaller text">
+          <div className="flex items-center rounded-xl bg-slate-100" role="group" aria-label="Text size">
+            <button onClick={() => changeSize(-1)} disabled={sizeIdx === 0} className="h-11 w-11 text-lg font-bold text-ink-700 disabled:opacity-30" aria-label="Smaller text">
               A−
             </button>
-            <button onClick={() => changeSize(1)} disabled={sizeIdx === 2} className="h-11 w-11 text-xl font-bold disabled:opacity-30" aria-label="Larger text">
+            <button onClick={() => changeSize(1)} disabled={sizeIdx === 2} className="h-11 w-11 text-xl font-bold text-ink-700 disabled:opacity-30" aria-label="Larger text">
               A+
             </button>
           </div>
@@ -373,9 +368,18 @@ const SongRequestMonitor: React.FC<SongRequestMonitorProps> = ({
             aria-pressed={chime}
             aria-label="Play a sound for new requests"
             title="Play a sound for new requests"
-            className={`flex h-11 w-11 items-center justify-center rounded-xl ${chime ? 'bg-brand-500' : 'bg-white/10'}`}
+            className={`flex h-11 w-11 items-center justify-center rounded-xl ${chime ? 'bg-brand-700 text-white' : 'bg-slate-100 text-ink-700'}`}
           >
-            <BrandIcon name="volume" size={22} color="#FFFFFF" />
+            <BrandIcon name="volume" size={22} tone="current" />
+          </button>
+
+          <button
+            onClick={() => setPreference(dark ? 'light' : 'dark')}
+            aria-label={dark ? 'Switch to light theme' : 'Switch to dark theme'}
+            title={dark ? 'Light theme' : 'Dark theme'}
+            className="flex h-11 w-11 items-center justify-center rounded-xl bg-slate-100"
+          >
+            <BrandIcon name={dark ? 'sun' : 'moon'} size={22} />
           </button>
         </div>
       </header>
@@ -385,29 +389,24 @@ const SongRequestMonitor: React.FC<SongRequestMonitorProps> = ({
         <div className="mx-auto grid max-w-6xl gap-5 lg:grid-cols-[1.1fr_1fr]">
           {/* Playing now */}
           <section aria-label="Playing now">
-            <h2 className="mb-3 text-sm font-bold uppercase tracking-wider text-brand-200">Playing now</h2>
+            <h2 className={sectionLabel}>Playing now</h2>
             {performing.length === 0 ? (
-              <div className="rounded-3xl border border-dashed border-white/20 p-8 text-center text-white/70">
-                <p className="text-lg font-semibold text-white">Nothing playing</p>
+              <div className="rounded-3xl border border-dashed border-slate-300 p-8 text-center text-ink-500">
+                <p className="text-lg font-semibold text-ink-900">Nothing playing</p>
                 <p className="mt-1">Tap “Play this” on a request when you start it.</p>
               </div>
             ) : (
               performing.map(r => {
                 const key = requestKey(r)
                 return (
-                  <article key={key} className="mb-4 rounded-3xl bg-white p-6 text-ink-900 shadow-lift">
+                  <article key={key} className="mb-4 rounded-3xl border border-slate-100 bg-white p-6 shadow-lift">
                     <div className="flex flex-wrap items-center gap-2">
                       <StatusChip kind="active" label="Playing" />
                       <TipBadge r={r} />
                     </div>
-                    <h3 className={`mt-4 font-extrabold leading-tight ${size.now}`}>{r.songTitle}</h3>
+                    <h3 className={`mt-4 font-extrabold leading-tight text-ink-900 ${size.now}`}>{r.songTitle}</h3>
                     <p className={`mt-1 text-ink-500 ${size.artist}`}>{r.artist}</p>
-                    {(r.requestorName || r.note) && (
-                      <div className="mt-4 rounded-xl bg-surface px-4 py-3 text-ink-700">
-                        {r.requestorName && <div className="font-semibold">From {r.requestorName}</div>}
-                        {r.note && <div className="mt-0.5">{r.note}</div>}
-                      </div>
-                    )}
+                    <Note r={r} />
                     <button
                       onClick={() => updateSongStatus(r, 'completed')}
                       disabled={updatingStatus === key}
@@ -424,18 +423,18 @@ const SongRequestMonitor: React.FC<SongRequestMonitorProps> = ({
 
           {/* Up next */}
           <section aria-label="Up next">
-            <h2 className="mb-3 flex items-center gap-2 text-sm font-bold uppercase tracking-wider text-brand-200">
+            <h2 className={sectionLabel}>
               Up next
-              <span className="rounded-full bg-white/15 px-2 py-0.5 text-xs text-white">{pending.length}</span>
+              <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-ink-700">{pending.length}</span>
             </h2>
 
             {pending.length === 0 ? (
-              <div className="rounded-3xl bg-white/5 p-8 text-center">
-                <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-white/10">
-                  <BrandIcon name="music" size={28} color="#7EE3EF" />
+              <div className="rounded-3xl border border-slate-100 bg-white p-8 text-center">
+                <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-brand-50">
+                  <BrandIcon name="music" size={28} />
                 </span>
-                <p className="mt-4 text-lg font-semibold">No requests waiting</p>
-                <p className="mt-1 text-white/70">New requests appear here the moment someone tips.</p>
+                <p className="mt-4 text-lg font-semibold text-ink-900">No requests waiting</p>
+                <p className="mt-1 text-ink-500">New requests appear here the moment someone tips.</p>
               </div>
             ) : (
               <ul className="space-y-3">
@@ -445,18 +444,21 @@ const SongRequestMonitor: React.FC<SongRequestMonitorProps> = ({
                   return (
                     <li
                       key={key}
-                      className={`rounded-3xl p-5 transition-colors ${fresh ? 'bg-accent-500/25 ring-2 ring-accent-400' : 'bg-white/10'}`}
+                      className={`rounded-3xl border p-5 transition-colors ${
+                        fresh ? 'border-accent-400 bg-accent-50 ring-2 ring-accent-400' : 'border-slate-100 bg-white'
+                      }`}
+                      style={fresh && dark ? { backgroundColor: 'rgba(229,84,140,0.18)' } : undefined}
                     >
                       <div className="flex items-start gap-3">
-                        <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/15 text-sm font-bold">{i + 1}</span>
+                        <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-100 text-sm font-bold text-ink-700">{i + 1}</span>
                         <div className="min-w-0 flex-1">
                           <div className="flex flex-wrap items-center gap-2">
                             <TipBadge r={r} />
-                            {fresh && <span className="rounded-full bg-white px-2.5 py-1 text-xs font-extrabold text-accent-700">NEW</span>}
-                            <span className="text-sm text-white/60">{ago(r.firstRequestTime, now)}</span>
+                            {fresh && <span className="rounded-full bg-accent-600 px-2.5 py-1 text-xs font-extrabold text-white">NEW</span>}
+                            <span className="text-sm text-ink-500">{ago(r.firstRequestTime, now)}</span>
                           </div>
-                          <h3 className={`mt-2 font-bold leading-tight ${size.title}`}>{r.songTitle}</h3>
-                          <p className={`text-white/70 ${size.artist}`}>{r.artist}</p>
+                          <h3 className={`mt-2 font-bold leading-tight text-ink-900 ${size.title}`}>{r.songTitle}</h3>
+                          <p className={`text-ink-500 ${size.artist}`}>{r.artist}</p>
                           <Note r={r} />
                         </div>
                       </div>
@@ -464,15 +466,15 @@ const SongRequestMonitor: React.FC<SongRequestMonitorProps> = ({
                         <button
                           onClick={() => updateSongStatus(r, 'performing')}
                           disabled={updatingStatus === key}
-                          className={`${btn} flex-1 bg-white text-ink-900 hover:bg-brand-50`}
+                          className={`${btn} flex-1 bg-brand-700 text-white hover:bg-brand-800`}
                         >
-                          <BrandIcon name="play" size={22} color="#0E7490" />
+                          <BrandIcon name="play" size={22} color="#FFFFFF" />
                           {updatingStatus === key ? 'Saving…' : 'Play this'}
                         </button>
                         <button
                           onClick={() => updateSongStatus(r, 'skipped')}
                           disabled={updatingStatus === key}
-                          className={`${btn} bg-white/10 px-5 text-white hover:bg-white/15`}
+                          className={`${btn} border border-slate-300 bg-white px-5 text-ink-700 hover:bg-slate-50`}
                           aria-label={`Skip ${r.songTitle}`}
                         >
                           Skip
@@ -490,18 +492,18 @@ const SongRequestMonitor: React.FC<SongRequestMonitorProps> = ({
                 <button
                   onClick={() => setShowDone(s => !s)}
                   aria-expanded={showDone}
-                  className="flex h-11 items-center gap-2 text-sm font-semibold text-white/70 hover:text-white"
+                  className="flex h-11 items-center gap-2 text-sm font-semibold text-ink-500 hover:text-ink-700"
                 >
-                  <BrandIcon name={showDone ? 'chevron-down' : 'chevron-right'} size={18} color="currentColor" />
+                  <BrandIcon name={showDone ? 'chevron-down' : 'chevron-right'} size={18} tone="current" />
                   {showDone ? 'Hide' : 'Show'} finished ({done.length})
                 </button>
                 {showDone && (
                   <ul className="mt-2 space-y-2">
                     {done.map(r => (
-                      <li key={requestKey(r)} className="flex items-center gap-3 rounded-2xl bg-white/5 px-4 py-3">
+                      <li key={requestKey(r)} className="flex items-center gap-3 rounded-2xl border border-slate-100 bg-white px-4 py-3">
                         <div className="min-w-0 flex-1">
-                          <div className="truncate font-semibold">{r.songTitle}</div>
-                          <div className="truncate text-sm text-white/60">{r.artist}</div>
+                          <div className="truncate font-semibold text-ink-900">{r.songTitle}</div>
+                          <div className="truncate text-sm text-ink-500">{r.artist}</div>
                         </div>
                         <StatusChip
                           kind={r.status === 'completed' ? 'paid' : 'offline'}

@@ -255,6 +255,11 @@ const SHAPES = {
     { d: 'M9.8 18h4.4', accent: true },
     { d: 'M10.5 20.5h3', accent: true }
   ],
+  moon: [
+    { d: 'M19.5 14.2A7.8 7.8 0 1 1 9.8 4.5a6.2 6.2 0 0 0 9.7 9.7z' },
+    { d: 'M16.5 5.2v2.4', accent: true },
+    { d: 'M15.3 6.4h2.4', accent: true }
+  ],
   sun: [
     { cx: 12, cy: 12, r: 3.6 },
     { d: 'M12 3.5v2', accent: true },
@@ -336,7 +341,7 @@ export function IconTile({ name, state = 'current', size = 40 }: { name: BrandIc
           width: size,
           height: size,
           borderRadius: '9999px',
-          background: upcoming ? '#F1F5F9' : '#E6F6F9',
+          background: upcoming ? 'var(--tile-muted-bg)' : 'var(--tile-bg)',
           display: 'inline-flex',
           alignItems: 'center',
           justifyContent: 'center'
@@ -354,7 +359,7 @@ export function IconTile({ name, state = 'current', size = 40 }: { name: BrandIc
             height: badge,
             borderRadius: '9999px',
             background: '#0891A6',
-            border: '2px solid #FFFFFF',
+            border: '2px solid var(--tile-badge-border)',
             boxSizing: 'border-box',
             display: 'flex',
             alignItems: 'center',
