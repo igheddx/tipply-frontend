@@ -50,7 +50,7 @@ describe('SongPickerSheet', () => {
 
     fireEvent.change(screen.getByPlaceholderText('Your name (optional)'), { target: { value: ' Sam ' } })
     fireEvent.change(screen.getByPlaceholderText('Add a note (optional)'), { target: { value: 'For my mum' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Done' }))
+    fireEvent.click(screen.getByRole('button', { name: /Choose a tip amount/ }))
 
     expect(onPick).toHaveBeenCalledWith({
       id: 's2',
@@ -65,7 +65,7 @@ describe('SongPickerSheet', () => {
     const onPick = vi.fn()
     render(<SongPickerSheet open deviceUuid="dev-1" onClose={() => {}} onPick={onPick} />)
     fireEvent.click(await screen.findByText('Blinding Lights'))
-    fireEvent.click(screen.getByRole('button', { name: 'Done' }))
+    fireEvent.click(screen.getByRole('button', { name: /Choose a tip amount/ }))
     expect(onPick).toHaveBeenCalledWith({ id: 's1', title: 'Blinding Lights', artist: 'The Weeknd', requestorName: undefined, note: undefined })
   })
 

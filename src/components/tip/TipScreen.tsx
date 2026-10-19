@@ -49,6 +49,8 @@ export interface TipScreenProps {
   onTip: (amount: number) => void
   canRequestSong: boolean
   selectedSong: { title: string; artist: string } | null
+  /** The song that was just sent with a tip, shown for a few seconds as "Request sent" */
+  sentSong?: { title: string; artist: string } | null
   onOpenSongPicker: () => void
   onClearSong: () => void
   card: { brand?: string; last4?: string } | null
@@ -71,6 +73,7 @@ export function TipScreen({
   onTip,
   canRequestSong,
   selectedSong,
+  sentSong = null,
   onOpenSongPicker,
   onClearSong,
   card,
@@ -112,55 +115,46 @@ export function TipScreen({
         </div>
       </header>
 
-      <div className="grid min-h-0 flex-1 grid-cols-2 grid-rows-3 gap-x-2.5 gap-y-[1.6dvh]">
-        {amounts.map((amount, index) => {
-          const style = AMOUNT_STYLES[index % AMOUNT_STYLES.length]
-          const sent = sentAmount === amount
-          return (
-            <button
-              key={`${amount}-${index}`}
-              type="button"
-              disabled={!ready}
-              onClick={() => onTip(amount)}
-              aria-label={`Tip ${formatMoney(amount)}`}
-              className={`relative flex min-h-0 items-center justify-center overflow-hidden rounded-[18px] border border-white/25 font-black shadow-[0_8px_20px_rgba(0,0,0,0.25)] transition-transform duration-150 active:scale-95 ${
-                ready ? '' : 'animate-pulse'
-              }`}
-              style={{
-                ...(ready ? style : { background: 'rgba(255,255,255,0.12)', color: 'transparent' }),
-                fontSize: 'clamp(1.6rem, 7dvh, 2.75rem)'
-              }}
-            >
-              {sent ? (
-                <span className="flex flex-col items-center gap-0.5" style={{ fontSize: '1rem' }}>
-                  <BrandIcon name="check" size={34} tone="inverse" strokeWidth={2.6} color={style.color} />
-                  <span className="text-xs font-bold uppercase tracking-wider">Sent</span>
-                </span>
-              ) : (
-                formatMoney(amount)
-              )}
-            </button>
-          )
-        })}
-      </div>
-
-      {selectedSong ? (
+      {/* The song request lives right under the performer, so it reads top to bottom: song first, then an amount */}
+      {sentSong ? (
         <div
-          className="flex flex-none items-center gap-2 rounded-[14px] border px-3.5"
-          style={{ height: 'max(2.75rem, 5.4dvh)', background: 'rgba(6,182,200,0.2)', borderColor: 'rgba(6,182,200,0.55)' }}
+          role="status"
+          className="flex flex-none items-center gap-3 rounded-[16px] border px-3.5 py-2.5"
+          style={{ background: 'rgba(34,197,94,0.22)', borderColor: 'rgba(74,222,128,0.6)' }}
         >
-          <button type="button" onClick={onOpenSongPicker} className="flex min-w-0 flex-1 items-center gap-2 text-left">
-            <BrandIcon name="music" size={20} tone="inverse" />
-            <span className="flex min-w-0 flex-col leading-tight">
-              <span className="text-[10px] uppercase tracking-wider text-white/70">Requesting</span>
-              <span className="truncate text-[13px] font-bold">
-                {selectedSong.title} · {selectedSong.artist}
-              </span>
+          <BrandIcon name="check-circle" size={26} color="#86EFAC" />
+          <span className="flex min-w-0 flex-col leading-tight">
+            <span className="text-[13px] font-extrabold">Request sent</span>
+            <span className="truncate text-[12px] text-white/80">
+              {sentSong.title} · {sentSong.artist}
             </span>
-          </button>
-          <button type="button" onClick={onClearSong} aria-label="Remove song request" className="flex h-8 w-8 flex-none items-center justify-center rounded-full active:bg-white/10">
-            <BrandIcon name="close" size={16} tone="inverse" />
-          </button>
+          </span>
+        </div>
+      ) : selectedSong ? (
+        <div
+          className="flex-none rounded-[16px] border px-3.5 py-2.5"
+          style={{ background: 'rgba(6,182,200,0.2)', borderColor: 'rgba(6,182,200,0.6)' }}
+        >
+          <div className="flex items-center gap-2.5">
+            <span className="flex h-9 w-9 flex-none items-center justify-center rounded-full bg-white/15">
+              <BrandIcon name="music" size={20} tone="inverse" />
+            </span>
+            <span className="flex min-w-0 flex-1 flex-col leading-tight">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-white/70">Your request</span>
+              <span className="truncate text-[14px] font-extrabold">{selectedSong.title}</span>
+              <span className="truncate text-[12px] text-white/70">{selectedSong.artist}</span>
+            </span>
+            <button type="button" onClick={onOpenSongPicker} className="flex-none px-1 text-[12px] font-semibold text-white/85 underline">
+              Change
+            </button>
+            <button type="button" onClick={onClearSong} aria-label="Remove song request" className="flex h-8 w-8 flex-none items-center justify-center rounded-full active:bg-white/10">
+              <BrandIcon name="close" size={16} tone="inverse" />
+            </button>
+          </div>
+          <div className="mt-2 flex items-center gap-1.5 border-t border-white/15 pt-2 text-[13px] font-bold">
+            <span className="motion-safe:animate-bounce"><BrandIcon name="chevron-down" size={18} tone="inverse" strokeWidth={2.4} /></span>
+            Tap an amount to send your request
+          </div>
         </div>
       ) : (
         canRequestSong && (
@@ -175,6 +169,45 @@ export function TipScreen({
           </button>
         )
       )}
+
+      <div className="grid min-h-0 flex-1 grid-cols-2 grid-rows-3 gap-x-2.5 gap-y-[1.6dvh]">
+        {amounts.map((amount, index) => {
+          const style = AMOUNT_STYLES[index % AMOUNT_STYLES.length]
+          const sent = sentAmount === amount
+          return (
+            <button
+              key={`${amount}-${index}`}
+              type="button"
+              disabled={!ready}
+              onClick={() => onTip(amount)}
+              aria-label={`Tip ${formatMoney(amount)}`}
+              className={`relative flex min-h-0 flex-col items-center justify-center overflow-hidden rounded-[18px] border border-white/25 font-black shadow-[0_8px_20px_rgba(0,0,0,0.25)] transition-transform duration-150 active:scale-95 ${
+                ready ? '' : 'animate-pulse'
+              } ${selectedSong && ready ? 'tile-hint' : ''}`}
+              style={{
+                ...(ready ? style : { background: 'rgba(255,255,255,0.12)', color: 'transparent' }),
+                fontSize: 'clamp(1.6rem, 7dvh, 2.75rem)'
+              }}
+            >
+              {sent ? (
+                <span className="flex flex-col items-center gap-0.5" style={{ fontSize: '1rem' }}>
+                  <BrandIcon name="check" size={34} tone="inverse" strokeWidth={2.6} color={style.color} />
+                  <span className="text-xs font-bold uppercase tracking-wider">{sentSong ? 'Request sent' : 'Sent'}</span>
+                </span>
+              ) : (
+                <>
+                  {formatMoney(amount)}
+                  {selectedSong && ready && (
+                    <span className="mt-0.5 text-[11px] font-bold uppercase tracking-wider opacity-85" style={{ fontSize: 'clamp(0.6rem, 1.6dvh, 0.75rem)' }}>
+                      Send request
+                    </span>
+                  )}
+                </>
+              )}
+            </button>
+          )
+        })}
+      </div>
 
       <div
         className="flex flex-none items-center justify-between rounded-[14px] border border-white/10 px-3.5"

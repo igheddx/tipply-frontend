@@ -135,9 +135,15 @@ export function SongPickerSheet({ open, deviceUuid, current, onClose, onPick }: 
                   placeholder="Add a note (optional)"
                   className="resize-none rounded-xl border border-slate-300 px-3 py-3 text-base focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-100"
                 />
-                <p className="text-center text-xs text-ink-500">Next, tap a tip amount to send your request.</p>
+                <div className="flex items-start gap-2.5 rounded-xl bg-slate-50 px-3 py-2.5 text-sm text-ink-700">
+                  <BrandIcon name="info" size={18} />
+                  <span>
+                    <strong className="text-ink-900">Next, choose a tip amount.</strong> Your song request is sent together with your tip.
+                  </span>
+                </div>
                 <Button size="lg" block onClick={confirm}>
-                  Done
+                  Choose a tip amount
+                  <BrandIcon name="chevron-right" size={18} tone="inverse" strokeWidth={2.2} />
                 </Button>
                 <Button variant="ghost" block onClick={() => setChosen(null)}>
                   Choose a different song

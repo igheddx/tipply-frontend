@@ -80,6 +80,9 @@ const TippingInterface: React.FC = () => {
   const [audioEnabled, setAudioEnabled] = useState(false)
   // The amount tapped most recently: its button shows "Sent" for a moment
   const [sentAmount, setSentAmount] = useState<number | null>(null)
+  // The song that was just sent with a tip, shown as "Request sent" for a few seconds
+  const [sentSong, setSentSong] = useState<{ title: string; artist: string } | null>(null)
+  const sentSongTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const sentTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [savedCard, setSavedCard] = useState<{ brand?: string; last4?: string } | null>(null)
   const [isMobile, setIsMobile] = useState(false)
@@ -731,6 +734,9 @@ const TippingInterface: React.FC = () => {
       setShowSongSearch(false)
       setSongRequestName('')
       setSongRequestNote('')
+      setSentSong({ title: selectedSongSnapshot.title, artist: selectedSongSnapshot.artist })
+      if (sentSongTimer.current) clearTimeout(sentSongTimer.current)
+      sentSongTimer.current = setTimeout(() => setSentSong(null), 4000)
       logger.log('🎵 [handleTipClick] Song is selected, calling processTipWithSong:', selectedSongSnapshot.id)
       void processTipWithSong(amount, selectedSongSnapshot)
       return
@@ -855,13 +861,13 @@ const TippingInterface: React.FC = () => {
           errorMsg = '⚠️ Server error. Please try again in a moment.'
         }
         logger.error('❌ Tip submission failed:', response.raw, 'Error:', errorMsg, 'Type:', response.errorType)
-        setSentAmount(null)
+        setSentAmount(null); setSentSong(null)
         toast.error(errorMsg)
       }
     } catch (error) {
       logger.error('❌ Error submitting tip with song:', error)
       const errorMsg = error instanceof Error ? error.message : 'Failed to submit tip. Please try again.'
-      setSentAmount(null)
+      setSentAmount(null); setSentSong(null)
         toast.error(errorMsg)
     }
 
@@ -985,6 +991,7 @@ const TippingInterface: React.FC = () => {
         onTip={handleTipClick}
         canRequestSong={canRequestSong}
         selectedSong={selectedSong}
+        sentSong={sentSong}
         onOpenSongPicker={() => setShowSongSearch(true)}
         onClearSong={clearSelectedSong}
         card={savedCard}

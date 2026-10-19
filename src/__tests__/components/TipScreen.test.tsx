@@ -60,14 +60,36 @@ describe('TipScreen', () => {
     expect(screen.queryByRole('button', { name: /Request a song/ })).toBeNull()
   })
 
-  it('replaces the request button with a chip for the chosen song, which can be removed', () => {
+  it('shows the chosen song as a request and tells the tipper to tap an amount', () => {
     const onClearSong = vi.fn()
-    render(<TipScreen {...base} selectedSong={{ title: 'Blinding Lights', artist: 'The Weeknd' }} onClearSong={onClearSong} />)
+    const onOpenSongPicker = vi.fn()
+    render(
+      <TipScreen {...base} selectedSong={{ title: 'Blinding Lights', artist: 'The Weeknd' }} onClearSong={onClearSong} onOpenSongPicker={onOpenSongPicker} />
+    )
     expect(screen.queryByRole('button', { name: /Request a song/ })).toBeNull()
-    expect(screen.getByText('Requesting')).toBeInTheDocument()
-    expect(screen.getByText('Blinding Lights · The Weeknd')).toBeInTheDocument()
+    expect(screen.getByText('Your request')).toBeInTheDocument()
+    expect(screen.getByText('Blinding Lights')).toBeInTheDocument()
+    expect(screen.getByText('The Weeknd')).toBeInTheDocument()
+    expect(screen.getByText(/Tap an amount to send your request/)).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Remove song request' }))
     expect(onClearSong).toHaveBeenCalled()
+    // "Change" on the request opens the picker (the other "Change" is the card)
+    fireEvent.click(screen.getAllByText('Change')[0])
+    expect(onOpenSongPicker).toHaveBeenCalled()
+  })
+
+  it('labels every amount "Send request" only while a song is waiting for an amount', () => {
+    const { rerender } = render(<TipScreen {...base} />)
+    expect(screen.queryByText('Send request')).toBeNull()
+    rerender(<TipScreen {...base} selectedSong={{ title: 'Blinding Lights', artist: 'The Weeknd' }} />)
+    expect(screen.getAllByText('Send request')).toHaveLength(6)
+  })
+
+  it('confirms the request once it has been sent', () => {
+    render(<TipScreen {...base} sentAmount={10} sentSong={{ title: 'Blinding Lights', artist: 'The Weeknd' }} />)
+    expect(screen.getAllByText('Request sent').length).toBeGreaterThanOrEqual(2) // the card and the tapped tile
+    expect(screen.getByText('Blinding Lights · The Weeknd')).toBeInTheDocument()
+    expect(screen.queryByText('Your request')).toBeNull()
   })
 
   it('lets the tipper change the saved card', () => {
