@@ -14,7 +14,7 @@ export interface ConfirmOptions {
 }
 
 interface FeedbackValue {
-  /** A short message at the top of the screen. Replaces the browser's alert(). */
+  /** A short message at the top of the screen. Errors open a dialog the person has to dismiss; other tones stay a quiet toast. */
   toast: (message: string, tone?: ToastTone) => void
   /** Ask the user to confirm. Resolves true on confirm, false on cancel. Replaces the browser's confirm(). */
   confirm: (options: ConfirmOptions) => Promise<boolean>
@@ -31,13 +31,19 @@ export const useFeedback = () => useContext(FeedbackContext)
 export function FeedbackProvider({ children }: { children: ReactNode }) {
   const { resolved, inPortal } = useTheme()
   const [toastState, setToastState] = useState<{ message: string; tone: ToastTone } | null>(null)
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [pending, setPending] = useState<{ options: ConfirmOptions; resolve: (ok: boolean) => void } | null>(null)
   const timer = useRef<number | undefined>(undefined)
 
   const toast = useCallback((message: string, tone: ToastTone = 'info') => {
+    if (tone === 'error') {
+      setToastState(null)
+      setErrorMessage(message)
+      return
+    }
     window.clearTimeout(timer.current)
     setToastState({ message, tone })
-    timer.current = window.setTimeout(() => setToastState(null), tone === 'error' ? 7000 : 4500)
+    timer.current = window.setTimeout(() => setToastState(null), 4500)
   }, [])
 
   const confirm = useCallback(
@@ -77,6 +83,14 @@ export function FeedbackProvider({ children }: { children: ReactNode }) {
           }
         >
           {o?.body && <div className="text-ink-700">{o.body}</div>}
+        </Modal>
+        <Modal
+          open={errorMessage !== null}
+          title="Something went wrong"
+          onClose={() => setErrorMessage(null)}
+          footer={<Button onClick={() => setErrorMessage(null)}>OK</Button>}
+        >
+          <p className="text-ink-700">{errorMessage}</p>
         </Modal>
       </div>
     </FeedbackContext.Provider>

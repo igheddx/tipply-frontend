@@ -1,8 +1,8 @@
 import logger from "../utils/logger";
 import React, { useState, useEffect } from 'react';
-import { Table, Select, DatePicker, Space, Button, message } from 'antd';
+import { Table, Select, DatePicker, Space, Button } from 'antd';
 import { ReloadOutlined } from '@ant-design/icons';
-import { Card, StatCard, StatusChip, type ChipKind } from './ui';
+import { Card, StatCard, StatusChip, useFeedback, type ChipKind } from './ui';
 import { apiService } from '../services/api';
 import dayjs from 'dayjs';
 
@@ -34,6 +34,7 @@ interface AggregatedChargesStats {
 }
 
 const AggregatedChargesTable: React.FC = () => {
+  const { toast: showError } = useFeedback();
   const [charges, setCharges] = useState<AggregatedCharge[]>([]);
   const [stats, setStats] = useState<AggregatedChargesStats | null>(null);
   const [loading, setLoading] = useState(false);
@@ -67,7 +68,7 @@ const AggregatedChargesTable: React.FC = () => {
       }
     } catch (error) {
       logger.error('Error loading aggregated charges:', error);
-      message.error('Failed to load aggregated charges');
+      showError('Failed to load aggregated charges', 'error');
     } finally {
       setLoading(false);
     }
