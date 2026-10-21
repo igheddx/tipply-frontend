@@ -263,7 +263,9 @@ const Dashboard: React.FC = () => {
           if (devicesWithSongRequests.length > 0) {
             try {
               let catalogTime = performance.now()
-              const catalogResp = await fetch(`${API_BASE_URL}/api/songcatalog/my-songs/${profileId}`)
+              const catalogResp = await fetch(`${API_BASE_URL}/api/songcatalog/my-songs/${profileId}`, {
+                headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+              })
               if (catalogResp.ok) {
                 const catalogData = await catalogResp.json()
                 const count = catalogData.length || 0
