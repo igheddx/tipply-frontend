@@ -447,6 +447,10 @@ class ApiService {
     return this.request(`/api/tips/recent-tips/${profileId}`)
   }
 
+  async getFailedTips(): Promise<ApiResponse<any>> {
+    return this.request('/api/tips/failed-tips')
+  }
+
   async getAwsIotStatus(): Promise<ApiResponse<any>> {
     return this.request('/api/tips/aws-iot-status')
   }

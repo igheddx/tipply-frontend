@@ -130,6 +130,7 @@ const Dashboard: React.FC = () => {
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null)
   const [recentTips, setRecentTips] = useState<TipSummary[]>([])
   const [loading, setLoading] = useState(true)
+  const [failedTips, setFailedTips] = useState<{ id: string; amount: number; deviceId: string; createdAt: string }[]>([])
   const [activeTab, setActiveTab] = useState(() => {
     const t = new URLSearchParams(window.location.search).get('tab')
     return t && ['devices', 'tips', 'songs', 'monitor'].includes(t) ? t : 'overview'
@@ -418,6 +419,9 @@ const Dashboard: React.FC = () => {
           break
           
         case 'tips':
+          void apiService.getFailedTips().then(resp => {
+            if (resp.data) setFailedTips(resp.data)
+          })
           // Lazy-load tips if not already loaded
           if (recentTips.length === 0) {
             const tipsResp = await apiService.getRecentTips(profileId)
@@ -1833,6 +1837,33 @@ const Dashboard: React.FC = () => {
                   </ul>
                 )}
               </Card>
+            )}
+
+            {activeTab === 'tips' && failedTips.length > 0 && (
+              <div className="mt-5">
+                <Card
+                  title="Not charged"
+                  subtitle={`${failedTips.length === 1 ? '1 tip' : `${failedTips.length} tips`} could not be charged. They are not counted in what you are owed.`}
+                  flush
+                >
+                  <ul className="divide-y divide-slate-100 px-5 pb-2">
+                    {failedTips.map(tip => {
+                      const device = (stats.devices ?? []).find(d => d.id === tip.deviceId || d.uuid === tip.deviceId)
+                      return (
+                        <li key={tip.id} className="flex items-center gap-3 py-3">
+                          <div className="min-w-0 flex-1">
+                            <div className="text-base font-bold text-ink-900">{formatCurrency(tip.amount)}</div>
+                            <div className="truncate text-xs text-ink-500">
+                              {device?.nickname || 'Tipwave device'} · {new Date(tip.createdAt).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
+                            </div>
+                          </div>
+                          <StatusChip kind="failed" label="Not charged" />
+                        </li>
+                      )
+                    })}
+                  </ul>
+                </Card>
+              </div>
             )}
 
             {activeTab === 'tips' && (
