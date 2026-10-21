@@ -198,7 +198,7 @@ const SongManagement: React.FC<SongManagementProps> = ({ profileId }) => {
       const artistParam = artist.trim()
       const url = `${API_BASE_URL}/api/songcatalog/musicbrainz/search?query=${encodeURIComponent(queryTitle)}${artistParam ? `&artist=${encodeURIComponent(artistParam)}` : ''}&limit=20`
       
-      const response = await fetch(url)
+      const response = await fetch(url, { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } })
       
       if (response.ok) {
         const data = await response.json()
