@@ -288,8 +288,12 @@ class ApiService {
     }, true) // Use API key for onboarding
   }
 
-  async getConnectAccountStatus(serialNumber: string): Promise<ApiResponse<any>> { // Changed from deviceUuid to serialNumber
-    return this.request(`/api/stripe/connect-account/${serialNumber}/status`)
+  // accessToken: used during onboarding, before the performer's token is stored
+  async getConnectAccountStatus(serialNumber: string, accessToken?: string): Promise<ApiResponse<any>> {
+    return this.request(
+      `/api/stripe/connect-account/${encodeURIComponent(serialNumber)}/status`,
+      accessToken ? { headers: { Authorization: `Bearer ${accessToken}` } } : {}
+    )
   }
 
   async createConnectAccountForUser(deviceUuid: string, serialNumber: string): Promise<ApiResponse<any>> {
