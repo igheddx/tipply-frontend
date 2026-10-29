@@ -2012,6 +2012,9 @@ const Dashboard: React.FC = () => {
                 <p className="text-sm text-ink-500">
                   On a tablet, open it in its own window to keep it beside your charts or sheet music. Bookmark /monitor or add it to your home screen to jump straight in.
                 </p>
+                <p className="text-sm text-ink-500">
+                  To see both at once on an iPad, swipe up from the bottom for the dock, then drag Safari next to your music app.
+                </p>
                 <Card title="Today's requests" subtitle="The most-tipped songs come first." flush>
                   {songRequests.length === 0 ? (
                     <EmptyState icon="music" title="No song requests today">

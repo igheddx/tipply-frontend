@@ -78,4 +78,24 @@ describe('SongRequestMonitor', () => {
     fireEvent.click(await screen.findByLabelText('More options'))
     expect(screen.getByLabelText('Larger text')).toBeInTheDocument()
   })
+
+  it('flags a request for a song played recently, and lets the performer mark one as already played', async () => {
+    mockQueue([
+      { ...request('a', 'Superstition', 5, 1), playedMinutesAgo: 25 },
+      request('b', 'Fresh Song', 3, 2)
+    ])
+    renderMonitor()
+
+    expect(await screen.findByText('Played 25 min ago')).toBeInTheDocument()
+    expect(screen.getAllByText(/^Played /)).toHaveLength(1)
+
+    fireEvent.click(screen.getByLabelText('Mark Superstition as already played'))
+    expect(await screen.findByText('Marked “Superstition” as played')).toBeInTheDocument()
+    await waitFor(() => {
+      const bodies = (global.fetch as any).mock.calls
+        .filter((c: any[]) => c[1]?.method === 'PUT')
+        .map((c: any[]) => JSON.parse(c[1].body).status)
+      expect(bodies).toEqual(['completed'])
+    })
+  })
 })

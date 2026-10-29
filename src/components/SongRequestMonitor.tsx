@@ -17,6 +17,8 @@ interface SongRequest {
   requestIds: string[]
   requestorName?: string
   note?: string
+  // Set while this song was played recently (the server clears it after 90 minutes)
+  playedMinutesAgo?: number | null
 }
 
 type RequestStatus = SongRequest['status']
@@ -46,6 +48,8 @@ const SIZES = [
   { title: 'text-2xl', now: 'text-4xl md:text-5xl', artist: 'text-lg', chip: 'text-base' },
   { title: 'text-3xl', now: 'text-5xl md:text-6xl', artist: 'text-xl', chip: 'text-lg' }
 ]
+
+const playedAgo = (mins: number) => (mins < 1 ? 'Played just now' : mins < 60 ? `Played ${mins} min ago` : `Played ${Math.floor(mins / 60)}h ${mins % 60}m ago`)
 
 const ago = (iso: string, now: number) => {
   const mins = Math.max(0, Math.round((now - new Date(iso).getTime()) / 60000))
@@ -89,7 +93,7 @@ const SongRequestMonitor: React.FC<SongRequestMonitorProps> = ({
   const [pauseDeviceId, setPauseDeviceId] = useState('')
   const [menuOpen, setMenuOpen] = useState(false)
   const [glow, setGlow] = useState<{ id: number; tipped: boolean } | null>(null)
-  const [undo, setUndo] = useState<SongRequest | null>(null)
+  const [undo, setUndo] = useState<{ request: SongRequest; message: string } | null>(null)
   const [held, setHeld] = useState(false)
   const shownRef = useRef<SongRequest[]>([])
   const glowId = useRef(0)
@@ -235,7 +239,8 @@ const SongRequestMonitor: React.FC<SongRequestMonitorProps> = ({
       if (response.ok) {
         // Update immediately so the screen feels instant, then confirm with the server
         setSongRequests(prev => prev.map(r => (requestKey(r) === key ? { ...r, status: newStatus } : r)))
-        if (newStatus === 'skipped') setUndo(request)
+        if (newStatus === 'skipped') setUndo({ request, message: `Skipped “${request.songTitle}”` })
+        else if (newStatus === 'completed' && request.status === 'pending') setUndo({ request, message: `Marked “${request.songTitle}” as played` })
         else if (newStatus === 'pending') setUndo(null)
         window.setTimeout(loadSongRequests, 1000)
       } else {
@@ -592,6 +597,12 @@ const SongRequestMonitor: React.FC<SongRequestMonitorProps> = ({
                           <div className="flex flex-wrap items-center gap-2">
                             <TipBadge r={r} />
                             {fresh && <span className="rounded-full bg-accent-600 px-2.5 py-1 text-xs font-extrabold text-white">NEW</span>}
+                            {r.playedMinutesAgo != null && (
+                              <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-1 text-xs font-extrabold text-amber-900">
+                                <BrandIcon name="check" size={14} tone="current" strokeWidth={2.4} />
+                                {playedAgo(r.playedMinutesAgo)}
+                              </span>
+                            )}
                             <span className="text-sm text-ink-500">{ago(r.firstRequestTime, now)}</span>
                           </div>
                           <h3 className={`mt-2 font-bold leading-tight text-ink-900 ${size.title}`}>{r.songTitle}</h3>
@@ -607,6 +618,14 @@ const SongRequestMonitor: React.FC<SongRequestMonitorProps> = ({
                         >
                           <BrandIcon name="play" size={22} color="#FFFFFF" />
                           {updatingStatus === key ? 'Saving…' : 'Play this'}
+                        </button>
+                        <button
+                          onClick={() => updateSongStatus(r, 'completed')}
+                          disabled={updatingStatus === key}
+                          className="inline-flex h-11 items-center justify-center rounded-xl px-3 text-sm font-semibold text-ink-500 hover:bg-slate-100 hover:text-ink-700 disabled:opacity-50"
+                          aria-label={`Mark ${r.songTitle} as already played`}
+                        >
+                          Already played
                         </button>
                         <button
                           onClick={() => updateSongStatus(r, 'skipped')}
@@ -662,9 +681,9 @@ const SongRequestMonitor: React.FC<SongRequestMonitorProps> = ({
           className="absolute inset-x-3 bottom-4 z-40 mx-auto flex max-w-md items-center gap-3 rounded-2xl bg-ink-900 px-4 py-3 text-white shadow-lift"
           role="status"
         >
-          <span className="min-w-0 flex-1 truncate text-sm font-semibold">Skipped “{undo.songTitle}”</span>
+          <span className="min-w-0 flex-1 truncate text-sm font-semibold">{undo.message}</span>
           <button
-            onClick={() => updateSongStatus(undo, 'pending')}
+            onClick={() => updateSongStatus(undo.request, 'pending')}
             className="h-10 rounded-xl bg-white/15 px-4 text-sm font-bold hover:bg-white/25"
           >
             Undo
