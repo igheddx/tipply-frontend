@@ -13,6 +13,7 @@ import { apiService } from '../services/api';
 import { isRefundEligible } from '../utils/refunds';
 import AggregatedChargesTable from '../components/AggregatedChargesTable';
 import RecoverChargedTips from '../components/RecoverChargedTips';
+import ClearFailedTestTips from '../components/ClearFailedTestTips';
 import PerformerInsights from '../components/PerformerInsights';
 import dayjs from 'dayjs';
 import { PortalShell, type PortalNavItem } from '../components/portal/PortalShell';
@@ -187,7 +188,7 @@ const runStatusChip = (status?: string) => {
 };
 
 const AdminDashboard: React.FC = () => {
-  const { confirm } = useFeedback();
+  const { confirm, toast: showError } = useFeedback();
   const navigate = useNavigate();
   const [stats, setStats] = useState<AdminDashboardStats | null>(null);
   const [performers, setPerformers] = useState<PerformerSummary[]>([]);
@@ -285,7 +286,7 @@ const AdminDashboard: React.FC = () => {
       if (profile?.data?.role === 'root_admin') {
         return true;
       }
-      message.error('Access denied. Admin privileges required.');
+      showError('Access denied. Admin privileges required.', 'error');
       navigate('/dashboard');
       return false;
     };
@@ -341,7 +342,7 @@ const AdminDashboard: React.FC = () => {
       if (earningsResponse.data) setPlatformEarnings(earningsResponse.data);
     } catch (error) {
       logger.error('Error loading admin dashboard data:', error);
-      message.error('Failed to load admin dashboard data');
+      showError('Failed to load admin dashboard data', 'error');
     } finally {
       setLoading(false);
     }
@@ -358,7 +359,7 @@ const AdminDashboard: React.FC = () => {
       }
     } catch (error) {
       logger.error('Error searching performers:', error);
-      message.error('Failed to search performers');
+      showError('Failed to search performers', 'error');
     }
   };
 
@@ -387,7 +388,7 @@ const AdminDashboard: React.FC = () => {
       logger.log('🔧 [DEBUG] Dashboard data reloaded');
     } catch (error) {
       logger.error('Error updating platform fee:', error);
-      message.error('Failed to update platform fee');
+      showError('Failed to update platform fee', 'error');
     } finally {
       setUpdatingFee(false);
     }
@@ -418,7 +419,7 @@ const AdminDashboard: React.FC = () => {
       if (response.data) {
         applyRateLimitResponse(response.data);
       } else if (response.error) {
-        message.error(`Failed to load payment security limits: ${response.error}`);
+        showError(`Failed to load payment security limits: ${response.error}`, 'error');
       }
     } catch (error) {
       logger.error('Error loading payment security limits:', error);
@@ -432,14 +433,14 @@ const AdminDashboard: React.FC = () => {
       setRateLimitsSaving(true);
       const response = await apiService.put('/api/payment-security-config/rate-limits', rateLimits);
       if (response.error) {
-        message.error(response.error);
+        showError(response.error, 'error');
       } else if (response.data) {
         applyRateLimitResponse(response.data);
         message.success('Payment security limits saved');
       }
     } catch (error) {
       logger.error('Error saving payment security limits:', error);
-      message.error('Failed to save payment security limits');
+      showError('Failed to save payment security limits', 'error');
     } finally {
       setRateLimitsSaving(false);
     }
@@ -450,14 +451,14 @@ const AdminDashboard: React.FC = () => {
       setRateLimitsSaving(true);
       const response = await apiService.delete('/api/payment-security-config/rate-limits');
       if (response.error) {
-        message.error(response.error);
+        showError(response.error, 'error');
       } else if (response.data) {
         applyRateLimitResponse(response.data);
         message.success('Payment security limits reset to defaults');
       }
     } catch (error) {
       logger.error('Error resetting payment security limits:', error);
-      message.error('Failed to reset payment security limits');
+      showError('Failed to reset payment security limits', 'error');
     } finally {
       setRateLimitsSaving(false);
     }
@@ -561,7 +562,7 @@ const AdminDashboard: React.FC = () => {
       }
     } catch (error) {
       logger.error('Error loading batch history:', error);
-      message.error('Failed to load batch history');
+      showError('Failed to load batch history', 'error');
     }
   };
 
@@ -585,7 +586,7 @@ const AdminDashboard: React.FC = () => {
       }
     } catch (error) {
       logger.error('Error loading tips:', error);
-      message.error('Failed to load tips');
+      showError('Failed to load tips', 'error');
     } finally {
       setTipsLoading(false);
     }
@@ -611,7 +612,7 @@ const AdminDashboard: React.FC = () => {
       }
     } catch (error) {
       logger.error('Error searching performers/devices:', error);
-      message.error('Failed to search performers/devices');
+      showError('Failed to search performers/devices', 'error');
     } finally {
       setDeviceSearchLoading(false);
     }
@@ -675,7 +676,7 @@ const AdminDashboard: React.FC = () => {
     } catch (error: any) {
       const errorMsg = error?.response?.data?.error || error?.message || 'Device action failed';
       logger.error('Error performing device action:', error);
-      message.error(errorMsg);
+      showError(errorMsg, 'error');
     } finally {
       setDeviceActionLoading(false);
       setPendingDeviceAction(null);
@@ -890,7 +891,7 @@ const AdminDashboard: React.FC = () => {
     } catch (error: any) {
       const errorMsg = error?.response?.data?.error || error?.message || 'Failed to process refund';
       logger.error('Error processing refund:', error);
-      message.error(errorMsg);
+      showError(errorMsg, 'error');
     } finally {
       setRefundLoading(false);
     }
@@ -918,7 +919,7 @@ const AdminDashboard: React.FC = () => {
       message.success('Tips exported successfully');
     } catch (error) {
       logger.error('Error exporting tips:', error);
-      message.error('Failed to export tips');
+      showError('Failed to export tips', 'error');
     }
   };
 
@@ -1906,6 +1907,7 @@ const AdminDashboard: React.FC = () => {
           <Tabs.TabPane tab="Aggregated Charges" key="aggregated-charges">
             <div className="space-y-5">
               <RecoverChargedTips />
+              <ClearFailedTestTips />
               <AggregatedChargesTable />
             </div>
           </Tabs.TabPane>

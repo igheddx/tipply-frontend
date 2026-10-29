@@ -90,4 +90,18 @@ describe('SongPickerSheet', () => {
     fireEvent.click(await screen.findByLabelText('Close'))
     expect(onClose).toHaveBeenCalled()
   })
+
+  it('marks songs the performer played recently, and still lets the tipper choose them', async () => {
+    respondWith([
+      { id: 's1', songTitle: 'Blinding Lights', artist: 'The Weeknd', playedMinutesAgo: 25 },
+      { id: 's2', songTitle: 'Easy On Me', artist: 'Adele', playedMinutesAgo: null }
+    ])
+    render(<SongPickerSheet open deviceUuid="dev-1" onClose={() => {}} onPick={() => {}} />)
+    expect(await screen.findByText('Played 25 min ago')).toBeInTheDocument()
+    expect(screen.getAllByText(/^Played /)).toHaveLength(1)
+
+    fireEvent.click(screen.getByText('Blinding Lights'))
+    expect(screen.getByText(/You can still request it/)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Choose a tip amount/ })).toBeInTheDocument()
+  })
 })

@@ -26,10 +26,10 @@ jobs:
           echo "🚀 Deploying to branch: ${{ github.ref }}"
           if [ "${{ github.ref }}" = "refs/heads/dev" ]; then
             echo "📝 Syncing to dev: s3://tipwave-sites-bucket/test"
-            aws s3 sync dist/ s3://tipwave-sites-bucket/test/ --delete
+            aws s3 sync dist/ s3://tipwave-sites-bucket/test/ --delete --exclude "*.DS_Store"
           else
             echo "📝 Syncing to prod: s3://tipwave-sites-bucket/app"
-            aws s3 sync dist/ s3://tipwave-sites-bucket/app/ --delete
+            aws s3 sync dist/ s3://tipwave-sites-bucket/app/ --delete --exclude "*.DS_Store"
           fi
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}

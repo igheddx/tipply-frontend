@@ -517,12 +517,20 @@ const Onboarding: React.FC = () => {
     const pollInterval = 1000 // 1 second
     
     logger.log(`Starting polling for device: ${formData.serialNumber}`)
-    
+
+    // The status lookup needs a sign-in. The account was created a moment ago, so sign in with it and keep the
+    // token in memory only; the normal sign-in after KYC still stores its own.
+    const signIn = await apiService.login({ email: formData.email, password: formData.password })
+    const accessToken: string | undefined = signIn.data?.accessToken
+    if (signIn.error || !accessToken) {
+      throw new Error('We could not confirm your account to continue. Please try again.')
+    }
+
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       try {
         logger.log(`Polling for onboarding URL, attempt ${attempt}/${maxAttempts}`)
         
-        const statusResult = await apiService.getConnectAccountStatus(formData.serialNumber)
+        const statusResult = await apiService.getConnectAccountStatus(formData.serialNumber, accessToken)
         
         logger.log(`Status response for attempt ${attempt}:`, statusResult)
         

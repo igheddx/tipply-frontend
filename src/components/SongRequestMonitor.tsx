@@ -17,6 +17,8 @@ interface SongRequest {
   requestIds: string[]
   requestorName?: string
   note?: string
+  // Set while this song was played recently (the server clears it after 90 minutes)
+  playedMinutesAgo?: number | null
 }
 
 type RequestStatus = SongRequest['status']
@@ -46,6 +48,8 @@ const SIZES = [
   { title: 'text-2xl', now: 'text-4xl md:text-5xl', artist: 'text-lg', chip: 'text-base' },
   { title: 'text-3xl', now: 'text-5xl md:text-6xl', artist: 'text-xl', chip: 'text-lg' }
 ]
+
+const playedAgo = (mins: number) => (mins < 1 ? 'Played just now' : mins < 60 ? `Played ${mins} min ago` : `Played ${Math.floor(mins / 60)}h ${mins % 60}m ago`)
 
 const ago = (iso: string, now: number) => {
   const mins = Math.max(0, Math.round((now - new Date(iso).getTime()) / 60000))
@@ -84,12 +88,17 @@ const SongRequestMonitor: React.FC<SongRequestMonitorProps> = ({
   const [updatingStatus, setUpdatingStatus] = useState<string | null>(null)
   const [now, setNow] = useState(() => Date.now())
   const [sizeIdx, setSizeIdx] = useState(() => Math.min(2, Math.max(0, Number(readPref('monitor_size', '1')) || 1)))
-  const [chime, setChime] = useState(() => readPref('monitor_chime', 'off') === 'on')
   const [showDone, setShowDone] = useState(false)
   const [freshKeys, setFreshKeys] = useState<Set<string>>(new Set())
   const [pauseDeviceId, setPauseDeviceId] = useState('')
+  const [menuOpen, setMenuOpen] = useState(false)
+  const [glow, setGlow] = useState<{ id: number; tipped: boolean } | null>(null)
+  const [undo, setUndo] = useState<{ request: SongRequest; message: string } | null>(null)
+  const [held, setHeld] = useState(false)
+  const shownRef = useRef<SongRequest[]>([])
+  const glowId = useRef(0)
+  const releaseTimer = useRef<number | undefined>(undefined)
   const knownKeys = useRef<Set<string> | null>(null)
-  const chimeRef = useRef<HTMLAudioElement | null>(null)
   const wakeLockRef = useRef<any>(null)
   const pauseInitRef = useRef(false)
 
@@ -131,17 +140,18 @@ const SongRequestMonitor: React.FC<SongRequestMonitorProps> = ({
         setSongRequests(list)
         setLoadFailed(false)
 
-        // Highlight (and optionally chime for) requests that were not there on the previous refresh
-        const keys = new Set(list.filter(r => r.status === 'pending').map(requestKey))
+        // Flag requests that were not there on the previous refresh. They stay flagged until the performer has seen them.
+        const keys = new Set(list.map(requestKey))
         if (knownKeys.current) {
-          const added = [...keys].filter(k => !knownKeys.current!.has(k))
+          const added = list
+            .filter(r => r.status === 'pending')
+            .map(requestKey)
+            .filter(k => !knownKeys.current!.has(k))
           if (added.length > 0) {
             setFreshKeys(prev => new Set([...prev, ...added]))
-            window.setTimeout(() => setFreshKeys(prev => new Set([...prev].filter(k => !added.includes(k)))), 6000)
-            if (chimeRef.current && readPref('monitor_chime', 'off') === 'on') {
-              chimeRef.current.currentTime = 0
-              chimeRef.current.play().catch(() => undefined)
-            }
+            const tipped = list.some(r => added.includes(requestKey(r)) && r.totalTipAmount > 0)
+            glowId.current += 1
+            setGlow({ id: glowId.current, tipped })
           }
         }
         knownKeys.current = keys
@@ -229,6 +239,9 @@ const SongRequestMonitor: React.FC<SongRequestMonitorProps> = ({
       if (response.ok) {
         // Update immediately so the screen feels instant, then confirm with the server
         setSongRequests(prev => prev.map(r => (requestKey(r) === key ? { ...r, status: newStatus } : r)))
+        if (newStatus === 'skipped') setUndo({ request, message: `Skipped “${request.songTitle}”` })
+        else if (newStatus === 'completed' && request.status === 'pending') setUndo({ request, message: `Marked “${request.songTitle}” as played` })
+        else if (newStatus === 'pending') setUndo(null)
         window.setTimeout(loadSongRequests, 1000)
       } else {
         logger.error('Failed to update status:', response.status, await response.text())
@@ -240,31 +253,87 @@ const SongRequestMonitor: React.FC<SongRequestMonitorProps> = ({
     }
   }
 
+  // Clear a request's NEW flag once it has been on screen for a moment
+  useEffect(() => {
+    if (!isVisible || freshKeys.size === 0) return
+    const timers = new Map<Element, number>()
+    const observer = new IntersectionObserver(
+      entries => {
+        entries.forEach(entry => {
+          const key = entry.target.getAttribute('data-key')
+          const pending = timers.get(entry.target)
+          if (pending) {
+            window.clearTimeout(pending)
+            timers.delete(entry.target)
+          }
+          if (!entry.isIntersecting || !key) return
+          timers.set(
+            entry.target,
+            window.setTimeout(() => {
+              if (document.visibilityState !== 'visible') return
+              setFreshKeys(prev => new Set([...prev].filter(k => k !== key)))
+            }, 2500)
+          )
+        })
+      },
+      { threshold: 0.6 }
+    )
+    document.querySelectorAll('[data-fresh="true"]').forEach(el => observer.observe(el))
+    return () => {
+      observer.disconnect()
+      timers.forEach(t => window.clearTimeout(t))
+    }
+  }, [isVisible, freshKeys, songRequests])
+
+  // Pending count in the tab title, so a background tab still shows what is waiting
+  const pendingTotal = songRequests.filter(r => r.status === 'pending').length
+  useEffect(() => {
+    if (!isVisible) return
+    const original = document.title
+    document.title = pendingTotal > 0 ? `(${pendingTotal}) Live requests` : 'Live requests'
+    return () => {
+      document.title = original
+    }
+  }, [isVisible, pendingTotal])
+
+  // Undo window after a skip
+  useEffect(() => {
+    if (!undo) return
+    const t = window.setTimeout(() => setUndo(null), 7000)
+    return () => window.clearTimeout(t)
+  }, [undo])
+
+  // The list holds still while a finger is on it, so a new bigger tip cannot slide a different song under the tap
+  const holdStart = () => {
+    window.clearTimeout(releaseTimer.current)
+    setHeld(true)
+    releaseTimer.current = window.setTimeout(() => setHeld(false), 8000)
+  }
+  const holdEnd = () => {
+    window.clearTimeout(releaseTimer.current)
+    releaseTimer.current = window.setTimeout(() => setHeld(false), 400)
+  }
+  useEffect(() => () => window.clearTimeout(releaseTimer.current), [])
+
   const changeSize = (delta: number) => {
     const next = Math.min(2, Math.max(0, sizeIdx + delta))
     setSizeIdx(next)
     writePref('monitor_size', String(next))
   }
 
-  const toggleChime = () => {
-    const next = !chime
-    setChime(next)
-    writePref('monitor_chime', next ? 'on' : 'off')
-    // Playing once on enabling both previews the sound and satisfies the browser's autoplay rule
-    if (next && chimeRef.current) {
-      chimeRef.current.currentTime = 0
-      chimeRef.current.play().catch(() => undefined)
-    }
-  }
 
   if (!isVisible) return null
 
-  // Playing first, then waiting by tip (highest first) and age, then everything finished
+  // While a finger is down the list keeps the order it had, then catches up
+  if (!held) shownRef.current = songRequests
+  const shown = shownRef.current
+
+  // Waiting by tip (highest first) and age, playing first, then everything finished
   const byTipThenAge = (a: SongRequest, b: SongRequest) =>
     b.totalTipAmount - a.totalTipAmount || new Date(a.firstRequestTime).getTime() - new Date(b.firstRequestTime).getTime()
-  const performing = songRequests.filter(r => r.status === 'performing').sort(byTipThenAge)
-  const pending = songRequests.filter(r => r.status === 'pending').sort(byTipThenAge)
-  const done = songRequests
+  const performing = shown.filter(r => r.status === 'performing').sort(byTipThenAge)
+  const pending = shown.filter(r => r.status === 'pending').sort(byTipThenAge)
+  const done = shown
     .filter(r => r.status === 'completed' || r.status === 'skipped' || r.status === 'cancelled')
     .sort((a, b) => new Date(b.lastRequestTime).getTime() - new Date(a.lastRequestTime).getTime())
 
@@ -275,7 +344,7 @@ const SongRequestMonitor: React.FC<SongRequestMonitorProps> = ({
 
   const Note = ({ r }: { r: SongRequest }) =>
     r.requestorName || r.note ? (
-      <div className="mt-3 rounded-xl bg-slate-50 px-4 py-3 text-ink-700">
+      <div className="mt-2 rounded-xl bg-slate-50 px-3 py-2 text-ink-700">
         {r.requestorName && (
           <div className="flex items-center gap-2 font-semibold text-ink-900">
             <BrandIcon name="user" size={16} />
@@ -293,6 +362,8 @@ const SongRequestMonitor: React.FC<SongRequestMonitorProps> = ({
     </span>
   )
 
+  const glowColor = glow?.tipped ? '229,84,140' : '6,182,200'
+
   return (
     <div
       className={`fixed inset-0 z-50 flex flex-col bg-surface text-ink-900 ${themeClass}`}
@@ -300,129 +371,198 @@ const SongRequestMonitor: React.FC<SongRequestMonitorProps> = ({
       role="dialog"
       aria-label="Live song requests"
     >
-      <audio ref={chimeRef} src="/cash-register.mp3" preload="auto" />
+      <style>{`@keyframes monitor-glow{0%{opacity:0}20%{opacity:1}100%{opacity:0}}`}</style>
 
-      {/* Top bar: kept slim so the queue gets the screen, and usable in a narrow side window */}
-      <header className="flex flex-none flex-wrap items-center gap-x-3 gap-y-2 border-b border-slate-200 bg-white px-4 py-3">
+      {/* A new request pulses the screen edge, so it shows in peripheral vision without covering anything */}
+      {glow && (
+        <div
+          key={glow.id}
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 z-40"
+          style={{
+            boxShadow: `inset 0 0 0 6px rgba(${glowColor},0.95), inset 0 0 60px 14px rgba(${glowColor},0.55)`,
+            animation: 'monitor-glow 1.8s ease-out forwards'
+          }}
+          onAnimationEnd={() => setGlow(null)}
+        />
+      )}
+
+      {/* Top bar: slim, so it fits a narrow side window. Less-used controls live in the menu. */}
+      <header className="relative flex flex-none items-center gap-2 border-b border-slate-200 bg-white px-3 py-2.5">
         <button onClick={onClose} className={`${soft} pl-2`} aria-label="Close live requests">
           <BrandIcon name="chevron-left" size={20} tone="current" />
-          Close
+          <span className="hidden sm:inline">Close</span>
         </button>
 
-        <div className="mr-auto flex items-center gap-2">
-          <h1 className="text-lg font-bold">Live requests</h1>
-          <span
-            className={`flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${loadFailed ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-ink-700'}`}
-            role="status"
-          >
-            <span className={`h-2 w-2 rounded-full ${loadFailed ? 'bg-amber-400' : 'animate-pulse bg-emerald-500'}`} />
-            {loadFailed ? 'Reconnecting…' : loading && songRequests.length === 0 ? 'Loading…' : 'Live'}
-          </span>
-        </div>
+        <h1 className="truncate text-lg font-bold">Live requests</h1>
+        <span
+          className={`flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${loadFailed ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-ink-700'}`}
+          role="status"
+        >
+          <span className={`h-2 w-2 rounded-full ${loadFailed ? 'bg-amber-400' : 'animate-pulse bg-emerald-500'}`} />
+          {loadFailed ? 'Reconnecting…' : loading && songRequests.length === 0 ? 'Loading…' : 'Live'}
+        </span>
 
-        <div className="flex flex-wrap items-center gap-2">
-          {onTogglePause && devices.length > 0 && (
-            <div className="flex items-center gap-2">
-              {devices.length > 1 && (
-                <select
-                  value={selectedPauseDevice?.id ?? ''}
-                  onChange={e => setPauseDeviceId(e.target.value)}
-                  className="h-11 rounded-xl border border-slate-300 bg-white px-3 text-sm font-semibold text-ink-900"
-                  aria-label="Choose a device to pause"
-                >
-                  <option value="">Choose device</option>
-                  {devices.map(d => (
-                    <option key={d.id} value={d.id}>
-                      {d.nickname || 'Device'}
-                      {d.isPaused ? ' (paused)' : ''}
-                    </option>
-                  ))}
-                </select>
-              )}
-              {selectedPauseDevice && (
+        <span
+          className={`ml-auto flex h-9 min-w-[2.25rem] items-center justify-center rounded-full px-3 text-base font-extrabold ${
+            pendingTotal > 0 ? 'bg-accent-500 text-white' : 'bg-slate-100 text-ink-500'
+          }`}
+          aria-label={`${pendingTotal} waiting`}
+          title={`${pendingTotal} waiting`}
+        >
+          {pendingTotal}
+        </span>
+
+        <button
+          onClick={() => setMenuOpen(o => !o)}
+          aria-expanded={menuOpen}
+          aria-label="More options"
+          className="flex h-11 w-11 items-center justify-center rounded-xl bg-slate-100 text-xl font-bold text-ink-700"
+        >
+          ⋯
+        </button>
+
+        {menuOpen && (
+          <>
+            <div className="fixed inset-0 z-30" onClick={() => setMenuOpen(false)} aria-hidden="true" />
+            <div className="absolute right-3 top-full z-50 mt-2 w-72 max-w-[calc(100vw-1.5rem)] space-y-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-lift">
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-sm font-semibold text-ink-700">Text size</span>
+                <div className="flex items-center rounded-xl bg-slate-100" role="group" aria-label="Text size">
+                  <button onClick={() => changeSize(-1)} disabled={sizeIdx === 0} className="h-11 w-11 text-lg font-bold text-ink-700 disabled:opacity-30" aria-label="Smaller text">
+                    A−
+                  </button>
+                  <button onClick={() => changeSize(1)} disabled={sizeIdx === 2} className="h-11 w-11 text-xl font-bold text-ink-700 disabled:opacity-30" aria-label="Larger text">
+                    A+
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-sm font-semibold text-ink-700">Theme</span>
                 <button
-                  onClick={() => onTogglePause(selectedPauseDevice.id)}
-                  disabled={pausingDeviceId === selectedPauseDevice.id}
-                  title={selectedPauseDevice.isPaused ? 'Turn the light and sound back on' : 'Stops light and sound. Tips still go through.'}
-                  className={`${soft} font-bold ${selectedPauseDevice.isPaused ? '!bg-amber-400 !text-ink-900 hover:!bg-amber-300' : ''}`}
+                  onClick={() => setPreference(dark ? 'light' : 'dark')}
+                  aria-label={dark ? 'Switch to light theme' : 'Switch to dark theme'}
+                  className={`${soft} gap-2`}
                 >
-                  <BrandIcon name={selectedPauseDevice.isPaused ? 'play' : 'pause'} size={18} tone="current" />
-                  {selectedPauseDevice.isPaused ? 'Resume device' : devices.length === 1 ? `Pause ${devices[0].nickname || 'device'}` : 'Pause device'}
+                  <BrandIcon name={dark ? 'sun' : 'moon'} size={20} />
+                  {dark ? 'Light' : 'Dark'}
                 </button>
+              </div>
+
+              {onTogglePause && devices.length > 0 && (
+                <div className="space-y-2 border-t border-slate-100 pt-3">
+                  {devices.length > 1 && (
+                    <select
+                      value={selectedPauseDevice?.id ?? ''}
+                      onChange={e => setPauseDeviceId(e.target.value)}
+                      className="h-11 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm font-semibold text-ink-900"
+                      aria-label="Choose a device to pause"
+                    >
+                      <option value="">Choose device</option>
+                      {devices.map(d => (
+                        <option key={d.id} value={d.id}>
+                          {d.nickname || 'Device'}
+                          {d.isPaused ? ' (paused)' : ''}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                  {selectedPauseDevice && (
+                    <button
+                      onClick={() => onTogglePause(selectedPauseDevice.id)}
+                      disabled={pausingDeviceId === selectedPauseDevice.id}
+                      title={selectedPauseDevice.isPaused ? 'Turn the light and sound back on' : 'Stops light and sound. Tips still go through.'}
+                      className={`${soft} w-full font-bold ${selectedPauseDevice.isPaused ? '!bg-amber-400 !text-ink-900 hover:!bg-amber-300' : ''}`}
+                    >
+                      <BrandIcon name={selectedPauseDevice.isPaused ? 'play' : 'pause'} size={18} tone="current" />
+                      {selectedPauseDevice.isPaused ? 'Resume device' : devices.length === 1 ? `Pause ${devices[0].nickname || 'device'}` : 'Pause device'}
+                    </button>
+                  )}
+                  {pausedCount > 0 && !selectedPauseDevice?.isPaused && (
+                    <p className="text-sm font-semibold text-amber-700">{pausedCount > 1 ? 'Several devices paused' : 'A device is paused'}</p>
+                  )}
+                </div>
               )}
-              {pausedCount > 1 && <span className="text-sm font-semibold text-amber-700">Several devices paused</span>}
             </div>
-          )}
-
-          <div className="flex items-center rounded-xl bg-slate-100" role="group" aria-label="Text size">
-            <button onClick={() => changeSize(-1)} disabled={sizeIdx === 0} className="h-11 w-11 text-lg font-bold text-ink-700 disabled:opacity-30" aria-label="Smaller text">
-              A−
-            </button>
-            <button onClick={() => changeSize(1)} disabled={sizeIdx === 2} className="h-11 w-11 text-xl font-bold text-ink-700 disabled:opacity-30" aria-label="Larger text">
-              A+
-            </button>
-          </div>
-
-          <button
-            onClick={toggleChime}
-            aria-pressed={chime}
-            aria-label="Play a sound for new requests"
-            title="Play a sound for new requests"
-            className={`flex h-11 w-11 items-center justify-center rounded-xl ${chime ? 'bg-brand-700 text-white' : 'bg-slate-100 text-ink-700'}`}
-          >
-            <BrandIcon name="volume" size={22} tone="current" />
-          </button>
-
-          <button
-            onClick={() => setPreference(dark ? 'light' : 'dark')}
-            aria-label={dark ? 'Switch to light theme' : 'Switch to dark theme'}
-            title={dark ? 'Light theme' : 'Dark theme'}
-            className="flex h-11 w-11 items-center justify-center rounded-xl bg-slate-100"
-          >
-            <BrandIcon name={dark ? 'sun' : 'moon'} size={22} />
-          </button>
-        </div>
+          </>
+        )}
       </header>
 
-      {/* Queue */}
-      <main className="min-h-0 flex-1 overflow-y-auto px-4 py-5">
-        <div className="mx-auto grid max-w-6xl gap-5 lg:grid-cols-[1.1fr_1fr]">
+      {/* Paused devices stay visible even with the menu closed, since tippers get no light or sound */}
+      {pausedCount > 0 && (
+        <div className="flex-none bg-amber-100 px-4 py-1.5 text-center text-sm font-semibold text-amber-900">
+          {pausedCount > 1 ? 'Several devices are paused' : 'A device is paused'}
+        </div>
+      )}
+
+      {/* Queue. Requests come first; on a wide screen "Playing now" moves to a side column. */}
+      <main
+        className="min-h-0 flex-1 overflow-y-auto px-3 py-4"
+        onPointerDown={holdStart}
+        onPointerUp={holdEnd}
+        onPointerCancel={holdEnd}
+      >
+        <div className="mx-auto grid max-w-6xl gap-4 lg:grid-cols-[1fr_22rem]">
           {/* Playing now */}
-          <section aria-label="Playing now">
-            <h2 className={sectionLabel}>Playing now</h2>
+          <section
+            aria-label="Playing now"
+            className={`lg:order-2 lg:sticky lg:top-0 lg:self-start ${performing.length === 0 ? 'hidden lg:block' : ''}`}
+          >
+            <h2 className={`${sectionLabel} hidden lg:flex`}>Playing now</h2>
             {performing.length === 0 ? (
-              <div className="rounded-3xl border border-dashed border-slate-300 p-8 text-center text-ink-500">
-                <p className="text-lg font-semibold text-ink-900">Nothing playing</p>
-                <p className="mt-1">Tap “Play this” on a request when you start it.</p>
+              <div className="rounded-3xl border border-dashed border-slate-300 p-6 text-center text-ink-500">
+                <p className="font-semibold text-ink-900">Nothing playing</p>
+                <p className="mt-1 text-sm">Tap “Play this” on a request when you start it.</p>
               </div>
             ) : (
               performing.map(r => {
                 const key = requestKey(r)
                 return (
-                  <article key={key} className="mb-4 rounded-3xl border border-slate-100 bg-white p-6 shadow-lift">
+                  <React.Fragment key={key}>
+                  {/* Narrow window: one slim row so the requests stay in view */}
+                  <article className="mb-1 flex items-center gap-3 rounded-2xl border border-slate-100 bg-white p-3 shadow-lift lg:hidden">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-brand-700">
+                        <BrandIcon name="music" size={14} />
+                        Playing
+                      </div>
+                      <div className="truncate font-bold text-ink-900">{r.songTitle}</div>
+                    </div>
+                    <button
+                      onClick={() => updateSongStatus(r, 'completed')}
+                      disabled={updatingStatus === key}
+                      className="inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-brand-700 px-4 font-bold text-white hover:bg-brand-800 disabled:opacity-50"
+                    >
+                      <BrandIcon name="check" size={20} color="#FFFFFF" strokeWidth={2.4} />
+                      {updatingStatus === key ? 'Saving…' : 'Done playing'}
+                    </button>
+                  </article>
+                  <article className="mb-3 hidden rounded-3xl border border-slate-100 bg-white p-4 shadow-lift lg:block">
                     <div className="flex flex-wrap items-center gap-2">
                       <StatusChip kind="active" label="Playing" />
                       <TipBadge r={r} />
                     </div>
-                    <h3 className={`mt-4 font-extrabold leading-tight text-ink-900 ${size.now}`}>{r.songTitle}</h3>
-                    <p className={`mt-1 text-ink-500 ${size.artist}`}>{r.artist}</p>
+                    <h3 className={`mt-3 font-extrabold leading-tight text-ink-900 ${size.title}`}>{r.songTitle}</h3>
+                    <p className={`text-ink-500 ${size.artist}`}>{r.artist}</p>
                     <Note r={r} />
                     <button
                       onClick={() => updateSongStatus(r, 'completed')}
                       disabled={updatingStatus === key}
-                      className={`${btn} mt-5 w-full bg-brand-700 text-white hover:bg-brand-800`}
+                      className={`${btn} mt-4 w-full bg-brand-700 text-white hover:bg-brand-800`}
                     >
                       <BrandIcon name="check" size={22} color="#FFFFFF" strokeWidth={2.4} />
                       {updatingStatus === key ? 'Saving…' : 'Done playing'}
                     </button>
                   </article>
+                  </React.Fragment>
                 )
               })
             )}
           </section>
 
           {/* Up next */}
-          <section aria-label="Up next">
+          <section aria-label="Up next" className="lg:order-1">
             <h2 className={sectionLabel}>
               Up next
               <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-ink-700">{pending.length}</span>
@@ -444,17 +584,25 @@ const SongRequestMonitor: React.FC<SongRequestMonitorProps> = ({
                   return (
                     <li
                       key={key}
-                      className={`rounded-3xl border p-5 transition-colors ${
+                      data-key={key}
+                      data-fresh={fresh ? 'true' : 'false'}
+                      className={`rounded-3xl border p-4 transition-colors ${
                         fresh ? 'border-accent-400 bg-accent-50 ring-2 ring-accent-400' : 'border-slate-100 bg-white'
                       }`}
                       style={fresh && dark ? { backgroundColor: 'rgba(229,84,140,0.18)' } : undefined}
                     >
                       <div className="flex items-start gap-3">
-                        <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-100 text-sm font-bold text-ink-700">{i + 1}</span>
+                        <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-slate-100 text-sm font-bold text-ink-700">{i + 1}</span>
                         <div className="min-w-0 flex-1">
                           <div className="flex flex-wrap items-center gap-2">
                             <TipBadge r={r} />
                             {fresh && <span className="rounded-full bg-accent-600 px-2.5 py-1 text-xs font-extrabold text-white">NEW</span>}
+                            {r.playedMinutesAgo != null && (
+                              <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-1 text-xs font-extrabold text-amber-900">
+                                <BrandIcon name="check" size={14} tone="current" strokeWidth={2.4} />
+                                {playedAgo(r.playedMinutesAgo)}
+                              </span>
+                            )}
                             <span className="text-sm text-ink-500">{ago(r.firstRequestTime, now)}</span>
                           </div>
                           <h3 className={`mt-2 font-bold leading-tight text-ink-900 ${size.title}`}>{r.songTitle}</h3>
@@ -462,19 +610,27 @@ const SongRequestMonitor: React.FC<SongRequestMonitorProps> = ({
                           <Note r={r} />
                         </div>
                       </div>
-                      <div className="mt-4 flex gap-3">
+                      <div className="mt-3 flex items-center gap-2">
                         <button
                           onClick={() => updateSongStatus(r, 'performing')}
                           disabled={updatingStatus === key}
-                          className={`${btn} flex-1 bg-brand-700 text-white hover:bg-brand-800`}
+                          className={`${btn} h-12 flex-1 bg-brand-700 text-white hover:bg-brand-800`}
                         >
                           <BrandIcon name="play" size={22} color="#FFFFFF" />
                           {updatingStatus === key ? 'Saving…' : 'Play this'}
                         </button>
                         <button
+                          onClick={() => updateSongStatus(r, 'completed')}
+                          disabled={updatingStatus === key}
+                          className="inline-flex h-11 items-center justify-center rounded-xl px-3 text-sm font-semibold text-ink-500 hover:bg-slate-100 hover:text-ink-700 disabled:opacity-50"
+                          aria-label={`Mark ${r.songTitle} as already played`}
+                        >
+                          Already played
+                        </button>
+                        <button
                           onClick={() => updateSongStatus(r, 'skipped')}
                           disabled={updatingStatus === key}
-                          className={`${btn} border border-slate-300 bg-white px-5 text-ink-700 hover:bg-slate-50`}
+                          className="inline-flex h-11 items-center justify-center rounded-xl px-3 text-sm font-semibold text-ink-500 hover:bg-slate-100 hover:text-ink-700 disabled:opacity-50"
                           aria-label={`Skip ${r.songTitle}`}
                         >
                           Skip
@@ -518,6 +674,22 @@ const SongRequestMonitor: React.FC<SongRequestMonitorProps> = ({
           </section>
         </div>
       </main>
+
+      {/* Undo for a skip, so a stray tap costs nothing */}
+      {undo && (
+        <div
+          className="absolute inset-x-3 bottom-4 z-40 mx-auto flex max-w-md items-center gap-3 rounded-2xl bg-ink-900 px-4 py-3 text-white shadow-lift"
+          role="status"
+        >
+          <span className="min-w-0 flex-1 truncate text-sm font-semibold">{undo.message}</span>
+          <button
+            onClick={() => updateSongStatus(undo.request, 'pending')}
+            className="h-10 rounded-xl bg-white/15 px-4 text-sm font-bold hover:bg-white/25"
+          >
+            Undo
+          </button>
+        </div>
+      )}
     </div>
   )
 }

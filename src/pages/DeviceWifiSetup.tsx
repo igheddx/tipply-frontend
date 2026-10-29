@@ -22,7 +22,7 @@ import logger from "../utils/logger";
  */
 
 import { useState, useEffect } from 'react';
-import { Banner, Button, Card, Modal } from '../components/ui';
+import { Banner, Button, Card, Modal, useFeedback } from '../components/ui';
 import { BrandIcon, IconTile, type BrandIconName } from '../components/icons/BrandIcons';
 import { toast } from 'sonner';
 
@@ -49,6 +49,7 @@ interface EnvironmentInfo {
 }
 
 const DeviceWifiSetup = () => {
+  const { toast: showError } = useFeedback();
   const [currentStep, setCurrentStep] = useState(0);
   const [scanning, setScanning] = useState(false);
   const [connecting, setConnecting] = useState(false);
@@ -193,17 +194,11 @@ const DeviceWifiSetup = () => {
       
       if (!hasBluetoothAccess || !(navigator as any).bluetooth) {
         if (environment?.isIOS) {
-          toast.error('🚫 Provisioning requires desktop or Android Chrome/Edge/Opera. iOS Safari does not support Web Bluetooth.', {
-            duration: 6000
-          });
+          showError('🚫 Provisioning requires desktop or Android Chrome/Edge/Opera. iOS Safari does not support Web Bluetooth.', 'error');
         } else if (environment?.isAndroid) {
-          toast.error(`Please open this page in Chrome, Edge, or Opera browser on Android.`, {
-            duration: 5000
-          });
+          showError(`Please open this page in Chrome, Edge, or Opera browser on Android.`, 'error');
         } else {
-          toast.error('Web Bluetooth is not supported. Please use Chrome, Edge, or Opera.', {
-            duration: 5000
-          });
+          showError('Web Bluetooth is not supported. Please use Chrome, Edge, or Opera.', 'error');
         }
         setScanning(false);
         return;
@@ -263,13 +258,13 @@ const DeviceWifiSetup = () => {
     } catch (err: any) {
       logger.error('Bluetooth scan error:', err);
       if (err.message.includes('User cancelled') || err.name === 'NotFoundError') {
-        toast.error('Device selection cancelled. No Tipwave devices found nearby.');
+        showError('Device selection cancelled. No Tipwave devices found nearby.', 'error');
         if (import.meta.env.DEV) {
           toast.info('💡 Hold Shift key while clicking "Find My Device" to test in demo mode');
         }
       } else {
         setError(`Failed to scan for devices: ${err.message}`);
-        toast.error('Failed to scan for devices');
+        showError('Failed to scan for devices', 'error');
       }
     } finally {
       setScanning(false);
@@ -314,7 +309,7 @@ const DeviceWifiSetup = () => {
     } catch (err: any) {
       logger.error('Connection error:', err);
       setError(`Failed to connect: ${err.message}`);
-      toast.error('Failed to connect to device');
+      showError('Failed to connect to device', 'error');
     } finally {
       setConnecting(false);
     }
@@ -329,7 +324,7 @@ const DeviceWifiSetup = () => {
   // Step 3: Send Wi-Fi credentials to device
   const configureWifi = async () => {
     if (!selectedDevice || !selectedSsid || !password) {
-      toast.error('Please enter WiFi network name and password');
+      showError('Please enter WiFi network name and password', 'error');
       return;
     }
 
@@ -432,14 +427,14 @@ const DeviceWifiSetup = () => {
       setTimeout(() => {
         if (connecting) {
           setConnecting(false);
-          toast.error('Connection timeout. Please try again.');
+          showError('Connection timeout. Please try again.', 'error');
         }
       }, 30000); // 30 second timeout
       
     } catch (err: any) {
       logger.error('Wi-Fi configuration error:', err);
       setError(`Failed to configure Wi-Fi: ${err.message}`);
-      toast.error(`Failed to configure Wi-Fi: ${err.message}`);
+      showError(`Failed to configure Wi-Fi: ${err.message}`, 'error');
       
       // Send failure notification if permission granted
       if (notificationPermission === 'granted') {

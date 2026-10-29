@@ -119,6 +119,7 @@ jobs:
           echo "🚀 Deploying to ${{ env.DEPLOY_ENV }} environment (s3://${{ env.S3_BUCKET }}/${{ env.S3_PATH }}/)"
           aws s3 sync frontend/dist/ s3://${{ env.S3_BUCKET }}/${{ env.S3_PATH }}/ \
             --delete \
+            --exclude "*.DS_Store" \
             --exclude "*.html" \
             --exclude "*.css" \
             --exclude "*.js" \

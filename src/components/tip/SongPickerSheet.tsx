@@ -9,7 +9,12 @@ interface Song {
   id: string
   songTitle: string
   artist: string
+  // Minutes since the performer played this song, while that was within the last 90 minutes
+  playedMinutesAgo?: number | null
 }
+
+export const playedLabel = (mins: number) =>
+  mins < 1 ? 'Played just now' : mins < 60 ? `Played ${mins} min ago` : `Played ${Math.floor(mins / 60)}h ${mins % 60}m ago`
 
 export interface PickedSong {
   id: string
@@ -120,6 +125,14 @@ export function SongPickerSheet({ open, deviceUuid, current, onClose, onPick }: 
                     <div className="truncate text-sm text-ink-500">{chosen.artist}</div>
                   </div>
                 </div>
+                {chosen.playedMinutesAgo != null && (
+                  <div className="flex items-start gap-2.5 rounded-xl bg-amber-50 px-3 py-2.5 text-sm text-amber-900">
+                    <BrandIcon name="info" size={18} />
+                    <span>
+                      <strong>{playedLabel(chosen.playedMinutesAgo)}.</strong> You can still request it, or pick a different song.
+                    </span>
+                  </div>
+                )}
                 <input
                   value={name}
                   onChange={(e) => setName(e.target.value)}
@@ -177,7 +190,12 @@ export function SongPickerSheet({ open, deviceUuid, current, onClose, onPick }: 
                         className="w-full border-b border-slate-100 py-3 text-left active:bg-slate-50"
                       >
                         <div className="text-[15px] font-semibold">{song.songTitle}</div>
-                        <div className="text-xs text-ink-500">{song.artist}</div>
+                        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-ink-500">
+                          <span>{song.artist}</span>
+                          {song.playedMinutesAgo != null && (
+                            <span className="rounded-full bg-amber-100 px-2 py-0.5 font-bold text-amber-900">{playedLabel(song.playedMinutesAgo)}</span>
+                          )}
+                        </div>
                       </button>
                     </li>
                   ))}
