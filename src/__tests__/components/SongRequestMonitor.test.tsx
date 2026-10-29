@@ -44,7 +44,7 @@ describe('SongRequestMonitor', () => {
     const titles = screen.getAllByRole('heading', { level: 3 }).map(h => h.textContent)
     expect(titles).toEqual(['High tip song', 'Low tip song'])
     expect(screen.getByLabelText('2 waiting')).toBeInTheDocument()
-    expect(document.title).toBe('(2) Live requests')
+    await waitFor(() => expect(document.title).toBe('(2) Live requests'))
   })
 
   it('has no sound control', async () => {
