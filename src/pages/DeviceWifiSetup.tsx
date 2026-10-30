@@ -21,10 +21,11 @@ import logger from "../utils/logger";
  * - {"state":"failure","error":"auth_failed|no_ssid|timeout|unknown"}
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Banner, Button, Card, Modal, useFeedback } from '../components/ui';
 import { BrandIcon, IconTile, type BrandIconName } from '../components/icons/BrandIcons';
 import { toast } from 'sonner';
+import { wifiVault, type SavedNetwork } from '../utils/savedWifi';
 
 interface BluetoothDevice {
   name: string;
@@ -37,6 +38,28 @@ interface WifiNetwork {
   rssi: number;
   security: string;
 }
+
+/** Where the setup time went, in milliseconds */
+interface SetupTimings {
+  bluetoothMs?: number;
+  sendMs?: number;
+  joinMs?: number;
+}
+
+const PROVISIONING_SERVICE = '550e8400-e29b-41d4-a716-446655440000';
+const SSID_CHAR = '550e8400-e29b-41d4-a716-446655440001';
+const PASSWORD_CHAR = '550e8400-e29b-41d4-a716-446655440002';
+const STATUS_CHAR = '550e8400-e29b-41d4-a716-446655440003';
+// How long to wait for the device to report that it joined the Wi-Fi
+const JOIN_TIMEOUT_MS = 45000;
+
+interface ProvisioningLink {
+  ssid: any;
+  password: any;
+  status: any;
+}
+
+const seconds = (ms?: number) => (ms == null ? '' : `${(ms / 1000).toFixed(1)} s`);
 
 interface EnvironmentInfo {
   isIOS: boolean;
@@ -63,6 +86,14 @@ const DeviceWifiSetup = () => {
   const [environment, setEnvironment] = useState<EnvironmentInfo | null>(null);
   const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>('default');
   const [demoMode, setDemoMode] = useState(false);
+  const [savedNetworks, setSavedNetworks] = useState<SavedNetwork[]>([]);
+  const [remember, setRemember] = useState(true);
+  const [phase, setPhase] = useState<'sending' | 'joining' | null>(null);
+  const [elapsed, setElapsed] = useState(0);
+  const [timings, setTimings] = useState<SetupTimings>({});
+  // The Bluetooth link is opened and its characteristics looked up once, while the performer types
+  const linkRef = useRef<ProvisioningLink | null>(null);
+  const bluetoothMsRef = useRef<number | undefined>(undefined);
 
   // Detect environment and capabilities
   const detectEnvironment = (): EnvironmentInfo => {
@@ -115,6 +146,21 @@ const DeviceWifiSetup = () => {
       }
     }
   }, []);
+
+  useEffect(() => {
+    wifiVault.list().then(setSavedNetworks);
+  }, []);
+
+  // Seconds since the credentials were sent, so a wait never looks frozen
+  useEffect(() => {
+    if (!phase) {
+      setElapsed(0);
+      return;
+    }
+    const started = Date.now();
+    const timer = setInterval(() => setElapsed(Math.floor((Date.now() - started) / 1000)), 500);
+    return () => clearInterval(timer);
+  }, [phase]);
 
   // Request Bluetooth permission (triggered on "Find my device" button)
   const requestBluetoothPermission = async (): Promise<boolean> => {
@@ -295,21 +341,27 @@ const DeviceWifiSetup = () => {
         return;
       }
 
+      const started = performance.now();
       const server = await targetDevice.device.gatt.connect();
-      toast.success('Connected to device');
 
-      // Get the Tipwave Provisioning Service (will be used in configureWifi)
-      await server.getPrimaryService('550e8400-e29b-41d4-a716-446655440000');
-      
-      // TODO: WiFi scanning will be implemented later when firmware supports characteristic 550e8400-e29b-41d4-a716-446655440004
-      // For now, skip directly to manual SSID entry
-      
+      // Look up the provisioning service and its characteristics now, so sending the details later is instant
+      const service = await server.getPrimaryService(PROVISIONING_SERVICE);
+      const [ssid, password, status] = await Promise.all([
+        service.getCharacteristic(SSID_CHAR),
+        service.getCharacteristic(PASSWORD_CHAR),
+        service.getCharacteristic(STATUS_CHAR)
+      ]);
+      linkRef.current = { ssid, password, status };
+      bluetoothMsRef.current = Math.round(performance.now() - started);
+      logger.log(`Bluetooth link ready in ${bluetoothMsRef.current} ms`);
+
       setCurrentStep(2);
-      toast.info('Enter your WiFi network credentials');
     } catch (err: any) {
       logger.error('Connection error:', err);
       setError(`Failed to connect: ${err.message}`);
       showError('Failed to connect to device', 'error');
+      // Back to the start so "Find my device" is available again
+      setCurrentStep(0);
     } finally {
       setConnecting(false);
     }
@@ -321,6 +373,25 @@ const DeviceWifiSetup = () => {
     setShowWifiModal(false);
   };
 
+  // Runs once the device reports that it joined the Wi-Fi
+  const finishSetup = async (ip: string | undefined, nextTimings: SetupTimings) => {
+    setTimings(nextTimings);
+    logger.log('Wi-Fi setup timings (ms):', nextTimings);
+    setConnected(true);
+    setCurrentStep(3);
+    toast.success(`Tipwave device connected to Wi-Fi${ip ? ` (IP ${ip})` : ''}`);
+
+    if (remember) {
+      const saved = await wifiVault.save(selectedSsid, password);
+      if (saved) setSavedNetworks(await wifiVault.list());
+    }
+
+    const notifGranted = await requestNotificationPermission();
+    if (notifGranted) {
+      sendNotification('✅ Setup Complete!', `Your Tipwave device is now connected to ${selectedSsid}${ip ? ` (IP: ${ip})` : ''}`, true);
+    }
+  };
+
   // Step 3: Send Wi-Fi credentials to device
   const configureWifi = async () => {
     if (!selectedDevice || !selectedSsid || !password) {
@@ -328,127 +399,107 @@ const DeviceWifiSetup = () => {
       return;
     }
 
+    let cleanup = () => {};
     try {
       setConnecting(true);
       setError('');
+      setPhase('sending');
 
       // Demo mode simulation - Only in development
       if (import.meta.env.DEV && (demoMode || !selectedDevice.device)) {
-        toast.info('Demo mode: Sending credentials to device...');
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
-        toast.info('Device is connecting to WiFi...');
-        await new Promise(resolve => setTimeout(resolve, 3000));
-        
-        // Simulate success
-        setConnected(true);
-        setCurrentStep(3);
-        const mockIp = '192.168.1.157';
-        toast.success(`✅ Tipwave device connected to WiFi! IP: ${mockIp} (Demo)`);
-        
-        const notifGranted = await requestNotificationPermission();
-        if (notifGranted) {
-          sendNotification(
-            '✅ Setup Complete!', 
-            `Your Tipwave device is now connected to ${selectedSsid} (Demo Mode)`,
-            true
-          );
-        }
-        
-        setConnecting(false);
+        await new Promise(resolve => setTimeout(resolve, 800));
+        setPhase('joining');
+        await new Promise(resolve => setTimeout(resolve, 2500));
+        await finishSetup('192.168.1.157', { bluetoothMs: 1500, sendMs: 800, joinMs: 2500 });
         return;
       }
 
-      const server = await selectedDevice.device.gatt.connect();
-      const service = await server.getPrimaryService('550e8400-e29b-41d4-a716-446655440000');
-      
-      // Get the SSID characteristic (write-only)
-      const ssidCharacteristic = await service.getCharacteristic('550e8400-e29b-41d4-a716-446655440001');
-      
-      // Get the Password characteristic (write-only)
-      const passwordCharacteristic = await service.getCharacteristic('550e8400-e29b-41d4-a716-446655440002');
-      
-      // Get the Status characteristic (notify-only)
-      const statusCharacteristic = await service.getCharacteristic('550e8400-e29b-41d4-a716-446655440003');
-      
-      // Write SSID
-      await ssidCharacteristic.writeValue(new TextEncoder().encode(selectedSsid));
-      toast.info('SSID sent to device');
-      
-      // Write Password
-      await passwordCharacteristic.writeValue(new TextEncoder().encode(password));
-      toast.info('Password sent to device');
-      
-      // Enable notifications for status updates
-      await statusCharacteristic.startNotifications();
-      
-      // Listen for status updates
-      statusCharacteristic.addEventListener('characteristicvaluechanged', async (event: any) => {
-        const statusData = event.target.value;
-        const statusJson = new TextDecoder().decode(statusData);
-        
-        try {
-          const status = JSON.parse(statusJson);
-          logger.log('Status update:', status);
-          
-          if (status.state === 'connecting') {
-            toast.info('Device is connecting to WiFi...');
-          } else if (status.state === 'success') {
-            setConnected(true);
-            setCurrentStep(3);
-            const ipAddress = status.ip || 'network';
-            toast.success(`✅ Tipwave device connected to WiFi! IP: ${ipAddress}`);
-            
-            // Request notification permission after successful provisioning
-            const notifGranted = await requestNotificationPermission();
-            if (notifGranted) {
-              sendNotification(
-                '✅ Setup Complete!', 
-                `Your Tipwave device is now connected to ${selectedSsid} (IP: ${ipAddress})`,
-                true
-              );
-            }
-            
-            // Stop notifications
-            await statusCharacteristic.stopNotifications();
-            setConnecting(false);
-          } else if (status.state === 'failure') {
-            const errorMsg = getErrorMessage(status.error);
-            throw new Error(errorMsg);
+      // Use the link opened in the previous step; reopen it only if Bluetooth dropped in the meantime
+      let link = linkRef.current;
+      if (!link || !selectedDevice.device.gatt.connected) {
+        const server = await selectedDevice.device.gatt.connect();
+        const service = await server.getPrimaryService(PROVISIONING_SERVICE);
+        link = {
+          ssid: await service.getCharacteristic(SSID_CHAR),
+          password: await service.getCharacteristic(PASSWORD_CHAR),
+          status: await service.getCharacteristic(STATUS_CHAR)
+        };
+        linkRef.current = link;
+      }
+      const { ssid: ssidChar, password: passwordChar, status: statusChar } = link;
+
+      // Listen BEFORE sending anything. The device can answer the moment it has the password; a listener added
+      // after the writes can miss that answer, which left the page waiting forever.
+      const outcome = new Promise<{ ip?: string }>((resolve, reject) => {
+        const onStatus = (event: any) => {
+          let status: any;
+          try {
+            status = JSON.parse(new TextDecoder().decode(event.target.value));
+          } catch (parseErr) {
+            logger.error('Failed to parse status JSON:', parseErr);
+            return;
           }
-        } catch (parseErr) {
-          logger.error('Failed to parse status JSON:', parseErr);
-        }
+          logger.log('Status update:', status);
+          if (status.state === 'success') resolve({ ip: status.ip });
+          else if (status.state === 'failure') reject(new Error(getErrorMessage(status.error)));
+        };
+        const onDrop = () => reject(new Error('Bluetooth connection to the device dropped. Move closer and try again.'));
+        const timer = setTimeout(
+          () => reject(new Error(`The device did not report back within ${JOIN_TIMEOUT_MS / 1000} seconds. Check the Wi-Fi name and password and try again.`)),
+          JOIN_TIMEOUT_MS
+        );
+        statusChar.addEventListener('characteristicvaluechanged', onStatus);
+        selectedDevice.device.addEventListener('gattserverdisconnected', onDrop);
+        cleanup = () => {
+          clearTimeout(timer);
+          statusChar.removeEventListener('characteristicvaluechanged', onStatus);
+          selectedDevice.device.removeEventListener('gattserverdisconnected', onDrop);
+          statusChar.stopNotifications().catch(() => {});
+        };
       });
-      
-      toast.info('Waiting for device to connect to WiFi...');
-      
-      // Set a timeout in case we don't get a response
-      setTimeout(() => {
-        if (connecting) {
-          setConnecting(false);
-          showError('Connection timeout. Please try again.', 'error');
-        }
-      }, 30000); // 30 second timeout
-      
+      outcome.catch(() => {}); // the real handling is at the await below
+
+      await statusChar.startNotifications();
+
+      const write = (characteristic: any, text: string) => {
+        const bytes = new TextEncoder().encode(text);
+        return characteristic.writeValueWithResponse ? characteristic.writeValueWithResponse(bytes) : characteristic.writeValue(bytes);
+      };
+      const sendStarted = performance.now();
+      await write(ssidChar, selectedSsid);
+      await write(passwordChar, password);
+      const sendMs = Math.round(performance.now() - sendStarted);
+
+      setPhase('joining');
+      const joinStarted = performance.now();
+      const { ip } = await outcome;
+      await finishSetup(ip, { bluetoothMs: bluetoothMsRef.current, sendMs, joinMs: Math.round(performance.now() - joinStarted) });
     } catch (err: any) {
       logger.error('Wi-Fi configuration error:', err);
-      setError(`Failed to configure Wi-Fi: ${err.message}`);
-      showError(`Failed to configure Wi-Fi: ${err.message}`, 'error');
-      
-      // Send failure notification if permission granted
+      setError(err.message || 'Failed to configure Wi-Fi. Please try again.');
+
       if (notificationPermission === 'granted') {
-        sendNotification(
-          '❌ Setup Failed',
-          'Tipwave device could not connect to Wi-Fi. Please try again.',
-          false
-        );
+        sendNotification('❌ Setup Failed', 'Tipwave device could not connect to Wi-Fi. Please try again.', false);
       }
-      
+    } finally {
+      cleanup();
+      setPhase(null);
       setConnecting(false);
     }
   };
-  
+
+  const pickSaved = (ssid: string) => {
+    const match = savedNetworks.find((n) => n.ssid === ssid);
+    if (!match) return;
+    setSelectedSsid(match.ssid);
+    setPassword(match.password);
+  };
+
+  const forgetSaved = (ssid: string) => {
+    wifiVault.forget(ssid);
+    setSavedNetworks((list) => list.filter((n) => n.ssid !== ssid));
+  };
+
   // Helper function to get user-friendly error messages
   const getErrorMessage = (errorCode: string): string => {
     switch (errorCode) {
@@ -478,6 +529,8 @@ const DeviceWifiSetup = () => {
     'h-12 w-full rounded-xl border border-slate-300 bg-white px-4 text-ink-900 placeholder:text-ink-400 transition-colors focus:border-transparent focus:outline-none focus:ring-2 focus:ring-brand-500';
 
   const resetToStart = () => {
+    try { selectedDevice?.device?.gatt?.disconnect(); } catch { /* already disconnected */ }
+    linkRef.current = null;
     setCurrentStep(0);
     setSelectedDevice(null);
     setWifiNetworks([]);
@@ -584,6 +637,32 @@ const DeviceWifiSetup = () => {
         {currentStep === 2 && (
           <Card title="Your Wi-Fi details" subtitle="The device will use this network to send tips and play effects.">
             <div className="space-y-5">
+              {savedNetworks.length > 0 && (
+                <div>
+                  <label htmlFor="wifi-saved" className="mb-1.5 block text-sm font-semibold text-ink-700">Saved networks</label>
+                  <div className="flex gap-2">
+                    <select
+                      id="wifi-saved"
+                      className={inputClass}
+                      value={savedNetworks.some((n) => n.ssid === selectedSsid) ? selectedSsid : ''}
+                      onChange={(e) => pickSaved(e.target.value)}
+                      disabled={connecting}
+                    >
+                      <option value="">Choose a network you used before…</option>
+                      {savedNetworks.map((n) => (
+                        <option key={n.ssid} value={n.ssid}>{n.ssid}</option>
+                      ))}
+                    </select>
+                    {savedNetworks.some((n) => n.ssid === selectedSsid) && (
+                      <Button variant="secondary" onClick={() => forgetSaved(selectedSsid)} disabled={connecting}>
+                        Forget
+                      </Button>
+                    )}
+                  </div>
+                  <p className="mt-1.5 text-sm text-ink-500">Saved on this browser only. The password is stored encrypted.</p>
+                </div>
+              )}
+
               <div>
                 <label htmlFor="wifi-ssid" className="mb-1.5 block text-sm font-semibold text-ink-700">Network name</label>
                 <input
@@ -613,8 +692,23 @@ const DeviceWifiSetup = () => {
                 />
               </div>
 
+              <label className="flex items-center gap-2.5 text-sm text-ink-700">
+                <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} className="h-4 w-4 accent-brand-600" />
+                Remember this network on this browser
+              </label>
+
+              {connecting && phase && (
+                <div role="status" className="flex items-center gap-3 rounded-xl bg-brand-50 px-4 py-3 text-sm text-ink-900">
+                  <span className="h-5 w-5 flex-none animate-spin rounded-full border-2 border-brand-600 border-t-transparent" />
+                  <span>
+                    {phase === 'sending' ? 'Sending the Wi-Fi details to your device…' : 'Your device is joining the Wi-Fi…'}{' '}
+                    <span className="text-ink-500">{elapsed} s</span>
+                  </span>
+                </div>
+              )}
+
               <div className="flex flex-col-reverse gap-3 border-t border-slate-100 pt-5 sm:flex-row sm:justify-end">
-                <Button variant="secondary" size="lg" onClick={resetToStart}>
+                <Button variant="secondary" size="lg" onClick={resetToStart} disabled={connecting}>
                   Start over
                 </Button>
                 <Button size="lg" icon="wifi" onClick={configureWifi} loading={connecting} disabled={!selectedSsid || !password}>
@@ -636,6 +730,20 @@ const DeviceWifiSetup = () => {
               <p className="mt-2 text-ink-500">
                 Connected to <strong className="text-ink-900">{selectedSsid}</strong>. You are ready to take tips.
               </p>
+              {(timings.bluetoothMs != null || timings.sendMs != null || timings.joinMs != null) && (
+                <dl className="mx-auto mt-5 max-w-xs space-y-1 rounded-2xl bg-surface p-4 text-left text-sm">
+                  <dt className="font-semibold text-ink-700">Where the time went</dt>
+                  {timings.bluetoothMs != null && (
+                    <dd className="flex justify-between text-ink-500"><span>Bluetooth link to the device</span><span>{seconds(timings.bluetoothMs)}</span></dd>
+                  )}
+                  {timings.sendMs != null && (
+                    <dd className="flex justify-between text-ink-500"><span>Sending the Wi-Fi details</span><span>{seconds(timings.sendMs)}</span></dd>
+                  )}
+                  {timings.joinMs != null && (
+                    <dd className="flex justify-between text-ink-500"><span>Device joining the Wi-Fi</span><span>{seconds(timings.joinMs)}</span></dd>
+                  )}
+                </dl>
+              )}
               <div className="mt-6">
                 <Button size="lg" onClick={() => (window.location.href = '/dashboard')}>
                   Go to my portal
