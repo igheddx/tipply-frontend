@@ -1,6 +1,8 @@
 import logger from "../utils/logger";
 import { PortalShell, type PortalNavItem } from '../components/portal/PortalShell'
 import { HomeTab, type HomeData } from '../components/portal/HomeTab'
+import { DemoBanner } from '../components/portal/DemoBanner'
+import { renderQrCard } from '../utils/qrCard'
 import { TipsTimeline } from '../components/charts/TipsTimeline'
 import { Banner, Button, Card, EmptyState, Modal, PageHeader, PageLoader, StatusChip, useFeedback, type ChipKind } from '../components/ui'
 import { BrandIcon, IconTile } from '../components/icons/BrandIcons'
@@ -11,6 +13,7 @@ import apiService from '../services/api'
 import SongManagement from '../components/SongManagement'
 import SongRequestMonitor from '../components/SongRequestMonitor'
 import { API_BASE_URL } from '../utils/config'
+import { setDemoModeOn, setShowDemoData, demoQuery } from '../utils/demoView'
 import { DEFAULT_TIP_AMOUNTS, TIP_AMOUNT_COUNT, LIGHT_EFFECTS, SOUND_OPTIONS, VOLUME_OPTIONS, DEFAULT_SOUND_ID, DEFAULT_SOUND_VOLUME, DEFAULT_EFFECT_CONFIG, normalizeEffectConfig, effectForAmount, buildEffectConfig } from '../utils/deviceConfig'
 import TipAmountsEditor from '../components/TipAmountsEditor'
 
@@ -145,6 +148,9 @@ const Dashboard: React.FC = () => {
     : DEFAULT_TIP_AMOUNTS
   const [stripeMetricsLoading, setStripeMetricsLoading] = useState(true)
   const [insights, setInsights] = useState<PerformerInsights | null>(null)
+  // Production only: the site is taking fake money, and whether the performer is looking at that demo data
+  const [demoMode, setDemoMode] = useState(false)
+  const [showDemo, setShowDemo] = useState(false)
   const [tipTimelinePoints, setTipTimelinePoints] = useState<TipPoint[]>([])
   // True until the charts' data (weekly totals and every tip) has arrived
   const [chartsLoading, setChartsLoading] = useState(true)
@@ -235,6 +241,13 @@ const Dashboard: React.FC = () => {
         setUserProfile(profileResp.data)
         const profileId = profileResp.data.id
         logger.log(`✅ [PERF] User profile set: ${profileId}`)
+
+        // Is production in demo mode (fake money)? Fails quietly: no banner if we cannot tell.
+        void apiService.getDemoMode().then(resp => {
+          const on = resp.data?.demoMode === true
+          setDemoModeOn(on)
+          setDemoMode(on)
+        })
 
         // ONLY fetch overview data on init (stats, metrics)
         // Time them individually to find the real bottleneck
@@ -342,7 +355,7 @@ const Dashboard: React.FC = () => {
           const insightsStart = performance.now()
           const timezoneOffset = new Date().getTimezoneOffset()
           const response = await fetch(
-            `${API_BASE_URL}/api/tips/insights/${profileId}?timezoneOffsetMinutes=${timezoneOffset}`,
+            `${API_BASE_URL}/api/tips/insights/${profileId}?timezoneOffsetMinutes=${timezoneOffset}${demoQuery('&')}`,
             {
               headers: {
                 'Authorization': `Bearer ${token}`,
@@ -358,7 +371,7 @@ const Dashboard: React.FC = () => {
           }
 
           const timelineResp = await fetch(
-            `${API_BASE_URL}/api/tips/tips-timeline/${profileId}?limit=2000`,
+            `${API_BASE_URL}/api/tips/tips-timeline/${profileId}?limit=2000${demoQuery('&')}`,
             {
               headers: {
                 'Authorization': `Bearer ${token}`,
@@ -467,6 +480,18 @@ const Dashboard: React.FC = () => {
 
   // Removed checkKycResult function
 
+  // Switch between real tips and demo (fake money) tips, then reload everything that shows tips
+  const handleShowDemoChange = async () => {
+    const next = !showDemo
+    setShowDemoData(next)
+    setShowDemo(next)
+    setRecentTips([])
+    setFailedTips([])
+    await refreshDashboard()
+    const failed = await apiService.getFailedTips()
+    if (failed.data) setFailedTips(failed.data)
+  }
+
   // Optimized refresh function that doesn't make redundant getProfile() calls
   const refreshDashboard = async () => {
     try {
@@ -491,7 +516,7 @@ const Dashboard: React.FC = () => {
         apiService.getRecentTips(profileId),
         apiService.getDeletedDevices(),
         apiService.getDevices(),
-        fetch(`${API_BASE_URL}/api/tips/insights/${profileId}?timezoneOffsetMinutes=${timezoneOffset}`,
+        fetch(`${API_BASE_URL}/api/tips/insights/${profileId}?timezoneOffsetMinutes=${timezoneOffset}${demoQuery('&')}`,
           {
             headers: {
               'Authorization': `Bearer ${token}`,
@@ -499,7 +524,7 @@ const Dashboard: React.FC = () => {
             }
           }
         ),
-        fetch(`${API_BASE_URL}/api/tips/tips-timeline/${profileId}?limit=2000`,
+        fetch(`${API_BASE_URL}/api/tips/tips-timeline/${profileId}?limit=2000${demoQuery('&')}`,
           {
             headers: {
               'Authorization': `Bearer ${token}`,
@@ -920,77 +945,9 @@ const Dashboard: React.FC = () => {
       // Get stage name from profile
       const stageName = userProfile?.stageName || userProfile?.firstName || 'Performer'
 
-      // Create a canvas for the 4x6 card (4in x 6in at 300 DPI = 1200 x 1800 px)
-      const canvas = document.createElement('canvas')
-      const ctx = canvas.getContext('2d')
-      if (!ctx) {
-        setDownloadingDeviceId(null)
-        return
-      }
-
-      const width = 1200
-      const height = 1800
-      canvas.width = width
-      canvas.height = height
-
-      // White background for print efficiency
-      ctx.fillStyle = '#ffffff'
-      ctx.fillRect(0, 0, width, height)
-
-      const loadImage = (src: string) => new Promise<HTMLImageElement>((resolve) => {
-        const img = new Image()
-        img.crossOrigin = 'anonymous'
-        img.onload = () => resolve(img)
-        img.onerror = () => resolve(img)
-        img.src = src
-      })
-
-      const [logo, musicNote] = await Promise.all([
-        loadImage('/images/logo/tipwave-logo2b.png?v=20260208'),
-        loadImage('/images/icons8-music-note-90.png')
-      ])
-      console.info('[QR] QR bitmap ready', { width: qrBitmap.width, height: qrBitmap.height })
-
-      // Draw header
-      const headerBarHeight = 260
-      ctx.fillStyle = '#111111'
-      ctx.fillRect(0, 0, width, headerBarHeight)
-      ctx.fillStyle = '#ffffff'
-      ctx.font = '600 118px Arial, sans-serif'
-      ctx.textAlign = 'center'
-      const headerTextY = 165
-      const headerText = 'TIP THE PERFORMER'
-      const iconSize = musicNote.complete && musicNote.naturalHeight > 0 ? 200 : 0
-      const iconGap = iconSize ? 14 : 0
-      const headerTextWidth = ctx.measureText(headerText).width
-      const headerTotalWidth = headerTextWidth + iconSize + iconGap
-      const headerSidePadding = 70
-      const headerMaxWidth = width - (headerSidePadding * 2)
-      const headerScaleX = headerTotalWidth > headerMaxWidth ? headerMaxWidth / headerTotalWidth : 1
-
-      ctx.save()
-      ctx.translate(width / 2, 0)
-      ctx.scale(headerScaleX, 1)
-      const headerStartX = -(headerTotalWidth / 2)
-      const iconY = (headerBarHeight - iconSize) / 2
-      if (iconSize) {
-        ctx.drawImage(musicNote, headerStartX, iconY, iconSize, iconSize)
-      }
-      ctx.fillText(headerText, headerStartX + iconSize + iconGap + headerTextWidth / 2, headerTextY)
-      ctx.restore()
-
-      // Draw QR code (centered, larger) with thick black border
+      let canvas: HTMLCanvasElement
       try {
-        if (!qrBitmap.width || !qrBitmap.height) {
-          throw new Error('QR image is empty or failed to load')
-        }
-        const qrSize = 900
-        const borderSize = 42
-        const qrX = (width - qrSize) / 2
-        const qrY = 360
-        ctx.fillStyle = '#111111'
-        ctx.fillRect(qrX - borderSize, qrY - borderSize, qrSize + borderSize * 2, qrSize + borderSize * 2)
-        ctx.drawImage(qrBitmap, qrX, qrY, qrSize, qrSize)
+        canvas = await renderQrCard(qrBitmap, stageName)
       } catch (err) {
         logger.error('[QR] Draw failed, falling back to raw QR download', err)
         const rawUrl = URL.createObjectURL(qrBlob)
@@ -1004,55 +961,6 @@ const Dashboard: React.FC = () => {
         toast('Could not render the branded card. Downloaded the raw QR instead.', 'info')
         setDownloadingDeviceId(null)
         return
-      }
-
-      // Tagline under QR (small and supportive)
-      ctx.fillStyle = '#374151'
-      ctx.font = '24px Arial, sans-serif'
-      ctx.textAlign = 'center'
-      ctx.fillText('Scan to tip instantly', width / 2, 1340)
-
-      // Instruction line under QR
-      ctx.fillStyle = '#111827'
-      ctx.font = '26px Arial, sans-serif'
-      ctx.textAlign = 'center'
-      ctx.fillText('Scan. Choose how to pay. Tap to tip.', width / 2, 1372)
-
-      // Trust line with padlock icon
-      const trustText = 'Secure payments powered by Stripe'
-      ctx.font = '22px Arial, sans-serif'
-      ctx.fillStyle = '#4B5563'
-      const textWidth = ctx.measureText(trustText).width
-      const lockSize = 18
-      const lockGap = 10
-      const trustY = 1412
-      const lockX = (width / 2) - (textWidth / 2) - lockGap - lockSize
-      const lockY = trustY - lockSize + 2
-
-      // Draw minimal padlock icon
-      ctx.strokeStyle = '#4B5563'
-      ctx.lineWidth = 2
-      ctx.beginPath()
-      ctx.roundRect(lockX, lockY + 6, lockSize, lockSize - 4, 3)
-      ctx.stroke()
-      ctx.beginPath()
-      ctx.arc(lockX + lockSize / 2, lockY + 6, lockSize / 3.2, Math.PI, 0)
-      ctx.stroke()
-      ctx.fillText(trustText, width / 2, trustY)
-
-      // Draw performer name
-      ctx.fillStyle = '#111827'
-      ctx.font = 'italic 42px Arial, sans-serif'
-      ctx.fillText(stageName, width / 2, 1535)
-
-      // Draw logo at bottom-right (aligned with footer region)
-      if (logo.complete && logo.naturalHeight > 0) {
-        const logoHeight = 320
-        const logoWidth = (logo.naturalWidth / logo.naturalHeight) * logoHeight
-        const padding = 40
-        const logoX = width - logoWidth - padding
-        const logoY = 1540
-        ctx.drawImage(logo, logoX, logoY, logoWidth, logoHeight)
       }
 
       // Convert canvas to blob and download
@@ -1540,6 +1448,7 @@ const Dashboard: React.FC = () => {
         onOpenProfile={() => navigate('/profile')}
         onLogout={handleLogout}
       >
+        <DemoBanner demoMode={demoMode} showDemo={showDemo} onToggle={handleShowDemoChange} />
         {activeTab !== 'overview' && activeTab !== 'addDevice' && (
           <PageHeader title={PAGE_TITLES[activeTab]?.title || ''} subtitle={PAGE_TITLES[activeTab]?.subtitle} />
         )}

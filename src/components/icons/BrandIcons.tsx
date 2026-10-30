@@ -328,6 +328,43 @@ export function BrandIcon({ name, size = 24, tone = 'brand', color, strokeWidth 
   )
 }
 
+/**
+ * Draws a brand icon on a canvas (for the printable QR card), with the same shapes and colors as <BrandIcon>.
+ * `x`,`y` is the top-left corner of the icon box and `size` its width and height.
+ */
+export function drawBrandIcon(
+  ctx: CanvasRenderingContext2D,
+  name: BrandIconName,
+  x: number,
+  y: number,
+  size: number,
+  { tone = 'brand', color, strokeWidth = 1.6 }: { tone?: IconTone; color?: string; strokeWidth?: number } = {}
+) {
+  const outline = color ?? TONES[tone].outline
+  const detail = color ?? TONES[tone].detail
+  const scale = size / 24
+  ctx.save()
+  ctx.translate(x, y)
+  ctx.scale(scale, scale)
+  ctx.lineWidth = strokeWidth
+  ctx.lineCap = 'round'
+  ctx.lineJoin = 'round'
+  for (const shape of SHAPES[name] as Shape[]) {
+    const stroke = shape.accent ? detail : outline
+    ctx.strokeStyle = stroke
+    ctx.fillStyle = stroke
+    if ('d' in shape) {
+      ctx.stroke(new Path2D(shape.d))
+    } else {
+      ctx.beginPath()
+      ctx.arc(shape.cx, shape.cy, shape.r, 0, Math.PI * 2)
+      if (shape.filled) ctx.fill()
+      ctx.stroke()
+    }
+  }
+  ctx.restore()
+}
+
 export type IconTileState = 'current' | 'done' | 'upcoming'
 
 /** A soft round tile behind an icon, used for step lists. A finished step keeps its icon and gains a check badge. */

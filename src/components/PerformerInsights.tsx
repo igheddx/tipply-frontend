@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
+import { renderQrCard } from '../utils/qrCard'
 import { LineChart, Line, ScatterChart, Scatter, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 import { AutoComplete } from 'antd'
 import type { BaseOptionType } from 'antd/es/select'
@@ -347,77 +348,11 @@ const PerformerInsights: React.FC = () => {
       const stageName = selectedPerformer?.stageName || `${selectedPerformer?.firstName || ''} ${selectedPerformer?.lastName || ''}`.trim() || 'Performer'
       console.log('[QR] Stage name:', stageName)
 
-      const canvas = document.createElement('canvas')
-      const ctx = canvas.getContext('2d')
-      if (!ctx) {
-        console.error('[QR] Failed to get canvas context')
-        setIsDownloadingQR(false)
-        return
-      }
-      console.log('[QR] Canvas created successfully')
-
-      const width = 1200
-      const height = 1800
-      canvas.width = width
-      canvas.height = height
-
-      ctx.fillStyle = '#ffffff'
-      ctx.fillRect(0, 0, width, height)
-
-      const loadImage = (src: string) => new Promise<HTMLImageElement>((resolve) => {
-        const img = new Image()
-        img.crossOrigin = 'anonymous'
-        img.onload = () => resolve(img)
-        img.onerror = () => resolve(img)
-        img.src = src
-      })
-
-      const [logo, musicNote] = await Promise.all([
-        loadImage('/images/logo/tipwave-logo2b.png?v=20260208'),
-        loadImage('/images/icons8-music-note-90.png')
-      ])
-      console.log('[QR] Images loaded. Logo:', { complete: logo.complete, height: logo.naturalHeight }, 'MusicNote:', { complete: musicNote.complete, height: musicNote.naturalHeight })
-
-      const headerBarHeight = 260
-      ctx.fillStyle = '#111111'
-      ctx.fillRect(0, 0, width, headerBarHeight)
-      ctx.fillStyle = '#ffffff'
-      ctx.font = '600 118px Arial, sans-serif'
-      ctx.textAlign = 'center'
-      const headerTextY = 165
-      const headerText = 'TIP THE PERFORMER'
-      const iconSize = musicNote.complete && musicNote.naturalHeight > 0 ? 200 : 0
-      const iconGap = iconSize ? 14 : 0
-      const headerTextWidth = ctx.measureText(headerText).width
-      const headerTotalWidth = headerTextWidth + iconSize + iconGap
-      const headerSidePadding = 70
-      const headerMaxWidth = width - (headerSidePadding * 2)
-      const headerScaleX = headerTotalWidth > headerMaxWidth ? headerMaxWidth / headerTotalWidth : 1
-
-      ctx.save()
-      ctx.translate(width / 2, 0)
-      ctx.scale(headerScaleX, 1)
-      const headerStartX = -(headerTotalWidth / 2)
-      const iconY = (headerBarHeight - iconSize) / 2
-      if (iconSize) {
-        ctx.drawImage(musicNote, headerStartX, iconY, iconSize, iconSize)
-      }
-      ctx.fillText(headerText, headerStartX + iconSize + iconGap + headerTextWidth / 2, headerTextY)
-      ctx.restore()
-
+      let canvas: HTMLCanvasElement
       try {
-        if (!qrBitmap.width || !qrBitmap.height) {
-          throw new Error('QR image is empty or failed to load')
-        }
-        const qrSize = 900
-        const borderSize = 42
-        const qrX = (width - qrSize) / 2
-        const qrY = 360
-        ctx.fillStyle = '#111111'
-        ctx.fillRect(qrX - borderSize, qrY - borderSize, qrSize + borderSize * 2, qrSize + borderSize * 2)
-        ctx.drawImage(qrBitmap, qrX, qrY, qrSize, qrSize)
+        canvas = await renderQrCard(qrBitmap, stageName)
       } catch (err) {
-        logger.error('[QR] Draw failed', err)
+        logger.error('[QR] Draw failed, falling back to raw QR download', err)
         const rawUrl = URL.createObjectURL(qrBlob)
         const a = document.createElement('a')
         a.href = rawUrl
@@ -429,48 +364,6 @@ const PerformerInsights: React.FC = () => {
         toast('Could not render the branded card. Downloaded the raw QR instead.', 'info')
         setIsDownloadingQR(false)
         return
-      }
-
-      ctx.fillStyle = '#374151'
-      ctx.font = '24px Arial, sans-serif'
-      ctx.textAlign = 'center'
-      ctx.fillText('Scan to tip instantly', width / 2, 1340)
-
-      ctx.fillStyle = '#111827'
-      ctx.font = '26px Arial, sans-serif'
-      ctx.fillText('Scan. Choose how to pay. Tap to tip.', width / 2, 1372)
-
-      const trustText = 'Secure payments powered by Stripe'
-      ctx.font = '22px Arial, sans-serif'
-      ctx.fillStyle = '#4B5563'
-      const textWidth = ctx.measureText(trustText).width
-      const lockSize = 18
-      const lockGap = 10
-      const trustY = 1412
-      const lockX = (width / 2) - (textWidth / 2) - lockGap - lockSize
-      const lockY = trustY - lockSize + 2
-
-      ctx.strokeStyle = '#4B5563'
-      ctx.lineWidth = 2
-      ctx.beginPath()
-      ctx.roundRect(lockX, lockY + 6, lockSize, lockSize - 4, 3)
-      ctx.stroke()
-      ctx.beginPath()
-      ctx.arc(lockX + lockSize / 2, lockY + 6, lockSize / 3.2, Math.PI, 0)
-      ctx.stroke()
-      ctx.fillText(trustText, width / 2, trustY)
-
-      ctx.fillStyle = '#111827'
-      ctx.font = 'italic 42px Arial, sans-serif'
-      ctx.fillText(stageName, width / 2, 1535)
-
-      if (logo.complete && logo.naturalHeight > 0) {
-        const logoHeight = 320
-        const logoWidth = (logo.naturalWidth / logo.naturalHeight) * logoHeight
-        const padding = 40
-        const logoX = width - logoWidth - padding
-        const logoY = 1540
-        ctx.drawImage(logo, logoX, logoY, logoWidth, logoHeight)
       }
 
       console.log('[QR] Canvas rendering complete, converting to blob...')

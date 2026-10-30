@@ -1,4 +1,5 @@
 import logger from "../utils/logger";
+import { tipHaptic, prepareHaptics } from '../utils/haptics'
 import React, { useState, useEffect, useRef, lazy, Suspense } from 'react'
 import { useParams } from 'react-router-dom'
 import { toast } from 'sonner'
@@ -101,6 +102,11 @@ const TippingInterface: React.FC = () => {
   const tipAmounts = deviceInfo?.tipAmounts?.length === TIP_AMOUNT_COUNT ? deviceInfo.tipAmounts : DEFAULT_TIP_AMOUNTS
 
   // Manage body overflow
+  // Have the iPhone haptic switch ready before the first tap
+  useEffect(() => {
+    prepareHaptics()
+  }, [])
+
   useEffect(() => {
     document.body.style.overflow = 'hidden'
     return () => {
@@ -632,38 +638,16 @@ const TippingInterface: React.FC = () => {
     }
   }
 
-  // Trigger haptic feedback (Web Vibration API)
-  const triggerHaptic = () => {
-    if ('vibrate' in navigator) {
-      navigator.vibrate(100) // 100ms - 2x intensity for enhanced feedback
-    }
-  }
-
-  // Canvas confetti with remapped intensity per denomination
+  // Canvas confetti: a burst from the middle, then a lighter drop from the top so it keeps falling after the burst.
+  // `ticks` is how many animation frames a piece lives (about 60 a second): 150-175 is 2.5-3 s; the library default is 200.
   const triggerCanvasConfetti = (amount: number) => {
-    // Confetti configuration based on denomination with remapped intensities
-    const getConfettiConfig = (amt: number) => {
-      // $100 and $50: New intensity - 2x burst of original
-      if (amt >= 100) {
-        return { particleCount: 300, spread: 200, startVelocity: 100, duration: 1000 }
-      } else if (amt >= 50) {
-        return { particleCount: 300, spread: 200, startVelocity: 100, duration: 1000 }
-      }
-      // $10 and $20: Use original $100 and $50 intensity
-      else if (amt >= 20) {
-        return { particleCount: 100, spread: 90, startVelocity: 45, duration: 450 }
-      } else if (amt >= 10) {
-        return { particleCount: 100, spread: 90, startVelocity: 45, duration: 450 }
-      }
-      // $2 and $5: Use original $10 and $20 intensity
-      else if (amt >= 5) {
-        return { particleCount: 70, spread: 80, startVelocity: 40, duration: 400 }
-      } else {
-        return { particleCount: 70, spread: 80, startVelocity: 40, duration: 400 }
-      }
-    }
-
-    const config = getConfettiConfig(amount)
+    const tier =
+      amount >= 50
+        ? { burst: 220, spread: 90, velocity: 45, ticks: 160, drop: 180 } // same outburst and fall as $10-$49, just more of it
+        : amount >= 10
+          ? { burst: 100, spread: 90, velocity: 45, ticks: 160, drop: 90 }
+          : { burst: 70, spread: 80, velocity: 40, ticks: 150, drop: 60 }
+    const colors = ['#ff0000', '#00ff00', '#0000ff', '#ffff00', '#ff00ff', '#00ffff']
 
     const runConfetti = async () => {
       try {
@@ -673,15 +657,36 @@ const TippingInterface: React.FC = () => {
         }
 
         confettiLoader({
-          particleCount: config.particleCount,
-          spread: config.spread,
-          startVelocity: config.startVelocity,
+          particleCount: tier.burst,
+          spread: tier.spread,
+          startVelocity: tier.velocity,
           origin: { y: 0.6 },
-          colors: ['#ff0000', '#00ff00', '#0000ff', '#ffff00', '#ff00ff', '#00ffff'],
-          ticks: config.duration / 16.67,
-          gravity: 1.2,
+          colors,
+          ticks: tier.ticks,
+          gravity: 1,
+          decay: 0.92,
           scalar: 1.2
         })
+
+        // The drop: three light waves from above the screen, falling slowly across the whole width
+        const waves = 3
+        for (let i = 0; i < waves; i++) {
+          setTimeout(() => {
+            confettiLoader({
+              particleCount: Math.round(tier.drop / waves),
+              angle: 90,
+              spread: 160,
+              startVelocity: 18,
+              origin: { x: 0.5, y: -0.1 },
+              colors,
+              ticks: tier.ticks - 40,
+              gravity: 0.7,
+              decay: 0.95,
+              drift: 0,
+              scalar: 1.1
+            })
+          }, 250 + i * 250)
+        }
       } catch (error) {
         logger.log('Confetti module load failed:', error)
       }
@@ -700,8 +705,8 @@ const TippingInterface: React.FC = () => {
 
     logger.log('🎯 [handleTipClick] Called with amount:', amount, 'selectedSong:', selectedSong)
 
-    // Trigger haptic feedback immediately
-    triggerHaptic()
+    // Haptic tap straight from the click (iPhone only allows it inside the tap), stronger for bigger tips
+    tipHaptic(amount)
 
     // Trigger canvas confetti immediately
     triggerCanvasConfetti(amount)
