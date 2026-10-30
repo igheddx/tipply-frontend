@@ -1,5 +1,6 @@
 import { API_BASE_URL } from '../utils/config';
 import logger from '../utils/logger';
+import { demoQuery } from '../utils/demoView';
 
 interface ApiResponse<T> {
   data?: T
@@ -213,7 +214,7 @@ class ApiService {
   }
 
   async getDashboardStats(): Promise<ApiResponse<any>> {
-    return this.request('/api/profiles/dashboard')
+    return this.request(`/api/profiles/dashboard${demoQuery('?')}`)
   }
 
   // Device endpoints
@@ -443,16 +444,21 @@ class ApiService {
 
   // Dashboard metrics endpoints
   async getDashboardMetrics(profileId: string, options?: { skipStripe?: boolean }): Promise<ApiResponse<any>> {
-    const qs = options?.skipStripe ? `?skipStripe=true` : ''
+    const qs = (options?.skipStripe ? `?skipStripe=true` : '') + demoQuery(options?.skipStripe ? '&' : '?')
     return this.request(`/api/tips/dashboard-metrics/${profileId}${qs}`)
   }
 
   async getRecentTips(profileId: string): Promise<ApiResponse<any>> {
-    return this.request(`/api/tips/recent-tips/${profileId}`)
+    return this.request(`/api/tips/recent-tips/${profileId}${demoQuery('?')}`)
   }
 
   async getFailedTips(): Promise<ApiResponse<any>> {
-    return this.request('/api/tips/failed-tips')
+    return this.request(`/api/tips/failed-tips${demoQuery('?')}`)
+  }
+
+  // Whether production is in demo mode (fake money). Always false on test and dev.
+  async getDemoMode(): Promise<ApiResponse<{ demoMode: boolean }>> {
+    return this.request('/api/stripe-config/demo-mode')
   }
 
   async getAwsIotStatus(): Promise<ApiResponse<any>> {

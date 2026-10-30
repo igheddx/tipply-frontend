@@ -1,6 +1,7 @@
 import logger from "../utils/logger";
 import { PortalShell, type PortalNavItem } from '../components/portal/PortalShell'
 import { HomeTab, type HomeData } from '../components/portal/HomeTab'
+import { DemoBanner } from '../components/portal/DemoBanner'
 import { TipsTimeline } from '../components/charts/TipsTimeline'
 import { Banner, Button, Card, EmptyState, Modal, PageHeader, PageLoader, StatusChip, useFeedback, type ChipKind } from '../components/ui'
 import { BrandIcon, IconTile } from '../components/icons/BrandIcons'
@@ -11,6 +12,7 @@ import apiService from '../services/api'
 import SongManagement from '../components/SongManagement'
 import SongRequestMonitor from '../components/SongRequestMonitor'
 import { API_BASE_URL } from '../utils/config'
+import { setDemoModeOn, setShowDemoData, demoQuery } from '../utils/demoView'
 import { DEFAULT_TIP_AMOUNTS, TIP_AMOUNT_COUNT, LIGHT_EFFECTS, SOUND_OPTIONS, VOLUME_OPTIONS, DEFAULT_SOUND_ID, DEFAULT_SOUND_VOLUME, DEFAULT_EFFECT_CONFIG, normalizeEffectConfig, effectForAmount, buildEffectConfig } from '../utils/deviceConfig'
 import TipAmountsEditor from '../components/TipAmountsEditor'
 
@@ -145,6 +147,9 @@ const Dashboard: React.FC = () => {
     : DEFAULT_TIP_AMOUNTS
   const [stripeMetricsLoading, setStripeMetricsLoading] = useState(true)
   const [insights, setInsights] = useState<PerformerInsights | null>(null)
+  // Production only: the site is taking fake money, and whether the performer is looking at that demo data
+  const [demoMode, setDemoMode] = useState(false)
+  const [showDemo, setShowDemo] = useState(false)
   const [tipTimelinePoints, setTipTimelinePoints] = useState<TipPoint[]>([])
   // True until the charts' data (weekly totals and every tip) has arrived
   const [chartsLoading, setChartsLoading] = useState(true)
@@ -235,6 +240,13 @@ const Dashboard: React.FC = () => {
         setUserProfile(profileResp.data)
         const profileId = profileResp.data.id
         logger.log(`✅ [PERF] User profile set: ${profileId}`)
+
+        // Is production in demo mode (fake money)? Fails quietly: no banner if we cannot tell.
+        void apiService.getDemoMode().then(resp => {
+          const on = resp.data?.demoMode === true
+          setDemoModeOn(on)
+          setDemoMode(on)
+        })
 
         // ONLY fetch overview data on init (stats, metrics)
         // Time them individually to find the real bottleneck
@@ -342,7 +354,7 @@ const Dashboard: React.FC = () => {
           const insightsStart = performance.now()
           const timezoneOffset = new Date().getTimezoneOffset()
           const response = await fetch(
-            `${API_BASE_URL}/api/tips/insights/${profileId}?timezoneOffsetMinutes=${timezoneOffset}`,
+            `${API_BASE_URL}/api/tips/insights/${profileId}?timezoneOffsetMinutes=${timezoneOffset}${demoQuery('&')}`,
             {
               headers: {
                 'Authorization': `Bearer ${token}`,
@@ -358,7 +370,7 @@ const Dashboard: React.FC = () => {
           }
 
           const timelineResp = await fetch(
-            `${API_BASE_URL}/api/tips/tips-timeline/${profileId}?limit=2000`,
+            `${API_BASE_URL}/api/tips/tips-timeline/${profileId}?limit=2000${demoQuery('&')}`,
             {
               headers: {
                 'Authorization': `Bearer ${token}`,
@@ -467,6 +479,18 @@ const Dashboard: React.FC = () => {
 
   // Removed checkKycResult function
 
+  // Switch between real tips and demo (fake money) tips, then reload everything that shows tips
+  const handleShowDemoChange = async () => {
+    const next = !showDemo
+    setShowDemoData(next)
+    setShowDemo(next)
+    setRecentTips([])
+    setFailedTips([])
+    await refreshDashboard()
+    const failed = await apiService.getFailedTips()
+    if (failed.data) setFailedTips(failed.data)
+  }
+
   // Optimized refresh function that doesn't make redundant getProfile() calls
   const refreshDashboard = async () => {
     try {
@@ -491,7 +515,7 @@ const Dashboard: React.FC = () => {
         apiService.getRecentTips(profileId),
         apiService.getDeletedDevices(),
         apiService.getDevices(),
-        fetch(`${API_BASE_URL}/api/tips/insights/${profileId}?timezoneOffsetMinutes=${timezoneOffset}`,
+        fetch(`${API_BASE_URL}/api/tips/insights/${profileId}?timezoneOffsetMinutes=${timezoneOffset}${demoQuery('&')}`,
           {
             headers: {
               'Authorization': `Bearer ${token}`,
@@ -499,7 +523,7 @@ const Dashboard: React.FC = () => {
             }
           }
         ),
-        fetch(`${API_BASE_URL}/api/tips/tips-timeline/${profileId}?limit=2000`,
+        fetch(`${API_BASE_URL}/api/tips/tips-timeline/${profileId}?limit=2000${demoQuery('&')}`,
           {
             headers: {
               'Authorization': `Bearer ${token}`,
@@ -1540,6 +1564,7 @@ const Dashboard: React.FC = () => {
         onOpenProfile={() => navigate('/profile')}
         onLogout={handleLogout}
       >
+        <DemoBanner demoMode={demoMode} showDemo={showDemo} onToggle={handleShowDemoChange} />
         {activeTab !== 'overview' && activeTab !== 'addDevice' && (
           <PageHeader title={PAGE_TITLES[activeTab]?.title || ''} subtitle={PAGE_TITLES[activeTab]?.subtitle} />
         )}
