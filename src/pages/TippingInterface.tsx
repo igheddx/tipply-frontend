@@ -638,16 +638,31 @@ const TippingInterface: React.FC = () => {
     }
   }
 
-  // Canvas confetti: a burst from the middle, then a lighter drop from the top so it keeps falling after the burst.
-  // `ticks` is how many animation frames a piece lives (about 60 a second); the library default is 200.
+  // Canvas confetti with remapped intensity per denomination
   const triggerCanvasConfetti = (amount: number) => {
-    const tier =
-      amount >= 50
-        ? { burst: 300, spread: 200, velocity: 100, ticks: 320, drop: 160 }
-        : amount >= 10
-          ? { burst: 100, spread: 90, velocity: 45, ticks: 260, drop: 90 }
-          : { burst: 70, spread: 80, velocity: 40, ticks: 240, drop: 60 }
-    const colors = ['#ff0000', '#00ff00', '#0000ff', '#ffff00', '#ff00ff', '#00ffff']
+    // Confetti configuration based on denomination with remapped intensities
+    const getConfettiConfig = (amt: number) => {
+      // $100 and $50: New intensity - 2x burst of original
+      if (amt >= 100) {
+        return { particleCount: 300, spread: 200, startVelocity: 100, ticks: 180 }
+      } else if (amt >= 50) {
+        return { particleCount: 300, spread: 200, startVelocity: 100, ticks: 180 }
+      }
+      // $10 and $20: Use original $100 and $50 intensity
+      else if (amt >= 20) {
+        return { particleCount: 100, spread: 90, startVelocity: 45, ticks: 165 }
+      } else if (amt >= 10) {
+        return { particleCount: 100, spread: 90, startVelocity: 45, ticks: 165 }
+      }
+      // $2 and $5: Use original $10 and $20 intensity
+      else if (amt >= 5) {
+        return { particleCount: 70, spread: 80, startVelocity: 40, ticks: 150 }
+      } else {
+        return { particleCount: 70, spread: 80, startVelocity: 40, ticks: 150 }
+      }
+    }
+
+    const config = getConfettiConfig(amount)
 
     const runConfetti = async () => {
       try {
@@ -657,36 +672,15 @@ const TippingInterface: React.FC = () => {
         }
 
         confettiLoader({
-          particleCount: tier.burst,
-          spread: tier.spread,
-          startVelocity: tier.velocity,
+          particleCount: config.particleCount,
+          spread: config.spread,
+          startVelocity: config.startVelocity,
           origin: { y: 0.6 },
-          colors,
-          ticks: tier.ticks,
-          gravity: 1,
-          decay: 0.92,
+          colors: ['#ff0000', '#00ff00', '#0000ff', '#ffff00', '#ff00ff', '#00ffff'],
+          ticks: config.ticks,
+          gravity: 1.2,
           scalar: 1.2
         })
-
-        // The drop: three light waves from above the screen, falling slowly across the whole width
-        const waves = 3
-        for (let i = 0; i < waves; i++) {
-          setTimeout(() => {
-            confettiLoader({
-              particleCount: Math.round(tier.drop / waves),
-              angle: 90,
-              spread: 160,
-              startVelocity: 18,
-              origin: { x: 0.5, y: -0.1 },
-              colors,
-              ticks: tier.ticks + 80,
-              gravity: 0.7,
-              decay: 0.95,
-              drift: 0,
-              scalar: 1.1
-            })
-          }, 250 + i * 250)
-        }
       } catch (error) {
         logger.log('Confetti module load failed:', error)
       }
