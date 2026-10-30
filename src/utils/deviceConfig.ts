@@ -41,7 +41,7 @@ export const VOLUME_OPTIONS: { value: string; label: string }[] = [
 ]
 
 export const DEFAULT_SOUND_ID = 1
-export const DEFAULT_SOUND_VOLUME = 'medium'
+export const DEFAULT_SOUND_VOLUME = 'low'
 
 export const DEFAULT_EFFECT_CONFIG: Record<string, string> = {
   '2': 'effect1',
