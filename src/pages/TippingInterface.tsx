@@ -643,7 +643,7 @@ const TippingInterface: React.FC = () => {
   const triggerCanvasConfetti = (amount: number) => {
     const tier =
       amount >= 50
-        ? { burst: 300, spread: 200, velocity: 100, ticks: 175, drop: 160 }
+        ? { burst: 220, spread: 90, velocity: 45, ticks: 160, drop: 180 } // same outburst and fall as $10-$49, just more of it
         : amount >= 10
           ? { burst: 100, spread: 90, velocity: 45, ticks: 160, drop: 90 }
           : { burst: 70, spread: 80, velocity: 40, ticks: 150, drop: 60 }
