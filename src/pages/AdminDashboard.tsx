@@ -14,6 +14,7 @@ import { isRefundEligible } from '../utils/refunds';
 import AggregatedChargesTable from '../components/AggregatedChargesTable';
 import RecoverChargedTips from '../components/RecoverChargedTips';
 import ClearFailedTestTips from '../components/ClearFailedTestTips';
+import MarkDemoTips from '../components/MarkDemoTips';
 import PerformerInsights from '../components/PerformerInsights';
 import dayjs from 'dayjs';
 import { PortalShell, type PortalNavItem } from '../components/portal/PortalShell';
@@ -1907,6 +1908,7 @@ const AdminDashboard: React.FC = () => {
           <Tabs.TabPane tab="Aggregated Charges" key="aggregated-charges">
             <div className="space-y-5">
               <RecoverChargedTips />
+              <MarkDemoTips />
               <ClearFailedTestTips />
               <AggregatedChargesTable />
             </div>
