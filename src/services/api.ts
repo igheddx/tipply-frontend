@@ -225,6 +225,15 @@ class ApiService {
     })
   }
 
+  /** Reports one Wi-Fi setup attempt to the server log. Never contains the password. Failures here are ignored. */
+  async logDeviceSetupAttempt(report: Record<string, unknown>): Promise<void> {
+    try {
+      await this.request('/api/devices/setup-log', { method: 'POST', body: JSON.stringify(report) })
+    } catch {
+      // diagnostics must never get in the way of setup
+    }
+  }
+
   async getDevices(): Promise<ApiResponse<any>> {
     return this.request('/api/devices/my-devices')
   }

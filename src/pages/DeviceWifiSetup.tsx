@@ -26,6 +26,7 @@ import { Banner, Button, Card, Modal, useFeedback } from '../components/ui';
 import { BrandIcon, IconTile, type BrandIconName } from '../components/icons/BrandIcons';
 import { toast } from 'sonner';
 import { wifiVault, type SavedNetwork } from '../utils/savedWifi';
+import { apiService } from '../services/api';
 
 interface BluetoothDevice {
   name: string;
@@ -407,6 +408,26 @@ const DeviceWifiSetup = () => {
     const attemptStarted = performance.now();
     const sinceStart = () => `${Math.round(performance.now() - attemptStarted)} ms`;
     let failureCode = '';
+    // Tells the server how this attempt went (never the password) so failures can be traced; "saved" means the details came from the saved list
+    const report = (outcome: 'success' | 'failure', extra: Record<string, unknown> = {}) => {
+      const edge = (t: string) => t !== t.trim();
+      const nonAscii = (t: string) => /[^\x20-\x7E]/.test(t);
+      void apiService.logDeviceSetupAttempt({
+        outcome,
+        source: savedNetworks.some((n) => n.ssid === selectedSsid && n.password === password) ? 'saved' : 'typed',
+        deviceName: selectedDevice?.name,
+        browser: navigator.userAgent,
+        deviceMessages: deviceMessages.slice(-20),
+        bluetoothMs: bluetoothMsRef.current,
+        networkNameLength: selectedSsid.length,
+        networkNameHasEdgeSpace: edge(selectedSsid),
+        networkNameNonAscii: nonAscii(selectedSsid),
+        passwordLength: password.length,
+        passwordHasEdgeSpace: edge(password),
+        passwordNonAscii: nonAscii(password),
+        ...extra
+      });
+    };
     try {
       setConnecting(true);
       setError('');
@@ -485,12 +506,14 @@ const DeviceWifiSetup = () => {
       setPhase('joining');
       const joinStarted = performance.now();
       const { ip } = await outcome;
+      report('success', { sendMs, joinMs: Math.round(performance.now() - joinStarted) });
       await finishSetup(ip, { bluetoothMs: bluetoothMsRef.current, sendMs, joinMs: Math.round(performance.now() - joinStarted) });
     } catch (err: any) {
       logger.error('Wi-Fi configuration error:', err);
       const message = err.message || 'Failed to configure Wi-Fi. Please try again.';
       const edge = (t: string) => t !== t.trim();
       const nonAscii = (t: string) => /[^\x20-\x7E]/.test(t);
+      report('failure', { errorCode: failureCode || 'no_report', error: message });
       setFailure({
         code: failureCode || 'no_report',
         message,
@@ -538,7 +561,7 @@ const DeviceWifiSetup = () => {
   const getErrorMessage = (errorCode: string): string => {
     switch (errorCode) {
       case 'auth_failed':
-        return 'The device says the Wi-Fi password was not accepted. If you are sure it is right: make sure the network is 2.4 GHz (the device cannot join a 5 GHz-only network), that the name matches exactly, and that the device is close to the router. Tap Show to check what you typed.';
+        return 'The device says the Wi-Fi password was not accepted. If you are sure it is right: make sure the network is 2.4 GHz (the device cannot join a 5 GHz-only network), that the name matches exactly, and that the device is close to the router. Tick Show password to check what you typed.';
       case 'no_ssid':
         return 'WiFi network not found. Make sure the network name is correct.';
       case 'timeout':
@@ -750,12 +773,7 @@ const DeviceWifiSetup = () => {
               </div>
 
               <div>
-                <div className="mb-1.5 flex items-center justify-between">
-                  <label htmlFor="wifi-password" className="block text-sm font-semibold text-ink-700">Password</label>
-                  <button type="button" className="text-sm font-semibold text-brand-700" onClick={() => setShowPassword((v) => !v)}>
-                    {showPassword ? 'Hide' : 'Show'}
-                  </button>
-                </div>
+                <label htmlFor="wifi-password" className="mb-1.5 block text-sm font-semibold text-ink-700">Password</label>
                 <input
                   id="wifi-password"
                   type={showPassword ? 'text' : 'password'}
@@ -769,6 +787,10 @@ const DeviceWifiSetup = () => {
                   onChange={(e) => setPassword(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && selectedSsid && password && configureWifi()}
                 />
+                <label className="mt-2 flex items-center gap-2.5 text-sm text-ink-700">
+                  <input type="checkbox" checked={showPassword} onChange={(e) => setShowPassword(e.target.checked)} className="h-4 w-4 accent-brand-600" />
+                  Show password
+                </label>
                 {password !== password.trim() && (
                   <p className="mt-1.5 text-sm text-amber-700">
                     The password has a space at the start or end. {' '}

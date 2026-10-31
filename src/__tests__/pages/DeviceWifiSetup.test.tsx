@@ -9,6 +9,8 @@ const vault = vi.hoisted(() => ({
   forget: vi.fn()
 }))
 vi.mock('@/utils/savedWifi', () => ({ wifiVault: vault }))
+const apiMock = vi.hoisted(() => ({ logDeviceSetupAttempt: vi.fn().mockResolvedValue(undefined) }))
+vi.mock('@/services/api', () => ({ apiService: apiMock, default: apiMock }))
 
 // A fake Tipwave device. `events` records the order of what the page does so the tests can check it.
 const makeDevice = () => {
@@ -53,6 +55,7 @@ describe('DeviceWifiSetup', () => {
     vault.list.mockReset().mockResolvedValue([])
     vault.save.mockReset().mockResolvedValue(true)
     vault.forget.mockReset()
+    apiMock.logDeviceSetupAttempt.mockClear()
   })
 
   it('listens for the device answer before sending the Wi-Fi details', async () => {
@@ -130,13 +133,30 @@ describe('DeviceWifiSetup', () => {
     expect(copied).not.toContain('secret-pass-9')
   })
 
+  it('reports a failed attempt to the server, marked as saved, without the password', async () => {
+    vault.list.mockResolvedValue([{ ssid: 'Flying J', password: 'saved-secret-1', lastUsed: 1 }])
+    const fake = makeDevice()
+    await reachWifiStep(fake)
+    fireEvent.change(await screen.findByLabelText(/saved networks/i), { target: { value: 'Flying J' } })
+    fireEvent.click(screen.getByRole('button', { name: /connect to wi-fi/i }))
+    await waitFor(() => expect(fake.events).toContain('write:password'))
+    fake.emit({ state: 'failure', error: 'auth_failed' })
+
+    await waitFor(() => expect(apiMock.logDeviceSetupAttempt).toHaveBeenCalled())
+    const report = apiMock.logDeviceSetupAttempt.mock.calls[0][0]
+    expect(report).toMatchObject({ outcome: 'failure', source: 'saved', errorCode: 'auth_failed', passwordLength: 14 })
+    expect(JSON.stringify(report)).not.toContain('saved-secret-1')
+  })
+
   it('shows the password on request and offers to remove a stray space from the network name', async () => {
     const fake = makeDevice()
     await reachWifiStep(fake)
     const pw = screen.getByLabelText(/^password/i) as HTMLInputElement
     expect(pw.type).toBe('password')
-    fireEvent.click(screen.getByRole('button', { name: /^show$/i }))
+    fireEvent.click(screen.getByLabelText(/show password/i))
     expect(pw.type).toBe('text')
+    fireEvent.click(screen.getByLabelText(/show password/i))
+    expect(pw.type).toBe('password')
 
     const ssid = screen.getByLabelText(/network name/i) as HTMLInputElement
     fireEvent.change(ssid, { target: { value: 'Flying J ' } })
