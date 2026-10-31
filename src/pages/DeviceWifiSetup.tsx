@@ -26,6 +26,7 @@ import { Banner, Button, Card, Modal, useFeedback } from '../components/ui';
 import { BrandIcon, IconTile, type BrandIconName } from '../components/icons/BrandIcons';
 import { toast } from 'sonner';
 import { wifiVault, type SavedNetwork } from '../utils/savedWifi';
+import { apiService } from '../services/api';
 
 interface BluetoothDevice {
   name: string;
@@ -407,6 +408,26 @@ const DeviceWifiSetup = () => {
     const attemptStarted = performance.now();
     const sinceStart = () => `${Math.round(performance.now() - attemptStarted)} ms`;
     let failureCode = '';
+    // Tells the server how this attempt went (never the password) so failures can be traced; "saved" means the details came from the saved list
+    const report = (outcome: 'success' | 'failure', extra: Record<string, unknown> = {}) => {
+      const edge = (t: string) => t !== t.trim();
+      const nonAscii = (t: string) => /[^\x20-\x7E]/.test(t);
+      void apiService.logDeviceSetupAttempt({
+        outcome,
+        source: savedNetworks.some((n) => n.ssid === selectedSsid && n.password === password) ? 'saved' : 'typed',
+        deviceName: selectedDevice?.name,
+        browser: navigator.userAgent,
+        deviceMessages: deviceMessages.slice(-20),
+        bluetoothMs: bluetoothMsRef.current,
+        networkNameLength: selectedSsid.length,
+        networkNameHasEdgeSpace: edge(selectedSsid),
+        networkNameNonAscii: nonAscii(selectedSsid),
+        passwordLength: password.length,
+        passwordHasEdgeSpace: edge(password),
+        passwordNonAscii: nonAscii(password),
+        ...extra
+      });
+    };
     try {
       setConnecting(true);
       setError('');
@@ -485,12 +506,14 @@ const DeviceWifiSetup = () => {
       setPhase('joining');
       const joinStarted = performance.now();
       const { ip } = await outcome;
+      report('success', { sendMs, joinMs: Math.round(performance.now() - joinStarted) });
       await finishSetup(ip, { bluetoothMs: bluetoothMsRef.current, sendMs, joinMs: Math.round(performance.now() - joinStarted) });
     } catch (err: any) {
       logger.error('Wi-Fi configuration error:', err);
       const message = err.message || 'Failed to configure Wi-Fi. Please try again.';
       const edge = (t: string) => t !== t.trim();
       const nonAscii = (t: string) => /[^\x20-\x7E]/.test(t);
+      report('failure', { errorCode: failureCode || 'no_report', error: message });
       setFailure({
         code: failureCode || 'no_report',
         message,
