@@ -142,7 +142,7 @@ export function PortalShell({
               key={item.id}
               onClick={() => onSelect(item.id)}
               aria-current={on ? 'page' : undefined}
-              className="relative flex h-16 min-w-[76px] flex-1 shrink-0 flex-col items-center justify-center gap-1"
+              className="relative flex h-16 min-w-0 flex-1 flex-col items-center justify-center gap-1"
             >
               <BrandIcon name={item.icon} size={22} tone={on ? 'brand' : 'muted'} />
               <span className={`text-[11px] font-semibold ${on ? 'text-brand-700' : 'text-ink-500'}`}>{item.label}</span>
