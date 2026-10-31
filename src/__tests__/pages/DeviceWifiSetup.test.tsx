@@ -135,8 +135,10 @@ describe('DeviceWifiSetup', () => {
     await reachWifiStep(fake)
     const pw = screen.getByLabelText(/^password/i) as HTMLInputElement
     expect(pw.type).toBe('password')
-    fireEvent.click(screen.getByRole('button', { name: /^show$/i }))
+    fireEvent.click(screen.getByLabelText(/show password/i))
     expect(pw.type).toBe('text')
+    fireEvent.click(screen.getByLabelText(/show password/i))
+    expect(pw.type).toBe('password')
 
     const ssid = screen.getByLabelText(/network name/i) as HTMLInputElement
     fireEvent.change(ssid, { target: { value: 'Flying J ' } })
