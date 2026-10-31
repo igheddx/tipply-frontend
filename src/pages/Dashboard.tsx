@@ -133,7 +133,7 @@ const Dashboard: React.FC = () => {
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null)
   const [recentTips, setRecentTips] = useState<TipSummary[]>([])
   const [loading, setLoading] = useState(true)
-  const [failedTips, setFailedTips] = useState<{ id: string; amount: number; deviceId: string; createdAt: string }[]>([])
+  const [failedTips, setFailedTips] = useState<{ id: string; amount: number; deviceId: string; createdAt: string; failureReason?: string }[]>([])
   const [activeTab, setActiveTab] = useState(() => {
     const t = new URLSearchParams(window.location.search).get('tab')
     return t && ['devices', 'tips', 'songs', 'monitor'].includes(t) ? t : 'overview'
@@ -1755,7 +1755,7 @@ const Dashboard: React.FC = () => {
               <div className="mt-5">
                 <Card
                   title="Not charged"
-                  subtitle={`${failedTips.length === 1 ? '1 tip' : `${failedTips.length} tips`} could not be charged. They are not counted in what you are owed.`}
+                  subtitle={`${failedTips.length === 1 ? '1 tip' : `${failedTips.length} tips`} could not be charged. They are not part of your earnings.`}
                   flush
                 >
                   <ul className="divide-y divide-slate-100 px-5 pb-2">
@@ -1768,6 +1768,7 @@ const Dashboard: React.FC = () => {
                             <div className="truncate text-xs text-ink-500">
                               {device?.nickname || 'Tipwave device'} · {new Date(tip.createdAt).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
                             </div>
+                            {tip.failureReason && <div className="mt-0.5 text-sm text-ink-700">{tip.failureReason}</div>}
                           </div>
                           <StatusChip kind="failed" label="Not charged" />
                         </li>

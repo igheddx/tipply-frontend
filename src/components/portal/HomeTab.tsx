@@ -119,7 +119,7 @@ export function HomeTab({ data, onGoToDevices, onGoToTips, onGoToLive, formatCur
             </Button>
           }
         >
-          These are not counted in what you are owed. The card was declined or no longer valid.
+          These are not part of your earnings. Open Tips to see what happened to each one.
         </Banner>
       )}
 
