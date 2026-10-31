@@ -105,10 +105,43 @@ describe('DeviceWifiSetup', () => {
     fake.emit({ state: 'connecting' })
     fake.emit({ state: 'failure', error: 'auth_failed' })
 
-    expect(await screen.findByText(/wrong wifi password/i)).toBeInTheDocument()
+    expect(await screen.findByText(/password was not accepted/i)).toBeInTheDocument()
     // The button is usable again for a retry, and nothing was saved
     await waitFor(() => expect(screen.getByRole('button', { name: /connect to wi-fi/i })).not.toBeDisabled())
     expect(vault.save).not.toHaveBeenCalled()
+  })
+
+  it('lets the person copy what the device reported, without the password in it', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true })
+    const fake = makeDevice()
+    await reachWifiStep(fake)
+    fireEvent.change(screen.getByLabelText(/network name/i), { target: { value: 'Flying J' } })
+    fireEvent.change(screen.getByLabelText(/^password/i), { target: { value: 'secret-pass-9' } })
+    fireEvent.click(screen.getByRole('button', { name: /connect to wi-fi/i }))
+    await waitFor(() => expect(fake.events).toContain('write:password'))
+    fake.emit({ state: 'failure', error: 'auth_failed' })
+
+    fireEvent.click(await screen.findByRole('button', { name: /copy details/i }))
+    await waitFor(() => expect(writeText).toHaveBeenCalled())
+    const copied = writeText.mock.calls[0][0] as string
+    expect(copied).toContain('auth_failed')
+    expect(copied).toContain('"length": 13')
+    expect(copied).not.toContain('secret-pass-9')
+  })
+
+  it('shows the password on request and offers to remove a stray space from the network name', async () => {
+    const fake = makeDevice()
+    await reachWifiStep(fake)
+    const pw = screen.getByLabelText(/^password/i) as HTMLInputElement
+    expect(pw.type).toBe('password')
+    fireEvent.click(screen.getByRole('button', { name: /^show$/i }))
+    expect(pw.type).toBe('text')
+
+    const ssid = screen.getByLabelText(/network name/i) as HTMLInputElement
+    fireEvent.change(ssid, { target: { value: 'Flying J ' } })
+    fireEvent.click(screen.getByRole('button', { name: /remove it/i }))
+    expect(ssid.value).toBe('Flying J')
   })
 
   it('fills the name and password from a saved network', async () => {
