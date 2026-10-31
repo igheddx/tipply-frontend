@@ -53,6 +53,7 @@ interface PerformerSummary {
   role: string;
   platformFeePercentage: number;
   totalTips: number;
+  totalGross: number;
   totalEarnings: number;
   totalPlatformFees: number;
   isActive: boolean;
@@ -1009,15 +1010,18 @@ const AdminDashboard: React.FC = () => {
       ),
     },
     {
-      title: 'Earnings',
+      title: 'Tips total / Earnings',
       key: 'earnings',
       render: (record: PerformerSummary) => (
         <div className="text-right">
+          <div className="font-medium text-ink-900">
+            ${(record.totalGross ?? 0).toFixed(2)} <span className="text-sm font-normal text-ink-500">tips (gross)</span>
+          </div>
           <div className="font-medium text-green-600">
-            ${record.totalEarnings.toFixed(2)}
+            ${record.totalEarnings.toFixed(2)} <span className="text-sm font-normal text-ink-500">earnings (after fees)</span>
           </div>
           <div className="text-sm text-ink-500">
-            Platform: ${record.totalPlatformFees.toFixed(2)}
+            Platform fee: ${record.totalPlatformFees.toFixed(2)}
           </div>
         </div>
       ),

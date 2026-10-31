@@ -614,7 +614,7 @@ const PerformerInsights: React.FC = () => {
               {/* Metrics Cards */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 <div className="bg-white rounded-lg shadow-sm p-6">
-                  <div className="text-sm text-ink-500">Today's Tips</div>
+                  <div className="text-sm text-ink-500">Today's Tips (gross)</div>
                   <div className="text-2xl font-bold text-ink-900">${(insights.metrics?.todaysTips || 0).toFixed(2)}</div>
                 </div>
                 
@@ -629,12 +629,12 @@ const PerformerInsights: React.FC = () => {
                 </div>
                 
                 <div className="bg-white rounded-lg shadow-sm p-6">
-                  <div className="text-sm text-ink-500">Total Balance</div>
+                  <div className="text-sm text-ink-500">Total Balance (net, after fees)</div>
                   <div className="text-2xl font-bold text-ink-900">${(insights.totalBalance || 0).toFixed(2)}</div>
                 </div>
                 
                 <div className="bg-white rounded-lg shadow-sm p-6">
-                  <div className="text-sm text-ink-500">Lifetime Volume</div>
+                  <div className="text-sm text-ink-500">Lifetime Volume (gross)</div>
                   <div className="text-2xl font-bold text-ink-900">${(insights.metrics?.stripeLifetimeVolume || 0).toFixed(2)}</div>
                 </div>
                 
