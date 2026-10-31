@@ -19,7 +19,7 @@ import PerformerInsights from '../components/PerformerInsights';
 import PerformerSongRequests from '../components/PerformerSongRequests';
 import dayjs from 'dayjs';
 import { PortalShell, type PortalNavItem } from '../components/portal/PortalShell';
-import { Banner, Button as UiButton, Card as UiCard, Modal, PageHeader, PageLoader, StatCard, StatusChip, useFeedback, type ChipKind } from '../components/ui';
+import { Banner, Button as UiButton, Card as UiCard, Modal, PageHeader, PageLoader, RefreshControl, StatCard, StatusChip, useFeedback, type ChipKind } from '../components/ui';
 import { BrandIcon } from '../components/icons/BrandIcons';
 
 const { Search } = Input;
@@ -328,9 +328,10 @@ const AdminDashboard: React.FC = () => {
     }
   };
 
-  const loadDashboardData = async () => {
+  const loadDashboardData = async (quiet = false) => {
     try {
-      setLoading(true);
+      // A quiet reload keeps the page on screen instead of swapping it for the loading screen
+      if (!quiet) setLoading(true);
       // Add timestamp to prevent caching
       const timestamp = Date.now();
       const [statsResponse, performersResponse, earningsResponse] = await Promise.all([
@@ -351,6 +352,7 @@ const AdminDashboard: React.FC = () => {
   };
 
   const handleSearch = async (value: string) => {
+    performerQueryRef.current = value.trim();
     try {
       if (value.trim()) {
         const searchResults = await apiService.get(`/api/admin/performers/search?q=${encodeURIComponent(value)}`);
@@ -565,6 +567,30 @@ const AdminDashboard: React.FC = () => {
     } catch (error) {
       logger.error('Error loading batch history:', error);
       showError('Failed to load batch history', 'error');
+    }
+  };
+
+  const performerQueryRef = useRef('');
+  const [refreshing, setRefreshing] = useState(false);
+  const [updatedAt, setUpdatedAt] = useState<Date | null>(null);
+  // Bumped on each refresh so open panels inside the Performers table (song requests) reload too
+  const [refreshTick, setRefreshTick] = useState(0);
+
+  // Reloads whatever the current tab shows (Overview, Performers or Tips) without leaving the page
+  const refreshCurrentTab = async () => {
+    setRefreshing(true);
+    try {
+      if (activeTab === 'tips') {
+        await loadTips();
+      } else if (activeTab === 'performers' && performerQueryRef.current) {
+        await handleSearch(performerQueryRef.current);
+      } else {
+        await loadDashboardData(true);
+      }
+      setRefreshTick((t) => t + 1);
+      setUpdatedAt(new Date());
+    } finally {
+      setRefreshing(false);
     }
   };
 
@@ -1062,7 +1088,15 @@ const AdminDashboard: React.FC = () => {
       }}
       topNotice={modeNotice}
     >
-      <PageHeader title={ADMIN_TITLES[activeTab]?.title || 'Admin'} subtitle={ADMIN_TITLES[activeTab]?.subtitle} />
+      <PageHeader
+        title={ADMIN_TITLES[activeTab]?.title || 'Admin'}
+        subtitle={ADMIN_TITLES[activeTab]?.subtitle}
+        actions={
+          ['overview', 'performers', 'tips'].includes(activeTab) ? (
+            <RefreshControl onRefresh={refreshCurrentTab} busy={refreshing} updatedAt={updatedAt} />
+          ) : undefined
+        }
+      />
       <div>
         {activeTab === 'overview' && (
           <div className="space-y-5">
@@ -1630,7 +1664,7 @@ const AdminDashboard: React.FC = () => {
             dataSource={performers}
             rowKey="id"
             expandable={{
-              expandedRowRender: (record: PerformerSummary) => <PerformerSongRequests profileId={record.id} />,
+              expandedRowRender: (record: PerformerSummary) => <PerformerSongRequests key={refreshTick} profileId={record.id} />,
               rowExpandable: () => true,
             }}
             pagination={{

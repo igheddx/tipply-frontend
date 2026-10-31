@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { BrandIcon, IconTile, type BrandIconName } from '../icons/BrandIcons'
 import { Banner, Button, Card, StatCard, StatusChip } from '../ui'
@@ -39,6 +40,8 @@ interface HomeTabProps {
   onGoToTips: () => void
   /** Shown when a device takes song requests: a one-tap way into the live requests screen */
   onGoToLive?: () => void
+  /** Top right of the greeting, e.g. the Refresh button */
+  headerAction?: ReactNode
   formatCurrency: (n: number) => string
 }
 
@@ -49,7 +52,7 @@ const greeting = () => {
 
 const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`
 
-export function HomeTab({ data, onGoToDevices, onGoToTips, onGoToLive, formatCurrency }: HomeTabProps) {
+export function HomeTab({ data, onGoToDevices, onGoToTips, onGoToLive, headerAction, formatCurrency }: HomeTabProps) {
   const openSteps = data.nextSteps.filter(s => !s.done)
   const money = (n: number) => (data.balancesLoading ? '…' : formatCurrency(n))
   const trend =
@@ -78,12 +81,15 @@ export function HomeTab({ data, onGoToDevices, onGoToTips, onGoToLive, formatCur
 
   return (
     <div className="space-y-5">
-      <div>
-        <h1 className="text-2xl font-bold text-ink-900">
-          {greeting()}
-          {data.firstName ? `, ${data.firstName}` : ''}
-        </h1>
-        <p className="mt-1 text-sm text-ink-500">Here is how tips are going.</p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h1 className="text-2xl font-bold text-ink-900">
+            {greeting()}
+            {data.firstName ? `, ${data.firstName}` : ''}
+          </h1>
+          <p className="mt-1 text-sm text-ink-500">Here is how tips are going.</p>
+        </div>
+        {headerAction}
       </div>
 
       {onGoToLive && (

@@ -4,10 +4,10 @@ import { HomeTab, type HomeData } from '../components/portal/HomeTab'
 import { DemoBanner } from '../components/portal/DemoBanner'
 import { renderQrCard } from '../utils/qrCard'
 import { TipsTimeline } from '../components/charts/TipsTimeline'
-import { Banner, Button, Card, EmptyState, Modal, PageHeader, PageLoader, StatusChip, useFeedback, type ChipKind } from '../components/ui'
+import { Banner, Button, Card, EmptyState, Modal, PageHeader, PageLoader, RefreshControl, StatusChip, useFeedback, type ChipKind } from '../components/ui'
 import { BrandIcon, IconTile } from '../components/icons/BrandIcons'
 import { Switch } from '../components/ui/Switch'
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import apiService from '../services/api'
 import SongManagement from '../components/SongManagement'
@@ -492,10 +492,29 @@ const Dashboard: React.FC = () => {
     if (failed.data) setFailedTips(failed.data)
   }
 
+  const quietRefreshRef = useRef(false)
+  const [refreshing, setRefreshing] = useState(false)
+  const [updatedAt, setUpdatedAt] = useState<Date | null>(null)
+
+  // The Refresh button on Home and Tips: reloads the numbers and tip lists while the page stays on screen
+  const refreshPage = async () => {
+    setRefreshing(true)
+    quietRefreshRef.current = true
+    try {
+      await refreshDashboard()
+      const failed = await apiService.getFailedTips()
+      if (failed.data) setFailedTips(failed.data)
+      setUpdatedAt(new Date())
+    } finally {
+      quietRefreshRef.current = false
+      setRefreshing(false)
+    }
+  }
+
   // Optimized refresh function that doesn't make redundant getProfile() calls
   const refreshDashboard = async () => {
     try {
-      setLoading(true)
+      if (!quietRefreshRef.current) setLoading(true)
       setStripeMetricsLoading(true)
       
       // Only fetch what actually changed - don't re-fetch profile
@@ -1450,7 +1469,15 @@ const Dashboard: React.FC = () => {
       >
         <DemoBanner demoMode={demoMode} showDemo={showDemo} onToggle={handleShowDemoChange} />
         {activeTab !== 'overview' && activeTab !== 'addDevice' && (
-          <PageHeader title={PAGE_TITLES[activeTab]?.title || ''} subtitle={PAGE_TITLES[activeTab]?.subtitle} />
+          <PageHeader
+            title={PAGE_TITLES[activeTab]?.title || ''}
+            subtitle={PAGE_TITLES[activeTab]?.subtitle}
+            actions={
+              activeTab === 'tips' ? (
+                <RefreshControl onRefresh={refreshPage} busy={refreshing} updatedAt={updatedAt} />
+              ) : undefined
+            }
+          />
         )}
         <div>
             {activeTab === 'overview' && (
@@ -1460,6 +1487,7 @@ const Dashboard: React.FC = () => {
                 onGoToDevices={() => (stats.totalDevices === 0 ? handleAddDeviceClick() : setActiveTab('devices'))}
                 onGoToTips={() => setActiveTab('tips')}
                 onGoToLive={hasSongRequestEnabled ? () => setActiveTab('monitor') : undefined}
+                headerAction={<RefreshControl onRefresh={refreshPage} busy={refreshing} updatedAt={updatedAt} />}
               />
             )}
 
