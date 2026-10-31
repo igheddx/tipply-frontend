@@ -16,6 +16,7 @@ import RecoverChargedTips from '../components/RecoverChargedTips';
 import ClearFailedTestTips from '../components/ClearFailedTestTips';
 import MarkDemoTips from '../components/MarkDemoTips';
 import PerformerInsights from '../components/PerformerInsights';
+import PerformerSongRequests from '../components/PerformerSongRequests';
 import dayjs from 'dayjs';
 import { PortalShell, type PortalNavItem } from '../components/portal/PortalShell';
 import { Banner, Button as UiButton, Card as UiCard, Modal, PageHeader, PageLoader, StatCard, StatusChip, useFeedback, type ChipKind } from '../components/ui';
@@ -1628,6 +1629,10 @@ const AdminDashboard: React.FC = () => {
             columns={performerColumns}
             dataSource={performers}
             rowKey="id"
+            expandable={{
+              expandedRowRender: (record: PerformerSummary) => <PerformerSongRequests profileId={record.id} />,
+              rowExpandable: () => true,
+            }}
             pagination={{
               pageSize: 10,
               showSizeChanger: true,
