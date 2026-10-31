@@ -1459,6 +1459,7 @@ const Dashboard: React.FC = () => {
                 formatCurrency={formatCurrency}
                 onGoToDevices={() => (stats.totalDevices === 0 ? handleAddDeviceClick() : setActiveTab('devices'))}
                 onGoToTips={() => setActiveTab('tips')}
+                onGoToLive={hasSongRequestEnabled ? () => setActiveTab('monitor') : undefined}
               />
             )}
 

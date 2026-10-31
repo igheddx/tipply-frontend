@@ -37,6 +37,8 @@ interface HomeTabProps {
   data: HomeData
   onGoToDevices: () => void
   onGoToTips: () => void
+  /** Shown when a device takes song requests: a one-tap way into the live requests screen */
+  onGoToLive?: () => void
   formatCurrency: (n: number) => string
 }
 
@@ -47,7 +49,7 @@ const greeting = () => {
 
 const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`
 
-export function HomeTab({ data, onGoToDevices, onGoToTips, formatCurrency }: HomeTabProps) {
+export function HomeTab({ data, onGoToDevices, onGoToTips, onGoToLive, formatCurrency }: HomeTabProps) {
   const openSteps = data.nextSteps.filter(s => !s.done)
   const money = (n: number) => (data.balancesLoading ? '…' : formatCurrency(n))
   const trend =
@@ -83,6 +85,12 @@ export function HomeTab({ data, onGoToDevices, onGoToTips, formatCurrency }: Hom
         </h1>
         <p className="mt-1 text-sm text-ink-500">Here is how tips are going.</p>
       </div>
+
+      {onGoToLive && (
+        <Button icon="mic" size="lg" block onClick={onGoToLive}>
+          Open live song requests
+        </Button>
+      )}
 
       {/* Device status */}
       <Card className="!shadow-none">
