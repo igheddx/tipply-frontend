@@ -90,6 +90,9 @@ const DeviceWifiSetup = () => {
   const [remember, setRemember] = useState(true);
   const [phase, setPhase] = useState<'sending' | 'joining' | null>(null);
   const [elapsed, setElapsed] = useState(0);
+  const [showPassword, setShowPassword] = useState(false);
+  // What the device reported when it could not join, kept so it can be copied and sent for help
+  const [failure, setFailure] = useState<{ code: string; message: string; details: string } | null>(null);
   const [timings, setTimings] = useState<SetupTimings>({});
   // The Bluetooth link is opened and its characteristics looked up once, while the performer types
   const linkRef = useRef<ProvisioningLink | null>(null);
@@ -400,9 +403,14 @@ const DeviceWifiSetup = () => {
     }
 
     let cleanup = () => {};
+    const deviceMessages: string[] = [];
+    const attemptStarted = performance.now();
+    const sinceStart = () => `${Math.round(performance.now() - attemptStarted)} ms`;
+    let failureCode = '';
     try {
       setConnecting(true);
       setError('');
+      setFailure(null);
       setPhase('sending');
 
       // Demo mode simulation - Only in development
@@ -440,8 +448,12 @@ const DeviceWifiSetup = () => {
             return;
           }
           logger.log('Status update:', status);
+          deviceMessages.push(`${sinceStart()}: ${JSON.stringify(status)}`);
           if (status.state === 'success') resolve({ ip: status.ip });
-          else if (status.state === 'failure') reject(new Error(getErrorMessage(status.error)));
+          else if (status.state === 'failure') {
+            failureCode = String(status.error || 'unknown');
+            reject(new Error(getErrorMessage(status.error)));
+          }
         };
         const onDrop = () => reject(new Error('Bluetooth connection to the device dropped. Move closer and try again.'));
         const timer = setTimeout(
@@ -476,7 +488,29 @@ const DeviceWifiSetup = () => {
       await finishSetup(ip, { bluetoothMs: bluetoothMsRef.current, sendMs, joinMs: Math.round(performance.now() - joinStarted) });
     } catch (err: any) {
       logger.error('Wi-Fi configuration error:', err);
-      setError(err.message || 'Failed to configure Wi-Fi. Please try again.');
+      const message = err.message || 'Failed to configure Wi-Fi. Please try again.';
+      const edge = (t: string) => t !== t.trim();
+      const nonAscii = (t: string) => /[^\x20-\x7E]/.test(t);
+      setFailure({
+        code: failureCode || 'no_report',
+        message,
+        // Everything except the password itself, so it is safe to paste into a message
+        details: JSON.stringify(
+          {
+            when: new Date().toISOString(),
+            browser: navigator.userAgent,
+            device: selectedDevice?.name,
+            deviceReported: failureCode || '(nothing before the error)',
+            error: message,
+            deviceMessages,
+            timings: { bluetoothMs: bluetoothMsRef.current, totalMs: Math.round(performance.now() - attemptStarted) },
+            network: { nameLength: selectedSsid.length, nameHasEdgeSpace: edge(selectedSsid), nameNonAscii: nonAscii(selectedSsid) },
+            password: { length: password.length, hasEdgeSpace: edge(password), hasNonAscii: nonAscii(password) }
+          },
+          null,
+          2
+        )
+      });
 
       if (notificationPermission === 'granted') {
         sendNotification('❌ Setup Failed', 'Tipwave device could not connect to Wi-Fi. Please try again.', false);
@@ -504,7 +538,7 @@ const DeviceWifiSetup = () => {
   const getErrorMessage = (errorCode: string): string => {
     switch (errorCode) {
       case 'auth_failed':
-        return 'Wrong WiFi password. Please check and try again.';
+        return 'The device says the Wi-Fi password was not accepted. If you are sure it is right: make sure the network is 2.4 GHz (the device cannot join a 5 GHz-only network), that the name matches exactly, and that the device is close to the router. Tap Show to check what you typed.';
       case 'no_ssid':
         return 'WiFi network not found. Make sure the network name is correct.';
       case 'timeout':
@@ -592,6 +626,33 @@ const DeviceWifiSetup = () => {
           </Banner>
         )}
 
+        {failure && !connecting && currentStep === 2 && (
+          <Banner
+            tone="error"
+            title="The device could not join the Wi-Fi"
+            className="mb-5"
+            onDismiss={() => setFailure(null)}
+            action={
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={async () => {
+                  try {
+                    await navigator.clipboard.writeText(failure.details);
+                    toast.success('Details copied. Paste them into a message to support.');
+                  } catch {
+                    toast.error('Could not copy. Take a screenshot of this page instead.');
+                  }
+                }}
+              >
+                Copy details
+              </Button>
+            }
+          >
+            {failure.message}
+          </Banner>
+        )}
+
         {/* Step 0: find the device */}
         {currentStep === 0 && (
           <Card>
@@ -676,20 +737,46 @@ const DeviceWifiSetup = () => {
                   spellCheck={false}
                   autoFocus
                 />
-                <p className="mt-1.5 text-sm text-ink-500">Type it exactly as it appears, including capital letters.</p>
+                {selectedSsid !== selectedSsid.trim() ? (
+                  <p className="mt-1.5 text-sm text-amber-700">
+                    The name has a space at the start or end, which phone keyboards often add. {' '}
+                    <button type="button" className="font-semibold underline" onClick={() => setSelectedSsid(selectedSsid.trim())}>
+                      Remove it
+                    </button>
+                  </p>
+                ) : (
+                  <p className="mt-1.5 text-sm text-ink-500">Type it exactly as it appears, including capital letters.</p>
+                )}
               </div>
 
               <div>
-                <label htmlFor="wifi-password" className="mb-1.5 block text-sm font-semibold text-ink-700">Password</label>
+                <div className="mb-1.5 flex items-center justify-between">
+                  <label htmlFor="wifi-password" className="block text-sm font-semibold text-ink-700">Password</label>
+                  <button type="button" className="text-sm font-semibold text-brand-700" onClick={() => setShowPassword((v) => !v)}>
+                    {showPassword ? 'Hide' : 'Show'}
+                  </button>
+                </div>
                 <input
                   id="wifi-password"
-                  type="password"
+                  type={showPassword ? 'text' : 'password'}
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  autoComplete="off"
                   className={inputClass}
                   placeholder="Wi-Fi password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && selectedSsid && password && configureWifi()}
                 />
+                {password !== password.trim() && (
+                  <p className="mt-1.5 text-sm text-amber-700">
+                    The password has a space at the start or end. {' '}
+                    <button type="button" className="font-semibold underline" onClick={() => setPassword(password.trim())}>
+                      Remove it
+                    </button>
+                  </p>
+                )}
               </div>
 
               <label className="flex items-center gap-2.5 text-sm text-ink-700">
