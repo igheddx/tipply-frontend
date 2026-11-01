@@ -241,7 +241,7 @@ const TippingInterface: React.FC = () => {
           return false
         }
       
-        const url = `${getApiBaseUrl()}/api/tips/user-total/${tempUserId}`
+        const url = `${getApiBaseUrl()}/api/tips/user-total/${tempUserId}?tzOffsetMinutes=${new Date().getTimezoneOffset()}`
         logger.log('📡 [loadUserTotal] Request URL:', url)
         const response = await fetch(url, {
           cache: 'no-store',
