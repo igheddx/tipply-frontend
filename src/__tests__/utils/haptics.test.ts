@@ -59,8 +59,8 @@ describe('tip haptics', () => {
       changes = 0
       tipHaptic(100)
       vi.runAllTimers()
-      expect(small).toBe(2)
-      expect(changes).toBe(6)
+      expect(small).toBe(4)
+      expect(changes).toBe(12)
     })
 
     it('keeps the hidden switch out of sight and out of the way', () => {

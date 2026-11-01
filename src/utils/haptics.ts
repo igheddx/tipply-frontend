@@ -17,14 +17,14 @@ export const hapticLevelFor = (amount: number): HapticLevel => (amount >= 50 ? 4
 
 // Android: vibrate / pause / vibrate ... in milliseconds
 export const VIBRATION_PATTERNS: Record<HapticLevel, number[]> = {
-  1: [70],
-  2: [90, 40, 90],
-  3: [110, 40, 110, 40, 130],
-  4: [150, 50, 150, 50, 180, 50, 240]
+  1: [140],
+  2: [180, 40, 180],
+  3: [220, 40, 220, 40, 260],
+  4: [300, 50, 300, 50, 360, 50, 480]
 }
 
 // iPhone: number of taps in the run, and the gap between them
-const TICKS: Record<HapticLevel, number> = { 1: 2, 2: 3, 3: 4, 4: 6 }
+const TICKS: Record<HapticLevel, number> = { 1: 4, 2: 6, 3: 8, 4: 12 }
 const TICK_GAP_MS = 65
 
 let switchLabel: HTMLLabelElement | null = null
