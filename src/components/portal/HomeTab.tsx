@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { BrandIcon, IconTile, type BrandIconName } from '../icons/BrandIcons'
-import { Banner, Button, Card, StatCard, StatusChip } from '../ui'
+import { Banner, Button, Card, EmptyState, StatCard, StatusChip } from '../ui'
 import { ChartTooltip } from '../charts/ChartTooltip'
 
 export interface HomeNextStep {
@@ -61,11 +61,11 @@ export function HomeTab({ data, onGoToDevices, onGoToTips, onGoToLive, headerAct
       : undefined
 
   const stats = [
-    { label: 'Today', value: formatCurrency(data.today.amount), caption: plural(data.today.count, 'tip'), icon: 'sun' as BrandIconName },
+    { label: 'Tips today', value: formatCurrency(data.today.amount), caption: `${plural(data.today.count, 'tip')}, before fees`, icon: 'sun' as BrandIconName },
     {
-      label: 'This month',
+      label: 'Tips this month',
       value: formatCurrency(data.month.amount),
-      caption: [plural(data.month.count, 'tip'), trend].filter(Boolean).join(' · '),
+      caption: [`${plural(data.month.count, 'tip')}, before fees`, trend].filter(Boolean).join(' · '),
       icon: 'calendar' as BrandIconName
     },
     { label: 'Ready to pay out', value: money(data.available), caption: 'Available in Stripe now', icon: 'wallet' as BrandIconName }
@@ -76,7 +76,7 @@ export function HomeTab({ data, onGoToDevices, onGoToTips, onGoToLive, headerAct
     { label: 'Scheduled payouts', hint: 'Coming from Stripe', value: money(data.scheduledPayouts), icon: 'calendar-check' },
     { label: 'On its way to your bank', hint: 'Usually 1 to 2 business days', value: money(data.inTransit), icon: 'transit' },
     { label: 'Ready to pay out', hint: 'Available in Stripe now', value: money(data.available), icon: 'wallet' },
-    { label: 'All-time tips', hint: 'Everything you have been tipped', value: money(data.lifetime), icon: 'trend-up' }
+    { label: 'All-time tips', hint: 'Before fees. Payouts are after fees.', value: money(data.lifetime), icon: 'trend-up' }
   ]
 
   return (
@@ -166,11 +166,13 @@ export function HomeTab({ data, onGoToDevices, onGoToTips, onGoToLive, headerAct
       )}
 
       {/* Weekly chart, always from zero */}
-      <Card title="Tips per week" subtitle="Last 8 weeks">
+      <Card title="Tips per week" subtitle="Last 8 weeks, before fees">
         {data.weeksLoading ? (
           <div className="h-[220px] animate-pulse rounded-2xl bg-slate-100" aria-busy="true" />
         ) : data.weeks.every(w => w.total === 0) ? (
-          <p className="py-8 text-center text-sm text-ink-500">Tips will show up here as soon as you get your first one.</p>
+          <EmptyState icon="coin" title="No tips yet" action={<Button variant="secondary" onClick={onGoToDevices}>Get your QR card</Button>}>
+            Tips will show up here as soon as you get your first one.
+          </EmptyState>
         ) : (
           <div style={{ width: '100%', height: 220 }}>
             <ResponsiveContainer>

@@ -4,6 +4,7 @@ import { API_BASE_URL } from '../utils/config'
 import { BrandIcon } from './icons/BrandIcons'
 import { StatusChip } from './ui'
 import { usePortalTheme, useTheme } from '../theme/ThemeContext'
+import { playTipChime, unlockTipChime, isTipChimeReady } from '../utils/tipChime'
 
 interface SongRequest {
   songId: string
@@ -93,6 +94,13 @@ const SongRequestMonitor: React.FC<SongRequestMonitorProps> = ({
   const [pauseDeviceId, setPauseDeviceId] = useState('')
   const [menuOpen, setMenuOpen] = useState(false)
   const [glow, setGlow] = useState<{ id: number; tipped: boolean } | null>(null)
+  // "New tip" notice shown inside the monitor, and the sound that goes with it
+  const [tipNotice, setTipNotice] = useState<{ id: number; text: string } | null>(null)
+  const [soundOn, setSoundOn] = useState(() => readPref('monitor_tip_sound', '1') === '1')
+  const [soundReady, setSoundReady] = useState(false)
+  const soundOnRef = useRef(soundOn)
+  soundOnRef.current = soundOn
+  const noticeId = useRef(0)
   const [undo, setUndo] = useState<{ request: SongRequest; message: string } | null>(null)
   const [held, setHeld] = useState(false)
   const shownRef = useRef<SongRequest[]>([])
@@ -149,9 +157,20 @@ const SongRequestMonitor: React.FC<SongRequestMonitorProps> = ({
             .filter(k => !knownKeys.current!.has(k))
           if (added.length > 0) {
             setFreshKeys(prev => new Set([...prev, ...added]))
-            const tipped = list.some(r => added.includes(requestKey(r)) && r.totalTipAmount > 0)
+            const tippedRequests = list.filter(r => added.includes(requestKey(r)) && r.totalTipAmount > 0)
+            const tipped = tippedRequests.length > 0
             glowId.current += 1
             setGlow({ id: glowId.current, tipped })
+            if (tipped) {
+              const total = tippedRequests.reduce((sum, r) => sum + r.totalTipAmount, 0)
+              const money = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(total)
+              noticeId.current += 1
+              setTipNotice({
+                id: noticeId.current,
+                text: tippedRequests.length === 1 ? `New tip ${money}: ${tippedRequests[0].songTitle}` : `${tippedRequests.length} new tips: ${money}`
+              })
+              if (soundOnRef.current) playTipChime()
+            }
           }
         }
         knownKeys.current = keys
@@ -322,6 +341,34 @@ const SongRequestMonitor: React.FC<SongRequestMonitorProps> = ({
   }
 
 
+  // Hide the "new tip" notice after a few seconds
+  useEffect(() => {
+    if (!tipNotice) return
+    const t = window.setTimeout(() => setTipNotice(null), 6000)
+    return () => window.clearTimeout(t)
+  }, [tipNotice])
+
+  // Browsers allow sound only after a touch: the first one on the monitor unlocks the chime
+  useEffect(() => {
+    if (!isVisible) return
+    setSoundReady(isTipChimeReady())
+    const unlock = () => {
+      void unlockTipChime().then(ok => {
+        setSoundReady(ok)
+        if (ok) document.removeEventListener('pointerdown', unlock)
+      })
+    }
+    document.addEventListener('pointerdown', unlock)
+    return () => document.removeEventListener('pointerdown', unlock)
+  }, [isVisible])
+
+  const toggleSound = () => {
+    const next = !soundOn
+    setSoundOn(next)
+    writePref('monitor_tip_sound', next ? '1' : '0')
+    if (next) void unlockTipChime().then(ok => { setSoundReady(ok); if (ok) playTipChime() })
+  }
+
   if (!isVisible) return null
 
   // While a finger is down the list keeps the order it had, then catches up
@@ -387,6 +434,15 @@ const SongRequestMonitor: React.FC<SongRequestMonitorProps> = ({
         />
       )}
 
+      {/* A tip arrived: a short message at the top, announced to screen readers, gone after a few seconds */}
+      {tipNotice && (
+        <div role="status" aria-live="polite" className="pointer-events-none absolute inset-x-0 top-16 z-50 flex justify-center px-4">
+          <div className="max-w-full truncate rounded-full bg-accent-500 px-5 py-2.5 text-base font-bold text-white shadow-lift">
+            {tipNotice.text}
+          </div>
+        </div>
+      )}
+
       {/* Top bar: slim, so it fits a narrow side window. Less-used controls live in the menu. */}
       <header className="relative flex flex-none items-center gap-2 border-b border-slate-200 bg-white px-3 py-2.5">
         <button onClick={onClose} className={`${soft} pl-2`} aria-label="Close live requests">
@@ -436,6 +492,25 @@ const SongRequestMonitor: React.FC<SongRequestMonitorProps> = ({
                     A+
                   </button>
                 </div>
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-sm font-semibold text-ink-700">Sound for new tips</span>
+                  <button
+                    onClick={toggleSound}
+                    role="switch"
+                    aria-checked={soundOn}
+                    aria-label="Sound for new tips"
+                    className={`${soft} gap-2`}
+                  >
+                    <BrandIcon name="volume" size={20} />
+                    {soundOn ? 'On' : 'Off'}
+                  </button>
+                </div>
+                {soundOn && !soundReady && (
+                  <p className="mt-1 text-xs text-ink-500">Tap anywhere on this screen once to allow sound.</p>
+                )}
               </div>
 
               <div className="flex items-center justify-between gap-3">
