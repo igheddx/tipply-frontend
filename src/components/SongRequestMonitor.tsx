@@ -434,6 +434,19 @@ const SongRequestMonitor: React.FC<SongRequestMonitorProps> = ({
         />
       )}
 
+      {/* Browsers keep a page silent until it is touched once: ask for that touch, then get out of the way */}
+      {soundOn && !soundReady && (
+        <div className="absolute inset-x-0 bottom-4 z-50 flex justify-center px-4">
+          <button
+            onClick={() => void unlockTipChime().then(ok => { setSoundReady(ok); if (ok) playTipChime() })}
+            className="inline-flex h-12 items-center gap-2 rounded-full bg-ink-900 px-5 text-sm font-bold text-white shadow-lift"
+          >
+            <BrandIcon name="volume" size={20} tone="inverse" />
+            Tap to turn on tip sounds
+          </button>
+        </div>
+      )}
+
       {/* A tip arrived: a short message at the top, announced to screen readers, gone after a few seconds */}
       {tipNotice && (
         <div role="status" aria-live="polite" className="pointer-events-none absolute inset-x-0 top-16 z-50 flex justify-center px-4">

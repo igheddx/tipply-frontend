@@ -1,10 +1,32 @@
 /**
- * The "new tip" sound for the Live tab: a soft three-note ripple, made in the browser (there is no audio file).
+ * The "new tip" sound for the Live tab: the Tipwave "Ripple" (sound 2), the same one the device plays.
  * Browsers only allow sound after the person has touched the page, so call `unlockTipChime` from a tap or click;
- * until then `playTipChime` quietly does nothing.
+ * until then `playTipChime` quietly does nothing. If the audio file cannot be loaded, a similar soft three-note
+ * ripple is made in the browser instead. (Tipwave_Spark_Sound3 is saved in public/sound for later and not used yet.)
  */
 
+export const RIPPLE_URL = '/sound/tipwave-ripple-sound2.wav'
+
 let ctx: AudioContext | null = null
+let rippleBuffer: AudioBuffer | null = null
+let rippleLoading: Promise<void> | null = null
+
+/** Fetches and decodes the Ripple once. Failure is fine: the synthesized ripple covers it. */
+const loadRipple = (c: AudioContext): Promise<void> => {
+  if (rippleBuffer) return Promise.resolve()
+  if (!rippleLoading) {
+    rippleLoading = fetch(RIPPLE_URL)
+      .then(r => (r.ok ? r.arrayBuffer() : Promise.reject(new Error(String(r.status)))))
+      .then(data => c.decodeAudioData(data))
+      .then(buffer => {
+        rippleBuffer = buffer
+      })
+      .catch(() => {
+        rippleLoading = null // try again next time
+      })
+  }
+  return rippleLoading
+}
 
 const create = (): AudioContext | null => {
   if (ctx) return ctx
@@ -24,6 +46,7 @@ export async function unlockTipChime(): Promise<boolean> {
   if (!c) return false
   try {
     if (c.state === 'suspended') await c.resume()
+    void loadRipple(c)
     return c.state === 'running'
   } catch {
     return false
@@ -32,11 +55,23 @@ export async function unlockTipChime(): Promise<boolean> {
 
 export const isTipChimeReady = () => ctx?.state === 'running'
 
-/** Plays the ripple. Never throws. Returns false if the browser is not allowing sound yet. */
+/** Plays the Ripple (or the browser-made one while the file is still loading). Never throws. Returns false if the browser is not allowing sound yet. */
 export function playTipChime(): boolean {
   try {
     const c = create()
     if (!c || c.state !== 'running') return false
+
+    if (rippleBuffer) {
+      const source = c.createBufferSource()
+      source.buffer = rippleBuffer
+      const volume = c.createGain()
+      volume.gain.value = 1
+      source.connect(volume)
+      volume.connect(c.destination)
+      source.start()
+      return true
+    }
+    void loadRipple(c)
 
     const master = c.createGain()
     master.gain.value = 0.28

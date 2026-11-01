@@ -70,6 +70,19 @@ describe('SongRequestMonitor', () => {
     expect(localStorage.setItem).toHaveBeenCalledWith('monitor_tip_sound', '0')
   })
 
+  it('asks for one tap to allow sound, plays a sample, and then stops asking', async () => {
+    chime.isTipChimeReady.mockReturnValue(false)
+    chime.unlockTipChime.mockClear()
+    chime.playTipChime.mockClear()
+    mockQueue([request('a', 'Song', 5, 1)])
+    renderMonitor()
+    const button = await screen.findByRole('button', { name: /tap to turn on tip sounds/i })
+    fireEvent.click(button)
+    await waitFor(() => expect(chime.playTipChime).toHaveBeenCalledTimes(1))
+    await waitFor(() => expect(screen.queryByRole('button', { name: /tap to turn on tip sounds/i })).toBeNull())
+    chime.isTipChimeReady.mockReturnValue(true)
+  })
+
   it('shows a notice and plays the chime when a tipped request arrives, not for the first load', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true })
     try {
