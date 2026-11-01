@@ -67,6 +67,7 @@ interface DashboardMetricsResponse {
   stripeFuturePayouts: number
   stripeInTransit: number
   stripeLifetimeVolume: number
+  recordedLifetimeGross?: number
 }
 
 interface PerformerInsights {
@@ -614,7 +615,7 @@ const PerformerInsights: React.FC = () => {
               {/* Metrics Cards */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 <div className="bg-white rounded-lg shadow-sm p-6">
-                  <div className="text-sm text-ink-500">Today's Tips</div>
+                  <div className="text-sm text-ink-500">Today's Tips (gross)</div>
                   <div className="text-2xl font-bold text-ink-900">${(insights.metrics?.todaysTips || 0).toFixed(2)}</div>
                 </div>
                 
@@ -629,13 +630,23 @@ const PerformerInsights: React.FC = () => {
                 </div>
                 
                 <div className="bg-white rounded-lg shadow-sm p-6">
-                  <div className="text-sm text-ink-500">Total Balance</div>
+                  <div className="text-sm text-ink-500">Total Balance (net, after fees)</div>
                   <div className="text-2xl font-bold text-ink-900">${(insights.totalBalance || 0).toFixed(2)}</div>
                 </div>
                 
                 <div className="bg-white rounded-lg shadow-sm p-6">
-                  <div className="text-sm text-ink-500">Lifetime Volume</div>
+                  <div className="text-sm text-ink-500">Lifetime Volume (gross)</div>
                   <div className="text-2xl font-bold text-ink-900">${(insights.metrics?.stripeLifetimeVolume || 0).toFixed(2)}</div>
+                  <div className="text-xs text-ink-400">What Stripe charged</div>
+                  {insights.metrics?.recordedLifetimeGross !== undefined && (
+                    <div className="text-xs text-ink-500">Recorded in Tipwave: ${insights.metrics.recordedLifetimeGross.toFixed(2)}</div>
+                  )}
+                  {insights.metrics?.recordedLifetimeGross !== undefined &&
+                    Math.abs((insights.metrics.stripeLifetimeVolume || 0) - insights.metrics.recordedLifetimeGross) >= 0.01 && (
+                      <div className="mt-1 text-xs font-semibold text-amber-700">
+                        Differs by ${Math.abs((insights.metrics.stripeLifetimeVolume || 0) - insights.metrics.recordedLifetimeGross).toFixed(2)}. Some charged tips may be marked failed: use Recover charged tips.
+                      </div>
+                    )}
                 </div>
                 
                 <div className="bg-white rounded-lg shadow-sm p-6">
