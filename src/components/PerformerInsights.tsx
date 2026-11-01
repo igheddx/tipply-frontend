@@ -67,6 +67,7 @@ interface DashboardMetricsResponse {
   stripeFuturePayouts: number
   stripeInTransit: number
   stripeLifetimeVolume: number
+  recordedLifetimeGross?: number
 }
 
 interface PerformerInsights {
@@ -636,6 +637,16 @@ const PerformerInsights: React.FC = () => {
                 <div className="bg-white rounded-lg shadow-sm p-6">
                   <div className="text-sm text-ink-500">Lifetime Volume (gross)</div>
                   <div className="text-2xl font-bold text-ink-900">${(insights.metrics?.stripeLifetimeVolume || 0).toFixed(2)}</div>
+                  <div className="text-xs text-ink-400">What Stripe charged</div>
+                  {insights.metrics?.recordedLifetimeGross !== undefined && (
+                    <div className="text-xs text-ink-500">Recorded in Tipwave: ${insights.metrics.recordedLifetimeGross.toFixed(2)}</div>
+                  )}
+                  {insights.metrics?.recordedLifetimeGross !== undefined &&
+                    Math.abs((insights.metrics.stripeLifetimeVolume || 0) - insights.metrics.recordedLifetimeGross) >= 0.01 && (
+                      <div className="mt-1 text-xs font-semibold text-amber-700">
+                        Differs by ${Math.abs((insights.metrics.stripeLifetimeVolume || 0) - insights.metrics.recordedLifetimeGross).toFixed(2)}. Some charged tips may be marked failed: use Recover charged tips.
+                      </div>
+                    )}
                 </div>
                 
                 <div className="bg-white rounded-lg shadow-sm p-6">
