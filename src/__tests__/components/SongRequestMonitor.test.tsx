@@ -130,6 +130,61 @@ describe('SongRequestMonitor', () => {
     }
   })
 
+  describe('tips without a song', () => {
+    const plain = (id: string, amount: number, minutesAgo = 1) => ({ id, amount, createdAt: new Date(Date.now() - minutesAgo * 60000).toISOString() })
+    const mockWithPlain = (tips: unknown[]) => {
+      global.fetch = vi.fn().mockImplementation(() =>
+        Promise.resolve({ ok: true, json: async () => ({ songRequests: [request('a', 'First Song', 5, 3)], tipsWithoutSong: tips }) })
+      ) as any
+    }
+
+    it('lists them in their own section, and lets the performer mark one as seen and bring it back', async () => {
+      mockWithPlain([plain('t1', 100), plain('t2', 20)])
+      renderMonitor()
+
+      const section = await screen.findByRole('region', { name: 'Tips without a song' })
+      expect(section).toHaveTextContent('$100.00')
+      expect(section).toHaveTextContent('$20.00')
+      // The song queue is untouched
+      expect(screen.getByText('First Song')).toBeInTheDocument()
+
+      fireEvent.click(screen.getByRole('button', { name: 'Mark the $100.00 tip as seen' }))
+      expect(screen.queryByRole('button', { name: 'Mark the $100.00 tip as seen' })).toBeNull()
+      fireEvent.click(screen.getByRole('button', { name: /Show seen \(1\)/ }))
+      fireEvent.click(screen.getByRole('button', { name: 'Undo' }))
+      expect(screen.getByRole('button', { name: 'Mark the $100.00 tip as seen' })).toBeInTheDocument()
+    })
+
+    it('has no section when there are none', async () => {
+      mockWithPlain([])
+      renderMonitor()
+      await screen.findByText('First Song')
+      expect(screen.queryByRole('region', { name: 'Tips without a song' })).toBeNull()
+    })
+
+    it('announces a new one with the notice and chime, but not on the first load', async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true })
+      try {
+        chime.playTipChime.mockClear()
+        let calls = 0
+        global.fetch = vi.fn().mockImplementation(() => {
+          calls++
+          const tips = calls === 1 ? [plain('t1', 20)] : [plain('t1', 20), plain('t2', 50, 0)]
+          return Promise.resolve({ ok: true, json: async () => ({ songRequests: [], tipsWithoutSong: tips }) })
+        }) as any
+        renderMonitor()
+        await screen.findByRole('region', { name: 'Tips without a song' })
+        expect(chime.playTipChime).not.toHaveBeenCalled()
+
+        await vi.advanceTimersByTimeAsync(5100)
+        expect(await screen.findByText('New tip $50.00')).toBeInTheDocument()
+        expect(chime.playTipChime).toHaveBeenCalledTimes(1)
+      } finally {
+        vi.useRealTimers()
+      }
+    })
+  })
+
   it('offers Undo after a skip and sends the right statuses', async () => {
     mockQueue([request('a', 'Song', 5, 1)])
     renderMonitor()
