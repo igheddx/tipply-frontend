@@ -14,6 +14,7 @@ import SongManagement from '../components/SongManagement'
 import SongRequestMonitor from '../components/SongRequestMonitor'
 import TipsTab from '../components/portal/TipsTab'
 import AlertsCard from '../components/portal/AlertsCard'
+import { turnOffAlertsOnSignOut } from '../utils/pushAlerts'
 import { API_BASE_URL } from '../utils/config'
 import { setDemoModeOn, setShowDemoData, demoQuery } from '../utils/demoView'
 import { DEFAULT_TIP_AMOUNTS, TIP_AMOUNT_COUNT, LIGHT_EFFECTS, SOUND_OPTIONS, VOLUME_OPTIONS, DEFAULT_SOUND_ID, DEFAULT_SOUND_VOLUME, DEFAULT_EFFECT_CONFIG, normalizeEffectConfig, effectForAmount, buildEffectConfig } from '../utils/deviceConfig'
@@ -470,7 +471,8 @@ const Dashboard: React.FC = () => {
     refreshData()
   }, [activeTab, userProfile?.id, stats?.devices, recentTips.length, deletedDevices.length])
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    await turnOffAlertsOnSignOut()
     localStorage.removeItem('token')
     localStorage.removeItem('refreshToken')
     navigate('/login')

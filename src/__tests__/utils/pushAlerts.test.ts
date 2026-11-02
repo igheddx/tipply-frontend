@@ -91,3 +91,43 @@ describe('push alert support', () => {
     expect(api.post).toHaveBeenCalledWith('/api/push/subscriptions', { endpoint: 'https://fcm.googleapis.com/x', p256dh: 'k', auth: 'a' })
   })
 })
+
+import { turnOffAlertsOnSignOut } from '@/utils/pushAlerts'
+
+describe('signing out', () => {
+  afterEach(() => {
+    delete (navigator as any).serviceWorker
+    delete (window as any).PushManager
+    delete (window as any).Notification
+    api.post.mockReset()
+  })
+
+  it('removes this device from the server and the browser before the token goes', async () => {
+    const subscription = { endpoint: 'https://fcm.googleapis.com/x', unsubscribe: vi.fn().mockResolvedValue(true) }
+    setNavigator({
+      userAgent: ANDROID,
+      serviceWorker: { getRegistration: vi.fn().mockResolvedValue({ pushManager: { getSubscription: vi.fn().mockResolvedValue(subscription) } }) }
+    })
+    ;(window as any).PushManager = function () {}
+    ;(window as any).Notification = function () {}
+    api.post.mockResolvedValue({ data: null })
+
+    await turnOffAlertsOnSignOut()
+
+    expect(api.post).toHaveBeenCalledWith('/api/push/subscriptions/remove', { endpoint: 'https://fcm.googleapis.com/x' })
+    expect(subscription.unsubscribe).toHaveBeenCalled()
+  })
+
+  it('never blocks sign-out when the server call fails', async () => {
+    const subscription = { endpoint: 'e', unsubscribe: vi.fn() }
+    setNavigator({
+      userAgent: ANDROID,
+      serviceWorker: { getRegistration: vi.fn().mockResolvedValue({ pushManager: { getSubscription: vi.fn().mockResolvedValue(subscription) } }) }
+    })
+    ;(window as any).PushManager = function () {}
+    ;(window as any).Notification = function () {}
+    api.post.mockRejectedValue(new Error('offline'))
+
+    await expect(turnOffAlertsOnSignOut()).resolves.toBeUndefined()
+  })
+})

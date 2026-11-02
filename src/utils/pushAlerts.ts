@@ -104,3 +104,17 @@ export async function sendTestAlert(): Promise<number> {
   const response = await apiService.post('/api/push/test', {})
   return response.data?.delivered ?? 0
 }
+
+/**
+ * Turns off alerts on this device when the performer signs out, so the next person to use it
+ * (or the same tablet later) gets nothing. Must run before the token is cleared. Never throws and
+ * waits at most two seconds, so signing out is never held up.
+ */
+export async function turnOffAlertsOnSignOut(): Promise<void> {
+  if (getPushSupport() !== 'ready') return
+  try {
+    await Promise.race([disablePushAlerts(), new Promise<void>(resolve => setTimeout(resolve, 2000))])
+  } catch {
+    /* signing out matters more than this */
+  }
+}

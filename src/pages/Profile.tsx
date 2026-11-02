@@ -1,4 +1,5 @@
 import logger from "../utils/logger";
+import { turnOffAlertsOnSignOut } from '../utils/pushAlerts'
 import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import apiService from '../services/api'
@@ -384,7 +385,8 @@ const Profile: React.FC = () => {
     }
   }
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    await turnOffAlertsOnSignOut()
     localStorage.removeItem('token')
     localStorage.removeItem('refreshToken')
     navigate('/login')
