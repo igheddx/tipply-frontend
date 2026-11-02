@@ -12,7 +12,8 @@ const push = vi.hoisted(() => ({
   currentSubscription: vi.fn(async () => null),
   enablePushAlerts: vi.fn(async () => 'on'),
   disablePushAlerts: vi.fn(async () => undefined),
-  sendTestAlert: vi.fn(async () => 1)
+  sendTestAlert: vi.fn(async () => 1),
+  getEnableFailure: vi.fn(() => '')
 }))
 vi.mock('@/utils/pushAlerts', () => push)
 

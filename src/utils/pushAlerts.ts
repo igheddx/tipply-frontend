@@ -65,6 +65,15 @@ export async function loadPushConfig(): Promise<PushConfig> {
 
 export type EnableResult = 'on' | 'denied' | 'unavailable' | 'failed'
 
+/** Which step failed, in plain words, so a "could not turn on" message can say why. */
+let lastEnableFailure = ''
+export const getEnableFailure = () => lastEnableFailure
+const fail = (step: string, error: unknown): EnableResult => {
+  const text = error instanceof Error ? `${error.name}: ${error.message}` : String(error ?? '')
+  lastEnableFailure = `${step}${text ? ` (${text.slice(0, 120)})` : ''}`
+  return 'failed'
+}
+
 /** Asks permission (call it from a tap), subscribes this browser, and tells the server. */
 export async function enablePushAlerts(): Promise<EnableResult> {
   if (getPushSupport() !== 'ready') return 'unavailable'
@@ -74,21 +83,33 @@ export async function enablePushAlerts(): Promise<EnableResult> {
   const permission = await Notification.requestPermission()
   if (permission !== 'granted') return 'denied'
 
+  lastEnableFailure = ''
+  let reg: ServiceWorkerRegistration
   try {
-    const reg = await registration()
-    const subscription =
+    reg = await registration()
+  } catch (e) {
+    return fail('Could not start the background service', e)
+  }
+
+  let subscription: PushSubscription
+  try {
+    subscription =
       (await reg.pushManager.getSubscription()) ??
       (await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(config.publicKey) as BufferSource }))
+  } catch (e) {
+    return fail('This browser would not subscribe', e)
+  }
 
+  try {
     const json = subscription.toJSON()
     const response = await apiService.post('/api/push/subscriptions', {
       endpoint: json.endpoint,
       p256dh: json.keys?.p256dh,
       auth: json.keys?.auth
     })
-    return response.error ? 'failed' : 'on'
-  } catch {
-    return 'failed'
+    return response.error ? fail('Tipwave could not save this device', response.error) : 'on'
+  } catch (e) {
+    return fail('Tipwave could not save this device', e)
   }
 }
 

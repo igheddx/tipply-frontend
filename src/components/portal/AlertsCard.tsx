@@ -5,6 +5,7 @@ import {
   currentSubscription,
   disablePushAlerts,
   enablePushAlerts,
+  getEnableFailure,
   getPushSupport,
   loadPushConfig,
   notificationPermission,
@@ -90,7 +91,7 @@ export default function AlertsCard({ tipAmounts }: AlertsCardProps) {
     if (result === 'on') setMessage({ tone: 'success', text: 'Tip alerts are on for this device.' })
     else if (result === 'denied') setMessage({ tone: 'error', text: 'Notifications were not allowed. You can allow them in this device’s settings.' })
     else if (result === 'unavailable') setMessage({ tone: 'info', text: 'Tip alerts are not available yet.' })
-    else setMessage({ tone: 'error', text: 'Could not turn on alerts. Please try again.' })
+    else setMessage({ tone: 'error', text: `Could not turn on alerts. ${getEnableFailure()}`.trim() })
     await refreshPushState()
   }
 
