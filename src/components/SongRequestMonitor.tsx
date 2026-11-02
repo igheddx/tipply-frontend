@@ -5,6 +5,7 @@ import { BrandIcon } from './icons/BrandIcons'
 import { StatusChip } from './ui'
 import { usePortalTheme, useTheme } from '../theme/ThemeContext'
 import { playTipChime, unlockTipChime, isTipChimeReady } from '../utils/tipChime'
+import { SessionBanner } from './venue/SessionBanner'
 
 interface SongRequest {
   songId: string
@@ -631,6 +632,11 @@ const SongRequestMonitor: React.FC<SongRequestMonitorProps> = ({
           </>
         )}
       </header>
+
+      {/* On a venue's device: how long the session has left, so the end of it is never a surprise */}
+      <div className="flex-none">
+        <SessionBanner compact />
+      </div>
 
       {/* Paused devices stay visible even with the menu closed, since tippers get no light or sound */}
       {pausedCount > 0 && (

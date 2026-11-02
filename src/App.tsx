@@ -8,6 +8,7 @@ const ForgotPassword = lazy(() => import('./pages/ForgotPassword'))
 const Dashboard = lazy(() => import('./pages/Dashboard'))
 const AdminDashboard = lazy(() => import('./pages/AdminDashboard'))
 const Profile = lazy(() => import('./pages/Profile'))
+const VenueDashboard = lazy(() => import('./pages/VenueDashboard'))
 const DeviceRegistration = lazy(() => import('./pages/DeviceRegistration'))
 const ManageDevices = lazy(() => import('./pages/ManageDevices'))
 const TippingInterface = lazy(() => import('./pages/TippingInterface'))
@@ -31,6 +32,7 @@ function App() {
           <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
           <Route path="/admin" element={<ProtectedRoute requiredRole="root_admin"><AdminDashboard /></ProtectedRoute>} />
           <Route path="/monitor" element={<ProtectedRoute><MonitorPage /></ProtectedRoute>} />
+          <Route path="/venue" element={<ProtectedRoute><VenueDashboard /></ProtectedRoute>} />
           <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
           <Route path="/add-device" element={<ProtectedRoute><DeviceRegistration /></ProtectedRoute>} />
           <Route path="/manage-devices" element={<ProtectedRoute><ManageDevices /></ProtectedRoute>} />

@@ -74,6 +74,8 @@ const Login: React.FC = () => {
         // Check if user is admin and redirect accordingly
         if (result.data?.user?.role === 'root_admin') {
           navigate('/admin')
+        } else if (result.data?.user?.accountType === 'venue') {
+          navigate('/venue')
         } else {
           navigate('/dashboard')
         }
