@@ -107,11 +107,31 @@ describe('DeviceWifiSetup', () => {
 
     fake.emit({ state: 'connecting' })
     fake.emit({ state: 'failure', error: 'auth_failed' })
+    // The page tries once more by itself; the second failure is the one shown
+    await waitFor(() => expect(fake.events.filter(e => e === 'write:password')).toHaveLength(2))
+    fake.emit({ state: 'failure', error: 'auth_failed' })
 
-    expect(await screen.findByText(/password was not accepted/i)).toBeInTheDocument()
+    expect(await screen.findByText(/could not join this wi-fi network/i)).toBeInTheDocument()
     // The button is usable again for a retry, and nothing was saved
     await waitFor(() => expect(screen.getByRole('button', { name: /connect to wi-fi/i })).not.toBeDisabled())
     expect(vault.save).not.toHaveBeenCalled()
+  })
+
+  it('tries once more by itself when the device first says auth_failed, and finishes if the second try works', async () => {
+    const fake = makeDevice()
+    await reachWifiStep(fake)
+    fireEvent.change(screen.getByLabelText(/network name/i), { target: { value: 'Flying J' } })
+    fireEvent.change(screen.getByLabelText(/^password/i), { target: { value: 'piano-bar-1' } })
+    fireEvent.click(screen.getByRole('button', { name: /connect to wi-fi/i }))
+    await waitFor(() => expect(fake.events).toContain('write:password'))
+
+    fake.emit({ state: 'failure', error: 'auth_failed' })
+    await waitFor(() => expect(fake.events.filter(e => e === 'write:password')).toHaveLength(2))
+    expect(screen.queryByText(/could not join this wi-fi network/i)).toBeNull()
+    fake.emit({ state: 'success', ip: '10.0.0.5' })
+
+    await screen.findByText(/your device is online/i)
+    expect(vault.save).toHaveBeenCalledWith('Flying J', 'piano-bar-1')
   })
 
   it('lets the person copy what the device reported, without the password in it', async () => {
@@ -123,6 +143,8 @@ describe('DeviceWifiSetup', () => {
     fireEvent.change(screen.getByLabelText(/^password/i), { target: { value: 'secret-pass-9' } })
     fireEvent.click(screen.getByRole('button', { name: /connect to wi-fi/i }))
     await waitFor(() => expect(fake.events).toContain('write:password'))
+    fake.emit({ state: 'failure', error: 'auth_failed' })
+    await waitFor(() => expect(fake.events.filter(e => e === 'write:password')).toHaveLength(2))
     fake.emit({ state: 'failure', error: 'auth_failed' })
 
     fireEvent.click(await screen.findByRole('button', { name: /copy details/i }))

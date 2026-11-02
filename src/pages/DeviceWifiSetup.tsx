@@ -397,7 +397,8 @@ const DeviceWifiSetup = () => {
   };
 
   // Step 3: Send Wi-Fi credentials to device
-  const configureWifi = async () => {
+  // `autoRetried` is true only for the automatic second try; the click handlers pass an event, which is ignored
+  const configureWifi = async (autoRetried: unknown = false) => {
     if (!selectedDevice || !selectedSsid || !password) {
       showError('Please enter WiFi network name and password', 'error');
       return;
@@ -408,6 +409,7 @@ const DeviceWifiSetup = () => {
     const attemptStarted = performance.now();
     const sinceStart = () => `${Math.round(performance.now() - attemptStarted)} ms`;
     let failureCode = '';
+    let retryAfter = false;
     // Tells the server how this attempt went (never the password) so failures can be traced; "saved" means the details came from the saved list
     const report = (outcome: 'success' | 'failure', extra: Record<string, unknown> = {}) => {
       const edge = (t: string) => t !== t.trim();
@@ -514,35 +516,44 @@ const DeviceWifiSetup = () => {
       const edge = (t: string) => t !== t.trim();
       const nonAscii = (t: string) => /[^\x20-\x7E]/.test(t);
       report('failure', { errorCode: failureCode || 'no_report', error: message });
-      setFailure({
-        code: failureCode || 'no_report',
-        message,
-        // Everything except the password itself, so it is safe to paste into a message
-        details: JSON.stringify(
-          {
-            when: new Date().toISOString(),
-            browser: navigator.userAgent,
-            device: selectedDevice?.name,
-            deviceReported: failureCode || '(nothing before the error)',
-            error: message,
-            deviceMessages,
-            timings: { bluetoothMs: bluetoothMsRef.current, totalMs: Math.round(performance.now() - attemptStarted) },
-            network: { nameLength: selectedSsid.length, nameHasEdgeSpace: edge(selectedSsid), nameNonAscii: nonAscii(selectedSsid) },
-            password: { length: password.length, hasEdgeSpace: edge(password), hasNonAscii: nonAscii(password) }
-          },
-          null,
-          2
-        )
-      });
+      // Field logs show the device often reports "auth_failed" after ~25 s for a first try with details that then work
+      // on the very next try. Try once more automatically before telling the performer it failed.
+      if (failureCode === 'auth_failed' && autoRetried !== true) {
+        retryAfter = true;
+        toast.info('The device did not join. Trying once more with the same details…');
+      } else {
+        setFailure({
+          code: failureCode || 'no_report',
+          message,
+          // Everything except the password itself, so it is safe to paste into a message
+          details: JSON.stringify(
+            {
+              when: new Date().toISOString(),
+              browser: navigator.userAgent,
+              device: selectedDevice?.name,
+              deviceReported: failureCode || '(nothing before the error)',
+              error: message,
+              deviceMessages,
+              timings: { bluetoothMs: bluetoothMsRef.current, totalMs: Math.round(performance.now() - attemptStarted) },
+              network: { nameLength: selectedSsid.length, nameHasEdgeSpace: edge(selectedSsid), nameNonAscii: nonAscii(selectedSsid) },
+              password: { length: password.length, hasEdgeSpace: edge(password), hasNonAscii: nonAscii(password) }
+            },
+            null,
+            2
+          )
+        });
 
-      if (notificationPermission === 'granted') {
-        sendNotification('❌ Setup Failed', 'Tipwave device could not connect to Wi-Fi. Please try again.', false);
+        if (notificationPermission === 'granted') {
+          sendNotification('❌ Setup Failed', 'Tipwave device could not connect to Wi-Fi. Please try again.', false);
+        }
       }
     } finally {
       cleanup();
       setPhase(null);
       setConnecting(false);
     }
+
+    if (retryAfter) await configureWifi(true);
   };
 
   const pickSaved = (ssid: string) => {
@@ -561,7 +572,7 @@ const DeviceWifiSetup = () => {
   const getErrorMessage = (errorCode: string): string => {
     switch (errorCode) {
       case 'auth_failed':
-        return 'The device says the Wi-Fi password was not accepted. If you are sure it is right: make sure the network is 2.4 GHz (the device cannot join a 5 GHz-only network), that the name matches exactly, and that the device is close to the router. Tick Show password to check what you typed.';
+        return 'The device could not join this Wi-Fi network. It reports this as a password problem, but it says the same when it simply could not connect. If you are sure the password is right: make sure the network is 2.4 GHz (the device cannot join a 5 GHz-only network), that the name matches exactly, and that the device is close to the router. Tick Show password to check what you typed.';
       case 'no_ssid':
         return 'WiFi network not found. Make sure the network name is correct.';
       case 'timeout':
