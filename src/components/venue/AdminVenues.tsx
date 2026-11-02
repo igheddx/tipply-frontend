@@ -143,6 +143,11 @@ export function AdminVenues() {
                       <a className="ml-1 font-semibold text-brand-700 hover:underline" href={mapLink(v)} target="_blank" rel="noopener noreferrer">
                         See on a map
                       </a>
+                      <span className={`mt-1 block text-xs font-semibold ${v.addressMatched ? 'text-emerald-700' : 'text-amber-700'}`}>
+                        {v.addressMatched
+                          ? `Address found${v.matchedAddress ? `: ${v.matchedAddress}` : ''}`
+                          : 'The address lookup could not find this address. Check it on the map before approving.'}
+                      </span>
                     </Item>
                   </div>
                   <Item label="Activity">

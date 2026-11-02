@@ -126,6 +126,8 @@ export interface AdminVenue {
   deviceCount: number
   linkedPerformers: number
   sessionCount: number
+  addressMatched: boolean
+  matchedAddress?: string | null
 }
 
 export interface StartSessionResult {

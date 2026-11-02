@@ -6,6 +6,12 @@ import { END_REASON_LABEL, STATE_LABEL, dayAndTime } from '../../utils/venueTime
 
 const PAGE = 20
 
+const HOW_STARTED: Record<string, string> = {
+  self: 'Started by themselves, confirmed at the venue',
+  approval: 'You approved it',
+  venue: 'You started it'
+}
+
 const lengthLabel = (s: VenueSession) => {
   const end = s.endedAt ? new Date(s.endedAt) : new Date(s.graceEndsAt)
   const mins = Math.max(0, Math.round((Math.min(end.getTime(), new Date(s.graceEndsAt).getTime()) - new Date(s.startsAt).getTime()) / 60000))
@@ -59,6 +65,7 @@ export function VenueHistory({ venue, refreshKey }: { venue: VenueProfile; refre
                 {s.tipCount} {s.tipCount === 1 ? 'tip' : 'tips'} · {lengthLabel(s)}
               </div>
               <div className="text-xs text-ink-500">{s.endReason ? END_REASON_LABEL[s.endReason] ?? s.endReason : STATE_LABEL[s.state] ?? s.state}</div>
+              {s.authorisedBy && HOW_STARTED[s.authorisedBy] && <div className="text-xs text-ink-400">{HOW_STARTED[s.authorisedBy]}</div>}
             </div>
           </li>
         ))}

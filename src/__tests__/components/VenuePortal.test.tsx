@@ -230,6 +230,14 @@ describe('admin venue review', () => {
     expect(feedback.confirm).toHaveBeenCalled()
   })
 
+  it('shows whether the address lookup found the address, so the reviewer knows what to check', async () => {
+    venueApi.adminVenues.mockResolvedValue({ data: [v({ addressMatched: true, matchedAddress: '1 MAIN ST, AUSTIN, TX' }), v({ id: 'v2', businessName: 'Odd Place', addressMatched: false })] })
+    render(<AdminVenues />)
+
+    expect(await screen.findByText('Address found: 1 MAIN ST, AUSTIN, TX')).toBeInTheDocument()
+    expect(screen.getByText(/could not find this address/)).toBeInTheDocument()
+  })
+
   it('has an empty state when nothing is waiting', async () => {
     venueApi.adminVenues.mockResolvedValue({ data: [] })
     render(<AdminVenues />)
