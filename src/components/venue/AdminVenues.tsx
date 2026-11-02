@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Banner, Button, Card, EmptyState, Modal, Switch, Tabs } from '../ui'
 import { useFeedback } from '../ui/Feedback'
-import { venueApi, type AdminVenue } from '../../services/venueApi'
+import { venueApi, type AdminVenue, type AuditEntry } from '../../services/venueApi'
 
 type Status = AdminVenue['status']
+type TabId = Status | 'activity'
 const TABS: { id: Status; label: string }[] = [
   { id: 'pending', label: 'Waiting' },
   { id: 'approved', label: 'Approved' },
@@ -20,7 +21,7 @@ const mapLink = (v: AdminVenue) =>
 export function AdminVenues() {
   const { toast, confirm } = useFeedback()
   const [venues, setVenues] = useState<AdminVenue[]>([])
-  const [tab, setTab] = useState<Status>('pending')
+  const [tab, setTab] = useState<TabId>('pending')
   const [enabled, setEnabled] = useState<boolean | null>(null)
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState<string | null>(null)
@@ -64,7 +65,7 @@ export function AdminVenues() {
     await load()
   }
 
-  const shown = venues.filter(v => v.status === tab)
+  const shown = tab === 'activity' ? [] : venues.filter(v => v.status === tab)
   const count = (s: Status) => venues.filter(v => v.status === s).length
 
   return (
@@ -81,9 +82,11 @@ export function AdminVenues() {
         </div>
       </Card>
 
-      <Tabs active={tab} onChange={id => setTab(id as Status)} items={TABS.map(t => ({ id: t.id, label: t.label, count: count(t.id) }))} />
+      <Tabs active={tab} onChange={id => setTab(id as TabId)} items={[...TABS.map(t => ({ id: t.id, label: t.label, count: count(t.id) })), { id: 'activity', label: 'Activity' }]} />
 
-      {loading ? null : shown.length === 0 ? (
+      {tab === 'activity' ? (
+        <AuditLog />
+      ) : loading ? null : shown.length === 0 ? (
         <Card>
           <EmptyState icon="home" title={tab === 'pending' ? 'No venues are waiting' : `No ${tab} venues`}>
             {tab === 'pending' ? 'New venues appear here as soon as they sign up, and you get an email.' : undefined}
@@ -150,6 +153,11 @@ export function AdminVenues() {
                       </span>
                     </Item>
                   </div>
+                  <div className="sm:col-span-2">
+                    <Item label="Devices claimed">
+                      {v.devices.length === 0 ? '—' : v.devices.map(d => `${d.serialNumber ?? 'no serial'}${d.nickname ? ` (${d.nickname})` : ''}`).join(', ')}
+                    </Item>
+                  </div>
                   <Item label="Activity">
                     {v.deviceCount} {v.deviceCount === 1 ? 'device' : 'devices'} · {v.linkedPerformers} linked {v.linkedPerformers === 1 ? 'performer' : 'performers'} · {v.sessionCount} {v.sessionCount === 1 ? 'session' : 'sessions'}
                   </Item>
@@ -202,5 +210,109 @@ function Item({ label, children }: { label: string; children: React.ReactNode })
       <dt className="text-xs font-bold uppercase tracking-wider text-ink-500">{label}</dt>
       <dd className="mt-0.5 text-ink-900">{children}</dd>
     </div>
+  )
+}
+
+const ACTION_TEXT: Record<string, string> = {
+  venue_signed_up: 'signed up',
+  venue_approve: 'was approved',
+  venue_reject: 'was rejected',
+  venue_suspend: 'was suspended',
+  venue_reinstate: 'was reinstated',
+  venue_profile_updated: 'updated their profile',
+  invited: 'invited a performer',
+  invited_by_email: 'invited someone by email',
+  invite_resent: 'sent an invitation again',
+  invite_accepted: 'accepted an invitation',
+  invite_declined: 'declined an invitation',
+  invite_auto_accepted: 'was linked automatically',
+  link_deactivate: 'turned a performer\'s access off',
+  link_reactivate: 'turned a performer\'s access back on',
+  link_cancel: 'cancelled an invitation',
+  link_left: 'left the venue',
+  trust_changed: 'changed who can start without asking',
+  session_requested: 'asked to start a session',
+  session_started_self: 'started a session by themselves',
+  session_started_by_venue: 'started a session for a performer',
+  session_approved: 'approved a session',
+  session_denied: 'declined a session',
+  session_ended: 'ended a session',
+  session_extended: 'added an hour to a session'
+}
+
+/** Read-only record of what happened in the venue feature, newest first. */
+function AuditLog() {
+  const [items, setItems] = useState<AuditEntry[]>([])
+  const [total, setTotal] = useState(0)
+  const [page, setPage] = useState(1)
+  const [filter, setFilter] = useState('')
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    let cancelled = false
+    setLoading(true)
+    venueApi.adminAudit(page, filter || undefined).then(res => {
+      if (cancelled) return
+      setLoading(false)
+      setItems(res.data?.items ?? [])
+      setTotal(res.data?.total ?? 0)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [page, filter])
+
+  return (
+    <Card title="Activity" subtitle="Who did what, newest first." flush>
+      <div className="flex flex-wrap items-center gap-3 px-5 pt-1">
+        <label htmlFor="audit-filter" className="text-sm font-semibold text-ink-700">Show</label>
+        <select
+          id="audit-filter"
+          value={filter}
+          onChange={e => {
+            setFilter(e.target.value)
+            setPage(1)
+          }}
+          className="h-10 rounded-xl border border-slate-300 bg-white px-3 text-sm text-ink-900"
+        >
+          <option value="">Everything</option>
+          {Object.entries(ACTION_TEXT).map(([k, label]) => (
+            <option key={k} value={k}>{label}</option>
+          ))}
+        </select>
+      </div>
+      {!loading && items.length === 0 ? (
+        <EmptyState icon="clock" title="Nothing yet">Activity appears here as venues and performers use Tipwave.</EmptyState>
+      ) : (
+        <ul className="mt-3 divide-y divide-slate-100 px-5 pb-2">
+          {items.map(a => (
+            <li key={a.id} className="py-3 text-sm">
+              <div className="flex flex-wrap items-baseline justify-between gap-2">
+                <span className="text-ink-900">
+                  <strong>{a.actorName || 'Someone'}</strong> {ACTION_TEXT[a.action] ?? a.action}
+                  {a.subjectName && a.subjectName !== a.actorName ? <> ({a.subjectName})</> : null}
+                  {a.deviceName ? <> on {a.deviceName}</> : null}
+                </span>
+                <span className="text-xs text-ink-500">{new Date(a.at).toLocaleString()}</span>
+              </div>
+              <div className="mt-0.5 text-xs text-ink-500">
+                {a.venueName && <>{a.venueName}</>}
+                {a.detail ? <> · {a.detail}</> : null}
+                {a.ipAddress ? <> · {a.ipAddress}</> : null}
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+      {total > 50 && (
+        <div className="flex items-center justify-between border-t border-slate-100 px-5 py-4">
+          <span className="text-sm text-ink-500">{(page - 1) * 50 + 1} to {Math.min(page * 50, total)} of {total}</span>
+          <div className="flex gap-2">
+            <Button size="sm" variant="secondary" disabled={page <= 1 || loading} onClick={() => setPage(p => p - 1)}>Previous</Button>
+            <Button size="sm" variant="secondary" disabled={page * 50 >= total || loading} onClick={() => setPage(p => p + 1)}>Next</Button>
+          </div>
+        </div>
+      )}
+    </Card>
   )
 }

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Button, Card, EmptyState } from '../ui'
 import { venueApi, type VenueProfile, type VenueSession } from '../../services/venueApi'
 import { PerformerChip } from './PerformerChip'
+import { LocationNote } from './LocationNote'
 import { END_REASON_LABEL, STATE_LABEL, dayAndTime } from '../../utils/venueTime'
 
 const PAGE = 20
@@ -66,6 +67,7 @@ export function VenueHistory({ venue, refreshKey }: { venue: VenueProfile; refre
               </div>
               <div className="text-xs text-ink-500">{s.endReason ? END_REASON_LABEL[s.endReason] ?? s.endReason : STATE_LABEL[s.state] ?? s.state}</div>
               {s.authorisedBy && HOW_STARTED[s.authorisedBy] && <div className="text-xs text-ink-400">{HOW_STARTED[s.authorisedBy]}</div>}
+              {s.requestedBy === 'performer' && <LocationNote session={s} />}
             </div>
           </li>
         ))}

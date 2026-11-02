@@ -38,6 +38,9 @@ export interface VenueSession {
   tipCount: number
   allowSongRequests: boolean
   createdAt: string
+  distanceMeters?: number | null
+  accuracyMeters?: number | null
+  locationDoubtful?: boolean
 }
 
 export interface VenueLink {
@@ -128,6 +131,19 @@ export interface AdminVenue {
   sessionCount: number
   addressMatched: boolean
   matchedAddress?: string | null
+  devices: { serialNumber?: string | null; nickname?: string | null; addedAt: string }[]
+}
+
+export interface AuditEntry {
+  id: string
+  at: string
+  venueName: string
+  actorName: string
+  action: string
+  subjectName?: string | null
+  deviceName?: string | null
+  detail?: string | null
+  ipAddress?: string | null
 }
 
 export interface StartSessionResult {
@@ -165,7 +181,7 @@ export const venueApi = {
   myVenues: () => apiService.get('/api/performer/venues'),
   leave: (linkId: string) => apiService.post(`/api/performer/venues/${linkId}/leave`),
   currentSession: () => apiService.get('/api/performer/sessions/current'),
-  startMine: (body: { deviceId: string; startsAt?: string; endsAt?: string; latitude?: number; longitude?: number; accuracyMeters?: number; allowSongRequests?: boolean }) =>
+  startMine: (body: { deviceId: string; startsAt?: string; endsAt?: string; latitude?: number; longitude?: number; accuracyMeters?: number; positionAt?: string; allowSongRequests?: boolean }) =>
     apiService.post('/api/performer/sessions', body),
   endMine: (sessionId: string) => apiService.post(`/api/performer/sessions/${sessionId}/end`),
   extendMine: (sessionId: string) => apiService.post(`/api/performer/sessions/${sessionId}/extend`),
@@ -174,6 +190,8 @@ export const venueApi = {
   adminVenues: (status?: string) => apiService.get(`/api/admin/venues${status ? `?status=${enc(status)}` : ''}`),
   adminDecide: (venueId: string, action: 'approve' | 'reject' | 'suspend' | 'reinstate', reason?: string) =>
     apiService.post(`/api/admin/venues/${venueId}/${action}`, { reason }),
+  adminAudit: (page = 1, action?: string, venueId?: string) =>
+    apiService.get(`/api/admin/venues/audit?page=${page}&pageSize=50${action ? `&action=${enc(action)}` : ''}${venueId ? `&venueId=${enc(venueId)}` : ''}`),
   adminFeatures: () => apiService.get('/api/admin/features'),
   adminSetVenues: (enabled: boolean) => apiService.put('/api/admin/features/venues', { enabled })
 }

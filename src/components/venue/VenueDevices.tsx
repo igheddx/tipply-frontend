@@ -6,6 +6,7 @@ import { venueApi, type VenueDevice, type VenueLink, type VenueProfile } from '.
 import { API_BASE_URL } from '../../utils/config'
 import { SOUND_OPTIONS, VOLUME_OPTIONS } from '../../utils/deviceConfig'
 import { PerformerChip } from './PerformerChip'
+import { LocationNote } from './LocationNote'
 import { localInputToIso, timeOnly, toLocalInput } from '../../utils/venueTime'
 
 interface Props {
@@ -149,6 +150,7 @@ export function VenueDevices({ venue, devices, links, onChanged }: Props) {
                           sub={`${d.current.state === 'grace' ? 'Finishing up, device disconnects ' + timeOnly(d.current.graceEndsAt, venue.timeZoneId) : 'Until ' + timeOnly(d.current.endsAt, venue.timeZoneId)} · ${d.current.tipCount} ${d.current.tipCount === 1 ? 'tip' : 'tips'}`}
                         />
                       </div>
+                      {d.current.requestedBy === 'performer' && <LocationNote session={d.current} />}
                       <Button size="sm" variant="danger" onClick={() => endSession(d)}>
                         End session
                       </Button>

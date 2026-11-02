@@ -8,7 +8,7 @@ import { AdminVenues } from '@/components/venue/AdminVenues'
 
 const venueApi = vi.hoisted(() => ({
   invites: vi.fn(), respond: vi.fn(), search: vi.fn(), invite: vi.fn(), changeLink: vi.fn(), setTrust: vi.fn(),
-  approve: vi.fn(), deny: vi.fn(), end: vi.fn(), adminVenues: vi.fn(), adminFeatures: vi.fn(), adminDecide: vi.fn(), adminSetVenues: vi.fn()
+  approve: vi.fn(), deny: vi.fn(), end: vi.fn(), adminVenues: vi.fn(), adminFeatures: vi.fn(), adminDecide: vi.fn(), adminSetVenues: vi.fn(), adminAudit: vi.fn()
 }))
 vi.mock('@/services/venueApi', () => ({ venueApi }))
 const feedback = vi.hoisted(() => ({ toast: vi.fn(), confirm: vi.fn(async () => true) }))
@@ -124,6 +124,21 @@ describe('venue performers page', () => {
   })
 })
 
+describe('location note', () => {
+  it('marks a start that was far away or vague, and shows a normal one quietly', async () => {
+    const { LocationNote } = await import('@/components/venue/LocationNote')
+    const { rerender } = render(<LocationNote session={{ distanceMeters: 40, accuracyMeters: 15, locationDoubtful: false }} />)
+    expect(screen.getByText('Phone was 40 m from the venue (GPS within 15 m)')).toBeInTheDocument()
+    expect(screen.queryByText(/^Check:/)).toBeNull()
+
+    rerender(<LocationNote session={{ distanceMeters: 190, accuracyMeters: 150, locationDoubtful: true }} />)
+    expect(screen.getByText('Check: Phone was 190 m from the venue (GPS within 150 m)')).toBeInTheDocument()
+
+    rerender(<LocationNote session={{}} />)
+    expect(screen.queryByText(/Phone was/)).toBeNull()
+  })
+})
+
 describe('venue home', () => {
   const request = { id: 's1', deviceId: 'd1', deviceName: 'Main stage', performer: { id: 'p1', displayName: 'Annie' }, startsAt: '2026-11-04T01:00:00Z', endsAt: '2026-11-04T05:00:00Z' } as any
 
@@ -163,6 +178,11 @@ describe('venue home', () => {
     expect(onGo).toHaveBeenCalledWith('profile')
   })
 
+  it('shows the reviewer how far away a requesting performer was', () => {
+    render(<VenueHome venue={venue()} devices={[]} requests={[{ ...request, distanceMeters: 330, accuracyMeters: 20, locationDoubtful: true }]} linkedCount={1} onChanged={() => {}} onGo={() => {}} />)
+    expect(screen.getByText(/Check: Phone was 330 m from the venue/)).toBeInTheDocument()
+  })
+
   it('invites the venue to find its first performer', () => {
     const onGo = vi.fn()
     render(<VenueHome venue={venue()} devices={[]} requests={[]} linkedCount={0} onChanged={() => {}} onGo={onGo} />)
@@ -174,7 +194,7 @@ describe('venue home', () => {
 describe('admin venue review', () => {
   const v = (over: Record<string, unknown> = {}) => ({
     id: 'v1', businessName: 'Flying J', contactName: 'Val Owner', email: 'val@x.test', phone: '5125550100', address: '1 Main St, Austin, TX, 78701',
-    status: 'pending', createdAt: '2026-11-01T00:00:00Z', deviceCount: 1, linkedPerformers: 0, sessionCount: 0, ...over
+    status: 'pending', createdAt: '2026-11-01T00:00:00Z', deviceCount: 1, linkedPerformers: 0, sessionCount: 0, addressMatched: true, devices: [], ...over
   })
 
   beforeEach(() => {
@@ -236,6 +256,24 @@ describe('admin venue review', () => {
 
     expect(await screen.findByText('Address found: 1 MAIN ST, AUSTIN, TX')).toBeInTheDocument()
     expect(screen.getByText(/could not find this address/)).toBeInTheDocument()
+  })
+
+  it('lists the serial numbers the venue claimed, so a stolen device stands out', async () => {
+    venueApi.adminVenues.mockResolvedValue({ data: [v({ devices: [{ serialNumber: 'TPY-5C07-K73', nickname: 'Main stage', addedAt: '2026-11-01' }] })] })
+    render(<AdminVenues />)
+    expect(await screen.findByText('TPY-5C07-K73 (Main stage)')).toBeInTheDocument()
+  })
+
+  it('has an Activity tab with who did what, and a filter', async () => {
+    venueApi.adminVenues.mockResolvedValue({ data: [] })
+    venueApi.adminAudit.mockResolvedValue({ data: { total: 1, items: [{ id: 'a1', at: '2026-11-03T20:00:00Z', venueName: 'Flying J', actorName: 'Annie', action: 'session_started_self', subjectName: 'Annie', deviceName: 'Main stage', detail: 'distance=40m accuracy=15 trust=self', ipAddress: '1.2.3.4' }] } })
+    render(<AdminVenues />)
+
+    fireEvent.click(await screen.findByRole('tab', { name: 'Activity' }))
+    expect(await screen.findByText(/started a session by themselves/)).toBeInTheDocument()
+    expect(screen.getByText(/distance=40m/)).toBeInTheDocument()
+    fireEvent.change(screen.getByLabelText('Show'), { target: { value: 'session_ended' } })
+    await waitFor(() => expect(venueApi.adminAudit).toHaveBeenLastCalledWith(1, 'session_ended'))
   })
 
   it('has an empty state when nothing is waiting', async () => {

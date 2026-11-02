@@ -3,6 +3,7 @@ import { Banner, Button, Card, EmptyState, StatusChip } from '../ui'
 import { useFeedback } from '../ui/Feedback'
 import { venueApi, type VenueDevice, type VenueProfile, type VenueSession } from '../../services/venueApi'
 import { PerformerChip } from './PerformerChip'
+import { LocationNote } from './LocationNote'
 import { timeOnly, untilLabel, windowLabel } from '../../utils/venueTime'
 
 interface VenueHomeProps {
@@ -83,6 +84,9 @@ export function VenueHome({ venue, devices, requests, linkedCount, onChanged, on
               <li key={r.id} className="flex flex-wrap items-center gap-3 py-3">
                 <div className="min-w-0 flex-1">
                   <PerformerChip performer={r.performer} sub={`${r.deviceName} · ${windowLabel(r.startsAt, r.endsAt, venue.timeZoneId)}`} />
+                  <div className="mt-1 pl-12">
+                    <LocationNote session={r} />
+                  </div>
                 </div>
                 <Button size="sm" variant="secondary" disabled={busy === r.id} onClick={() => decide(r, false)}>
                   Decline

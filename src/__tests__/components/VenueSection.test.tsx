@@ -24,7 +24,7 @@ describe('At venues', () => {
     feedback.confirm.mockClear().mockResolvedValue(true)
     Object.defineProperty(navigator, 'geolocation', {
       configurable: true,
-      value: { getCurrentPosition: (ok: (p: unknown) => void) => ok({ coords: { latitude: 30.1, longitude: -97.2, accuracy: 25 } }) }
+      value: { getCurrentPosition: (ok: (p: unknown) => void) => ok({ coords: { latitude: 30.1, longitude: -97.2, accuracy: 25 }, timestamp: Date.now() }) }
     })
   })
 
@@ -54,7 +54,7 @@ describe('At venues', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Start now' }))
 
     await waitFor(() => expect(venueApi.startMine).toHaveBeenCalled())
-    expect(venueApi.startMine).toHaveBeenCalledWith(expect.objectContaining({ deviceId: 'd1', latitude: 30.1, longitude: -97.2, accuracyMeters: 25, allowSongRequests: true }))
+    expect(venueApi.startMine).toHaveBeenCalledWith(expect.objectContaining({ deviceId: 'd1', latitude: 30.1, longitude: -97.2, accuracyMeters: 25, allowSongRequests: true, positionAt: expect.stringMatching(/Z$/) }))
   })
 
   it('a performer who needs approval says so, and sends no location', async () => {

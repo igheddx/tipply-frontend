@@ -68,10 +68,11 @@ export function VenueSection({ onChanged, performerId, stageName }: { onChanged?
   const activate = async () => {
     if (!target) return
     setWorking(true)
-    let coords: { latitude?: number; longitude?: number; accuracyMeters?: number } = {}
+    let coords: { latitude?: number; longitude?: number; accuracyMeters?: number; positionAt?: string } = {}
     if (!scheduled && target.venue.trustLevel === 'self') {
       const pos = await getPosition()
-      if (pos) coords = { latitude: pos.coords.latitude, longitude: pos.coords.longitude, accuracyMeters: pos.coords.accuracy }
+      // The time of the reading goes with it, so a saved or replayed reading is not trusted
+      if (pos) coords = { latitude: pos.coords.latitude, longitude: pos.coords.longitude, accuracyMeters: pos.coords.accuracy, positionAt: new Date(pos.timestamp || Date.now()).toISOString() }
     }
     const res = await venueApi.startMine({
       deviceId: target.device.deviceId,
