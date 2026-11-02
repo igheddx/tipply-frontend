@@ -1,6 +1,8 @@
 import logger from "../utils/logger";
 import { Banner, Button, Card, EmptyState, Modal, StatCard, Tabs, Toast } from './ui'
 import { BrandIcon, IconTile } from './icons/BrandIcons'
+import { FavoriteStar } from './icons/FavoriteStar'
+import { parseSongList, TEMPLATE_CSV } from '../utils/songFile'
 import React, { useState, useEffect } from 'react'
 import { API_BASE_URL } from '../utils/config'
 
@@ -11,6 +13,7 @@ interface Song {
   album: string
   genre: string
   isActive: boolean
+  isFavorite?: boolean
   createdAt: string
 }
 
@@ -29,6 +32,7 @@ interface UploadSong {
   artist: string
   album?: string
   genre?: string
+  favorite?: boolean
 }
 
 interface BulkUploadResponse {
@@ -73,6 +77,13 @@ const SongManagement: React.FC<SongManagementProps> = ({ profileId }) => {
   const [catalogPage, setCatalogPage] = useState(1)
   const [catalogTotalCount, setCatalogTotalCount] = useState(0)
   
+  // Artist favorites: the filter on the catalog, how many there are, and the stars chosen on search results
+  const [catalogFavoritesOnly, setCatalogFavoritesOnly] = useState(false)
+  const [favoriteCount, setFavoriteCount] = useState(0)
+  const [favoriteDraft, setFavoriteDraft] = useState<Set<string>>(new Set())
+  const [addedCatalogIds, setAddedCatalogIds] = useState<Record<string, string>>({})
+  const [isBulkFavoriting, setIsBulkFavoriting] = useState(false)
+
   // Bulk operations
   const [selectedCatalogSongs, setSelectedCatalogSongs] = useState<Set<string>>(new Set())
   const [isBulkRemoving, setIsBulkRemoving] = useState(false)
@@ -126,14 +137,15 @@ const SongManagement: React.FC<SongManagementProps> = ({ profileId }) => {
   }
 
   // Load user's catalog
-  const loadMyCatalog = async (page = 1, search = '') => {
+  const loadMyCatalog = async (page = 1, search = '', favoritesOnly = catalogFavoritesOnly) => {
     setIsLoadingCatalog(true)
     try {
       const token = localStorage.getItem('token')
       const params = new URLSearchParams({
         page: page.toString(),
         limit: limit.toString(),
-        ...(search && { search })
+        ...(search && { search }),
+        ...(favoritesOnly && { favoritesOnly: 'true' })
       })
       
       const response = await fetch(`${API_BASE_URL}/api/songcatalog/my-songs/${profileId}?${params}`, {
@@ -146,6 +158,8 @@ const SongManagement: React.FC<SongManagementProps> = ({ profileId }) => {
       if (response.ok) {
         const songs = await response.json()
         setMyCatalog(songs)
+        const headerFavorites = response.headers.get('X-Favorite-Count')
+        if (headerFavorites) setFavoriteCount(parseInt(headerFavorites, 10) || 0)
         
         // Try to get count from header first, then fallback to counting the response array
         const headerCount = response.headers.get('X-Total-Count')
@@ -234,12 +248,15 @@ const SongManagement: React.FC<SongManagementProps> = ({ profileId }) => {
           artist: song.artist,
           album: song.album,
           genre: song.genre,
-          musicBrainzId: song.id
+          musicBrainzId: song.id,
+          isFavorite: favoriteDraft.has(song.id)
         })
       })
 
       if (response.ok) {
-        showNotification('success', `Added "${song.title}" to your catalog`)
+        const created = await response.json().catch(() => null)
+        if (created?.id) setAddedCatalogIds(prev => ({ ...prev, [song.id]: created.id }))
+        showNotification('success', favoriteDraft.has(song.id) ? `Added "${song.title}" as a favorite` : `Added "${song.title}" to your catalog`)
         setSearchResults(prev => prev.map(s => 
           s.id === song.id 
             ? { ...s, isInCatalog: true }
@@ -256,6 +273,95 @@ const SongManagement: React.FC<SongManagementProps> = ({ profileId }) => {
     } finally {
       setIsAddingSong(null)
     }
+  }
+
+  const setFavoriteOnServer = async (songId: string, isFavorite: boolean): Promise<boolean> => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/songcatalog/${songId}/favorite?profileId=${profileId}`, {
+        method: 'PUT',
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isFavorite })
+      })
+      return response.ok
+    } catch (error) {
+      logger.error('Error setting favorite:', error)
+      return false
+    }
+  }
+
+  // Star on a catalog row: flips at once, goes back if the save fails
+  const toggleCatalogFavorite = async (song: Song) => {
+    const next = !song.isFavorite
+    setMyCatalog(prev => prev.map(s => (s.id === song.id ? { ...s, isFavorite: next } : s)))
+    setFavoriteCount(c => Math.max(0, c + (next ? 1 : -1)))
+    const ok = await setFavoriteOnServer(song.id, next)
+    if (!ok) {
+      setMyCatalog(prev => prev.map(s => (s.id === song.id ? { ...s, isFavorite: !next } : s)))
+      setFavoriteCount(c => Math.max(0, c + (next ? -1 : 1)))
+      showNotification('error', 'Could not save that. Please try again.')
+    } else if (catalogFavoritesOnly && !next) {
+      setMyCatalog(prev => prev.filter(s => s.id !== song.id))
+    }
+  }
+
+  // Star on a search result: before adding it means "add as a favorite"; after adding it changes the saved song
+  const toggleSearchFavorite = async (song: any) => {
+    const wasOn = favoriteDraft.has(song.id)
+    const flip = (on: boolean) =>
+      setFavoriteDraft(prev => {
+        const next = new Set(prev)
+        if (on) next.add(song.id)
+        else next.delete(song.id)
+        return next
+      })
+    flip(!wasOn)
+    const catalogId = addedCatalogIds[song.id]
+    if (catalogId) {
+      const ok = await setFavoriteOnServer(catalogId, !wasOn)
+      if (!ok) {
+        flip(wasOn)
+        showNotification('error', 'Could not save that. Please try again.')
+      } else {
+        refreshCatalogCount()
+      }
+    }
+  }
+
+  const bulkSetFavorite = async (isFavorite: boolean) => {
+    const ids = Array.from(selectedCatalogSongs)
+    if (ids.length === 0) return
+    setIsBulkFavoriting(true)
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/songcatalog/bulk-favorite`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ profileId, songIds: ids, isFavorite })
+      })
+      if (response.ok) {
+        showNotification('success', isFavorite ? `${ids.length} marked as favorites` : `${ids.length} removed from favorites`)
+        setSelectedCatalogSongs(new Set())
+        loadMyCatalog(catalogPage, catalogSearch)
+      } else {
+        showNotification('error', 'Could not update those songs')
+      }
+    } catch (error) {
+      logger.error('Error bulk favoriting:', error)
+      showNotification('error', 'Could not update those songs')
+    } finally {
+      setIsBulkFavoriting(false)
+    }
+  }
+
+  const toggleUploadFavorite = (index: number) =>
+    setParsedSongs(prev => prev.map((song, i) => (i === index ? { ...song, favorite: !song.favorite } : song)))
+
+  const downloadTemplate = () => {
+    const url = URL.createObjectURL(new Blob([TEMPLATE_CSV], { type: 'text/csv' }))
+    const link = document.createElement('a')
+    link.href = url
+    link.download = 'tipwave-song-list-template.csv'
+    link.click()
+    URL.revokeObjectURL(url)
   }
 
   // Handle search form submission
@@ -389,78 +495,13 @@ const SongManagement: React.FC<SongManagementProps> = ({ profileId }) => {
   const parseFile = async (file: File): Promise<UploadSong[]> => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader()
-      
-      reader.onload = (e) => {
+      reader.onload = e => {
         try {
-          const content = e.target?.result as string
-          const songs: UploadSong[] = []
-          
-          // Determine file type
-          const isCSV = file.name.toLowerCase().endsWith('.csv')
-          
-          if (isCSV) {
-            // Parse CSV
-            const lines = content.split('\n').filter(line => line.trim())
-            if (lines.length === 0) {
-              reject(new Error('File is empty'))
-              return
-            }
-            
-            // Skip header row
-            const dataLines = lines.slice(1)
-            
-            for (const line of dataLines) {
-              const columns = line.split(',').map(col => col.trim())
-              if (columns.length >= 2) {
-                songs.push({
-                  title: columns[0] || '',
-                  artist: columns[1] || '',
-                  album: columns[2] || undefined,
-                  genre: columns[3] || undefined
-                })
-              }
-            }
-          } else {
-            // Parse text file - try different delimiters
-            const lines = content.split('\n').filter(line => line.trim())
-            
-            for (const line of lines) {
-              let columns: string[] = []
-              
-              // Try comma first
-              if (line.includes(',')) {
-                columns = line.split(',').map(col => col.trim())
-              }
-              // Try pipe
-              else if (line.includes('|')) {
-                columns = line.split('|').map(col => col.trim())
-              }
-              // Try tab
-              else if (line.includes('\t')) {
-                columns = line.split('\t').map(col => col.trim())
-              }
-              // Single item per line (title only - invalid)
-              else {
-                columns = [line.trim()]
-              }
-              
-              if (columns.length >= 2) {
-                songs.push({
-                  title: columns[0] || '',
-                  artist: columns[1] || '',
-                  album: columns[2] || undefined,
-                  genre: columns[3] || undefined
-                })
-              }
-            }
-          }
-          
-          resolve(songs)
+          resolve(parseSongList(e.target?.result as string, file.name.toLowerCase().endsWith('.csv')))
         } catch (error) {
           reject(error)
         }
       }
-      
       reader.onerror = () => reject(new Error('Failed to read file'))
       reader.readAsText(file)
     })
@@ -553,7 +594,8 @@ const SongManagement: React.FC<SongManagementProps> = ({ profileId }) => {
             Title: song.title,
             Artist: song.artist,
             Album: song.album || null,
-            Genre: song.genre || null
+            Genre: song.genre || null,
+            IsFavorite: !!song.favorite
           }))
         })
       })
@@ -654,7 +696,7 @@ const SongManagement: React.FC<SongManagementProps> = ({ profileId }) => {
       {activeView === 'search' && (
         <div className="space-y-5">
           <Banner tone="info" title="Search for a song to add">
-            Results are original albums and singles only, with no cover versions.
+            Results are original albums and singles only, with no cover versions. Tap the star to mark a song as one of your favorites, the ones you do best. Tippers see those first.
           </Banner>
 
           <Card>
@@ -696,15 +738,35 @@ const SongManagement: React.FC<SongManagementProps> = ({ profileId }) => {
               <ul className="divide-y divide-slate-100 px-5 pb-2">
                 {searchResults.map((song: any) => {
                   const adding = isAddingSong === `${song.title}-${song.artist}`
+                  const isFav = favoriteDraft.has(song.id)
                   return (
-                    <li key={song.id} className="flex items-center gap-4 py-3">
+                    <li key={song.id} className="flex items-center gap-3 py-3">
                       <div className="min-w-0 flex-1">
                         <div className="truncate font-semibold text-ink-900">{song.title}</div>
                         <div className="truncate text-sm text-ink-500">{[song.artist, meta(song)].filter(Boolean).join(' · ')}</div>
                       </div>
-                      <Button variant="secondary" size="sm" icon="plus" loading={adding} onClick={() => addSongToCatalog(song)}>
-                        Add
-                      </Button>
+                      <button
+                        type="button"
+                        onClick={() => toggleSearchFavorite(song)}
+                        aria-pressed={isFav}
+                        aria-label={isFav ? `Remove ${song.title} from your favorites` : `Mark ${song.title} as a favorite`}
+                        title={isFav ? 'Artist favorite' : 'Mark as an artist favorite'}
+                        className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl transition-colors ${
+                          isFav ? 'bg-amber-100 text-amber-600' : 'text-slate-400 hover:bg-slate-100 hover:text-amber-500'
+                        }`}
+                      >
+                        <FavoriteStar filled={isFav} size={22} />
+                      </button>
+                      {song.isInCatalog ? (
+                        <span className="inline-flex h-9 items-center gap-1.5 rounded-xl bg-emerald-50 px-3 text-sm font-semibold text-emerald-700">
+                          <BrandIcon name="check" size={16} tone="current" strokeWidth={2.4} />
+                          Added
+                        </span>
+                      ) : (
+                        <Button variant="secondary" size="sm" icon="plus" loading={adding} onClick={() => addSongToCatalog(song)}>
+                          {isFav ? 'Add as favorite' : 'Add'}
+                        </Button>
+                      )}
                     </li>
                   )
                 })}
@@ -726,7 +788,7 @@ const SongManagement: React.FC<SongManagementProps> = ({ profileId }) => {
       {activeView === 'upload' && (
         <div className="space-y-5">
           <Banner tone="info" title="Add many songs at once">
-            Upload a CSV or text file with <strong>title, artist, album, genre</strong>. Title and artist are required. Text files can use commas, pipes (|) or tabs.
+            Upload a CSV or text file with <strong>title, artist, album, genre, favorite</strong>. Title and artist are required. Put <strong>yes</strong> in the favorite column for songs you do especially well; leave it blank for the rest. Text files can use commas, pipes (|) or tabs.
           </Banner>
 
           <div
@@ -776,15 +838,23 @@ const SongManagement: React.FC<SongManagementProps> = ({ profileId }) => {
             <div className="grid gap-5 md:grid-cols-2">
               <div>
                 <h4 className="mb-2 text-sm font-semibold text-ink-700">CSV</h4>
-                <pre className="overflow-x-auto rounded-xl bg-surface p-3 text-xs text-ink-700">{`title,artist,album,genre
-Bohemian Rhapsody,Queen,A Night at the Opera,Rock
-Hotel California,Eagles,Hotel California,Rock`}</pre>
+                <pre className="overflow-x-auto rounded-xl bg-surface p-3 text-xs text-ink-700">{`title,artist,album,genre,favorite
+Bohemian Rhapsody,Queen,A Night at the Opera,Rock,yes
+Hotel California,Eagles,Hotel California,Rock,`}</pre>
               </div>
               <div>
                 <h4 className="mb-2 text-sm font-semibold text-ink-700">Text (commas, pipes or tabs)</h4>
-                <pre className="overflow-x-auto rounded-xl bg-surface p-3 text-xs text-ink-700">{`Bohemian Rhapsody,Queen,A Night at the Opera,Rock
+                <pre className="overflow-x-auto rounded-xl bg-surface p-3 text-xs text-ink-700">{`Bohemian Rhapsody,Queen,A Night at the Opera,Rock,yes
 Hotel California|Eagles|Hotel California|Rock`}</pre>
               </div>
+            </div>
+            <p className="mt-4 text-sm text-ink-500">
+              The favorite column is optional. “yes”, “y”, “true”, “1” or “x” all count. An older file with four columns still works.
+            </p>
+            <div className="mt-3">
+              <Button variant="secondary" size="sm" icon="download" onClick={downloadTemplate}>
+                Download a template
+              </Button>
             </div>
           </Card>
         </div>
@@ -812,11 +882,51 @@ Hotel California|Eagles|Hotel California|Rock`}</pre>
             </Button>
           </form>
 
+          <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Show songs">
+            {[
+              { id: false, label: 'All songs', count: catalogCount },
+              { id: true, label: 'Favorites', count: favoriteCount }
+            ].map(f => (
+              <button
+                key={String(f.id)}
+                type="button"
+                aria-pressed={catalogFavoritesOnly === f.id}
+                onClick={() => {
+                  setCatalogFavoritesOnly(f.id)
+                  setCatalogPage(1)
+                  setSelectedCatalogSongs(new Set())
+                  loadMyCatalog(1, catalogSearch, f.id)
+                }}
+                className={`inline-flex h-10 items-center gap-1.5 rounded-full border px-4 text-sm font-semibold transition-colors ${
+                  catalogFavoritesOnly === f.id ? 'border-brand-700 bg-brand-700 text-white' : 'border-slate-300 bg-white text-ink-700 hover:bg-slate-50'
+                }`}
+              >
+                {f.id && <FavoriteStar filled size={16} />}
+                {f.label} ({f.count})
+              </button>
+            ))}
+          </div>
+
           {selectedCatalogSongs.size > 0 && (
             <div className="sticky top-16 z-20 flex flex-wrap items-center gap-3 rounded-2xl bg-ink-900 px-4 py-3 text-white shadow-lift lg:top-3">
               <span className="mr-auto font-semibold">{selectedCatalogSongs.size} selected</span>
               <button onClick={() => setSelectedCatalogSongs(new Set())} className="h-9 rounded-lg px-3 text-sm font-semibold text-white/80 hover:bg-white/10">
                 Clear
+              </button>
+              <button
+                onClick={() => bulkSetFavorite(true)}
+                disabled={isBulkFavoriting}
+                className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-amber-400 px-4 text-sm font-bold text-ink-900 hover:bg-amber-300 disabled:opacity-50"
+              >
+                <FavoriteStar filled size={16} />
+                Mark favorite
+              </button>
+              <button
+                onClick={() => bulkSetFavorite(false)}
+                disabled={isBulkFavoriting}
+                className="h-9 rounded-lg bg-white/15 px-4 text-sm font-semibold text-white hover:bg-white/25 disabled:opacity-50"
+              >
+                Unfavorite
               </button>
               <button
                 onClick={bulkRemoveSongs}
@@ -845,6 +955,18 @@ Hotel California|Eagles|Hotel California|Rock`}</pre>
                       <div className="truncate text-sm text-ink-500">{[song.artist, meta(song)].filter(Boolean).join(' · ')}</div>
                       <div className="text-xs text-ink-400">Added {new Date(song.createdAt).toLocaleDateString()}</div>
                     </div>
+                    <button
+                      type="button"
+                      onClick={() => toggleCatalogFavorite(song)}
+                      aria-pressed={!!song.isFavorite}
+                      aria-label={song.isFavorite ? `Remove ${song.songTitle} from your favorites` : `Mark ${song.songTitle} as a favorite`}
+                      title={song.isFavorite ? 'Artist favorite' : 'Mark as an artist favorite'}
+                      className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl transition-colors ${
+                        song.isFavorite ? 'bg-amber-100 text-amber-600' : 'text-slate-400 hover:bg-slate-100 hover:text-amber-500'
+                      }`}
+                    >
+                      <FavoriteStar filled={!!song.isFavorite} size={22} />
+                    </button>
                     <Button
                       variant="danger"
                       size="sm"
@@ -899,10 +1021,12 @@ Hotel California|Eagles|Hotel California|Rock`}</pre>
             <Card>
               <EmptyState
                 icon="music"
-                title="No songs in your catalog yet"
+                title={catalogFavoritesOnly ? 'No favorites yet' : 'No songs in your catalog yet'}
                 action={<Button onClick={() => setActiveView('search')} icon="search">Find songs</Button>}
               >
-                Search for songs or upload a list. Fans can only request songs that are here.
+                {catalogFavoritesOnly
+                  ? 'Tap the star on the songs you do best. Tippers see them first, marked as your favorites.'
+                  : 'Search for songs or upload a list. Fans can only request songs that are here.'}
               </EmptyState>
             </Card>
           )}
@@ -914,7 +1038,7 @@ Hotel California|Eagles|Hotel California|Rock`}</pre>
         open={showPreviewModal}
         wide
         onClose={cancelUpload}
-        title={`Preview: ${parsedSongs.length} ${parsedSongs.length === 1 ? 'song' : 'songs'}`}
+        title={`Preview: ${parsedSongs.length} ${parsedSongs.length === 1 ? 'song' : 'songs'}${parsedSongs.some(s => s.favorite) ? ` · ${parsedSongs.filter(s => s.favorite).length} favorites` : ''}`}
         footer={
           <>
             <Button variant="secondary" onClick={cancelUpload} disabled={isUploading}>
@@ -926,11 +1050,12 @@ Hotel California|Eagles|Hotel California|Rock`}</pre>
           </>
         }
       >
+        <p className="mb-3 text-sm text-ink-500">Tap a star to mark the songs you do best as favorites. Tippers see them first.</p>
         <div className="max-h-96 overflow-auto rounded-xl border border-slate-200">
           <table className="min-w-full divide-y divide-slate-200">
             <thead className="sticky top-0 bg-surface">
               <tr>
-                {['Title', 'Artist', 'Album', 'Genre'].map(h => (
+                {['Favorite', 'Title', 'Artist', 'Album', 'Genre'].map(h => (
                   <th key={h} className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider text-ink-500">{h}</th>
                 ))}
               </tr>
@@ -938,6 +1063,17 @@ Hotel California|Eagles|Hotel California|Rock`}</pre>
             <tbody className="divide-y divide-slate-100 bg-white">
               {parsedSongs.map((song, index) => (
                 <tr key={index}>
+                  <td className="px-2 py-1">
+                    <button
+                      type="button"
+                      onClick={() => toggleUploadFavorite(index)}
+                      aria-pressed={!!song.favorite}
+                      aria-label={song.favorite ? `Remove ${song.title} from your favorites` : `Mark ${song.title} as a favorite`}
+                      className={`flex h-11 w-11 items-center justify-center rounded-xl ${song.favorite ? 'bg-amber-100 text-amber-600' : 'text-slate-300 hover:text-amber-500'}`}
+                    >
+                      <FavoriteStar filled={!!song.favorite} size={20} />
+                    </button>
+                  </td>
                   <td className="px-4 py-3 text-sm font-semibold text-ink-900">{song.title}</td>
                   <td className="px-4 py-3 text-sm text-ink-700">{song.artist}</td>
                   <td className="px-4 py-3 text-sm text-ink-500">{song.album || '—'}</td>

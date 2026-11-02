@@ -12,6 +12,9 @@ import { useNavigate } from 'react-router-dom'
 import apiService from '../services/api'
 import SongManagement from '../components/SongManagement'
 import SongRequestMonitor from '../components/SongRequestMonitor'
+import TipsTab from '../components/portal/TipsTab'
+import AlertsCard from '../components/portal/AlertsCard'
+import { turnOffAlertsOnSignOut } from '../utils/pushAlerts'
 import { API_BASE_URL } from '../utils/config'
 import { setDemoModeOn, setShowDemoData, demoQuery } from '../utils/demoView'
 import { DEFAULT_TIP_AMOUNTS, TIP_AMOUNT_COUNT, LIGHT_EFFECTS, SOUND_OPTIONS, VOLUME_OPTIONS, DEFAULT_SOUND_ID, DEFAULT_SOUND_VOLUME, DEFAULT_EFFECT_CONFIG, normalizeEffectConfig, effectForAmount, buildEffectConfig } from '../utils/deviceConfig'
@@ -133,7 +136,6 @@ const Dashboard: React.FC = () => {
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null)
   const [recentTips, setRecentTips] = useState<TipSummary[]>([])
   const [loading, setLoading] = useState(true)
-  const [failedTips, setFailedTips] = useState<{ id: string; amount: number; deviceId: string; createdAt: string; failureReason?: string }[]>([])
   const [activeTab, setActiveTab] = useState(() => {
     const t = new URLSearchParams(window.location.search).get('tab')
     return t && ['devices', 'tips', 'songs', 'monitor'].includes(t) ? t : 'overview'
@@ -434,9 +436,6 @@ const Dashboard: React.FC = () => {
           break
           
         case 'tips':
-          void apiService.getFailedTips().then(resp => {
-            if (resp.data) setFailedTips(resp.data)
-          })
           // Lazy-load tips if not already loaded
           if (recentTips.length === 0) {
             const tipsResp = await apiService.getRecentTips(profileId)
@@ -472,7 +471,8 @@ const Dashboard: React.FC = () => {
     refreshData()
   }, [activeTab, userProfile?.id, stats?.devices, recentTips.length, deletedDevices.length])
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    await turnOffAlertsOnSignOut()
     localStorage.removeItem('token')
     localStorage.removeItem('refreshToken')
     navigate('/login')
@@ -486,10 +486,7 @@ const Dashboard: React.FC = () => {
     setShowDemoData(next)
     setShowDemo(next)
     setRecentTips([])
-    setFailedTips([])
     await refreshDashboard()
-    const failed = await apiService.getFailedTips()
-    if (failed.data) setFailedTips(failed.data)
   }
 
   const quietRefreshRef = useRef(false)
@@ -502,8 +499,6 @@ const Dashboard: React.FC = () => {
     quietRefreshRef.current = true
     try {
       await refreshDashboard()
-      const failed = await apiService.getFailedTips()
-      if (failed.data) setFailedTips(failed.data)
       setUpdatedAt(new Date())
     } finally {
       quietRefreshRef.current = false
@@ -1332,7 +1327,7 @@ const Dashboard: React.FC = () => {
 
   const PAGE_TITLES: Record<string, { title: string; subtitle?: string }> = {
     devices: { title: 'Devices', subtitle: 'Your Tipwave devices, tip amounts and QR codes.' },
-    tips: { title: 'Tips', subtitle: 'Your latest tips and whether they have been charged.' },
+    tips: { title: 'Tips', subtitle: 'Every tip, before and after fees. Pick a date range, or download it as a spreadsheet.' },
     songs: { title: 'Song catalog', subtitle: 'The songs your audience can pick from.' },
     monitor: { title: 'Live requests', subtitle: 'Song requests as they come in.' }
   }
@@ -1746,65 +1741,13 @@ const Dashboard: React.FC = () => {
               </div>
             )}
 
-            {activeTab === 'tips' && (
-              <Card
-                title="Last 24 hours"
-                subtitle="Your 10 most recent tips. Waiting tips are charged in the next batch."
-                flush
-              >
-                {recentTips.length === 0 ? (
-                  <EmptyState icon="coin" title="No tips in the last 24 hours">
-                    New tips show up here the moment someone sends one.
-                  </EmptyState>
-                ) : (
-                  <ul className="divide-y divide-slate-100 px-5 pb-2">
-                    {recentTips.map(tip => {
-                      const device = (stats.devices ?? []).find(d => d.id === tip.deviceId || d.uuid === tip.deviceId)
-                      const kind = tip.status === 'processed' ? 'paid' : tip.status === 'pending' ? 'processing' : 'failed'
-                      const label = tip.status === 'processed' ? 'Charged' : tip.status === 'pending' ? 'Waiting' : 'Not charged'
-                      return (
-                        <li key={tip.id} className="flex items-center gap-3 py-3">
-                          <div className="min-w-0 flex-1">
-                            <div className="text-base font-bold text-ink-900">{formatCurrency(tip.amount)}</div>
-                            <div className="truncate text-xs text-ink-500">
-                              {device?.nickname || 'Tipwave device'} · {new Date(tip.createdAt).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
-                            </div>
-                          </div>
-                          <StatusChip kind={kind} label={label} />
-                        </li>
-                      )
-                    })}
-                  </ul>
-                )}
-              </Card>
-            )}
-
-            {activeTab === 'tips' && failedTips.length > 0 && (
-              <div className="mt-5">
-                <Card
-                  title="Not charged"
-                  subtitle={`${failedTips.length === 1 ? '1 tip' : `${failedTips.length} tips`} could not be charged. They are not part of your earnings.`}
-                  flush
-                >
-                  <ul className="divide-y divide-slate-100 px-5 pb-2">
-                    {failedTips.map(tip => {
-                      const device = (stats.devices ?? []).find(d => d.id === tip.deviceId || d.uuid === tip.deviceId)
-                      return (
-                        <li key={tip.id} className="flex items-center gap-3 py-3">
-                          <div className="min-w-0 flex-1">
-                            <div className="text-base font-bold text-ink-900">{formatCurrency(tip.amount)}</div>
-                            <div className="truncate text-xs text-ink-500">
-                              {device?.nickname || 'Tipwave device'} · {new Date(tip.createdAt).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
-                            </div>
-                            {tip.failureReason && <div className="mt-0.5 text-sm text-ink-700">{tip.failureReason}</div>}
-                          </div>
-                          <StatusChip kind="failed" label="Not charged" />
-                        </li>
-                      )
-                    })}
-                  </ul>
-                </Card>
-              </div>
+            {activeTab === 'tips' && userProfile?.id && (
+              <TipsTab
+                profileId={userProfile.id}
+                devices={(stats?.devices ?? []).map(d => ({ id: d.id, uuid: d.uuid, nickname: d.nickname }))}
+                refreshKey={`${updatedAt?.getTime() ?? 0}-${showDemo}`}
+                onGoToDevices={() => setActiveTab('devices')}
+              />
             )}
 
             {activeTab === 'tips' && (
@@ -1980,6 +1923,7 @@ const Dashboard: React.FC = () => {
                     </ul>
                   )}
                 </Card>
+                {userProfile?.id && <AlertsCard tipAmounts={tipAmounts} />}
               </div>
             )}
         </div>

@@ -3,12 +3,15 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { getApiBaseUrl } from '../../utils/config'
 import logger from '../../utils/logger'
 import { BrandIcon } from '../icons/BrandIcons'
+import { FavoriteStar } from '../icons/FavoriteStar'
 import { Button } from '../ui'
 
 interface Song {
   id: string
   songTitle: string
   artist: string
+  // The performer marked this as one of the songs they do best
+  isFavorite?: boolean
   // Minutes since the performer played this song, while that was within the last 90 minutes
   playedMinutesAgo?: number | null
 }
@@ -31,6 +34,49 @@ interface SongPickerSheetProps {
   current?: PickedSong | null
   onClose: () => void
   onPick: (song: PickedSong) => void
+}
+
+/** One song in the list. Artist favorites stand out: warm card, star badge, and a plain-words label. */
+function SongRow({ song, onChoose }: { song: Song; onChoose: (song: Song) => void }) {
+  const played = song.playedMinutesAgo != null && (
+    <span className="rounded-full bg-amber-100 px-2 py-0.5 font-bold text-amber-900">{playedLabel(song.playedMinutesAgo)}</span>
+  )
+  if (song.isFavorite) {
+    return (
+      <li className="py-1.5">
+        <button
+          type="button"
+          onClick={() => onChoose(song)}
+          data-favorite="true"
+          className="flex w-full items-center gap-3 rounded-2xl border border-amber-300 bg-gradient-to-r from-amber-50 to-accent-50 px-3 py-3 text-left shadow-sm active:scale-[0.99]"
+        >
+          <span className="flex h-10 w-10 flex-none items-center justify-center rounded-full bg-amber-400 text-white shadow-sm">
+            <FavoriteStar filled size={22} />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-[15px] font-bold text-ink-900">{song.songTitle}</span>
+            <span className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-ink-600">
+              <span>{song.artist}</span>
+              <span className="rounded-full bg-amber-200 px-2 py-0.5 font-extrabold uppercase tracking-wide text-amber-900">Artist favorite</span>
+              {played}
+            </span>
+          </span>
+          <BrandIcon name="chevron-right" size={18} color="#B45309" />
+        </button>
+      </li>
+    )
+  }
+  return (
+    <li>
+      <button type="button" onClick={() => onChoose(song)} className="w-full border-b border-slate-100 py-3 text-left active:bg-slate-50">
+        <div className="text-[15px] font-semibold">{song.songTitle}</div>
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-ink-500">
+          <span>{song.artist}</span>
+          {played}
+        </div>
+      </button>
+    </li>
+  )
 }
 
 /**
@@ -80,6 +126,11 @@ export function SongPickerSheet({ open, deviceUuid, current, onClose, onPick }: 
     return () => clearTimeout(timer)
   }, [open, deviceUuid, query])
 
+  // With no search, artist favorites get their own section on top; a search shows one list, favorites marked
+  const favorites = songs.filter((song) => song.isFavorite)
+  const others = songs.filter((song) => !song.isFavorite)
+  const showSections = !query.trim() && favorites.length > 0
+
   const confirm = () => {
     if (!chosen) return
     onPick({
@@ -125,6 +176,14 @@ export function SongPickerSheet({ open, deviceUuid, current, onClose, onPick }: 
                     <div className="truncate text-sm text-ink-500">{chosen.artist}</div>
                   </div>
                 </div>
+                {chosen.isFavorite && (
+                  <div className="flex items-start gap-2.5 rounded-xl border border-amber-300 bg-gradient-to-r from-amber-50 to-accent-50 px-3 py-2.5 text-sm text-amber-950">
+                    <FavoriteStar filled size={18} className="mt-0.5 flex-none text-amber-500" />
+                    <span>
+                      <strong>Artist favorite.</strong> One of the songs they do best. Great pick!
+                    </span>
+                  </div>
+                )}
                 {chosen.playedMinutesAgo != null && (
                   <div className="flex items-start gap-2.5 rounded-xl bg-amber-50 px-3 py-2.5 text-sm text-amber-900">
                     <BrandIcon name="info" size={18} />
@@ -182,23 +241,24 @@ export function SongPickerSheet({ open, deviceUuid, current, onClose, onPick }: 
                   />
                 </div>
                 <ul className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4">
-                  {songs.map((song) => (
-                    <li key={song.id}>
-                      <button
-                        type="button"
-                        onClick={() => setChosen(song)}
-                        className="w-full border-b border-slate-100 py-3 text-left active:bg-slate-50"
-                      >
-                        <div className="text-[15px] font-semibold">{song.songTitle}</div>
-                        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-ink-500">
-                          <span>{song.artist}</span>
-                          {song.playedMinutesAgo != null && (
-                            <span className="rounded-full bg-amber-100 px-2 py-0.5 font-bold text-amber-900">{playedLabel(song.playedMinutesAgo)}</span>
-                          )}
-                        </div>
-                      </button>
+                  {showSections && (
+                    <li className="px-1 pb-1 pt-2">
+                      <div className="flex items-center gap-1.5 text-xs font-extrabold uppercase tracking-wider text-amber-700">
+                        <FavoriteStar filled size={14} />
+                        Artist favorites
+                      </div>
+                      <p className="text-xs text-ink-500">Songs they do best</p>
                     </li>
+                  )}
+                  {(showSections ? favorites : songs).map((song) => (
+                    <SongRow key={song.id} song={song} onChoose={setChosen} />
                   ))}
+                  {showSections && others.length > 0 && (
+                    <li className="px-1 pb-1 pt-4">
+                      <div className="text-xs font-extrabold uppercase tracking-wider text-ink-500">All songs</div>
+                    </li>
+                  )}
+                  {showSections && others.map((song) => <SongRow key={song.id} song={song} onChoose={setChosen} />)}
                   {!loading && songs.length === 0 && (
                     <li className="px-2 py-10 text-center text-sm text-ink-500">
                       {query.trim() ? `No songs match “${query.trim()}”.` : 'This performer has not added any songs yet. You can still send a tip.'}

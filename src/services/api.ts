@@ -461,6 +461,19 @@ class ApiService {
     return this.request(`/api/tips/recent-tips/${profileId}${demoQuery('?')}`)
   }
 
+  /** The performer's tips for a date range, with totals for everything that matches. `from` is inclusive, `to` exclusive. */
+  async getTipHistory(
+    profileId: string,
+    filter: { from: Date; to: Date; deviceId?: string; status?: string; page?: number; pageSize?: number }
+  ): Promise<ApiResponse<any>> {
+    const q = new URLSearchParams({ from: filter.from.toISOString(), to: filter.to.toISOString() })
+    if (filter.deviceId) q.set('deviceId', filter.deviceId)
+    if (filter.status && filter.status !== 'all') q.set('status', filter.status)
+    if (filter.page) q.set('page', String(filter.page))
+    if (filter.pageSize) q.set('pageSize', String(filter.pageSize))
+    return this.request(`/api/tips/history/${profileId}?${q.toString()}${demoQuery('&')}`)
+  }
+
   async getFailedTips(): Promise<ApiResponse<any>> {
     return this.request(`/api/tips/failed-tips${demoQuery('?')}`)
   }

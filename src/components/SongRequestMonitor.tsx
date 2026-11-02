@@ -4,6 +4,7 @@ import { API_BASE_URL } from '../utils/config'
 import { BrandIcon } from './icons/BrandIcons'
 import { StatusChip } from './ui'
 import { usePortalTheme, useTheme } from '../theme/ThemeContext'
+import { playTipChime, unlockTipChime, isTipChimeReady } from '../utils/tipChime'
 
 interface SongRequest {
   songId: string
@@ -19,6 +20,13 @@ interface SongRequest {
   note?: string
   // Set while this song was played recently (the server clears it after 90 minutes)
   playedMinutesAgo?: number | null
+}
+
+// A tip of an amount the performer chose to see even though the tipper picked no song
+interface PlainTip {
+  id: string
+  amount: number
+  createdAt: string
 }
 
 type RequestStatus = SongRequest['status']
@@ -41,6 +49,8 @@ interface SongRequestMonitorProps {
 
 const REFRESH_MS = 5000
 const requestKey = (r: SongRequest) => r.requestIds.join('-')
+const money = (n: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(n)
+const SEEN_TIPS_KEY = 'monitor_seen_tips'
 
 // Three reading sizes, for a tablet on a stand a few feet away
 const SIZES = [
@@ -93,12 +103,24 @@ const SongRequestMonitor: React.FC<SongRequestMonitorProps> = ({
   const [pauseDeviceId, setPauseDeviceId] = useState('')
   const [menuOpen, setMenuOpen] = useState(false)
   const [glow, setGlow] = useState<{ id: number; tipped: boolean } | null>(null)
+  // "New tip" notice shown inside the monitor, and the sound that goes with it
+  const [tipNotice, setTipNotice] = useState<{ id: number; text: string } | null>(null)
+  const [soundOn, setSoundOn] = useState(() => readPref('monitor_tip_sound', '1') === '1')
+  const [soundReady, setSoundReady] = useState(false)
+  const soundOnRef = useRef(soundOn)
+  soundOnRef.current = soundOn
+  const noticeId = useRef(0)
   const [undo, setUndo] = useState<{ request: SongRequest; message: string } | null>(null)
   const [held, setHeld] = useState(false)
   const shownRef = useRef<SongRequest[]>([])
   const glowId = useRef(0)
   const releaseTimer = useRef<number | undefined>(undefined)
   const knownKeys = useRef<Set<string> | null>(null)
+  // Tips with no song: the list, which the performer has marked seen (kept on this device), and which were already announced
+  const [plainTips, setPlainTips] = useState<PlainTip[]>([])
+  const [seenTips, setSeenTips] = useState<Set<string>>(() => new Set(readPref(SEEN_TIPS_KEY, '').split(',').filter(Boolean)))
+  const [showSeenTips, setShowSeenTips] = useState(false)
+  const knownTipIds = useRef<Set<string> | null>(null)
   const wakeLockRef = useRef<any>(null)
   const pauseInitRef = useRef(false)
 
@@ -140,6 +162,8 @@ const SongRequestMonitor: React.FC<SongRequestMonitorProps> = ({
         setSongRequests(list)
         setLoadFailed(false)
 
+        let announced = false
+
         // Flag requests that were not there on the previous refresh. They stay flagged until the performer has seen them.
         const keys = new Set(list.map(requestKey))
         if (knownKeys.current) {
@@ -149,12 +173,44 @@ const SongRequestMonitor: React.FC<SongRequestMonitorProps> = ({
             .filter(k => !knownKeys.current!.has(k))
           if (added.length > 0) {
             setFreshKeys(prev => new Set([...prev, ...added]))
-            const tipped = list.some(r => added.includes(requestKey(r)) && r.totalTipAmount > 0)
+            const tippedRequests = list.filter(r => added.includes(requestKey(r)) && r.totalTipAmount > 0)
+            const tipped = tippedRequests.length > 0
             glowId.current += 1
             setGlow({ id: glowId.current, tipped })
+            if (tipped) {
+              const total = tippedRequests.reduce((sum, r) => sum + r.totalTipAmount, 0)
+              noticeId.current += 1
+              setTipNotice({
+                id: noticeId.current,
+                text: tippedRequests.length === 1 ? `New tip ${money(total)}: ${tippedRequests[0].songTitle}` : `${tippedRequests.length} new tips: ${money(total)}`
+              })
+              if (soundOnRef.current) playTipChime()
+              announced = true
+            }
           }
         }
         knownKeys.current = keys
+
+        // Tips of the chosen amounts that came with no song: list them, and announce new ones like song tips
+        const plain: PlainTip[] = data.tipsWithoutSong || []
+        setPlainTips(plain)
+        if (knownTipIds.current) {
+          const addedTips = plain.filter(t => !knownTipIds.current!.has(t.id))
+          if (addedTips.length > 0) {
+            glowId.current += 1
+            setGlow({ id: glowId.current, tipped: true })
+            if (!announced) {
+              const total = addedTips.reduce((sum, t) => sum + t.amount, 0)
+              noticeId.current += 1
+              setTipNotice({
+                id: noticeId.current,
+                text: addedTips.length === 1 ? `New tip ${money(total)}` : `${addedTips.length} new tips: ${money(total)}`
+              })
+              if (soundOnRef.current) playTipChime()
+            }
+          }
+        }
+        knownTipIds.current = new Set(plain.map(t => t.id))
       } else {
         setLoadFailed(true)
         logger.error(`[Monitor] Failed to load song requests: ${response.status} ${response.statusText}`)
@@ -322,11 +378,57 @@ const SongRequestMonitor: React.FC<SongRequestMonitorProps> = ({
   }
 
 
+  // Hide the "new tip" notice after a few seconds
+  useEffect(() => {
+    if (!tipNotice) return
+    const t = window.setTimeout(() => setTipNotice(null), 6000)
+    return () => window.clearTimeout(t)
+  }, [tipNotice])
+
+  // Browsers allow sound only after a touch: the first one on the monitor unlocks the chime
+  useEffect(() => {
+    if (!isVisible) return
+    setSoundReady(isTipChimeReady())
+    const unlock = () => {
+      void unlockTipChime().then(ok => {
+        setSoundReady(ok)
+        if (ok) document.removeEventListener('pointerdown', unlock)
+      })
+    }
+    document.addEventListener('pointerdown', unlock)
+    return () => document.removeEventListener('pointerdown', unlock)
+  }, [isVisible])
+
+  const toggleSound = () => {
+    const next = !soundOn
+    setSoundOn(next)
+    writePref('monitor_tip_sound', next ? '1' : '0')
+    if (next) void unlockTipChime().then(ok => { setSoundReady(ok); if (ok) playTipChime() })
+  }
+
   if (!isVisible) return null
 
   // While a finger is down the list keeps the order it had, then catches up
   if (!held) shownRef.current = songRequests
   const shown = shownRef.current
+
+  const markTipSeen = (id: string) => {
+    setSeenTips(prev => {
+      const next = new Set(prev).add(id)
+      writePref(SEEN_TIPS_KEY, [...next].slice(-200).join(','))
+      return next
+    })
+  }
+  const markTipUnseen = (id: string) => {
+    setSeenTips(prev => {
+      const next = new Set(prev)
+      next.delete(id)
+      writePref(SEEN_TIPS_KEY, [...next].join(','))
+      return next
+    })
+  }
+  const newTips = plainTips.filter(t => !seenTips.has(t.id))
+  const seenList = plainTips.filter(t => seenTips.has(t.id))
 
   // Waiting by tip (highest first) and age, playing first, then everything finished
   const byTipThenAge = (a: SongRequest, b: SongRequest) =>
@@ -387,6 +489,28 @@ const SongRequestMonitor: React.FC<SongRequestMonitorProps> = ({
         />
       )}
 
+      {/* Browsers keep a page silent until it is touched once: ask for that touch, then get out of the way */}
+      {soundOn && !soundReady && (
+        <div className="absolute inset-x-0 bottom-4 z-50 flex justify-center px-4">
+          <button
+            onClick={() => void unlockTipChime().then(ok => { setSoundReady(ok); if (ok) playTipChime() })}
+            className="inline-flex h-12 items-center gap-2 rounded-full bg-ink-900 px-5 text-sm font-bold text-white shadow-lift"
+          >
+            <BrandIcon name="volume" size={20} tone="inverse" />
+            Tap to turn on tip sounds
+          </button>
+        </div>
+      )}
+
+      {/* A tip arrived: a short message at the top, announced to screen readers, gone after a few seconds */}
+      {tipNotice && (
+        <div role="status" aria-live="polite" className="pointer-events-none absolute inset-x-0 top-16 z-50 flex justify-center px-4">
+          <div className="max-w-full truncate rounded-full bg-accent-500 px-5 py-2.5 text-base font-bold text-white shadow-lift">
+            {tipNotice.text}
+          </div>
+        </div>
+      )}
+
       {/* Top bar: slim, so it fits a narrow side window. Less-used controls live in the menu. */}
       <header className="relative flex flex-none items-center gap-2 border-b border-slate-200 bg-white px-3 py-2.5">
         <button onClick={onClose} className={`${soft} pl-2`} aria-label="Close live requests">
@@ -436,6 +560,25 @@ const SongRequestMonitor: React.FC<SongRequestMonitorProps> = ({
                     A+
                   </button>
                 </div>
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-sm font-semibold text-ink-700">Sound for new tips</span>
+                  <button
+                    onClick={toggleSound}
+                    role="switch"
+                    aria-checked={soundOn}
+                    aria-label="Sound for new tips"
+                    className={`${soft} gap-2`}
+                  >
+                    <BrandIcon name="volume" size={20} />
+                    {soundOn ? 'On' : 'Off'}
+                  </button>
+                </div>
+                {soundOn && !soundReady && (
+                  <p className="mt-1 text-xs text-ink-500">Tap anywhere on this screen once to allow sound.</p>
+                )}
               </div>
 
               <div className="flex items-center justify-between gap-3">
@@ -640,6 +783,61 @@ const SongRequestMonitor: React.FC<SongRequestMonitorProps> = ({
                   )
                 })}
               </ul>
+            )}
+
+            {/* Tips of the amounts the performer chose to see, with no song attached */}
+            {plainTips.length > 0 && (
+              <section aria-label="Tips without a song" className="mt-6">
+                <h2 className={sectionLabel}>
+                  Tips without a song
+                  <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-ink-700">{newTips.length}</span>
+                </h2>
+                {newTips.length === 0 ? (
+                  <p className="rounded-2xl border border-slate-100 bg-white px-4 py-3 text-sm text-ink-500">All seen.</p>
+                ) : (
+                  <ul className="space-y-2">
+                    {newTips.map(t => (
+                      <li key={t.id} className="flex items-center gap-3 rounded-2xl border border-slate-100 bg-white px-4 py-3">
+                        <span className={`inline-flex items-center rounded-full bg-accent-500 px-3 py-1 font-bold text-white ${size.chip}`}>{money(t.amount)}</span>
+                        <span className="min-w-0 flex-1 truncate text-sm text-ink-500">{ago(t.createdAt, now)}</span>
+                        <button
+                          onClick={() => markTipSeen(t.id)}
+                          className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-slate-100 px-4 text-sm font-semibold text-ink-700 hover:bg-slate-200"
+                          aria-label={`Mark the ${money(t.amount)} tip as seen`}
+                        >
+                          <BrandIcon name="check" size={18} tone="current" strokeWidth={2.4} />
+                          Seen
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                {seenList.length > 0 && (
+                  <div className="mt-2">
+                    <button
+                      onClick={() => setShowSeenTips(s => !s)}
+                      aria-expanded={showSeenTips}
+                      className="flex h-11 items-center gap-2 text-sm font-semibold text-ink-500 hover:text-ink-700"
+                    >
+                      <BrandIcon name={showSeenTips ? 'chevron-down' : 'chevron-right'} size={18} tone="current" />
+                      {showSeenTips ? 'Hide' : 'Show'} seen ({seenList.length})
+                    </button>
+                    {showSeenTips && (
+                      <ul className="mt-1 space-y-2">
+                        {seenList.map(t => (
+                          <li key={t.id} className="flex items-center gap-3 rounded-2xl border border-slate-100 bg-white px-4 py-2">
+                            <span className="font-semibold text-ink-900">{money(t.amount)}</span>
+                            <span className="min-w-0 flex-1 truncate text-sm text-ink-500">{ago(t.createdAt, now)}</span>
+                            <button onClick={() => markTipUnseen(t.id)} className="h-11 rounded-xl px-3 text-sm font-semibold text-ink-500 hover:bg-slate-100">
+                              Undo
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                )}
+              </section>
             )}
 
             {/* Finished requests stay out of the way until asked for */}

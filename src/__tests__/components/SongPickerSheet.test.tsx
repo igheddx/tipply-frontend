@@ -104,4 +104,59 @@ describe('SongPickerSheet', () => {
     expect(screen.getByText(/You can still request it/)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Choose a tip amount/ })).toBeInTheDocument()
   })
+
+  describe('artist favorites', () => {
+    const withFavorites = [
+      { id: 'f1', songTitle: 'Superstition', artist: 'Stevie Wonder', isFavorite: true },
+      { id: 's1', songTitle: 'Blinding Lights', artist: 'The Weeknd' },
+      { id: 's2', songTitle: 'Easy On Me', artist: 'Adele' }
+    ]
+
+    it('puts favorites in their own section on top, marked in plain words, with the rest under All songs', async () => {
+      respondWith(withFavorites)
+      render(<SongPickerSheet open deviceUuid="dev-1" onClose={() => {}} onPick={() => {}} />)
+
+      expect(await screen.findByText('Superstition')).toBeInTheDocument()
+      expect(screen.getByText('Songs they do best')).toBeInTheDocument()
+      expect(screen.getByText('Artist favorite')).toBeInTheDocument()
+      expect(screen.getByText('All songs')).toBeInTheDocument()
+      const rows = screen.getAllByRole('button').filter(b => /Superstition|Blinding|Easy/.test(b.textContent || ''))
+      expect(rows[0]).toHaveAttribute('data-favorite', 'true')
+      expect(rows[1]).not.toHaveAttribute('data-favorite')
+    })
+
+    it('has no favorites section when the performer has none', async () => {
+      render(<SongPickerSheet open deviceUuid="dev-1" onClose={() => {}} onPick={() => {}} />)
+      await screen.findByText('Blinding Lights')
+      expect(screen.queryByText('Songs they do best')).toBeNull()
+      expect(screen.queryByText('All songs')).toBeNull()
+    })
+
+    it('keeps one list while searching, with the favorite still marked', async () => {
+      respondWith(withFavorites)
+      render(<SongPickerSheet open deviceUuid="dev-1" onClose={() => {}} onPick={() => {}} />)
+      await screen.findByText('Superstition')
+      fireEvent.change(screen.getByLabelText('Search songs or artists'), { target: { value: 's' } })
+
+      await waitFor(() => expect(screen.queryByText('Songs they do best')).toBeNull())
+      expect(screen.getByText('Artist favorite')).toBeInTheDocument()
+    })
+
+    it('tells the tipper when the song they chose is a favorite', async () => {
+      respondWith(withFavorites)
+      render(<SongPickerSheet open deviceUuid="dev-1" onClose={() => {}} onPick={() => {}} />)
+      fireEvent.click(await screen.findByText('Superstition'))
+
+      expect(await screen.findByText(/One of the songs they do best/)).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: /Choose a tip amount/ })).toBeInTheDocument()
+    })
+
+    it('says nothing about favorites for an ordinary song', async () => {
+      respondWith(withFavorites)
+      render(<SongPickerSheet open deviceUuid="dev-1" onClose={() => {}} onPick={() => {}} />)
+      fireEvent.click(await screen.findByText('Easy On Me'))
+      await screen.findByRole('button', { name: /Choose a tip amount/ })
+      expect(screen.queryByText(/One of the songs they do best/)).toBeNull()
+    })
+  })
 })
