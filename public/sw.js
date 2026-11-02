@@ -17,14 +17,17 @@ self.addEventListener('push', event => {
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(windows => {
       // Every push must show a notification (iOS cancels alerts that stay silent). If Tipwave is already on
       // screen it has its own notice and sound, so the banner is shown without a second sound.
+      const tag = typeof data.tag === 'string' ? data.tag : 'tipwave-tip'
       const appVisible = windows.some(w => w.visibilityState === 'visible')
+      // Tell open pages the alert arrived (the Tip alerts card uses this to confirm a test)
+      windows.forEach(w => w.postMessage({ type: 'tipwave-push', tag }))
       return self.registration.showNotification(title, {
         body: typeof data.body === 'string' ? data.body : '',
         icon: '/images/logo/icon-192.png',
         badge: '/images/logo/icon-192.png',
-        tag: typeof data.tag === 'string' ? data.tag : 'tipwave-tip',
+        tag,
         renotify: true,
-        silent: appVisible,
+        silent: appVisible && tag !== 'tipwave-test',
         data: { url }
       })
     })

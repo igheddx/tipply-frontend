@@ -66,6 +66,21 @@ export default function AlertsCard({ tipAmounts }: AlertsCardProps) {
     void refreshPushState()
   }, [refreshPushState])
 
+  // The service worker tells the page when a test alert reaches this device
+  useEffect(() => {
+    if (!('serviceWorker' in navigator)) return
+    const onMessage = (event: MessageEvent) => {
+      if (event.data?.type === 'tipwave-push' && event.data.tag === 'tipwave-test') {
+        setMessage({
+          tone: 'success',
+          text: 'The test reached this device. If no banner appeared, open this device’s Settings > Notifications, allow Tipwave (or your browser), and turn off Do Not Disturb.'
+        })
+      }
+    }
+    navigator.serviceWorker.addEventListener('message', onMessage)
+    return () => navigator.serviceWorker.removeEventListener('message', onMessage)
+  }, [])
+
   const toggleAmount = async (amount: number) => {
     const next = alertAmounts.includes(amount) ? alertAmounts.filter(a => a !== amount) : [...alertAmounts, amount].sort((a, b) => a - b)
     if (next.length > MAX_ALERT_AMOUNTS) return
