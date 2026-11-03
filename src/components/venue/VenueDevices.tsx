@@ -1,9 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { Banner, Button, Card, EmptyState, Modal, StatusChip, Switch } from '../ui'
 import { useFeedback } from '../ui/Feedback'
 import apiService from '../../services/api'
 import { venueApi, type VenueDevice, type VenueLink, type VenueProfile } from '../../services/venueApi'
-import { fetchQrPng } from '../../utils/qrImage'
+import { QrCardDialog } from '../QrCardDialog'
 import { SOUND_OPTIONS, VOLUME_OPTIONS } from '../../utils/deviceConfig'
 import { PerformerChip } from './PerformerChip'
 import { LocationNote } from './LocationNote'
@@ -36,28 +36,6 @@ export function VenueDevices({ venue, devices, links, onChanged }: Props) {
 
   const [settings, setSettings] = useState<VenueDevice | null>(null)
   const [qr, setQr] = useState<VenueDevice | null>(null)
-  const [qrUrl, setQrUrl] = useState<string | null>(null)
-  const [qrFailed, setQrFailed] = useState(false)
-
-  // Load the picture as a real PNG (the gateway can return it as text), and free it when the dialog closes
-  useEffect(() => {
-    if (!qr) return
-    let url: string | null = null
-    let cancelled = false
-    setQrUrl(null)
-    setQrFailed(false)
-    fetchQrPng(qr.deviceId)
-      .then(png => {
-        if (cancelled) return
-        url = URL.createObjectURL(png)
-        setQrUrl(url)
-      })
-      .catch(() => !cancelled && setQrFailed(true))
-    return () => {
-      cancelled = true
-      if (url) URL.revokeObjectURL(url)
-    }
-  }, [qr])
 
   const addDevice = async () => {
     if (!serial.trim()) return
@@ -317,32 +295,16 @@ export function VenueDevices({ venue, devices, links, onChanged }: Props) {
         )}
       </Modal>
 
-      {/* QR code */}
-      <Modal open={!!qr} title={`${qr?.name ?? ''} QR code`} onClose={() => setQr(null)} footer={
-        qr ? (
-          <>
-            {qrUrl && (
-              <a href={qrUrl} download={`tipwave-${qr.name}.png`.replace(/\s+/g, '-')} className="inline-flex h-11 items-center justify-center rounded-xl border border-slate-300 bg-white px-4 text-sm font-semibold text-ink-700 hover:bg-slate-50">
-                Download
-              </a>
-            )}
-            <Button onClick={() => setQr(null)}>Done</Button>
-          </>
-        ) : undefined
-      }>
-        {qr && (
-          <div className="text-center">
-            {qrUrl ? (
-              <img src={qrUrl} alt={`QR code for ${qr.name}`} className="mx-auto h-56 w-56" />
-            ) : qrFailed ? (
-              <p className="py-16 text-sm text-red-700">The QR code could not be loaded. Close this and try again.</p>
-            ) : (
-              <div className="mx-auto flex h-56 w-56 items-center justify-center text-sm text-ink-500">Loading…</div>
-            )}
-            <p className="mt-3 text-sm text-ink-500">This code always works. Fans who scan it tip whoever is performing on this device.</p>
-          </div>
-        )}
-      </Modal>
+      {/* QR card: the same for every performer, with the venue's name and no artist's */}
+      <QrCardDialog
+        open={!!qr}
+        onClose={() => setQr(null)}
+        title={`${qr?.name ?? ''} QR card`}
+        deviceId={qr?.deviceId ?? ''}
+        name={venue.businessName ?? ''}
+        fileLabel={`venue-${qr?.name ?? 'device'}`}
+        note="This card always works. Fans who scan it tip whoever is performing on this device."
+      />
     </div>
   )
 }

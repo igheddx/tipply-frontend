@@ -7,7 +7,8 @@ const venueApi = vi.hoisted(() => ({ myVenues: vi.fn(), startMine: vi.fn(), endM
 vi.mock('@/services/venueApi', () => ({ venueApi }))
 const feedback = vi.hoisted(() => ({ toast: vi.fn(), confirm: vi.fn(async () => true) }))
 vi.mock('@/components/ui/Feedback', () => ({ useFeedback: () => feedback, FeedbackProvider: ({ children }: any) => children }))
-vi.mock('@/utils/venueCard', () => ({ downloadPerformerVenueCard: vi.fn(async () => undefined) }))
+const dialog = vi.hoisted(() => ({ props: null as any }))
+vi.mock('@/components/QrCardDialog', () => ({ QrCardDialog: (p: any) => { dialog.props = p; return p.open ? <div role="dialog" aria-label="qr card">{p.name}|{p.performerId}|{p.deviceId}</div> : null } }))
 
 const venue = (trust: 'self' | 'approval', devices: any[]) => [
   { venue: { id: 'v1', name: 'Flying J', status: 'approved', city: 'Austin', state: 'TX', timeZoneId: 'America/Chicago' }, linkId: 'l1', trustLevel: trust, devices }
@@ -107,13 +108,12 @@ describe('At venues', () => {
     await waitFor(() => expect(venueApi.endMine).toHaveBeenCalledWith('s10'))
   })
 
-  it('offers their own printable card, and leaving the venue', async () => {
-    const card = await import('@/utils/venueCard')
+  it('offers their own printable card, with their name and id, and leaving the venue', async () => {
     venueApi.myVenues.mockResolvedValue({ data: venue('self', [device()]) })
     render(<VenueSection performerId="p1" stageName="Annie" />)
 
     fireEvent.click(await screen.findByRole('button', { name: 'My QR card' }))
-    await waitFor(() => expect(card.downloadPerformerVenueCard).toHaveBeenCalledWith('d1', 'Main stage', 'p1', 'Annie'))
+    expect(screen.getByRole('dialog', { name: 'qr card' })).toHaveTextContent('Annie|p1|d1')
 
     fireEvent.click(screen.getByRole('button', { name: 'Leave this venue' }))
     await waitFor(() => expect(venueApi.leave).toHaveBeenCalledWith('l1'))

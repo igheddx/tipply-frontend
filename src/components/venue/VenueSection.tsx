@@ -5,7 +5,7 @@ import { useFeedback } from '../ui/Feedback'
 import { photoSrc } from '../../utils/photoUrl'
 import { venueApi, type PerformerDevice, type PerformerVenue } from '../../services/venueApi'
 import { localInputToIso, timeOnly, toLocalInput, untilLabel } from '../../utils/venueTime'
-import { downloadPerformerVenueCard } from '../../utils/venueCard'
+import { QrCardDialog } from '../QrCardDialog'
 
 const AVAILABILITY: Record<PerformerDevice['availability'], { label: string; cls: string }> = {
   available: { label: 'Available', cls: 'bg-emerald-50 text-emerald-700' },
@@ -38,6 +38,7 @@ export function VenueSection({ onChanged, performerId, stageName }: { onChanged?
   const [endAt, setEndAt] = useState('')
   const [songs, setSongs] = useState(true)
   const [working, setWorking] = useState(false)
+  const [cardFor, setCardFor] = useState<{ venue: PerformerVenue; device: PerformerDevice } | null>(null)
 
   const load = useCallback(async () => {
     const res = await venueApi.myVenues()
@@ -103,16 +104,6 @@ export function VenueSection({ onChanged, performerId, stageName }: { onChanged?
     onChanged?.()
   }
 
-  const downloadCard = async (d: PerformerDevice) => {
-    if (!performerId) return
-    try {
-      await downloadPerformerVenueCard(d.deviceId, d.name, performerId, stageName || 'Performer')
-      toast('Card downloaded. It only takes tips while you are on this device.', 'success')
-    } catch {
-      toast('Could not make the card. Please try again.', 'error')
-    }
-  }
-
   const leave = async (v: PerformerVenue) => {
     const ok = await confirm({ title: `Leave ${v.venue.name}?`, body: 'You will not be able to use their devices unless they invite you again.', confirmLabel: 'Leave venue', tone: 'danger' })
     if (!ok) return
@@ -162,7 +153,7 @@ export function VenueSection({ onChanged, performerId, stageName }: { onChanged?
                       </div>
                     </div>
                     {performerId && (
-                      <Button size="sm" variant="ghost" onClick={() => downloadCard(d)} title="A printable card with your name. Its QR code only takes tips while you are on this device.">
+                      <Button size="sm" variant="ghost" onClick={() => setCardFor({ venue: v, device: d })} title="A printable card with your name. Its QR code only takes tips while you are on this device.">
                         My QR card
                       </Button>
                     )}
@@ -182,6 +173,17 @@ export function VenueSection({ onChanged, performerId, stageName }: { onChanged?
           </div>
         </div>
       ))}
+
+      <QrCardDialog
+        open={!!cardFor}
+        onClose={() => setCardFor(null)}
+        title={cardFor ? `${cardFor.device.name} at ${cardFor.venue.venue.name}` : ''}
+        deviceId={cardFor?.device.deviceId ?? ''}
+        performerId={performerId}
+        name={stageName || 'Performer'}
+        fileLabel={`${stageName || 'performer'}-${cardFor?.device.name ?? 'device'}`}
+        note="This card carries your name. Its QR code only takes tips while you are on this device; if someone else is on it, fans are told you are not active."
+      />
 
       <Modal
         open={!!target}
