@@ -1,10 +1,13 @@
 import React from 'react'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
-import { MemoryRouter } from 'react-router-dom'
+import { MemoryRouter, Routes, Route } from 'react-router-dom'
 import { vi, describe, it, expect, beforeEach } from 'vitest'
 import Onboarding from '@/pages/Onboarding'
 
-const api = vi.hoisted(() => ({ createProfileOnboarding: vi.fn(), request: vi.fn(), login: vi.fn() }))
+const api = vi.hoisted(() => ({
+  createProfileOnboarding: vi.fn(), request: vi.fn(), login: vi.fn(), sendOnboardingVerification: vi.fn(), validateOnboardingCode: vi.fn(),
+  checkDeviceExists: vi.fn(), checkDetectedDeviceBySerialNumber: vi.fn(), registerDeviceOnboarding: vi.fn()
+}))
 vi.mock('@/services/api', () => ({ default: api, apiService: api }))
 const venueApi = vi.hoisted(() => ({ features: vi.fn(), invitePreview: vi.fn() }))
 vi.mock('@/services/venueApi', () => ({ venueApi }))
@@ -97,5 +100,46 @@ describe('onboarding for venues', () => {
     expect(venueApi.invitePreview).toHaveBeenCalledWith('abc123')
     await waitFor(() => expect((screen.getByLabelText('Email') as HTMLInputElement).value).toBe('new@x.test'))
     expect(screen.queryByRole('radio', { name: /Venue/ })).toBeNull()
+  })
+
+  it('walks a venue through to the end: three steps, a finish screen (never blank), then the venue portal', async () => {
+    api.sendOnboardingVerification.mockResolvedValue({ data: {} })
+    api.validateOnboardingCode.mockResolvedValue({ data: {} })
+    api.checkDeviceExists.mockResolvedValue({ data: { exists: false } })
+    api.checkDetectedDeviceBySerialNumber.mockResolvedValue({ data: { exists: true } })
+    api.registerDeviceOnboarding.mockResolvedValue({ data: {} })
+    api.login.mockResolvedValue({ data: { accessToken: 'tok', refreshToken: 'ref' } })
+
+    render(
+      <MemoryRouter initialEntries={['/onboarding']}>
+        <Routes>
+          <Route path="/onboarding" element={<Onboarding />} />
+          <Route path="/venue" element={<p>VENUE PORTAL</p>} />
+          <Route path="/login" element={<p>LOGIN PAGE</p>} />
+        </Routes>
+      </MemoryRouter>
+    )
+    fireEvent.click(await screen.findByRole('radio', { name: /Venue/ }))
+    const type = (label: string, value: string) => fireEvent.change(screen.getByLabelText(label), { target: { value } })
+    type('Business name', 'The Flying J'); type('Contact first name', 'Val'); type('Contact last name', 'Owner')
+    type('Phone number', '(512) 555-0100'); type('Street address', '1 Main St'); type('City', 'Austin'); type('State', 'TX'); type('Zip code', '78701')
+    type('Email', 'val@venue.test'); type('Password', 'password1'); type('Confirm password', 'password1')
+    fireEvent.click(screen.getByRole('checkbox'))
+    fireEvent.click(screen.getByRole('button', { name: 'Create account' }))
+
+    // Step 2: the emailed code
+    fireEvent.change(await screen.findByLabelText('Verification code'), { target: { value: '123456' } })
+    // Step 3: the device
+    fireEvent.change(await screen.findByLabelText('Serial number'), { target: { value: 'TPY-5C07-K73' } })
+    expect(screen.queryByText('Let people request songs')).toBeNull() // song requests belong to performers
+    fireEvent.click(screen.getByRole('button', { name: 'Add device' }))
+
+    // The finish screen
+    expect(await screen.findByText('Your venue is set up')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Go to your venue portal' }))
+
+    expect(await screen.findByText('VENUE PORTAL')).toBeInTheDocument()
+    expect(api.registerDeviceOnboarding).toHaveBeenCalledWith(expect.objectContaining({ isAllowSongRequest: false }))
+    expect(localStorage.setItem).toHaveBeenCalledWith('token', 'tok')
   })
 })
