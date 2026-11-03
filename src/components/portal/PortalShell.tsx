@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { photoSrc } from '../../utils/photoUrl'
 import { usePortalTheme } from '../../theme/ThemeContext'
 import { ThemeToggle, ThemeQuickToggle } from '../ui/ThemeToggle'
@@ -42,7 +42,10 @@ function Avatar({ name, photoUrl, size = 36 }: { name: string; photoUrl?: string
   )
 }
 
-/** The performer portal frame: a left sidebar on desktop, a bottom bar on phones. */
+/** Most items a phone's bottom bar shows at once. With more, the first few stay and the rest go under "More". */
+const BAR_LIMIT = 5
+
+/** The portal frame: a left sidebar on desktop, a bottom bar on phones (with a "More" sheet when there are many items). */
 export function PortalShell({
   items,
   active,
@@ -58,6 +61,25 @@ export function PortalShell({
 }: PortalShellProps) {
   const { className: themeClass, dark } = usePortalTheme()
   const logoSrc = dark ? '/images/logo/tipwave-logo-v2-light.png' : '/images/logo/tipwave-logo-v2.png'
+  const [moreOpen, setMoreOpen] = useState(false)
+  const overflowing = items.length > BAR_LIMIT
+  const barItems = overflowing ? items.slice(0, BAR_LIMIT - 1) : items
+  const moreItems = overflowing ? items.slice(BAR_LIMIT - 1) : []
+  const moreActive = !profileActive && moreItems.some(i => i.id === active)
+  const moreBadge = moreItems.reduce((n, i) => n + (i.badge ?? 0), 0)
+
+  useEffect(() => {
+    if (!moreOpen) return
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setMoreOpen(false)
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [moreOpen])
+
+  const choose = (id: string) => {
+    setMoreOpen(false)
+    onSelect(id)
+  }
+
   return (
     <div className={`min-h-screen bg-surface ${themeClass}`}>
       {/* Desktop sidebar */}
@@ -116,7 +138,7 @@ export function PortalShell({
         <img src={logoSrc} alt="Tipwave" className="h-8 w-auto" />
         <div className="flex items-center gap-1">
           <ThemeQuickToggle />
-          <button onClick={onOpenProfile} aria-label="Profile and payouts" className="rounded-full">
+          <button onClick={() => setMoreOpen(true)} aria-label="Account and menu" aria-haspopup="dialog" className="rounded-full">
             <Avatar name={userName} photoUrl={userPhotoUrl} size={34} />
           </button>
         </div>
@@ -135,7 +157,7 @@ export function PortalShell({
         className="fixed inset-x-0 bottom-0 z-30 flex overflow-x-auto border-t border-slate-200 bg-white lg:hidden"
         style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
       >
-        {items.map(item => {
+        {barItems.map(item => {
           const on = !profileActive && item.id === active
           return (
             <button
@@ -154,7 +176,77 @@ export function PortalShell({
             </button>
           )
         })}
+        {overflowing && (
+          <button
+            onClick={() => setMoreOpen(true)}
+            aria-haspopup="dialog"
+            aria-expanded={moreOpen}
+            aria-current={moreActive ? 'page' : undefined}
+            className="relative flex h-16 min-w-0 flex-1 flex-col items-center justify-center gap-1"
+          >
+            <BrandIcon name="menu" size={22} tone={moreActive ? 'brand' : 'muted'} />
+            <span className={`text-[11px] font-semibold ${moreActive ? 'text-brand-700' : 'text-ink-500'}`}>More</span>
+            {moreBadge > 0 && (
+              <span className="absolute right-[calc(50%-20px)] top-2 min-w-[18px] rounded-full bg-accent-500 px-1 text-center text-[10px] font-bold leading-[18px] text-white">{moreBadge}</span>
+            )}
+          </button>
+        )}
       </nav>
+
+      {/* Phone "More" sheet: the rest of the menu, the account, and sign out */}
+      {moreOpen && (
+        <div className="fixed inset-0 z-40 lg:hidden" role="dialog" aria-modal="true" aria-label="More">
+          <div className="absolute inset-0 bg-slate-950/50" onClick={() => setMoreOpen(false)} aria-hidden="true" />
+          <div
+            className={`absolute inset-x-0 bottom-0 rounded-t-3xl bg-white shadow-2xl ${themeClass}`}
+            style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 0.75rem)' }}
+          >
+            <div className="mx-auto mt-2.5 h-1 w-10 rounded-full bg-slate-300" />
+            <div className={`grid grid-cols-3 gap-2 px-4 pb-3 pt-4 ${moreItems.length === 0 ? 'hidden' : ''}`}>
+              {moreItems.map(item => {
+                const on = !profileActive && item.id === active
+                return (
+                  <button
+                    key={item.id}
+                    onClick={() => choose(item.id)}
+                    aria-current={on ? 'page' : undefined}
+                    className={`relative flex h-20 flex-col items-center justify-center gap-1.5 rounded-2xl text-xs font-semibold ${on ? 'bg-brand-50 text-brand-800' : 'bg-slate-50 text-ink-700'}`}
+                  >
+                    <BrandIcon name={item.icon} size={24} tone={on ? 'brand' : 'muted'} />
+                    {item.label}
+                    {!!item.badge && <span className="absolute right-2 top-2 min-w-[18px] rounded-full bg-accent-500 px-1 text-center text-[10px] font-bold leading-[18px] text-white">{item.badge}</span>}
+                  </button>
+                )
+              })}
+            </div>
+            <div className="border-t border-slate-100 px-4 pt-3">
+              <button
+                onClick={() => {
+                  setMoreOpen(false)
+                  onOpenProfile()
+                }}
+                className="flex w-full items-center gap-3 rounded-xl p-2 text-left hover:bg-slate-50"
+              >
+                <Avatar name={userName} photoUrl={userPhotoUrl} />
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-sm font-semibold text-ink-900">{userName}</span>
+                  <span className="block text-xs text-ink-500">{accountHint}</span>
+                </span>
+              </button>
+              <button
+                onClick={() => {
+                  setMoreOpen(false)
+                  onLogout()
+                }}
+                className="mt-1 flex h-12 w-full items-center gap-3 rounded-xl px-3 text-sm font-semibold text-ink-700 hover:bg-slate-50"
+              >
+                <BrandIcon name="logout" size={20} tone="muted" />
+                Sign out
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
