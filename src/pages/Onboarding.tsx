@@ -12,14 +12,21 @@ const RESEND_SECONDS = 30
 const STEPS: { id: number; title: string; subtitle: string; icon: BrandIconName }[] = [
   { id: 1, title: 'Create account', subtitle: 'Your name, email and password', icon: 'user' },
   { id: 2, title: 'Verify email', subtitle: 'Enter the 6-digit code', icon: 'mail' },
-  { id: 3, title: 'Add your device', subtitle: 'Serial number and nickname', icon: 'device' },
+  { id: 3, title: 'Add your device', subtitle: 'Optional: you can add it later', icon: 'device' },
   { id: 4, title: 'Get paid', subtitle: 'Verify your identity with Stripe', icon: 'bank' }
 ]
 // A venue has no payouts to set up, so it has one step fewer
 const VENUE_STEPS: { id: number; title: string; subtitle: string; icon: BrandIconName }[] = [
   { id: 1, title: 'Create account', subtitle: 'Your venue and contact details', icon: 'user' },
   { id: 2, title: 'Verify email', subtitle: 'Enter the 6-digit code', icon: 'mail' },
-  { id: 3, title: 'Add your device', subtitle: 'Serial number and name', icon: 'device' }
+  { id: 3, title: 'Add your device', subtitle: 'Optional: you can add it later', icon: 'device' }
+]
+
+// A performer invited by a venue does not have a device yet: no device step, straight to payouts
+const INVITED_STEPS: { id: number; title: string; subtitle: string; icon: BrandIconName }[] = [
+  { id: 1, title: 'Create account', subtitle: 'Your name, email and password', icon: 'user' },
+  { id: 2, title: 'Verify email', subtitle: 'Enter the 6-digit code', icon: 'mail' },
+  { id: 3, title: 'Get paid', subtitle: 'Verify your identity with Stripe', icon: 'bank' }
 ]
 
 type AccountType = 'performer' | 'venue'
@@ -136,8 +143,12 @@ const Onboarding: React.FC = () => {
   }, [inviteToken])
 
   const isVenue = accountType === 'venue'
-  const steps = isVenue ? VENUE_STEPS : STEPS
-  const finishStep = steps.length + 1
+  // Invited by a venue: no device yet, so the device step is skipped (it stays internal step 3, hidden)
+  const invited = !isVenue && !!inviteToken
+  const steps = isVenue ? VENUE_STEPS : invited ? INVITED_STEPS : STEPS
+  const finishStep = isVenue ? 4 : 5
+  // The step number shown to the person (an invited performer sees "3 of 3" on the payouts step, which is internal step 4)
+  const shownStep = invited && step === 4 ? 3 : step
 
   // Resend countdown
   useEffect(() => {
@@ -346,7 +357,7 @@ const Onboarding: React.FC = () => {
       try {
         const verified = await verifyEmail()
         if (!verified) return
-        setStep(3)
+        setStep(invited ? 4 : 3)
       } finally {
         verifyingRef.current = false
         setIsLoading(false)
@@ -476,7 +487,44 @@ const Onboarding: React.FC = () => {
     }
   }
 
+  // The device is optional: it can be added later from the portal
+  const skipDevice = () => {
+    setErrors(prev => ({ ...prev, serialNumber: '' }))
+    setDeviceConflict(null)
+    setFormData(prev => ({ ...prev, serialNumber: '', deviceNickname: '' }))
+    setStep(isVenue ? finishStep : 4)
+  }
+
+  // Payouts without a device (invited, or skipped it): sign in, then use the profile-level Stripe set-up, the same one the profile page uses
+  const startProfileKYC = async () => {
+    setIsLoading(true)
+    setShowKycSupportActions(false)
+    try {
+      const signIn = await apiService.login({ email: formData.email, password: formData.password })
+      const accessToken: string | undefined = signIn.data?.accessToken
+      if (signIn.error || !accessToken) throw new Error('We could not sign you in to continue. Please try again.')
+      localStorage.setItem('token', accessToken)
+      if (signIn.data?.refreshToken) localStorage.setItem('refreshToken', signIn.data.refreshToken)
+
+      let link = await apiService.post('/api/stripe/profile-onboarding-link', {})
+      // An account may already exist (they started before): then use the verification link instead
+      if (!link.error && !link.data?.onboardingUrl) link = await apiService.post('/api/stripe/profile-verification-link', {})
+      if (link.error || !link.data?.onboardingUrl) throw new Error(link.error || 'We could not start identity verification. Please try again.')
+
+      const url: string = link.data.onboardingUrl
+      if (isIOS) setOnboardingUrl(url)
+      else window.location.href = url
+    } catch (err) {
+      logger.error('Profile KYC failed:', err)
+      setErrors(prev => ({ ...prev, general: err instanceof Error ? err.message : 'We could not start identity verification. Please try again.' }))
+      setShowKycSupportActions(true)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
   const startKYC = async () => {
+    if (!formData.serialNumber.trim()) return startProfileKYC()
     setIsLoading(true)
     setShowKycSupportActions(false)
     try {
@@ -1011,7 +1059,7 @@ const Onboarding: React.FC = () => {
 
   const renderDevice = () => (
     <div>
-      {renderStepHeading('Add your device', isVenue ? 'Enter the serial number printed on one of your Tipwave devices. You can add more later.' : 'Enter the serial number printed on your Tipwave device.')}
+      {renderStepHeading('Add your device', isVenue ? 'Enter the serial number printed on one of your Tipwave devices, or skip this and add devices later from your portal.' : 'Enter the serial number printed on your Tipwave device. Do not have it with you? Skip this and add it later from your portal.')}
 
       <div className="space-y-5">
         <Field
@@ -1220,23 +1268,23 @@ const Onboarding: React.FC = () => {
         {step === 1 && (
           <div className="mb-6">
             <h1 className="text-3xl font-bold text-ink-900">Set up Tipwave</h1>
-            <p className="mt-1 text-ink-500">{isVenue ? "About 3 minutes. You'll need the serial number of one of your devices." : "About 5 minutes. You'll need your device and a photo ID."}</p>
+            <p className="mt-1 text-ink-500">{isVenue ? "About 3 minutes. Your device's serial number is optional for now." : invited ? "About 5 minutes. You'll need a photo ID to set up payouts." : "About 5 minutes. You'll need a photo ID. Your device is optional for now."}</p>
           </div>
         )}
 
         {/* Phones: a slim progress bar */}
-        {step <= steps.length && (
+        {shownStep <= steps.length && (
           <div className="mb-4 lg:hidden">
             <div className="mb-1.5 flex justify-between text-sm">
-              <span className="font-semibold text-ink-900">{steps[step - 1].title}</span>
+              <span className="font-semibold text-ink-900">{steps[shownStep - 1].title}</span>
               <span className="text-ink-500">
-                Step {step} of {steps.length}
+                Step {shownStep} of {steps.length}
               </span>
             </div>
             <div className="h-1.5 w-full rounded-full bg-slate-200">
               <div
                 className="h-1.5 rounded-full bg-brand-600 transition-all duration-300"
-                style={{ width: `${(step / steps.length) * 100}%` }}
+                style={{ width: `${(shownStep / steps.length) * 100}%` }}
               />
             </div>
           </div>
@@ -1248,9 +1296,9 @@ const Onboarding: React.FC = () => {
             <ol className="sticky top-6 space-y-5 rounded-2xl bg-white p-6 shadow-card">
               {steps.map(s => (
                 <li key={s.id} className="flex items-center gap-3">
-                  <IconTile name={s.icon} size={40} state={s.id < step ? 'done' : s.id === step ? 'current' : 'upcoming'} />
+                  <IconTile name={s.icon} size={40} state={s.id < shownStep ? 'done' : s.id === shownStep ? 'current' : 'upcoming'} />
                   <div className="min-w-0">
-                    <p className={`text-sm font-semibold ${s.id <= step ? 'text-ink-900' : 'text-ink-500'}`}>{s.title}</p>
+                    <p className={`text-sm font-semibold ${s.id <= shownStep ? 'text-ink-900' : 'text-ink-500'}`}>{s.title}</p>
                     <p className="text-xs text-ink-500">{s.subtitle}</p>
                   </div>
                 </li>
@@ -1263,16 +1311,23 @@ const Onboarding: React.FC = () => {
               {renderCurrentStep()}
 
               <div className="mt-8 flex flex-col-reverse gap-3 border-t border-slate-100 pt-6 sm:flex-row sm:items-center sm:justify-between">
-                {step > 1 && step <= steps.length && step !== 2 ? (
+                {step > 1 && step <= (isVenue ? 3 : 4) && step !== 2 && !(invited && step === 4) ? (
                   <Button variant="ghost" onClick={handleBack} icon="chevron-left" disabled={isLoading}>
                     Back
                   </Button>
                 ) : (
                   <span />
                 )}
-                <Button size="lg" onClick={onPrimary} disabled={primaryDisabled} loading={isLoading}>
-                  {primaryLabel}
-                </Button>
+                <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center">
+                  {step === 3 && (
+                    <Button variant="ghost" size="lg" onClick={skipDevice} disabled={isLoading}>
+                      Skip for now
+                    </Button>
+                  )}
+                  <Button size="lg" onClick={onPrimary} disabled={primaryDisabled} loading={isLoading}>
+                    {primaryLabel}
+                  </Button>
+                </div>
               </div>
             </div>
           </main>
