@@ -29,6 +29,13 @@ interface DeviceInfo {
   stripeAccountId?: string
   isAllowSongRequest?: boolean
   tipAmounts?: number[]
+  // Venue devices: who is on, and the session the page must send back with a tip
+  isVenueDevice?: boolean
+  venueName?: string
+  sessionId?: string
+  noActivePerformer?: boolean
+  performerMismatch?: boolean
+  expectedPerformerName?: string
 }
 
 interface PaymentMethodsCheckResult {
@@ -295,19 +302,66 @@ const TippingInterface: React.FC = () => {
     }
   }
 
+  // On a venue's device the performer can change while this page is open. Keep watching, and reload when it does,
+  // so the tipper always sees (and pays) whoever is really on the device.
+  const venueWatch = deviceInfo?.isVenueDevice ? `${deviceInfo.sessionId ?? ''}|${deviceInfo.noActivePerformer ? 1 : 0}|${deviceInfo.performerMismatch ? 1 : 0}` : null
+  useEffect(() => {
+    if (!deviceId || venueWatch === null) return
+    const timer = setInterval(async () => {
+      if (document.visibilityState !== 'visible') return
+      try {
+        const p = new URLSearchParams(window.location.search).get('p')
+        const r = await fetch(`${getApiBaseUrl()}/api/devices/${deviceId}/public${p ? `?performerId=${encodeURIComponent(p)}` : ''}`)
+        if (!r.ok) return
+        const d = await r.json()
+        const now = `${d.sessionId ?? ''}|${d.noActivePerformer ? 1 : 0}|${d.performerMismatch ? 1 : 0}`
+        if (now !== venueWatch) {
+          toast.message('The performer on this device changed. Updating…')
+          setTimeout(() => window.location.reload(), 1200)
+        }
+      } catch {
+        /* try again next time */
+      }
+    }, 30000)
+    return () => clearInterval(timer)
+  }, [deviceId, venueWatch])
+
   // Fetch device info and check payment methods
   useEffect(() => {
     const fetchDeviceData = async () => {
       if (!deviceId) return
       
       try {
-        const deviceResponse = await fetch(`${getApiBaseUrl()}/api/devices/${deviceId}/public`)
+        // A poster printed for one performer carries their id (?p=...), so a different performer is never paid by mistake
+        const expectedPerformer = new URLSearchParams(window.location.search).get('p')
+        const deviceResponse = await fetch(
+          `${getApiBaseUrl()}/api/devices/${deviceId}/public${expectedPerformer ? `?performerId=${encodeURIComponent(expectedPerformer)}` : ''}`
+        )
         if (!deviceResponse.ok) {
           toast.error('Device not found')
           return
         }
         
         const device = await deviceResponse.json()
+
+        // A venue device with nobody on it, or a poster for a performer who is not the one on it: no tipping
+        if (device.noActivePerformer || device.performerMismatch) {
+          setDeviceInfo({
+            id: device.id,
+            uuid: device.uuid,
+            ownerFirstName: '',
+            ownerLastName: '',
+            ownerId: device.id,
+            isVenueDevice: true,
+            venueName: device.venueName,
+            noActivePerformer: !!device.noActivePerformer,
+            performerMismatch: !!device.performerMismatch,
+            expectedPerformerName: device.expectedPerformerName
+          })
+          setCheckingPaymentMethods(false)
+          return
+        }
+
         const deviceInfoData = {
           id: device.id,
           uuid: device.uuid,
@@ -322,7 +376,10 @@ const TippingInterface: React.FC = () => {
           isAllowSongRequest: device.isAllowSongRequest,
           isStripeVerified: device.isStripeVerified || false,
           isKycVerified: device.isKycVerified || false,
-          tipAmounts: device.tipAmounts
+          tipAmounts: device.tipAmounts,
+          isVenueDevice: !!device.isVenueDevice,
+          venueName: device.venueName || undefined,
+          sessionId: device.sessionId || undefined
         }
         setDeviceInfo(deviceInfoData)
         
@@ -769,7 +826,8 @@ const TippingInterface: React.FC = () => {
         effect: getLightEffect(amount),
         duration: 3000,
         paymentMethodId: paymentMethodId || undefined,
-        stripeCustomerId: stripeCustomerId || undefined
+        stripeCustomerId: stripeCustomerId || undefined,
+        ...(deviceInfo?.isVenueDevice && deviceInfo.sessionId ? { expectedSessionId: deviceInfo.sessionId } : {})
       }
       logger.log('🎰 SUBMITTING TIP PAYLOAD TO BACKEND (Classic Mode):', tipPayload)
 
@@ -781,6 +839,13 @@ const TippingInterface: React.FC = () => {
         refreshPaymentMethodSession()
       } else {
         // Provide specific error messages based on error type
+        // On a venue device the performer may have changed since this page loaded; nothing was charged
+        if (response.raw?.code === 'performer_changed' || response.raw?.code === 'no_performer') {
+          setSentAmount(null); setSentSong(null)
+          toast.error(response.error || 'The performer just changed. Please refresh.')
+          setTimeout(() => window.location.reload(), 1800)
+          return
+        }
         let errorMsg = response.error || 'Failed to submit tip. Please try again.'
         if (response.errorType === 'timeout') {
           errorMsg = '⏱️ Request timeout - the server took too long to respond. Please check your internet connection and try again.'
@@ -828,6 +893,7 @@ const TippingInterface: React.FC = () => {
         duration: 3000,
         paymentMethodId: paymentMethodId || undefined,
         stripeCustomerId: stripeCustomerId || undefined,
+        ...(deviceInfo?.isVenueDevice && deviceInfo.sessionId ? { expectedSessionId: deviceInfo.sessionId } : {}),
         // Include song request fields if song is selected
         ...(selectedSongSnapshot && {
           songId: selectedSongSnapshot.id,
@@ -853,6 +919,13 @@ const TippingInterface: React.FC = () => {
         refreshPaymentMethodSession()
       } else {
         // Provide specific error messages based on error type
+        // On a venue device the performer may have changed since this page loaded; nothing was charged
+        if (response.raw?.code === 'performer_changed' || response.raw?.code === 'no_performer') {
+          setSentAmount(null); setSentSong(null)
+          toast.error(response.error || 'The performer just changed. Please refresh.')
+          setTimeout(() => window.location.reload(), 1800)
+          return
+        }
         let errorMsg = response.error || 'Failed to submit tip. Please try again.'
         if (response.errorType === 'timeout') {
           errorMsg = '⏱️ Request timeout - the server took too long to respond. Please check your internet connection and try again.'
@@ -947,6 +1020,25 @@ const TippingInterface: React.FC = () => {
     )
   }
 
+  // A venue's device with nobody on it, or a performer's poster while someone else is on: no tipping
+  if (deviceInfo?.noActivePerformer) {
+    return (
+      <InfoScreen icon="clock" title="No one is performing right now">
+        {deviceInfo.venueName ? `${deviceInfo.venueName} has this device, but` : 'Nobody is using this device and'} tips are paused until a performer starts. This page checks again by itself.
+      </InfoScreen>
+    )
+  }
+  if (deviceInfo?.performerMismatch) {
+    return (
+      <InfoScreen
+        icon="info"
+        title={`${deviceInfo.expectedPerformerName || 'This performer'} is not active here right now`}
+      >
+        {deviceInfo.expectedPerformerName || 'This performer'} is not using this Tipwave device at the moment, so tips cannot go to them here. To tip the performer who is on, scan the venue's own QR code on the device.
+      </InfoScreen>
+    )
+  }
+
   // Check if device is verified (Stripe and KYC)
   if (isDeviceVerified === false) {
     return (
@@ -988,6 +1080,7 @@ const TippingInterface: React.FC = () => {
     <>
       <TipScreen
         performerName={performerName}
+        venueName={deviceInfo?.isVenueDevice ? deviceInfo.venueName : undefined}
         photoUrl={deviceInfo?.profilePhotoUrl}
         bio={deviceInfo?.bio}
         amounts={tipAmounts}

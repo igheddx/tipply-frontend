@@ -14,6 +14,9 @@ import SongManagement from '../components/SongManagement'
 import SongRequestMonitor from '../components/SongRequestMonitor'
 import TipsTab from '../components/portal/TipsTab'
 import AlertsCard from '../components/portal/AlertsCard'
+import { SessionBanner } from '../components/venue/SessionBanner'
+import { VenueInvites } from '../components/venue/VenueInvites'
+import { VenueSection } from '../components/venue/VenueSection'
 import { turnOffAlertsOnSignOut } from '../utils/pushAlerts'
 import { API_BASE_URL } from '../utils/config'
 import { setDemoModeOn, setShowDemoData, demoQuery } from '../utils/demoView'
@@ -240,6 +243,12 @@ const Dashboard: React.FC = () => {
           return
         }
         
+        // A venue account has its own portal
+        if (profileResp.data.accountType === 'venue') {
+          navigate('/venue')
+          return
+        }
+
         setUserProfile(profileResp.data)
         const profileId = profileResp.data.id
         logger.log(`✅ [PERF] User profile set: ${profileId}`)
@@ -1461,6 +1470,7 @@ const Dashboard: React.FC = () => {
         userPhotoUrl={userProfile?.profilePhotoUrl || undefined}
         onOpenProfile={() => navigate('/profile')}
         onLogout={handleLogout}
+        topNotice={<SessionBanner />}
       >
         <DemoBanner demoMode={demoMode} showDemo={showDemo} onToggle={handleShowDemoChange} />
         {activeTab !== 'overview' && activeTab !== 'addDevice' && (
@@ -1475,6 +1485,8 @@ const Dashboard: React.FC = () => {
           />
         )}
         <div>
+            {activeTab === 'overview' && <VenueInvites />}
+
             {activeTab === 'overview' && (
               <HomeTab
                 data={homeData}
@@ -1688,6 +1700,9 @@ const Dashboard: React.FC = () => {
                     )
                   })}
                 </div>
+
+                <VenueInvites />
+                <VenueSection performerId={userProfile?.id} stageName={userProfile?.stageName || userProfile?.firstName} />
 
                 <TipAmountsEditor
                   amounts={tipAmounts}

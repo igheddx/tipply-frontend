@@ -42,6 +42,8 @@ export interface TipScreenProps {
   performerName: string
   photoUrl?: string
   bio?: string
+  /** On a venue's device: the venue the performer is playing at */
+  venueName?: string
   amounts: number[]
   /** False until the performer and the tipper's ID have loaded: shows placeholders and ignores taps */
   ready: boolean
@@ -66,6 +68,7 @@ export interface TipScreenProps {
  */
 export function TipScreen({
   performerName,
+  venueName,
   photoUrl,
   bio,
   amounts,
@@ -157,6 +160,7 @@ export function TipScreen({
           ) : (
             <div aria-hidden className="h-5 w-40 animate-pulse rounded bg-white/20" />
           )}
+          {venueName && performerName && <p className="truncate text-xs font-semibold text-white/80">Performing at {venueName}</p>}
           {bio && <p className="truncate text-xs text-white/70 [@media(max-height:640px)]:hidden">{bio}</p>}
         </div>
       </header>

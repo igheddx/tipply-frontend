@@ -1,7 +1,8 @@
 import logger from "../utils/logger";
 import React, { useState, useEffect, useRef } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import apiService from '../services/api'
+import { venueApi } from '../services/venueApi'
 import { getEncryptDecryptNoUserName } from '../utils/encryption'
 import { BrandIcon, IconTile, type BrandIconName } from '../components/icons/BrandIcons'
 import { Banner, Button, Modal, PageLoader } from '../components/ui'
@@ -11,10 +12,26 @@ const RESEND_SECONDS = 30
 const STEPS: { id: number; title: string; subtitle: string; icon: BrandIconName }[] = [
   { id: 1, title: 'Create account', subtitle: 'Your name, email and password', icon: 'user' },
   { id: 2, title: 'Verify email', subtitle: 'Enter the 6-digit code', icon: 'mail' },
-  { id: 3, title: 'Add your device', subtitle: 'Serial number and nickname', icon: 'device' },
+  { id: 3, title: 'Add your device', subtitle: 'Optional: you can add it later', icon: 'device' },
   { id: 4, title: 'Get paid', subtitle: 'Verify your identity with Stripe', icon: 'bank' }
 ]
-const FINISH_STEP = STEPS.length + 1
+// A venue has no payouts to set up, so it has one step fewer
+const VENUE_STEPS: { id: number; title: string; subtitle: string; icon: BrandIconName }[] = [
+  { id: 1, title: 'Create account', subtitle: 'Your venue and contact details', icon: 'user' },
+  { id: 2, title: 'Verify email', subtitle: 'Enter the 6-digit code', icon: 'mail' },
+  { id: 3, title: 'Add your device', subtitle: 'Optional: you can add it later', icon: 'device' }
+]
+
+// A performer invited by a venue does not have a device yet: no device step, straight to payouts
+const INVITED_STEPS: { id: number; title: string; subtitle: string; icon: BrandIconName }[] = [
+  { id: 1, title: 'Create account', subtitle: 'Your name, email and password', icon: 'user' },
+  { id: 2, title: 'Verify email', subtitle: 'Enter the 6-digit code', icon: 'mail' },
+  { id: 3, title: 'Get paid', subtitle: 'Verify your identity with Stripe', icon: 'bank' }
+]
+
+type AccountType = 'performer' | 'venue'
+
+const VENUE_TYPES = ['Bar or pub', 'Restaurant', 'Brewery or winery', 'Club or music venue', 'Event space', 'Hotel or resort', 'Outdoor stage', 'Other']
 
 const inputClass = (hasError?: boolean) =>
   `w-full h-12 px-4 rounded-xl border bg-white text-ink-900 placeholder:text-ink-400 transition-colors focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent ${
@@ -60,8 +77,21 @@ const Onboarding: React.FC = () => {
     confirmPassword: '',
     serialNumber: '',
     deviceNickname: '',
-    isAllowSongRequest: false
+    isAllowSongRequest: false,
+    // Venue only
+    businessName: '',
+    addressLine1: '',
+    city: '',
+    state: '',
+    postalCode: '',
+    venueType: '',
+    acceptTerms: false
   })
+  const [searchParams] = useSearchParams()
+  const inviteToken = searchParams.get('invite') || ''
+  const [accountType, setAccountType] = useState<AccountType>('performer')
+  const [venuesEnabled, setVenuesEnabled] = useState(false)
+  const [invitedBy, setInvitedBy] = useState<string | null>(null)
 
   const [errors, setErrors] = useState<{[key: string]: string}>({})
   const [isLoading, setIsLoading] = useState(false)
@@ -93,6 +123,32 @@ const Onboarding: React.FC = () => {
     }
     generateApiKey()
   }, [])
+
+  // Is the venue option switched on? And did a venue invite this person?
+  useEffect(() => {
+    let cancelled = false
+    venueApi.features().then(r => {
+      if (!cancelled) setVenuesEnabled(!!r.data?.venues)
+    })
+    if (inviteToken) {
+      venueApi.invitePreview(inviteToken).then(r => {
+        if (cancelled || !r.data) return
+        setInvitedBy(r.data.venueName)
+        if (r.data.email) setFormData(prev => (prev.email ? prev : { ...prev, email: r.data.email }))
+      })
+    }
+    return () => {
+      cancelled = true
+    }
+  }, [inviteToken])
+
+  const isVenue = accountType === 'venue'
+  // Invited by a venue: no device yet, so the device step is skipped (it stays internal step 3, hidden)
+  const invited = !isVenue && !!inviteToken
+  const steps = isVenue ? VENUE_STEPS : invited ? INVITED_STEPS : STEPS
+  const finishStep = isVenue ? 4 : 5
+  // The step number shown to the person (an invited performer sees "3 of 3" on the payouts step, which is internal step 4)
+  const shownStep = invited && step === 4 ? 3 : step
 
   // Resend countdown
   useEffect(() => {
@@ -254,7 +310,16 @@ const Onboarding: React.FC = () => {
 
     if (!formData.firstName.trim()) newErrors.firstName = 'Enter your first name'
     if (!formData.lastName.trim()) newErrors.lastName = 'Enter your last name'
-    if (!formData.stageName.trim()) newErrors.stageName = 'Enter the name your audience will see'
+    if (!isVenue && !formData.stageName.trim()) newErrors.stageName = 'Enter the name your audience will see'
+    if (isVenue) {
+      if (!formData.businessName.trim()) newErrors.businessName = 'Enter the business name'
+      if (formData.phone.replace(/\D/g, '').length < 10) newErrors.phone = 'Enter a phone number with area code'
+      if (!formData.addressLine1.trim()) newErrors.addressLine1 = 'Enter the street address'
+      if (!formData.city.trim()) newErrors.city = 'Enter the city'
+      if (!formData.state.trim()) newErrors.state = 'Enter the state'
+      if (!formData.postalCode.trim()) newErrors.postalCode = 'Enter the zip code'
+      if (!formData.acceptTerms) newErrors.acceptTerms = 'Please accept the venue terms'
+    }
     if (!formData.email.trim()) {
       newErrors.email = 'Enter your email'
     } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
@@ -292,7 +357,7 @@ const Onboarding: React.FC = () => {
       try {
         const verified = await verifyEmail()
         if (!verified) return
-        setStep(3)
+        setStep(invited ? 4 : 3)
       } finally {
         verifyingRef.current = false
         setIsLoading(false)
@@ -335,7 +400,20 @@ const Onboarding: React.FC = () => {
         bio: formData.bio,
         email: formData.email,
         phone: formData.phone,
-        password: formData.password
+        password: formData.password,
+        ...(isVenue
+          ? {
+              accountType: 'venue',
+              businessName: formData.businessName.trim(),
+              addressLine1: formData.addressLine1.trim(),
+              city: formData.city.trim(),
+              state: formData.state.trim(),
+              postalCode: formData.postalCode.trim(),
+              venueType: formData.venueType || undefined,
+              timeZoneId: Intl.DateTimeFormat().resolvedOptions().timeZone,
+              acceptTerms: formData.acceptTerms
+            }
+          : {})
       })
 
       if (result.error) {
@@ -382,7 +460,7 @@ const Onboarding: React.FC = () => {
         email: formData.email,
         phone: formData.phone,
         nickname: formData.deviceNickname,
-        isAllowSongRequest: formData.isAllowSongRequest
+        isAllowSongRequest: isVenue ? false : formData.isAllowSongRequest
       })
 
       if (result.error) {
@@ -409,7 +487,44 @@ const Onboarding: React.FC = () => {
     }
   }
 
+  // The device is optional: it can be added later from the portal
+  const skipDevice = () => {
+    setErrors(prev => ({ ...prev, serialNumber: '' }))
+    setDeviceConflict(null)
+    setFormData(prev => ({ ...prev, serialNumber: '', deviceNickname: '' }))
+    setStep(isVenue ? finishStep : 4)
+  }
+
+  // Payouts without a device (invited, or skipped it): sign in, then use the profile-level Stripe set-up, the same one the profile page uses
+  const startProfileKYC = async () => {
+    setIsLoading(true)
+    setShowKycSupportActions(false)
+    try {
+      const signIn = await apiService.login({ email: formData.email, password: formData.password })
+      const accessToken: string | undefined = signIn.data?.accessToken
+      if (signIn.error || !accessToken) throw new Error('We could not sign you in to continue. Please try again.')
+      localStorage.setItem('token', accessToken)
+      if (signIn.data?.refreshToken) localStorage.setItem('refreshToken', signIn.data.refreshToken)
+
+      let link = await apiService.post('/api/stripe/profile-onboarding-link', {})
+      // An account may already exist (they started before): then use the verification link instead
+      if (!link.error && !link.data?.onboardingUrl) link = await apiService.post('/api/stripe/profile-verification-link', {})
+      if (link.error || !link.data?.onboardingUrl) throw new Error(link.error || 'We could not start identity verification. Please try again.')
+
+      const url: string = link.data.onboardingUrl
+      if (isIOS) setOnboardingUrl(url)
+      else window.location.href = url
+    } catch (err) {
+      logger.error('Profile KYC failed:', err)
+      setErrors(prev => ({ ...prev, general: err instanceof Error ? err.message : 'We could not start identity verification. Please try again.' }))
+      setShowKycSupportActions(true)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
   const startKYC = async () => {
+    if (!formData.serialNumber.trim()) return startProfileKYC()
     setIsLoading(true)
     setShowKycSupportActions(false)
     try {
@@ -635,6 +750,18 @@ const Onboarding: React.FC = () => {
   const handleSubmit = async () => {
     setIsLoading(true)
     try {
+      if (isVenue) {
+        // A venue has no Stripe step, so it is not signed in yet: sign in now and go to the venue portal
+        const login = await apiService.login({ email: formData.email, password: formData.password })
+        if (login.data?.accessToken) {
+          localStorage.setItem('token', login.data.accessToken)
+          if (login.data.refreshToken) localStorage.setItem('refreshToken', login.data.refreshToken)
+          navigate('/venue')
+        } else {
+          navigate('/login')
+        }
+        return
+      }
       // Navigate to dashboard
       navigate('/dashboard')
     } catch (err) {
@@ -661,9 +788,44 @@ const Onboarding: React.FC = () => {
     </div>
   )
 
+  const typeChoice = (value: AccountType, title: string, text: string, icon: BrandIconName) => (
+    <button
+      type="button"
+      role="radio"
+      aria-checked={accountType === value}
+      onClick={() => setAccountType(value)}
+      disabled={profileCreated}
+      className={`flex flex-1 items-start gap-3 rounded-2xl border-2 p-4 text-left transition-colors disabled:opacity-60 ${
+        accountType === value ? 'border-brand-600 bg-brand-50' : 'border-slate-200 bg-white hover:border-slate-300'
+      }`}
+    >
+      <IconTile name={icon} size={40} state={accountType === value ? 'current' : 'upcoming'} />
+      <span>
+        <span className="block font-bold text-ink-900">{title}</span>
+        <span className="block text-sm text-ink-500">{text}</span>
+      </span>
+    </button>
+  )
+
   const renderAccount = () => (
     <div>
       {renderStepHeading('Create your account', 'This is how you will sign in to your Tipwave portal.')}
+
+      {invitedBy && (
+        <Banner tone="info" title={`${invitedBy} invited you`} className="mb-5">
+          Create your performer account and finish setting up payouts. You will be linked to {invitedBy} automatically.
+        </Banner>
+      )}
+
+      {venuesEnabled && !inviteToken && (
+        <div className="mb-6" role="radiogroup" aria-label="Account type">
+          <p className="mb-2 text-sm font-semibold text-ink-700">I am a…</p>
+          <div className="flex flex-col gap-3 sm:flex-row">
+            {typeChoice('performer', 'Performer', 'I play, sing or entertain and get tipped.', 'mic')}
+            {typeChoice('venue', 'Venue', 'I own a venue with Tipwave devices that performers can use.', 'home')}
+          </div>
+        </div>
+      )}
 
       {errors.accountError && step === 1 && (
         <Banner tone="error" title="We could not create your account" className="mb-5">
@@ -673,7 +835,7 @@ const Onboarding: React.FC = () => {
 
       <div className="space-y-5">
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-          <Field id="firstName" label="First name" error={errors.firstName}>
+          <Field id="firstName" label={isVenue ? 'Contact first name' : 'First name'} error={errors.firstName}>
             <input
               id="firstName"
               name="firstName"
@@ -683,7 +845,7 @@ const Onboarding: React.FC = () => {
               onChange={handleInputChange}
             />
           </Field>
-          <Field id="lastName" label="Last name" error={errors.lastName}>
+          <Field id="lastName" label={isVenue ? 'Contact last name' : 'Last name'} error={errors.lastName}>
             <input
               id="lastName"
               name="lastName"
@@ -695,21 +857,56 @@ const Onboarding: React.FC = () => {
           </Field>
         </div>
 
-        <Field
-          id="stageName"
-          label="Stage name"
-          error={errors.stageName}
-          hint="The name your audience sees on your tipping page."
-        >
-          <input
+        {isVenue ? (
+          <>
+            <Field id="businessName" label="Business name" error={errors.businessName} hint="Performers and their fans will see this name.">
+              <input id="businessName" name="businessName" autoComplete="organization" className={inputClass(!!errors.businessName)} placeholder="The Flying J" value={formData.businessName} onChange={handleInputChange} />
+            </Field>
+            <Field id="venueType" label="Type of venue" optional>
+              <select id="venueType" name="venueType" className={inputClass(false)} value={formData.venueType} onChange={handleInputChange}>
+                <option value="">Choose one</option>
+                {VENUE_TYPES.map(t => (
+                  <option key={t} value={t}>
+                    {t}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <Field id="phone" label="Phone number" error={errors.phone} hint="So Tipwave and your performers can reach you.">
+              <input id="phone" name="phone" type="tel" autoComplete="tel" className={inputClass(!!errors.phone)} placeholder="(555) 123-4567" value={formData.phone} onChange={handleInputChange} />
+            </Field>
+            <Field id="addressLine1" label="Street address" error={errors.addressLine1}>
+              <input id="addressLine1" name="addressLine1" autoComplete="address-line1" className={inputClass(!!errors.addressLine1)} value={formData.addressLine1} onChange={handleInputChange} />
+            </Field>
+            <div className="grid grid-cols-1 gap-5 sm:grid-cols-3">
+              <Field id="city" label="City" error={errors.city}>
+                <input id="city" name="city" autoComplete="address-level2" className={inputClass(!!errors.city)} value={formData.city} onChange={handleInputChange} />
+              </Field>
+              <Field id="state" label="State" error={errors.state}>
+                <input id="state" name="state" autoComplete="address-level1" className={inputClass(!!errors.state)} value={formData.state} onChange={handleInputChange} />
+              </Field>
+              <Field id="postalCode" label="Zip code" error={errors.postalCode}>
+                <input id="postalCode" name="postalCode" autoComplete="postal-code" inputMode="numeric" className={inputClass(!!errors.postalCode)} value={formData.postalCode} onChange={handleInputChange} />
+              </Field>
+            </div>
+          </>
+        ) : (
+          <Field
             id="stageName"
-            name="stageName"
-            className={inputClass(!!errors.stageName)}
-            placeholder="Your artist or performer name"
-            value={formData.stageName}
-            onChange={handleInputChange}
-          />
-        </Field>
+            label="Stage name"
+            error={errors.stageName}
+            hint="The name your audience sees on your tipping page."
+          >
+            <input
+              id="stageName"
+              name="stageName"
+              className={inputClass(!!errors.stageName)}
+              placeholder="Your artist or performer name"
+              value={formData.stageName}
+              onChange={handleInputChange}
+            />
+          </Field>
+        )}
 
         <Field id="email" label="Email" error={errors.email}>
           <input
@@ -767,6 +964,7 @@ const Onboarding: React.FC = () => {
           />
         </Field>
 
+        {!isVenue && (
         <details className="rounded-xl border border-slate-200 px-4 py-3">
           <summary className="cursor-pointer text-sm font-semibold text-ink-700">Add a phone number and bio (optional)</summary>
           <div className="mt-4 space-y-5">
@@ -794,6 +992,28 @@ const Onboarding: React.FC = () => {
             </Field>
           </div>
         </details>
+        )}
+        {isVenue && (
+          <div>
+            <label className="flex items-start gap-3 text-sm text-ink-700">
+              <input
+                type="checkbox"
+                checked={formData.acceptTerms}
+                onChange={e => {
+                  setFormData(prev => ({ ...prev, acceptTerms: e.target.checked }))
+                  setErrors(prev => ({ ...prev, acceptTerms: '' }))
+                }}
+                className="mt-0.5 h-5 w-5 rounded border-slate-300 accent-brand-700"
+              />
+              <span>
+                I agree to the venue terms: I will only authorise performers I trust, tips go to the performer using a device, and Tipwave's session records are the record of who performed.
+              </span>
+            </label>
+            {errors.acceptTerms && <p className="mt-1.5 text-sm text-red-600">{errors.acceptTerms}</p>}
+            <p className="mt-3 text-sm text-ink-500">Tipwave reviews each new venue before it can invite performers. You can add your devices right away.</p>
+          </div>
+        )}
+
       </div>
     </div>
   )
@@ -839,7 +1059,7 @@ const Onboarding: React.FC = () => {
 
   const renderDevice = () => (
     <div>
-      {renderStepHeading('Add your device', 'Enter the serial number printed on your Tipwave device.')}
+      {renderStepHeading('Add your device', isVenue ? 'Enter the serial number printed on one of your Tipwave devices, or skip this and add devices later from your portal.' : 'Enter the serial number printed on your Tipwave device. Do not have it with you? Skip this and add it later from your portal.')}
 
       <div className="space-y-5">
         <Field
@@ -900,6 +1120,7 @@ const Onboarding: React.FC = () => {
           />
         </Field>
 
+        {!isVenue && (
         <div className="flex items-center justify-between gap-4 rounded-2xl border border-slate-200 p-4">
           <div className="flex items-center gap-3">
             <IconTile name="music" size={40} />
@@ -921,6 +1142,7 @@ const Onboarding: React.FC = () => {
             />
           </button>
         </div>
+        )}
       </div>
     </div>
   )
@@ -984,7 +1206,15 @@ const Onboarding: React.FC = () => {
     </div>
   )
 
-  const renderFinish = () => (
+  const renderFinish = () => isVenue ? (
+    <div className="text-center">
+      <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-brand-50">
+        <BrandIcon name="check-circle" size={34} />
+      </div>
+      <h2 className="text-2xl font-bold text-ink-900">Your venue is set up</h2>
+      <p className="mt-1 text-ink-500">Tipwave will review it and email you when it is approved. After that you can invite performers and let them use your devices.</p>
+    </div>
+  ) : (
     <div className="text-center">
       <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-brand-50">
         <BrandIcon name="check-circle" size={34} />
@@ -1003,21 +1233,21 @@ const Onboarding: React.FC = () => {
       case 3:
         return renderDevice()
       case 4:
-        return renderPayouts()
+        return isVenue ? renderFinish() : renderPayouts()
       default:
         return renderFinish()
     }
   }
 
   const primaryLabel =
-    step === 1 ? 'Create account' : step === 2 ? 'Verify' : step === 3 ? 'Add device' : step === 4 ? 'Verify identity with Stripe' : 'Go to your portal'
+    step === 1 ? 'Create account' : step === 2 ? 'Verify' : step === 3 ? 'Add device' : step === 4 && !isVenue ? 'Verify identity with Stripe' : isVenue ? 'Go to your venue portal' : 'Go to your portal'
 
   const primaryDisabled =
     isLoading ||
     (step === 2 && verificationCode.length < 6) ||
     (step === 3 && (isValidatingDevice || !formData.serialNumber.trim()))
 
-  const onPrimary = step === 4 ? startKYC : step === FINISH_STEP ? handleSubmit : handleNext
+  const onPrimary = isVenue ? (step === finishStep ? handleSubmit : handleNext) : step === 4 ? startKYC : step === finishStep ? handleSubmit : handleNext
 
   if (!apiKeyGenerated) {
     return (
@@ -1038,23 +1268,23 @@ const Onboarding: React.FC = () => {
         {step === 1 && (
           <div className="mb-6">
             <h1 className="text-3xl font-bold text-ink-900">Set up Tipwave</h1>
-            <p className="mt-1 text-ink-500">About 5 minutes. You'll need your device and a photo ID.</p>
+            <p className="mt-1 text-ink-500">{isVenue ? "About 3 minutes. Your device's serial number is optional for now." : invited ? "About 5 minutes. You'll need a photo ID to set up payouts." : "About 5 minutes. You'll need a photo ID. Your device is optional for now."}</p>
           </div>
         )}
 
         {/* Phones: a slim progress bar */}
-        {step <= STEPS.length && (
+        {shownStep <= steps.length && (
           <div className="mb-4 lg:hidden">
             <div className="mb-1.5 flex justify-between text-sm">
-              <span className="font-semibold text-ink-900">{STEPS[step - 1].title}</span>
+              <span className="font-semibold text-ink-900">{steps[shownStep - 1].title}</span>
               <span className="text-ink-500">
-                Step {step} of {STEPS.length}
+                Step {shownStep} of {steps.length}
               </span>
             </div>
             <div className="h-1.5 w-full rounded-full bg-slate-200">
               <div
                 className="h-1.5 rounded-full bg-brand-600 transition-all duration-300"
-                style={{ width: `${(step / STEPS.length) * 100}%` }}
+                style={{ width: `${(shownStep / steps.length) * 100}%` }}
               />
             </div>
           </div>
@@ -1064,11 +1294,11 @@ const Onboarding: React.FC = () => {
           {/* Desktop: the step list */}
           <aside className="hidden lg:block">
             <ol className="sticky top-6 space-y-5 rounded-2xl bg-white p-6 shadow-card">
-              {STEPS.map(s => (
+              {steps.map(s => (
                 <li key={s.id} className="flex items-center gap-3">
-                  <IconTile name={s.icon} size={40} state={s.id < step ? 'done' : s.id === step ? 'current' : 'upcoming'} />
+                  <IconTile name={s.icon} size={40} state={s.id < shownStep ? 'done' : s.id === shownStep ? 'current' : 'upcoming'} />
                   <div className="min-w-0">
-                    <p className={`text-sm font-semibold ${s.id <= step ? 'text-ink-900' : 'text-ink-500'}`}>{s.title}</p>
+                    <p className={`text-sm font-semibold ${s.id <= shownStep ? 'text-ink-900' : 'text-ink-500'}`}>{s.title}</p>
                     <p className="text-xs text-ink-500">{s.subtitle}</p>
                   </div>
                 </li>
@@ -1081,16 +1311,23 @@ const Onboarding: React.FC = () => {
               {renderCurrentStep()}
 
               <div className="mt-8 flex flex-col-reverse gap-3 border-t border-slate-100 pt-6 sm:flex-row sm:items-center sm:justify-between">
-                {step > 1 && step <= STEPS.length && step !== 2 ? (
+                {step > 1 && step <= (isVenue ? 3 : 4) && step !== 2 && !(invited && step === 4) ? (
                   <Button variant="ghost" onClick={handleBack} icon="chevron-left" disabled={isLoading}>
                     Back
                   </Button>
                 ) : (
                   <span />
                 )}
-                <Button size="lg" onClick={onPrimary} disabled={primaryDisabled} loading={isLoading}>
-                  {primaryLabel}
-                </Button>
+                <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center">
+                  {step === 3 && (
+                    <Button variant="ghost" size="lg" onClick={skipDevice} disabled={isLoading}>
+                      Skip for now
+                    </Button>
+                  )}
+                  <Button size="lg" onClick={onPrimary} disabled={primaryDisabled} loading={isLoading}>
+                    {primaryLabel}
+                  </Button>
+                </div>
               </div>
             </div>
           </main>

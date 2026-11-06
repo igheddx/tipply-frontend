@@ -4,6 +4,8 @@ import { vi, describe, it, expect, beforeEach } from 'vitest'
 import SongRequestMonitor from '@/components/SongRequestMonitor'
 
 vi.mock('@/utils/config', () => ({ API_BASE_URL: 'http://localhost:3000' }))
+// The venue session notice makes its own requests; it has its own tests
+vi.mock('@/components/venue/SessionBanner', () => ({ SessionBanner: () => null }))
 const chime = vi.hoisted(() => ({ playTipChime: vi.fn(() => true), unlockTipChime: vi.fn(async () => true), isTipChimeReady: vi.fn(() => true) }))
 vi.mock('@/utils/tipChime', () => chime)
 vi.mock('@/theme/ThemeContext', () => ({

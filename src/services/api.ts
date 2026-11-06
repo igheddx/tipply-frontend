@@ -368,6 +368,16 @@ class ApiService {
     email: string
     phone?: string
     password: string
+    // Venue sign-up
+    accountType?: 'venue'
+    businessName?: string
+    addressLine1?: string
+    city?: string
+    state?: string
+    postalCode?: string
+    venueType?: string
+    timeZoneId?: string
+    acceptTerms?: boolean
   }): Promise<ApiResponse<any>> {
     return this.request('/api/auth/create-profile-onboarding', {
       method: 'POST',
@@ -441,6 +451,7 @@ class ApiService {
     songId?: string
     requestorName?: string
     note?: string
+    expectedSessionId?: string
   }): Promise<ApiResponse<any>> {
     logger.log('🎰 API SERVICE - Submitting tip with data:', tipData)
     const response = await this.request('/api/tips', {

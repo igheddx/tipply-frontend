@@ -17,6 +17,7 @@ import ClearFailedTestTips from '../components/ClearFailedTestTips';
 import MarkDemoTips from '../components/MarkDemoTips';
 import PerformerInsights from '../components/PerformerInsights';
 import PerformerSongRequests from '../components/PerformerSongRequests';
+import { AdminVenues } from '../components/venue/AdminVenues';
 import dayjs from 'dayjs';
 import { PortalShell, type PortalNavItem } from '../components/portal/PortalShell';
 import { Banner, Button as UiButton, Card as UiCard, Modal, PageHeader, PageLoader, RefreshControl, StatCard, StatusChip, useFeedback, type ChipKind } from '../components/ui';
@@ -1044,6 +1045,7 @@ const AdminDashboard: React.FC = () => {
   const adminNav: PortalNavItem[] = [
     { id: 'overview', label: 'Overview', icon: 'home' },
     { id: 'performers', label: 'Performers', icon: 'users' },
+    { id: 'venues', label: 'Venues', icon: 'home' },
     { id: 'tips', label: 'Tips', icon: 'coin' },
     { id: 'aggregated-charges', label: 'Charges', icon: 'card' },
     ...(userProfile?.role === 'root_admin' ? [{ id: 'device-management', label: 'Devices', icon: 'device' } as PortalNavItem] : []),
@@ -1056,6 +1058,7 @@ const AdminDashboard: React.FC = () => {
   const ADMIN_TITLES: Record<string, { title: string; subtitle?: string }> = {
     overview: { title: 'Overview', subtitle: 'How the platform is doing right now.' },
     performers: { title: 'Performers', subtitle: 'Everyone who can receive tips, and their fee.' },
+    venues: { title: 'Venues', subtitle: 'Approve new venues and manage the venue feature.' },
     tips: { title: 'Tips', subtitle: 'Search, export and refund tips.' },
     'aggregated-charges': { title: 'Charges', subtitle: 'What was charged to each card, combined per batch.' },
     'device-management': { title: 'Devices', subtitle: 'Add or remove devices on a performer’s behalf.' },
@@ -1308,6 +1311,8 @@ const AdminDashboard: React.FC = () => {
           </div>
         )}
 
+
+        {activeTab === 'venues' && <AdminVenues />}
 
         {activeTab === 'settings' && (
           <div className="space-y-5">

@@ -19,6 +19,16 @@ const base: TipScreenProps = {
 }
 
 describe('TipScreen', () => {
+  it('says which venue the performer is playing at, on a venue\'s device', () => {
+    render(<TipScreen {...base} venueName="The Flying J" />)
+    expect(screen.getByText('Performing at The Flying J')).toBeInTheDocument()
+  })
+
+  it('shows no venue line on a performer\'s own device', () => {
+    render(<TipScreen {...base} />)
+    expect(screen.queryByText(/Performing at/)).toBeNull()
+  })
+
   it('colors the page and the browser bar to match while it is open, then restores them', () => {
     document.head.insertAdjacentHTML('beforeend', '<meta name="theme-color" content="#0E7490">')
     const { unmount } = render(<TipScreen {...base} />)
