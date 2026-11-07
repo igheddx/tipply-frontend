@@ -32,8 +32,10 @@ describe('TipperRefundNotice', () => {
     api.forTipper.mockResolvedValue({ notices: [notice('a'), notice('b')], totalAmount: 200 })
     render(<TipperRefundNotice userId="u1" />)
 
-    expect(await screen.findByText('Your tips were refunded')).toBeInTheDocument()
+    expect(await screen.findByText('Your refund is on its way')).toBeInTheDocument()
     expect(screen.getByText('$200.00')).toBeInTheDocument()
+    expect(screen.getByText(/Your 2 tips to Dave Lovett Piano were refunded to your card/)).toBeInTheDocument()
+    expect(screen.getAllByText('$100.00')).toHaveLength(2)
     expect(screen.getByText(/5 to 10 business days/)).toBeInTheDocument()
     expect(screen.queryByText(/tip again/i)).toBeNull()
   })
@@ -45,17 +47,27 @@ describe('TipperRefundNotice', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Got it' }))
 
     expect(api.tipperSeen).toHaveBeenCalledWith('u1', ['a', 'b'])
-    expect(screen.queryByText('Your tips were refunded')).toBeNull()
+    expect(screen.queryByText('Your refund is on its way')).toBeNull()
   })
 
-  it('closing with the X does not count as acknowledged, so it comes back next visit', async () => {
+  it('a single refund has one clear sentence and no repeated list, and no corner X', async () => {
+    api.forTipper.mockResolvedValue({ notices: [notice('a', 50, 'Tipwave')], totalAmount: 50 })
+    render(<TipperRefundNotice userId="u1" />)
+
+    expect(await screen.findByText(/Your tip to Tipwave was refunded to your card on November 7/)).toBeInTheDocument()
+    expect(screen.getAllByText('$50.00')).toHaveLength(1)
+    expect(screen.queryByRole('button', { name: 'Close' })).toBeNull()
+  })
+
+  it('hiding it without Got it does not count as acknowledged, so it comes back next visit', async () => {
     api.forTipper.mockResolvedValue({ notices: [notice('a')], totalAmount: 100 })
     render(<TipperRefundNotice userId="u1" />)
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Close' }))
+    await screen.findByText('Your refund is on its way')
+    fireEvent.keyDown(document, { key: 'Escape' })
 
     expect(api.tipperSeen).not.toHaveBeenCalled()
-    expect(screen.queryByText('Your tip was refunded')).toBeNull()
+    expect(screen.queryByText('Your refund is on its way')).toBeNull()
   })
 })
 
