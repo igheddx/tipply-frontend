@@ -7,9 +7,11 @@ export interface CsvTip {
   fees: number
   youKeep: number
   reason?: string | null
+  refundedAt?: string | null
 }
 
-export const statusLabel = (status: string) => (status === 'processed' ? 'Charged' : status === 'pending' ? 'Waiting' : 'Not charged')
+export const statusLabel = (status: string) =>
+  status === 'processed' ? 'Charged' : status === 'pending' ? 'Waiting' : status === 'refunded' ? 'Refunded' : 'Not charged'
 
 /** Quotes a cell when needed, and defuses text a spreadsheet would run as a formula (=, +, -, @). */
 export const csvCell = (value: string | number): string => {
@@ -30,7 +32,7 @@ export const CSV_HEADERS = ['Date and time', 'Device', 'Tip (gross)', 'Status', 
 export function buildTipsCsv(tips: (CsvTip & { deviceName: string })[]): string {
   const lines = [CSV_HEADERS.map(csvCell).join(',')]
   for (const t of tips) {
-    const charged = t.status !== 'pending' && t.status !== 'failed'
+    const charged = t.status !== 'pending' && t.status !== 'failed' && t.status !== 'refunded'
     lines.push(
       [
         localStamp(t.createdAt),
@@ -39,7 +41,7 @@ export function buildTipsCsv(tips: (CsvTip & { deviceName: string })[]): string 
         statusLabel(t.status),
         charged ? two(t.fees) : '',
         charged ? two(t.youKeep) : '',
-        t.reason ?? (t.status === 'pending' ? 'Charged in the next batch' : '')
+        t.reason ?? (t.status === 'pending' ? 'Charged in the next batch' : t.status === 'refunded' ? 'Refunded to the tipper. Not counted in totals.' : '')
       ]
         .map(csvCell)
         .join(',')

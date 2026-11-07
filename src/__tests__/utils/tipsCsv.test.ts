@@ -33,4 +33,11 @@ describe('Tips CSV', () => {
     expect(lines[3]).toContain('2.00,Not charged,,,')
     expect(csv.startsWith('﻿')).toBe(true)
   })
+
+  it('marks a refunded tip, leaves its fees and earnings empty, and says it is not counted', () => {
+    const csv = buildTipsCsv([{ amount: 100, status: 'refunded', createdAt: '2026-11-07T01:00:00Z', fees: 8.2, youKeep: 91.8, deviceName: 'Patio' }])
+    const row = csv.replace('\ufeff', '').trim().split('\r\n')[1]
+    expect(row).toContain('100.00,Refunded,,,')
+    expect(row).toContain('Refunded to the tipper. Not counted in totals.')
+  })
 })
