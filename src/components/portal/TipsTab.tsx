@@ -19,6 +19,7 @@ interface TipRow {
   fees: number
   youKeep: number
   reason?: string | null
+  refundedAt?: string | null
 }
 
 interface Summary {
@@ -29,6 +30,8 @@ interface Summary {
   youKeep: number
   notChargedCount: number
   notChargedGross: number
+  refundedCount?: number
+  refundedGross?: number
 }
 
 interface Props {
@@ -55,12 +58,15 @@ const STATUS_OPTIONS = [
   { value: 'all', label: 'All tips' },
   { value: 'processed', label: 'Charged' },
   { value: 'pending', label: 'Waiting' },
-  { value: 'failed', label: 'Not charged' }
+  { value: 'failed', label: 'Not charged' },
+  { value: 'refunded', label: 'Refunded' }
 ]
 
 const money = (n: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(n)
 const when = (iso: string) => new Date(iso).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
-const chipFor = (status: string): ChipKind => (status === 'processed' ? 'paid' : status === 'pending' ? 'processing' : 'failed')
+const chipFor = (status: string): ChipKind =>
+  status === 'processed' ? 'paid' : status === 'pending' ? 'processing' : status === 'refunded' ? 'info' : 'failed'
+const day = (iso: string) => new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 
 const selectClass =
   'h-11 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm text-ink-900 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-brand-500'
@@ -271,6 +277,12 @@ export default function TipsTab({ profileId, devices, refreshKey, onGoToDevices 
               {money(summary.waitingGross)} of these tips are waiting to be charged. Fees and You keep count charged tips only.
             </p>
           )}
+          {!!summary.refundedCount && status !== 'refunded' && (
+            <p className="mt-2 text-sm text-ink-700">
+              {summary.refundedCount} {summary.refundedCount === 1 ? 'tip' : 'tips'} ({money(summary.refundedGross ?? 0)}) {summary.refundedCount === 1 ? 'was' : 'were'} refunded to the tipper and {summary.refundedCount === 1 ? 'is' : 'are'} not counted above.{' '}
+              <button type="button" className="font-semibold text-brand-700 underline" onClick={() => setStatus('refunded')}>Show {summary.refundedCount === 1 ? 'it' : 'them'}</button>
+            </p>
+          )}
           {summary.notChargedCount > 0 && status !== 'failed' && (
             <p className="mt-2 text-sm text-ink-700">
               {summary.notChargedCount} {summary.notChargedCount === 1 ? 'tip' : 'tips'} ({money(summary.notChargedGross)}) could not be charged and are not counted above.{' '}
@@ -297,9 +309,12 @@ export default function TipsTab({ profileId, devices, refreshKey, onGoToDevices 
               {rows.map(tip => (
                 <li key={tip.id} className="flex items-center gap-3 py-3">
                   <div className="min-w-0 flex-1">
-                    <div className="text-base font-bold text-ink-900">{money(tip.amount)}</div>
+                    <div className={`text-base font-bold ${tip.status === 'refunded' ? 'text-ink-400 line-through' : 'text-ink-900'}`}>{money(tip.amount)}</div>
                     <div className="truncate text-xs text-ink-500">{deviceName(tip.deviceId)} · {when(tip.createdAt)}</div>
                     {tip.status === 'processed' && <div className="text-xs text-ink-500">You keep {money(tip.youKeep)}</div>}
+                    {tip.status === 'refunded' && (
+                      <div className="text-xs text-ink-500">Refunded to the tipper{tip.refundedAt ? ` on ${day(tip.refundedAt)}` : ''}. Not counted in your totals.</div>
+                    )}
                     {tip.reason && <div className="mt-0.5 text-sm text-ink-700">{tip.reason}</div>}
                   </div>
                   <StatusChip kind={chipFor(tip.status)} label={statusLabel(tip.status)} />

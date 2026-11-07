@@ -32,6 +32,22 @@ describe('TipsTab', () => {
     expect(screen.getByText('Waiting', { selector: 'span' })).toBeInTheDocument()
   })
 
+  it('shows a refunded tip struck through and marked, and says it is not counted', async () => {
+    api.getTipHistory.mockResolvedValue({
+      data: {
+        items: [tip('r', { amount: 100, status: 'refunded', fees: 0, youKeep: 0, refundedAt: '2026-11-07T15:00:00Z' })],
+        total: 1,
+        summary: { ...summary, refundedCount: 1, refundedGross: 100 }
+      }
+    })
+    renderTab()
+
+    expect(await screen.findByText('Refunded', { selector: 'span' })).toBeInTheDocument()
+    expect(screen.getByText(/Refunded to the tipper on Nov 7/)).toBeInTheDocument()
+    expect(screen.getByText(/1 tip \(\$100\.00\) was refunded to the tipper and is not counted above/)).toBeInTheDocument()
+    expect(screen.queryByText(/You keep \$/)).toBeNull()
+  })
+
   it('asks the server again when the status filter changes, and for the chosen device', async () => {
     renderTab()
     await screen.findByText('Tips')

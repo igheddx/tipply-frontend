@@ -913,8 +913,13 @@ const AdminDashboard: React.FC = () => {
     if (!refundTip) return;
     try {
       setRefundLoading(true);
-      await apiService.post(`/api/admin/tips/${refundTip.id}/refund`);
-      message.success('Refund processed successfully');
+      const res = await apiService.post(`/api/admin/tips/${refundTip.id}/refund`);
+      if (res.error) {
+        // The server's reason (for example Stripe's own wording) is shown as it is, so it can be acted on
+        showError(res.error, 'error');
+        return;
+      }
+      showError('Refund processed. The tipper and the performer have been told.', 'success');
       setRefundModalOpen(false);
       setRefundTip(null);
       await loadTips();

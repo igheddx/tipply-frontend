@@ -5,6 +5,7 @@ import { useParams } from 'react-router-dom'
 import { toast } from 'sonner'
 import apiService from '../services/api'
 import { getApiBaseUrl } from '../utils/config'
+import { TipperRefundNotice } from '../components/tip/TipperRefundNotice'
 import { DEFAULT_TIP_AMOUNTS, TIP_AMOUNT_COUNT } from '../utils/deviceConfig'
 import { getUniqueDeviceId, detectPlatform, initDeviceId } from '../utils/deviceId'
 import { TipScreen } from '../components/tip/TipScreen'
@@ -1072,6 +1073,7 @@ const TippingInterface: React.FC = () => {
           Add a payment method to continue tipping.
         </InfoScreen>
         {paymentModal}
+        <TipperRefundNotice userId={userId} />
       </>
     )
   }
@@ -1114,6 +1116,8 @@ const TippingInterface: React.FC = () => {
       />
 
       {paymentModal}
+
+      <TipperRefundNotice userId={userId} />
 
       {/* Audio Element */}
       <audio ref={audioRef} src="/cash-register.mp3" preload="auto" />

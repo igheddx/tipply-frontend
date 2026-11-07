@@ -15,6 +15,7 @@ import SongRequestMonitor from '../components/SongRequestMonitor'
 import TipsTab from '../components/portal/TipsTab'
 import AlertsCard from '../components/portal/AlertsCard'
 import { SessionBanner } from '../components/venue/SessionBanner'
+import { RefundNoticeBanner } from '../components/portal/RefundNoticeBanner'
 import { VenueInvites } from '../components/venue/VenueInvites'
 import { VenueSection } from '../components/venue/VenueSection'
 import { turnOffAlertsOnSignOut } from '../utils/pushAlerts'
@@ -1470,7 +1471,12 @@ const Dashboard: React.FC = () => {
         userPhotoUrl={userProfile?.profilePhotoUrl || undefined}
         onOpenProfile={() => navigate('/profile')}
         onLogout={handleLogout}
-        topNotice={<SessionBanner />}
+        topNotice={
+          <>
+            <RefundNoticeBanner onView={() => setActiveTab('tips')} />
+            <SessionBanner />
+          </>
+        }
       >
         <DemoBanner demoMode={demoMode} showDemo={showDemo} onToggle={handleShowDemoChange} />
         {activeTab !== 'overview' && activeTab !== 'addDevice' && (
