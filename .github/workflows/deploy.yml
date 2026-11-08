@@ -23,14 +23,23 @@ jobs:
 
       - name: Sync to S3
         run: |
-          echo "🚀 Deploying to branch: ${{ github.ref }}"
           if [ "${{ github.ref }}" = "refs/heads/dev" ]; then
-            echo "📝 Syncing to dev: s3://tipwave-sites-bucket/test"
-            aws s3 sync dist/ s3://tipwave-sites-bucket/test/ --delete --exclude "*.DS_Store"
+            TARGET="s3://tipwave-sites-bucket/test"
           else
-            echo "📝 Syncing to prod: s3://tipwave-sites-bucket/app"
-            aws s3 sync dist/ s3://tipwave-sites-bucket/app/ --delete --exclude "*.DS_Store"
+            TARGET="s3://tipwave-sites-bucket/app"
           fi
+          echo "🚀 Deploying branch ${{ github.ref }} to $TARGET"
+
+          # 1. The built scripts and styles (hashed names, never edited): cached for a year, and the PREVIOUS build's files are
+          #    KEPT. A phone that still holds an older copy of the page therefore keeps working instead of failing to load.
+          aws s3 sync dist/assets/ "$TARGET/assets/" --cache-control "public, max-age=31536000, immutable"
+
+          # 2. Everything else (the page itself, icons, images, service worker): always checked again, and stale files removed.
+          #    Without this the page was saved by browsers for a while after a deploy and pointed at files that no longer existed.
+          aws s3 sync dist/ "$TARGET/" --delete --exclude "assets/*" --exclude "*.DS_Store" --cache-control "no-cache, must-revalidate"
+
+          # 3. HTML must never be saved by a browser or the CDN's edge
+          aws s3 cp dist/index.html "$TARGET/index.html" --content-type "text/html" --cache-control "no-cache, no-store, must-revalidate"
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}

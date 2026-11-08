@@ -6,6 +6,10 @@ import { toast } from 'sonner'
 import apiService from '../services/api'
 import { getApiBaseUrl } from '../utils/config'
 import { TipperRefundNotice } from '../components/tip/TipperRefundNotice'
+import { FeedbackBar } from '../components/tip/FeedbackBar'
+import { FeedbackFormModal } from '../components/tip/FeedbackFormModal'
+import { GiveFeedbackLink } from '../components/tip/GiveFeedbackLink'
+import { useFeedbackPrompt } from '../hooks/useFeedbackPrompt'
 import { DEFAULT_TIP_AMOUNTS, TIP_AMOUNT_COUNT } from '../utils/deviceConfig'
 import { getUniqueDeviceId, detectPlatform, initDeviceId } from '../utils/deviceId'
 import { TipScreen } from '../components/tip/TipScreen'
@@ -51,12 +55,15 @@ function InfoScreen({
   icon,
   title,
   children,
-  action
+  action,
+  feedback
 }: {
   icon: BrandIconName
   title: string
   children: React.ReactNode
   action?: React.ReactNode
+  /** Lets anyone, even without a tip, tell us how it went */
+  feedback?: { userId: string; deviceUuid?: string }
 }) {
   return (
     <div
@@ -71,6 +78,11 @@ function InfoScreen({
         <p className="mt-3 text-white/80">{children}</p>
         {action && <div className="mt-6">{action}</div>}
       </div>
+      {feedback && (
+        <div className="absolute inset-x-0 bottom-4 text-center">
+          <GiveFeedbackLink userId={feedback.userId} deviceUuid={feedback.deviceUuid} />
+        </div>
+      )}
     </div>
   )
 }
@@ -93,6 +105,9 @@ const TippingInterface: React.FC = () => {
   const [sentSong, setSentSong] = useState<{ title: string; artist: string } | null>(null)
   const sentSongTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const sentTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // A short, optional question after a tip goes through; the server decides whether to ask at all
+  const feedback = useFeedbackPrompt(userId, deviceInfo?.uuid)
+  const songPickerUsed = useRef(false)
   const [savedCard, setSavedCard] = useState<{ brand?: string; last4?: string } | null>(null)
   const [isMobile, setIsMobile] = useState(false)
   const [isPortrait, setIsPortrait] = useState(true)
@@ -754,6 +769,8 @@ const TippingInterface: React.FC = () => {
   }
 
   const handleTipClick = (amount: number) => {
+    // Tapping anything else quietly closes a question that is showing
+    feedback.dismissNow()
     if (isDebouncing) return
     if (!deviceInfo || !userId) {
       logger.log('⏳ [handleTipClick] Not ready yet - deviceInfo:', !!deviceInfo, 'userId:', !!userId)
@@ -838,6 +855,7 @@ const TippingInterface: React.FC = () => {
         await loadUserTotal(userId)
         // Refresh payment method session on successful tip (extends 30-day memory)
         refreshPaymentMethodSession()
+        void feedback.onTipConfirmed(songPickerUsed.current)
       } else {
         // Provide specific error messages based on error type
         // On a venue device the performer may have changed since this page loaded; nothing was charged
@@ -918,6 +936,7 @@ const TippingInterface: React.FC = () => {
         }
         // Refresh payment method session on successful tip (extends 30-day memory)
         refreshPaymentMethodSession()
+        void feedback.onTipConfirmed(true)
       } else {
         // Provide specific error messages based on error type
         // On a venue device the performer may have changed since this page loaded; nothing was charged
@@ -953,6 +972,7 @@ const TippingInterface: React.FC = () => {
   }
 
   const handleSongPick = (song: PickedSong) => {
+    songPickerUsed.current = true
     setSelectedSong({ id: song.id, title: song.title, artist: song.artist })
     setSongRequestName(song.requestorName ?? '')
     setSongRequestNote(song.note ?? '')
@@ -1024,7 +1044,7 @@ const TippingInterface: React.FC = () => {
   // A venue's device with nobody on it, or a performer's poster while someone else is on: no tipping
   if (deviceInfo?.noActivePerformer) {
     return (
-      <InfoScreen icon="clock" title="No one is performing right now">
+      <InfoScreen feedback={userId ? { userId, deviceUuid: deviceInfo?.uuid } : undefined} icon="clock" title="No one is performing right now">
         {deviceInfo.venueName ? `${deviceInfo.venueName} has this device, but` : 'Nobody is using this device and'} tips are paused until a performer starts. This page checks again by itself.
       </InfoScreen>
     )
@@ -1032,6 +1052,7 @@ const TippingInterface: React.FC = () => {
   if (deviceInfo?.performerMismatch) {
     return (
       <InfoScreen
+        feedback={userId ? { userId, deviceUuid: deviceInfo?.uuid } : undefined}
         icon="info"
         title={`${deviceInfo.expectedPerformerName || 'This performer'} is not active here right now`}
       >
@@ -1043,7 +1064,7 @@ const TippingInterface: React.FC = () => {
   // Check if device is verified (Stripe and KYC)
   if (isDeviceVerified === false) {
     return (
-      <InfoScreen icon="shield" title="Performer not set up">
+      <InfoScreen feedback={userId ? { userId, deviceUuid: deviceInfo?.uuid } : undefined} icon="shield" title="Performer not set up">
         This performer is not set up to receive tips yet. Please let them know.
       </InfoScreen>
     )
@@ -1052,7 +1073,7 @@ const TippingInterface: React.FC = () => {
   // Block desktop usage and prompt user to open on mobile
   if (!isMobile) {
     return (
-      <InfoScreen icon="qr" title="Open this on your phone">
+      <InfoScreen feedback={userId ? { userId, deviceUuid: deviceInfo?.uuid } : undefined} icon="qr" title="Open this on your phone">
         The tipping page is made for phones. Scan the QR code again with your phone's camera.
       </InfoScreen>
     )
@@ -1062,6 +1083,7 @@ const TippingInterface: React.FC = () => {
     return (
       <>
         <InfoScreen
+          feedback={userId ? { userId, deviceUuid: deviceInfo?.uuid } : undefined}
           icon="card"
           title="Add a card to tip"
           action={
@@ -1092,12 +1114,41 @@ const TippingInterface: React.FC = () => {
         canRequestSong={canRequestSong}
         selectedSong={selectedSong}
         sentSong={sentSong}
-        onOpenSongPicker={() => setShowSongSearch(true)}
+        onOpenSongPicker={() => {
+          feedback.dismissNow()
+          songPickerUsed.current = true
+          setShowSongSearch(true)
+        }}
         onClearSong={clearSelectedSong}
         card={savedCard}
-        onChangeCard={() => setShowPaymentModal(true)}
+        onChangeCard={() => {
+          feedback.dismissNow()
+          setShowPaymentModal(true)
+        }}
         total={totalTipped}
+        bottomBarOverride={
+          feedback.prompt && (feedback.phase === 'thanks' || (feedback.phase === 'asking' && sentAmount === null && !showSongSearch && !showPaymentModal)) ? (
+            <FeedbackBar prompt={feedback.prompt} phase={feedback.phase} onRate={feedback.rate} onChoose={feedback.choose} onDismiss={feedback.dismissNow} />
+          ) : undefined
+        }
+        footerLink={<GiveFeedbackLink userId={userId} deviceUuid={deviceInfo?.uuid} />}
       />
+
+      {feedback.prompt && (
+        <FeedbackFormModal
+          open={feedback.phase === 'followup'}
+          title={feedback.prompt.question === 'ease' ? 'Sorry about that. What was it about?' : 'Which song were you looking for?'}
+          reasons={feedback.prompt.question === 'ease' ? feedback.prompt.reasons : []}
+          alreadyLow
+          placeholder={feedback.prompt.textPlaceholder}
+          sendLabel="Send"
+          skipLabel="Skip"
+          onSend={async body => {
+            feedback.sendFollowUp({ choice: body.choice, comment: body.comment })
+          }}
+          onClose={() => feedback.sendFollowUp({})}
+        />
+      )}
 
       {!isPortrait && (
         <div className="fixed inset-0 z-[60] flex flex-col items-center justify-center bg-slate-950/85 px-6 text-center text-white">

@@ -141,4 +141,41 @@ describe('formatting', () => {
     expect(cardLabel(null)).toBe('Card on file')
     expect(cardLabel({ brand: 'visa' })).toBe('Card on file')
   })
+
+  it('swaps a quick question into the bottom bar without removing the amounts, and puts the card and total back after', () => {
+    const { rerender } = render(<TipScreen {...base} />)
+    expect(screen.getByText(/Visa/i)).toBeInTheDocument()
+
+    rerender(<TipScreen {...base} bottomBarOverride={<span>How easy was that?</span>} />)
+    expect(screen.getByText('How easy was that?')).toBeInTheDocument()
+    expect(screen.queryByText(/Change/)).toBeNull()
+    expect(screen.getAllByRole('button', { name: /^Tip \$/ })).toHaveLength(6)
+
+    rerender(<TipScreen {...base} />)
+    expect(screen.getByText(/Change/)).toBeInTheDocument()
+  })
+
+  it('tints the bottom bar while a question shows, and puts the usual look back after', () => {
+    const { container, rerender } = render(<TipScreen {...base} />)
+    const bar = () => container.querySelector('div[style*="max(2.5rem, 5.2dvh)"]') as HTMLElement
+    expect(bar().style.background).toContain('rgba(8, 12, 40')
+
+    rerender(<TipScreen {...base} bottomBarOverride={<span>Question</span>} />)
+    expect(bar().style.background).toContain('rgba(6, 182, 200')
+
+    rerender(<TipScreen {...base} />)
+    expect(bar().style.background).toContain('rgba(8, 12, 40')
+  })
+
+  it('paints a dark backdrop past the screen edges, so no light strip can show under the phone toolbar', () => {
+    const { container } = render(<TipScreen {...base} />)
+    const backdrop = container.querySelector('div[aria-hidden="true"][style*="-80px"]') as HTMLElement
+    expect(backdrop).not.toBeNull()
+    expect(backdrop.style.background).toContain('13, 66, 84')
+  })
+
+  it('shows a quiet footer link when one is given', () => {
+    render(<TipScreen {...base} footerLink={<button>Give feedback</button>} />)
+    expect(screen.getByRole('button', { name: 'Give feedback' })).toBeInTheDocument()
+  })
 })

@@ -118,7 +118,9 @@ describe('SongPickerSheet', () => {
 
       expect(await screen.findByText('Superstition')).toBeInTheDocument()
       expect(screen.getByText('Songs they do best')).toBeInTheDocument()
-      expect(screen.getByText('Artist favorite')).toBeInTheDocument()
+      // The heading says it once; the row does not repeat the label
+      expect(screen.getByText('Artist favorites')).toBeInTheDocument()
+      expect(screen.queryByText('Artist favorite')).toBeNull()
       expect(screen.getByText('All songs')).toBeInTheDocument()
       const rows = screen.getAllByRole('button').filter(b => /Superstition|Blinding|Easy/.test(b.textContent || ''))
       expect(rows[0]).toHaveAttribute('data-favorite', 'true')

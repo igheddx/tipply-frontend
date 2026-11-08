@@ -16,8 +16,9 @@ import RecoverChargedTips from '../components/RecoverChargedTips';
 import ClearFailedTestTips from '../components/ClearFailedTestTips';
 import MarkDemoTips from '../components/MarkDemoTips';
 import PerformerInsights from '../components/PerformerInsights';
-import PerformerSongRequests from '../components/PerformerSongRequests';
+import { AdminPerformerPanel } from '../components/shows/AdminPerformerPanel';
 import { AdminVenues } from '../components/venue/AdminVenues';
+import { AdminFeedback } from '../components/feedback/AdminFeedback';
 import dayjs from 'dayjs';
 import { PortalShell, type PortalNavItem } from '../components/portal/PortalShell';
 import { Banner, Button as UiButton, Card as UiCard, Modal, PageHeader, PageLoader, RefreshControl, StatCard, StatusChip, useFeedback, type ChipKind } from '../components/ui';
@@ -1051,6 +1052,7 @@ const AdminDashboard: React.FC = () => {
     { id: 'overview', label: 'Overview', icon: 'home' },
     { id: 'performers', label: 'Performers', icon: 'users' },
     { id: 'venues', label: 'Venues', icon: 'home' },
+    { id: 'feedback', label: 'Feedback', icon: 'sparkle' },
     { id: 'tips', label: 'Tips', icon: 'coin' },
     { id: 'aggregated-charges', label: 'Charges', icon: 'card' },
     ...(userProfile?.role === 'root_admin' ? [{ id: 'device-management', label: 'Devices', icon: 'device' } as PortalNavItem] : []),
@@ -1064,6 +1066,7 @@ const AdminDashboard: React.FC = () => {
     overview: { title: 'Overview', subtitle: 'How the platform is doing right now.' },
     performers: { title: 'Performers', subtitle: 'Everyone who can receive tips, and their fee.' },
     venues: { title: 'Venues', subtitle: 'Approve new venues and manage the venue feature.' },
+    feedback: { title: 'Feedback', subtitle: 'How the audience feels about tipping, and how often we ask.' },
     tips: { title: 'Tips', subtitle: 'Search, export and refund tips.' },
     'aggregated-charges': { title: 'Charges', subtitle: 'What was charged to each card, combined per batch.' },
     'device-management': { title: 'Devices', subtitle: 'Add or remove devices on a performer’s behalf.' },
@@ -1318,6 +1321,7 @@ const AdminDashboard: React.FC = () => {
 
 
         {activeTab === 'venues' && <AdminVenues />}
+        {activeTab === 'feedback' && <AdminFeedback />}
 
         {activeTab === 'settings' && (
           <div className="space-y-5">
@@ -1678,7 +1682,7 @@ const AdminDashboard: React.FC = () => {
             dataSource={performers}
             rowKey="id"
             expandable={{
-              expandedRowRender: (record: PerformerSummary) => <PerformerSongRequests key={refreshTick} profileId={record.id} />,
+              expandedRowRender: (record: PerformerSummary) => <AdminPerformerPanel key={refreshTick} profileId={record.id} />,
               rowExpandable: () => true,
             }}
             pagination={{
