@@ -44,6 +44,8 @@ interface HomeTabProps {
   showSlot?: ReactNode
   /** The "Your regulars" card, shown under the numbers */
   regularsSlot?: ReactNode
+  /** Refund requests waiting for review, shown near the top */
+  requestsSlot?: ReactNode
   /** Top right of the greeting, e.g. the Refresh button */
   headerAction?: ReactNode
   formatCurrency: (n: number) => string
@@ -56,7 +58,7 @@ const greeting = () => {
 
 const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`
 
-export function HomeTab({ data, onGoToDevices, onGoToTips, onGoToLive, showSlot, regularsSlot, headerAction, formatCurrency }: HomeTabProps) {
+export function HomeTab({ data, onGoToDevices, onGoToTips, onGoToLive, showSlot, regularsSlot, requestsSlot, headerAction, formatCurrency }: HomeTabProps) {
   const openSteps = data.nextSteps.filter(s => !s.done)
   const money = (n: number) => (data.balancesLoading ? '…' : formatCurrency(n))
   const trend =
@@ -134,6 +136,8 @@ export function HomeTab({ data, onGoToDevices, onGoToTips, onGoToLive, showSlot,
           These are not part of your earnings. Open Tips to see what happened to each one.
         </Banner>
       )}
+
+      {requestsSlot}
 
       {showSlot}
 

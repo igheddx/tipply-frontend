@@ -32,4 +32,11 @@ describe('HomeTab with shows', () => {
     render(<HomeTab {...props} regularsSlot={<div>Your regulars card</div>} />)
     expect(screen.getByText('Your regulars card')).toBeInTheDocument()
   })
+
+  it('shows waiting refund requests near the top of the home screen', () => {
+    render(<HomeTab {...props} requestsSlot={<div>A refund request is waiting</div>} showSlot={<div>This show card</div>} />)
+    expect(screen.getByText('A refund request is waiting')).toBeInTheDocument()
+    const html = document.body.innerHTML
+    expect(html.indexOf('A refund request is waiting')).toBeLessThan(html.indexOf('This show card'))
+  })
 })

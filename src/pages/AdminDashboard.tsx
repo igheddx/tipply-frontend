@@ -1,5 +1,5 @@
 import logger from "../utils/logger";
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Row, Col, Table, Button, Input, InputNumber, message, Spin, Card, Select, DatePicker, Space, Divider, Alert, Tabs } from 'antd';
 import { 
@@ -20,6 +20,8 @@ import { AdminPerformerPanel } from '../components/shows/AdminPerformerPanel';
 import { AdminVenues } from '../components/venue/AdminVenues';
 import { AdminFeedback } from '../components/feedback/AdminFeedback';
 import { AdminRepeat } from '../components/repeat/AdminRepeat';
+import { AdminRefunds } from '../components/refunds/AdminRefunds';
+import { refundRequestApi } from '../services/refundRequestApi';
 import { repeatApi, type PerformerRepeatRow } from '../services/repeatApi';
 import { percent } from '../utils/repeat';
 import dayjs from 'dayjs';
@@ -244,7 +246,9 @@ const AdminDashboard: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [minAmount, setMinAmount] = useState<number | undefined>(undefined);
   const [maxAmount, setMaxAmount] = useState<number | undefined>(undefined);
-  const [activeTab, setActiveTab] = useState('overview');
+  // An alert or a link can open the Refunds tab directly (/admin?tab=refunds)
+  const [activeTab, setActiveTab] = useState(() => (new URLSearchParams(window.location.search).get('tab') === 'refunds' ? 'refunds' : 'overview'));
+  const [pendingRefunds, setPendingRefunds] = useState(0);
   const [refundModalOpen, setRefundModalOpen] = useState(false);
   const [refundTip, setRefundTip] = useState<TipDetail | null>(null);
   const [refundLoading, setRefundLoading] = useState(false);
@@ -580,6 +584,17 @@ const AdminDashboard: React.FC = () => {
   const performerQueryRef = useRef('');
   const [refreshing, setRefreshing] = useState(false);
   const [updatedAt, setUpdatedAt] = useState<Date | null>(null);
+
+  // How many refund requests are waiting, for the badge on the Refunds tab
+  const refreshPendingRefunds = useCallback(async () => {
+    const res = await refundRequestApi.adminList(true);
+    if (typeof res.data?.pendingCount === 'number') setPendingRefunds(res.data.pendingCount);
+  }, []);
+  useEffect(() => {
+    void refreshPendingRefunds();
+    const timer = setInterval(() => document.visibilityState === 'visible' && void refreshPendingRefunds(), 60000);
+    return () => clearInterval(timer);
+  }, [refreshPendingRefunds]);
 
   // Each performer's repeat-tipper numbers for the Performers table
   useEffect(() => {
@@ -1086,6 +1101,7 @@ const AdminDashboard: React.FC = () => {
     { id: 'venues', label: 'Venues', icon: 'home' },
     { id: 'feedback', label: 'Feedback', icon: 'sparkle' },
     { id: 'tips', label: 'Tips', icon: 'coin' },
+    { id: 'refunds', label: 'Refunds', icon: 'wallet', badge: pendingRefunds },
     { id: 'aggregated-charges', label: 'Charges', icon: 'card' },
     ...(userProfile?.role === 'root_admin' ? [{ id: 'device-management', label: 'Devices', icon: 'device' } as PortalNavItem] : []),
     { id: 'performer-insights', label: 'Insights', icon: 'trend-up' },
@@ -1098,6 +1114,7 @@ const AdminDashboard: React.FC = () => {
     overview: { title: 'Overview', subtitle: 'How the platform is doing right now.' },
     performers: { title: 'Performers', subtitle: 'Everyone who can receive tips, and their fee.' },
     venues: { title: 'Venues', subtitle: 'Approve new venues and manage the venue feature.' },
+    refunds: { title: 'Refunds', subtitle: 'Refund requests from performers. Nothing is refunded until you approve it.' },
     feedback: { title: 'Feedback', subtitle: 'How the audience feels about tipping, and how often we ask.' },
     tips: { title: 'Tips', subtitle: 'Search, export and refund tips.' },
     'aggregated-charges': { title: 'Charges', subtitle: 'What was charged to each card, combined per batch.' },
@@ -1356,6 +1373,7 @@ const AdminDashboard: React.FC = () => {
 
         {activeTab === 'venues' && <AdminVenues />}
         {activeTab === 'feedback' && <AdminFeedback />}
+        {activeTab === 'refunds' && <AdminRefunds onChanged={refreshPendingRefunds} />}
 
         {activeTab === 'settings' && (
           <div className="space-y-5">

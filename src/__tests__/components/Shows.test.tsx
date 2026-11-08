@@ -6,7 +6,7 @@ import { ShowsList } from '@/components/shows/ShowsList'
 import { VenuePicker } from '@/components/shows/VenuePicker'
 
 const api = vi.hoisted(() => ({
-  current: vi.fn(), list: vi.fn(), startNew: vi.fn(), end: vi.fn(), update: vi.fn(), mergeIntoPrevious: vi.fn(), venues: vi.fn()
+  current: vi.fn(), list: vi.fn(), tips: vi.fn(), startNew: vi.fn(), end: vi.fn(), update: vi.fn(), mergeIntoPrevious: vi.fn(), venues: vi.fn()
 }))
 vi.mock('@/services/showApi', () => ({ showApi: api }))
 const feedback = vi.hoisted(() => ({ toast: vi.fn(), confirm: vi.fn(async () => true) }))
@@ -33,6 +33,18 @@ describe('ShowCard', () => {
     expect(screen.getByTestId('show-total')).toHaveTextContent('$135.00')
     expect(screen.getByText(/4 tips, before fees · You keep \$125\.00/)).toBeInTheDocument()
     expect(screen.getByText('Live')).toBeInTheDocument()
+  })
+
+  it('opens the show’s tips from the card, where a refund can be asked for', async () => {
+    api.current.mockResolvedValue({ data: { show: show() } })
+    api.list.mockResolvedValue({ data: { shows: [show()] } })
+    api.tips.mockResolvedValue({ data: { tips: [{ id: 't1', createdAt: new Date().toISOString(), amount: 50, status: 'processed', hasSongRequest: false }] } })
+    render(<ShowCard />)
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Tips' }))
+
+    expect(await screen.findByRole('list', { name: 'Tips in this show' })).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: 'Request refund' })).toBeInTheDocument()
   })
 
   it('says how many different people tipped, and how many had tipped before', async () => {

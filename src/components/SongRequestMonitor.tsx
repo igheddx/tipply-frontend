@@ -6,6 +6,9 @@ import { StatusChip } from './ui'
 import { usePortalTheme, useTheme } from '../theme/ThemeContext'
 import { playTipChime, unlockTipChime, isTipChimeReady } from '../utils/tipChime'
 import { SessionBanner } from './venue/SessionBanner'
+import { RefundRequestDialog, type RefundableTip } from './refunds/RefundRequestDialog'
+import { showApi, type ShowSummary } from '../services/showApi'
+import { showTitle } from '../utils/showName'
 
 interface SongRequest {
   songId: string
@@ -21,6 +24,16 @@ interface SongRequest {
   note?: string
   // Set while this song was played recently (the server clears it after 90 minutes)
   playedMinutesAgo?: number | null
+  // The individual tips behind this request, so a refund can be asked for one of them
+  items?: RequestItem[]
+}
+
+interface RequestItem {
+  requestId: string
+  tipId?: string | null
+  amount: number
+  createdAt: string
+  refundRequest?: 'pending' | 'declined' | null
 }
 
 // A tip of an amount the performer chose to see even though the tipper picked no song
@@ -28,6 +41,9 @@ interface PlainTip {
   id: string
   amount: number
   createdAt: string
+  status?: string
+  // pending or declined when a refund was asked for this tip
+  refundRequest?: 'pending' | 'declined' | null
 }
 
 type RequestStatus = SongRequest['status']
@@ -52,6 +68,7 @@ const REFRESH_MS = 5000
 const requestKey = (r: SongRequest) => r.requestIds.join('-')
 const money = (n: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(n)
 const SEEN_TIPS_KEY = 'monitor_seen_tips'
+const timeOfDay = (iso: string) => new Date(iso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
 
 // Three reading sizes, for a tablet on a stand a few feet away
 const SIZES = [
@@ -119,6 +136,10 @@ const SongRequestMonitor: React.FC<SongRequestMonitorProps> = ({
   const knownKeys = useRef<Set<string> | null>(null)
   // Tips with no song: the list, which the performer has marked seen (kept on this device), and which were already announced
   const [plainTips, setPlainTips] = useState<PlainTip[]>([])
+  // The queue is for one show: the current one, or an earlier one the performer picks. null means "the current show".
+  const [shows, setShows] = useState<ShowSummary[]>([])
+  const [pickedShowId, setPickedShowId] = useState<string | null>(null)
+  const [refundTips, setRefundTips] = useState<RefundableTip[] | null>(null)
   const [seenTips, setSeenTips] = useState<Set<string>>(() => new Set(readPref(SEEN_TIPS_KEY, '').split(',').filter(Boolean)))
   const [showSeenTips, setShowSeenTips] = useState(false)
   const knownTipIds = useRef<Set<string> | null>(null)
@@ -153,7 +174,7 @@ const SongRequestMonitor: React.FC<SongRequestMonitorProps> = ({
     setLoading(true)
     try {
       const token = localStorage.getItem('token')
-      const response = await fetch(`${API_BASE_URL}/api/SongCatalog/monitor/${profileId}?_t=${Date.now()}`, {
+      const response = await fetch(`${API_BASE_URL}/api/SongCatalog/monitor/${profileId}?_t=${Date.now()}${pickedShowId ? `&showId=${pickedShowId}` : ''}`, {
         method: 'GET',
         headers: { Authorization: `Bearer ${token}` }
       })
@@ -222,7 +243,26 @@ const SongRequestMonitor: React.FC<SongRequestMonitorProps> = ({
     } finally {
       setLoading(false)
     }
-  }, [profileId])
+  }, [profileId, pickedShowId])
+
+  // The list of shows to pick from, loaded when the monitor opens
+  useEffect(() => {
+    if (!isVisible) return
+    let cancelled = false
+    void showApi.list(1, 10).then(res => {
+      if (!cancelled && Array.isArray(res.data?.shows)) setShows(res.data.shows)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [isVisible])
+
+  // Switching shows is not new activity: start the "what is new" tracking again so nothing glows or chimes
+  useEffect(() => {
+    knownKeys.current = null
+    knownTipIds.current = null
+    setFreshKeys(new Set())
+  }, [pickedShowId])
 
   // Live updates while open, plus a clock for the "x min ago" labels
   useEffect(() => {
@@ -430,6 +470,43 @@ const SongRequestMonitor: React.FC<SongRequestMonitorProps> = ({
   }
   const newTips = plainTips.filter(t => !seenTips.has(t.id))
   const seenList = plainTips.filter(t => seenTips.has(t.id))
+
+  // Asking for a refund: only tips from the last 7 days, and not ones already asked about
+  const REFUND_WINDOW_MS = 7 * 24 * 3600 * 1000
+  const requestRefundFor = (r: SongRequest) => {
+    const items = (r.items ?? []).filter(i => Date.now() - new Date(i.createdAt).getTime() <= REFUND_WINDOW_MS)
+    if (items.length === 0) return null
+    if (items.every(i => i.refundRequest === 'pending')) return <StatusChip kind="processing" label="Refund requested" />
+    const open = items.filter(i => i.refundRequest !== 'pending')
+    return (
+      <button
+        type="button"
+        onClick={() =>
+          setRefundTips(open.map(i => ({ ...(i.tipId ? { tipId: i.tipId } : { songRequestId: i.requestId }), amount: i.amount, createdAt: i.createdAt })))
+        }
+        className="inline-flex h-11 items-center justify-center rounded-xl px-3 text-sm font-semibold text-ink-500 hover:bg-slate-100 hover:text-ink-700"
+        aria-label={`Request a refund for ${r.songTitle}`}
+      >
+        Request refund
+      </button>
+    )
+  }
+  const requestRefundForTip = (t: PlainTip) => {
+    if (t.refundRequest === 'pending') return <StatusChip kind="processing" label="Refund requested" />
+    if (t.refundRequest === 'declined') return <StatusChip kind="offline" label="Not refunded" />
+    if (t.status && t.status !== 'processed') return null
+    if (Date.now() - new Date(t.createdAt).getTime() > REFUND_WINDOW_MS) return null
+    return (
+      <button
+        type="button"
+        onClick={() => setRefundTips([{ tipId: t.id, amount: t.amount, createdAt: t.createdAt }])}
+        className="inline-flex h-11 items-center justify-center rounded-xl px-3 text-sm font-semibold text-ink-500 hover:bg-slate-100 hover:text-ink-700"
+        aria-label={`Request a refund for the ${money(t.amount)} tip`}
+      >
+        Request refund
+      </button>
+    )
+  }
 
   // Waiting by tip (highest first) and age, playing first, then everything finished
   const byTipThenAge = (a: SongRequest, b: SongRequest) =>
@@ -652,6 +729,25 @@ const SongRequestMonitor: React.FC<SongRequestMonitorProps> = ({
         onPointerUp={holdEnd}
         onPointerCancel={holdEnd}
       >
+        {shows.length > 1 && (
+          <div className="mx-auto mb-3 flex max-w-6xl items-center gap-2 text-sm text-ink-500">
+            <label htmlFor="monitor-show">Show</label>
+            <select
+              id="monitor-show"
+              value={pickedShowId ?? ''}
+              onChange={e => setPickedShowId(e.target.value || null)}
+              className="max-w-[16rem] rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm text-ink-900"
+            >
+              {shows.map((sh, i) => (
+                <option key={sh.id} value={i === 0 ? '' : sh.id}>
+                  {showTitle(sh, shows)}
+                  {sh.isLive ? ' (live)' : ''}
+                  {i === 0 ? '' : ` · ${new Date(sh.startedAt).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}`}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
         <div className="mx-auto grid max-w-6xl gap-4 lg:grid-cols-[1fr_22rem]">
           {/* Playing now */}
           <section
@@ -784,6 +880,7 @@ const SongRequestMonitor: React.FC<SongRequestMonitorProps> = ({
                         >
                           Skip
                         </button>
+                        {requestRefundFor(r)}
                       </div>
                     </li>
                   )
@@ -805,7 +902,10 @@ const SongRequestMonitor: React.FC<SongRequestMonitorProps> = ({
                     {newTips.map(t => (
                       <li key={t.id} className="flex items-center gap-3 rounded-2xl border border-slate-100 bg-white px-4 py-3">
                         <span className={`inline-flex items-center rounded-full bg-accent-500 px-3 py-1 font-bold text-white ${size.chip}`}>{money(t.amount)}</span>
-                        <span className="min-w-0 flex-1 truncate text-sm text-ink-500">{ago(t.createdAt, now)}</span>
+                        <span className="min-w-0 flex-1 truncate text-sm text-ink-500">
+                          <span className="font-semibold text-ink-700">{timeOfDay(t.createdAt)}</span> · {ago(t.createdAt, now)}
+                        </span>
+                        {requestRefundForTip(t)}
                         <button
                           onClick={() => markTipSeen(t.id)}
                           className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-slate-100 px-4 text-sm font-semibold text-ink-700 hover:bg-slate-200"
@@ -833,7 +933,10 @@ const SongRequestMonitor: React.FC<SongRequestMonitorProps> = ({
                         {seenList.map(t => (
                           <li key={t.id} className="flex items-center gap-3 rounded-2xl border border-slate-100 bg-white px-4 py-2">
                             <span className="font-semibold text-ink-900">{money(t.amount)}</span>
-                            <span className="min-w-0 flex-1 truncate text-sm text-ink-500">{ago(t.createdAt, now)}</span>
+                            <span className="min-w-0 flex-1 truncate text-sm text-ink-500">
+                              <span className="font-semibold text-ink-700">{timeOfDay(t.createdAt)}</span> · {ago(t.createdAt, now)}
+                            </span>
+                            {requestRefundForTip(t)}
                             <button onClick={() => markTipUnseen(t.id)} className="h-11 rounded-xl px-3 text-sm font-semibold text-ink-500 hover:bg-slate-100">
                               Undo
                             </button>
@@ -865,6 +968,7 @@ const SongRequestMonitor: React.FC<SongRequestMonitorProps> = ({
                           <div className="truncate font-semibold text-ink-900">{r.songTitle}</div>
                           <div className="truncate text-sm text-ink-500">{r.artist}</div>
                         </div>
+                        {requestRefundFor(r)}
                         <StatusChip
                           kind={r.status === 'completed' ? 'paid' : 'offline'}
                           label={r.status === 'completed' ? 'Played' : r.status === 'skipped' ? 'Skipped' : 'Cancelled'}
@@ -878,6 +982,13 @@ const SongRequestMonitor: React.FC<SongRequestMonitorProps> = ({
           </section>
         </div>
       </main>
+
+      <RefundRequestDialog
+        open={!!refundTips}
+        tips={refundTips ?? []}
+        onClose={() => setRefundTips(null)}
+        onRequested={() => void loadSongRequests()}
+      />
 
       {/* Undo for a skip, so a stray tap costs nothing */}
       {undo && (

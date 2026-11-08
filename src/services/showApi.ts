@@ -35,6 +35,10 @@ export interface ShowTip {
   amount: number
   /** processed, pending or refunded */
   status: string
+  /** It came with a song request, or it was a tip only */
+  hasSongRequest?: boolean
+  /** pending or declined when a refund was asked for this tip */
+  refundRequest?: 'pending' | 'declined' | null
 }
 
 export const showApi = {
