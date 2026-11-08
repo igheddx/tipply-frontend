@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Banner, Button, Card, EmptyState, StatusChip } from '../ui'
 import { Modal } from '../ui/Modal'
 import { useFeedback } from '../ui/Feedback'
-import { refundRequestApi, DEFAULT_REFUND_REASONS, type AdminRefundRequest } from '../../services/refundRequestApi'
+import { refundRequestApi, DEFAULT_REFUND_REASONS, type AdminDirectRefund, type AdminRefundRequest } from '../../services/refundRequestApi'
 import {
   currentSubscription,
   disablePushAlerts,
@@ -92,6 +92,8 @@ function PhoneAlerts() {
 export function AdminRefunds({ onChanged }: { onChanged?: () => void }) {
   const { toast, confirm } = useFeedback()
   const [requests, setRequests] = useState<AdminRefundRequest[]>([])
+  const [direct, setDirect] = useState<AdminDirectRefund[]>([])
+  const [historyDays, setHistoryDays] = useState(30)
   const [loaded, setLoaded] = useState(false)
   const [failed, setFailed] = useState(false)
   const [busy, setBusy] = useState<string | null>(null)
@@ -104,6 +106,8 @@ export function AdminRefunds({ onChanged }: { onChanged?: () => void }) {
     else {
       setFailed(false)
       setRequests(res.data.requests)
+      setDirect(Array.isArray(res.data.directRefunds) ? res.data.directRefunds : [])
+      if (typeof res.data.historyDays === 'number') setHistoryDays(res.data.historyDays)
     }
     setLoaded(true)
     onChanged?.()
@@ -146,7 +150,14 @@ export function AdminRefunds({ onChanged }: { onChanged?: () => void }) {
   }
 
   const waiting = requests.filter(r => r.status === 'pending')
-  const decided = requests.filter(r => r.status !== 'pending')
+  // Everything that was decided or refunded recently, newest first: requests the admin handled, and refunds made directly
+  type HistoryItem =
+    | { kind: 'request'; id: string; at: string; request: AdminRefundRequest }
+    | { kind: 'direct'; id: string; at: string; refund: AdminDirectRefund }
+  const history: HistoryItem[] = [
+    ...requests.filter(r => r.status !== 'pending').map(r => ({ kind: 'request' as const, id: r.id, at: r.decidedAt ?? r.requestedAt, request: r })),
+    ...direct.map(d => ({ kind: 'direct' as const, id: d.tipId, at: d.refundedAt, refund: d }))
+  ].sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime())
 
   return (
     <div className="space-y-5">
@@ -200,18 +211,29 @@ export function AdminRefunds({ onChanged }: { onChanged?: () => void }) {
         )}
       </Card>
 
-      {decided.length > 0 && (
-        <Card title="Recently decided" flush>
-          <ul className="divide-y divide-slate-100 px-5 pb-2">
-            {decided.map(r => (
-              <li key={r.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 py-3 text-sm">
-                <span className="font-semibold text-ink-900">{r.performerName}</span>
-                <span className="text-ink-700">{money(r.amount)}</span>
-                <StatusChip kind={r.status === 'approved' ? 'paid' : 'offline'} label={r.status === 'approved' ? 'Refunded' : 'Declined'} />
-                <span className="ml-auto text-ink-500">{r.decidedAt ? when(r.decidedAt) : ''}</span>
-                {r.status === 'declined' && r.declineReason && <span className="basis-full text-ink-500">{r.declineReason}</span>}
-              </li>
-            ))}
+      {history.length > 0 && (
+        <Card title="Recently decided" subtitle={`Everything refunded or declined in the last ${historyDays} days`} flush>
+          <ul className="divide-y divide-slate-100 px-5 pb-2" aria-label="Recently decided">
+            {history.map(item =>
+              item.kind === 'request' ? (
+                <li key={`r-${item.id}`} className="flex flex-wrap items-center gap-x-3 gap-y-1 py-3 text-sm">
+                  <span className="font-semibold text-ink-900">{item.request.performerName}</span>
+                  <span className="text-ink-700">{money(item.request.amount)}</span>
+                  <StatusChip kind={item.request.status === 'approved' ? 'paid' : 'offline'} label={item.request.status === 'approved' ? 'Refunded' : 'Declined'} />
+                  <span className="text-ink-500">{item.request.status === 'approved' ? 'after a request' : ''}</span>
+                  <span className="ml-auto text-ink-500">{when(item.at)}</span>
+                  {item.request.status === 'declined' && item.request.declineReason && <span className="basis-full text-ink-500">{item.request.declineReason}</span>}
+                </li>
+              ) : (
+                <li key={`d-${item.id}`} className="flex flex-wrap items-center gap-x-3 gap-y-1 py-3 text-sm">
+                  <span className="font-semibold text-ink-900">{item.refund.performerName}</span>
+                  <span className="text-ink-700">{money(item.refund.amount)}</span>
+                  <StatusChip kind="paid" label="Refunded" />
+                  <span className="text-ink-500">by an admin, no request</span>
+                  <span className="ml-auto text-ink-500">{when(item.at)}</span>
+                </li>
+              )
+            )}
           </ul>
         </Card>
       )}

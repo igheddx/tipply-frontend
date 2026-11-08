@@ -22,6 +22,17 @@ export interface AdminRefundRequest extends RefundRequest {
   decidedAt?: string | null
 }
 
+/** A refund an admin made straight from the Tips tab, with no request behind it */
+export interface AdminDirectRefund {
+  tipId: string
+  profileId: string
+  performerName: string
+  amount: number
+  tipAt: string
+  refundedAt: string
+  hasSongRequest: boolean
+}
+
 export interface RefundReason {
   key: string
   label: string

@@ -255,6 +255,37 @@ describe('AdminRefunds', () => {
     expect(screen.getByText('Refunded')).toBeInTheDocument()
   })
 
+  it('also lists refunds the admin made directly, merged by time with the decided requests, saying how each happened', async () => {
+    refunds.adminList.mockResolvedValue({
+      data: {
+        pendingCount: 0,
+        historyDays: 30,
+        requests: [req({ id: 'r1', status: 'approved', decidedAt: hoursAgo(5) }), req({ id: 'r2', status: 'declined', declineReason: 'Meant to tip', decidedAt: hoursAgo(1) })],
+        directRefunds: [{ tipId: 'd1', profileId: 'p1', performerName: 'Sam Singer', amount: 20, tipAt: hoursAgo(30), refundedAt: hoursAgo(3), hasSongRequest: false }]
+      }
+    })
+    render(<AdminRefunds />)
+
+    const list = await screen.findByRole('list', { name: 'Recently decided' })
+    const rows = within(list).getAllByRole('listitem')
+    expect(rows).toHaveLength(3)
+    expect(rows[0]).toHaveTextContent('Declined')              // newest: the decline an hour ago
+    expect(rows[1]).toHaveTextContent('Sam Singer')            // then the direct refund
+    expect(rows[1]).toHaveTextContent('by an admin, no request')
+    expect(rows[2]).toHaveTextContent('after a request')       // then the approved request
+    expect(screen.getByText('Everything refunded or declined in the last 30 days')).toBeInTheDocument()
+  })
+
+  it('shows direct refunds even when there are no requests at all', async () => {
+    refunds.adminList.mockResolvedValue({
+      data: { pendingCount: 0, requests: [], directRefunds: [{ tipId: 'd1', profileId: 'p1', performerName: 'Sam Singer', amount: 20, tipAt: hoursAgo(30), refundedAt: hoursAgo(3), hasSongRequest: false }] }
+    })
+    render(<AdminRefunds />)
+
+    expect(await screen.findByText('Sam Singer')).toBeInTheDocument()
+    expect(screen.getByText('Nothing is waiting')).toBeInTheDocument()
+  })
+
   it('says nothing is waiting when the list is empty, and explains how phone alerts need the Home Screen', async () => {
     refunds.adminList.mockResolvedValue({ data: { pendingCount: 0, requests: [] } })
     render(<AdminRefunds />)
