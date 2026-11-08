@@ -49,5 +49,9 @@ export const showApi = {
   venues: () => apiService.get('/api/shows/venues'),
   tips: (id: string) => apiService.get(`/api/shows/${id}/tips`),
   split: (id: string, tipId: string) => apiService.post(`/api/shows/${id}/split`, { tipId }),
+  // Admin: one performer's shows and the song requests inside each
+  adminShows: (profileId: string, page = 1, pageSize = 10) => apiService.get(`/api/admin/performers/${profileId}/shows?page=${page}&pageSize=${pageSize}`),
+  adminShowRequests: (profileId: string, showId: string, page = 1, pageSize = 10) =>
+    apiService.get(`/api/admin/performers/${profileId}/shows/${showId}/song-requests?page=${page}&pageSize=${pageSize}`),
   adminSetShows: (enabled: boolean) => apiService.put('/api/admin/features/shows', { enabled })
 }

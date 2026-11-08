@@ -16,7 +16,7 @@ import RecoverChargedTips from '../components/RecoverChargedTips';
 import ClearFailedTestTips from '../components/ClearFailedTestTips';
 import MarkDemoTips from '../components/MarkDemoTips';
 import PerformerInsights from '../components/PerformerInsights';
-import PerformerSongRequests from '../components/PerformerSongRequests';
+import { AdminPerformerPanel } from '../components/shows/AdminPerformerPanel';
 import { AdminVenues } from '../components/venue/AdminVenues';
 import { AdminFeedback } from '../components/feedback/AdminFeedback';
 import dayjs from 'dayjs';
@@ -1682,7 +1682,7 @@ const AdminDashboard: React.FC = () => {
             dataSource={performers}
             rowKey="id"
             expandable={{
-              expandedRowRender: (record: PerformerSummary) => <PerformerSongRequests key={refreshTick} profileId={record.id} />,
+              expandedRowRender: (record: PerformerSummary) => <AdminPerformerPanel key={refreshTick} profileId={record.id} />,
               rowExpandable: () => true,
             }}
             pagination={{

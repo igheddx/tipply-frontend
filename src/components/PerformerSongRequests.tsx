@@ -3,7 +3,7 @@ import { Table } from 'antd'
 import { apiService } from '../services/api'
 import { Banner, StatusChip, type ChipKind } from './ui'
 
-interface SongRequestRow {
+export interface SongRequestRow {
   id: string
   songTitle: string
   artist?: string
@@ -41,6 +41,37 @@ const STATUS: Record<string, { kind: ChipKind; label: string }> = {
 
 const chipFor = (row: SongRequestRow) =>
   row.performed ? STATUS.completed : STATUS[row.status] ?? { kind: 'info' as ChipKind, label: row.status }
+
+
+/** The columns shared by every song request table in the admin view */
+export const songRequestColumns = [
+          {
+            title: 'Song',
+            key: 'song',
+            render: (_: unknown, r: SongRequestRow) => (
+              <div>
+                <div className="font-medium text-ink-900">{r.songTitle}</div>
+                {(r.artist || r.requestorName) && (
+                  <div className="text-sm text-ink-500">{[r.artist, r.requestorName && `from ${r.requestorName}`].filter(Boolean).join(' · ')}</div>
+                )}
+              </div>
+            )
+          },
+          { title: 'Amount', key: 'amount', align: 'right' as const, render: (_: unknown, r: SongRequestRow) => `$${r.amount.toFixed(2)}` },
+          {
+            title: 'Sent',
+            key: 'sent',
+            render: (_: unknown, r: SongRequestRow) => new Date(r.sentAt).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
+          },
+          {
+            title: 'Performed?',
+            key: 'status',
+            render: (_: unknown, r: SongRequestRow) => {
+              const chip = chipFor(r)
+              return <StatusChip kind={chip.kind} label={chip.label} />
+            }
+          }
+]
 
 /** A performer's song requests for one day, ten at a time. Shown when a row of the admin Performers table is expanded. */
 export default function PerformerSongRequests({ profileId }: { profileId: string }) {
@@ -121,34 +152,7 @@ export default function PerformerSongRequests({ profileId }: { profileId: string
           showTotal: (total, range) => `${range[0]}-${range[1]} of ${total}`
         }}
         scroll={{ x: 560 }}
-        columns={[
-          {
-            title: 'Song',
-            key: 'song',
-            render: (_: unknown, r: SongRequestRow) => (
-              <div>
-                <div className="font-medium text-ink-900">{r.songTitle}</div>
-                {(r.artist || r.requestorName) && (
-                  <div className="text-sm text-ink-500">{[r.artist, r.requestorName && `from ${r.requestorName}`].filter(Boolean).join(' · ')}</div>
-                )}
-              </div>
-            )
-          },
-          { title: 'Amount', key: 'amount', align: 'right' as const, render: (_: unknown, r: SongRequestRow) => `$${r.amount.toFixed(2)}` },
-          {
-            title: 'Sent',
-            key: 'sent',
-            render: (_: unknown, r: SongRequestRow) => new Date(r.sentAt).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
-          },
-          {
-            title: 'Performed?',
-            key: 'status',
-            render: (_: unknown, r: SongRequestRow) => {
-              const chip = chipFor(r)
-              return <StatusChip kind={chip.kind} label={chip.label} />
-            }
-          }
-        ]}
+        columns={songRequestColumns}
       />
     </div>
   )
