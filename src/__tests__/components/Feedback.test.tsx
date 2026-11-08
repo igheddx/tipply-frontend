@@ -30,6 +30,18 @@ describe('FeedbackBar', () => {
     expect(onRate).toHaveBeenCalledWith(4)
   })
 
+  it('fills the stars up to the one under the finger while pressing, and clears when released', () => {
+    const { container } = render(<FeedbackBar prompt={stars} phase="asking" onRate={() => {}} onChoose={() => {}} onDismiss={() => {}} />)
+    const filled = () => container.querySelectorAll('svg[fill="currentColor"]').length
+    expect(filled()).toBe(0)
+
+    fireEvent.pointerDown(screen.getByRole('radio', { name: '4 out of 5' }))
+    expect(filled()).toBe(4)
+
+    fireEvent.pointerUp(screen.getByRole('radio', { name: '4 out of 5' }))
+    expect(filled()).toBe(0)
+  })
+
   it('shows Yes, Sort of and No for the song question', () => {
     const onChoose = vi.fn()
     render(<FeedbackBar prompt={song} phase="asking" onRate={() => {}} onChoose={onChoose} onDismiss={() => {}} />)
@@ -107,6 +119,19 @@ describe('GiveFeedbackLink', () => {
 
     await waitFor(() => expect(api.submitLink).toHaveBeenCalledWith({ userId: 'u1', deviceUuid: 'dev-1', rating: 4, comment: 'Easy' }))
     expect(await screen.findByText('Thank you!')).toBeInTheDocument()
+  })
+
+  it('draws its dialog at the top of the page, so a positioned footer cannot squeeze it to one side', () => {
+    render(
+      <footer style={{ position: 'relative', transform: 'translateY(-50%)' }}>
+        <GiveFeedbackLink userId="u1" />
+      </footer>
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Give feedback' }))
+
+    const dialog = screen.getByRole('dialog')
+    expect(dialog.closest('footer')).toBeNull()
+    expect(dialog.parentElement).toBe(document.body)
   })
 
   it('renders nothing until the visitor has an id', () => {
