@@ -21,6 +21,7 @@ import { AdminVenues } from '../components/venue/AdminVenues';
 import { AdminFeedback } from '../components/feedback/AdminFeedback';
 import { AdminRepeat } from '../components/repeat/AdminRepeat';
 import { AdminRefunds } from '../components/refunds/AdminRefunds';
+import { AdminTipperBlock } from '../components/refunds/AdminTipperBlock';
 import { refundRequestApi } from '../services/refundRequestApi';
 import { repeatApi, type PerformerRepeatRow } from '../services/repeatApi';
 import { percent } from '../utils/repeat';
@@ -109,6 +110,8 @@ interface TipDetail {
   platformFee: number;
   performerEarnings: number;
   failureReason?: string | null;
+  /** Our id for the tipper, so every tip from the same person can be found together (admin only) */
+  tipperUserId?: string;
 }
 
 interface PerformerDeviceSummary {
@@ -251,6 +254,9 @@ const AdminDashboard: React.FC = () => {
   const [pendingRefunds, setPendingRefunds] = useState(0);
   const [refundModalOpen, setRefundModalOpen] = useState(false);
   const [refundTip, setRefundTip] = useState<TipDetail | null>(null);
+  // Who gave a tip (details), and a filter to see every tip from one tipper
+  const [tipperDetailsFor, setTipperDetailsFor] = useState<TipDetail | null>(null);
+  const [tipperFilter, setTipperFilter] = useState<{ userId: string; code: string } | null>(null);
   const [refundLoading, setRefundLoading] = useState(false);
 
   // Performer devices management state
@@ -326,7 +332,7 @@ const AdminDashboard: React.FC = () => {
   // Reload tips when filters change
   useEffect(() => {
     loadTips();
-  }, [currentPage, filterStatus, dateRange, searchTerm, minAmount, maxAmount]);
+  }, [currentPage, filterStatus, dateRange, searchTerm, minAmount, maxAmount, tipperFilter]);
 
   const fetchUserProfile = async () => {
     try {
@@ -641,7 +647,8 @@ const AdminDashboard: React.FC = () => {
         endDate: dateRange?.[1]?.toISOString(),
         searchTerm: searchTerm,
         minAmount: minAmount,
-        maxAmount: maxAmount
+        maxAmount: maxAmount,
+        tipperUserId: tipperFilter?.userId
       });
 
       if (response.data) {
@@ -1595,6 +1602,23 @@ const AdminDashboard: React.FC = () => {
             </Row>
           </div>
 
+          {tipperFilter && (
+            <div className="mb-3 flex flex-wrap items-center gap-2 text-sm text-ink-700" role="status">
+              Showing every tip from tipper
+              <span className="rounded-full bg-brand-50 px-2.5 py-0.5 font-semibold text-brand-800">{tipperFilter.code}</span>
+              <button
+                type="button"
+                className="font-semibold text-brand-700 underline"
+                onClick={() => {
+                  setTipperFilter(null);
+                  setCurrentPage(1);
+                }}
+              >
+                Show all tips
+              </button>
+            </div>
+          )}
+
           {/* Tips Table */}
           <Spin spinning={tipsLoading}>
             <Table
@@ -1644,6 +1668,24 @@ const AdminDashboard: React.FC = () => {
                   width: 240
                 },
                 {
+                  title: 'Tipper',
+                  key: 'tipper',
+                  render: (_: unknown, record: TipDetail) =>
+                    record.tipperUserId ? (
+                      <button
+                        type="button"
+                        className="text-left font-mono text-xs font-semibold text-brand-700 underline"
+                        onClick={() => setTipperDetailsFor(record)}
+                        aria-label={`Who gave the ${record.amount.toFixed(2)} dollar tip from ${shortDate(record.createdAt)}`}
+                      >
+                        {record.tipperUserId.slice(0, 8)}
+                      </button>
+                    ) : (
+                      <span className="text-ink-400">–</span>
+                    ),
+                  width: 100
+                },
+                {
                   title: 'Performer gets',
                   dataIndex: 'performerEarnings',
                   key: 'performerEarnings',
@@ -1677,6 +1719,18 @@ const AdminDashboard: React.FC = () => {
               scroll={{ x: 880 }}
             />
           </Spin>
+          <Modal open={!!tipperDetailsFor} title="Who gave this tip" onClose={() => setTipperDetailsFor(null)}>
+            {tipperDetailsFor && (
+              <AdminTipperBlock
+                tipId={tipperDetailsFor.id}
+                onShowAllTips={details => {
+                  setTipperFilter({ userId: details.userId, code: details.userId.slice(0, 8) });
+                  setCurrentPage(1);
+                  setTipperDetailsFor(null);
+                }}
+              />
+            )}
+          </Modal>
           <Modal
             open={refundModalOpen}
             title="Refund this tip?"

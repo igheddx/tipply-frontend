@@ -262,6 +262,14 @@ describe('SongRequestMonitor', () => {
       expect(row.textContent).toMatch(/12 min ago/)
     })
 
+    it('shows the performer nothing about who tipped, only the amount and the time', async () => {
+      mockMonitor({ songRequests: [], tipsWithoutSong: [tip('a', 50, 12), tip('b', 50, 4)] })
+      renderMonitor()
+
+      const row = (await screen.findAllByLabelText('Mark the $50.00 tip as seen'))[0].closest('li')!
+      expect(row.textContent).not.toMatch(/tipper/i)
+    })
+
     it('offers Request refund on a charged tip, but not on one still waiting to be charged', async () => {
       mockMonitor({ songRequests: [], tipsWithoutSong: [tip('a', 50, 12), tip('b', 5, 3, { status: 'pending' })] })
       renderMonitor()

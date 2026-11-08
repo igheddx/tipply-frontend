@@ -20,6 +20,8 @@ export interface AdminRefundRequest extends RefundRequest {
   tipStatus: string
   hasSongRequest: boolean
   decidedAt?: string | null
+  /** Our id for the tipper (admin only) */
+  tipperUserId?: string
 }
 
 /** A refund an admin made straight from the Tips tab, with no request behind it */

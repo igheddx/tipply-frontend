@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Banner, Button, Card, EmptyState, StatusChip } from '../ui'
 import { Modal } from '../ui/Modal'
 import { useFeedback } from '../ui/Feedback'
+import { AdminTipperBlock } from './AdminTipperBlock'
 import { refundRequestApi, DEFAULT_REFUND_REASONS, type AdminDirectRefund, type AdminRefundRequest } from '../../services/refundRequestApi'
 import {
   currentSubscription,
@@ -192,6 +193,9 @@ export function AdminRefunds({ onChanged }: { onChanged?: () => void }) {
                       {r.tipStatus !== 'processed' && <StatusChip kind="failed" label={`Tip is ${r.tipStatus}`} />}
                     </div>
                     {r.note && <p className="mt-2 text-sm text-ink-900">“{r.note}”</p>}
+                    <div className="mt-3 max-w-xl">
+                      <AdminTipperBlock tipId={r.tipId} />
+                    </div>
                   </div>
                   <div className="text-right">
                     <div className="text-2xl font-bold text-ink-900">{money(r.amount)}</div>

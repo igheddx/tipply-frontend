@@ -5,12 +5,15 @@ import { RefundRequestDialog } from '@/components/refunds/RefundRequestDialog'
 import { RefundRequestsBanner } from '@/components/refunds/RefundRequestsBanner'
 import { AdminRefunds } from '@/components/refunds/AdminRefunds'
 import { ShowTipsSheet } from '@/components/shows/ShowTipsSheet'
+import { AdminTipperBlock } from '@/components/refunds/AdminTipperBlock'
 
 const refunds = vi.hoisted(() => ({ create: vi.fn(), mine: vi.fn(), mineSeen: vi.fn(), adminList: vi.fn(), approve: vi.fn(), decline: vi.fn() }))
 vi.mock('@/services/refundRequestApi', async () => {
   const actual: any = await vi.importActual('@/services/refundRequestApi')
   return { ...actual, refundRequestApi: refunds }
 })
+const tipper = vi.hoisted(() => ({ details: vi.fn() }))
+vi.mock('@/services/tipperApi', () => ({ tipperApi: tipper }))
 const shows = vi.hoisted(() => ({ list: vi.fn(), tips: vi.fn() }))
 vi.mock('@/services/showApi', () => ({ showApi: shows }))
 const feedback = vi.hoisted(() => ({ toast: vi.fn(), confirm: vi.fn(async () => true) }))
@@ -25,6 +28,7 @@ const hoursAgo = (h: number) => new Date(Date.now() - h * 3600 * 1000).toISOStri
 beforeEach(() => {
   Object.values(refunds).forEach(f => f.mockReset())
   Object.values(shows).forEach(f => f.mockReset())
+  tipper.details.mockReset().mockResolvedValue({ data: { tipId: 't1', userId: 'u-1', browserId: 'b-1', email: null, cardBrand: 'visa', cardLast4: '4242', wallet: null, stripeStatus: 'ok', otherTips: [] } })
   feedback.toast.mockClear()
   feedback.confirm.mockClear().mockResolvedValue(true)
 })
@@ -292,5 +296,93 @@ describe('AdminRefunds', () => {
 
     expect(await screen.findByText('Nothing is waiting')).toBeInTheDocument()
     expect(screen.getByText('Add Tipwave to your Home Screen first')).toBeInTheDocument()
+  })
+})
+
+describe('the admin’s tipper block (performers never see any of it)', () => {
+  const details = (over: Record<string, unknown> = {}) => ({
+    tipId: 't1', userId: '3e52f097-3044-48e0-8428-64753b33e40c', browserId: '4f4f22f4-8710-4720-94bb-47e49ee336fa',
+    email: 'jane@example.com', cardBrand: 'visa', cardLast4: '4242', wallet: 'apple_pay', stripeStatus: 'ok', otherTips: [], ...over
+  })
+
+  it('keeps the ids, email and card together as one block', async () => {
+    tipper.details.mockResolvedValue({ data: details() })
+    render(<AdminTipperBlock tipId="t1" />)
+
+    const block = await screen.findByLabelText('Who gave this tip')
+    expect(block).toHaveTextContent('jane@example.com')
+    expect(block).toHaveTextContent('Visa ···· 4242 · Apple Pay')
+    expect(block).toHaveTextContent('3e52f097-3044-48e0-8428-64753b33e40c')
+    expect(block).toHaveTextContent('4f4f22f4-8710-4720-94bb-47e49ee336fa')
+  })
+
+  it('says plainly when there is no email, and still shows the card and the ids', async () => {
+    tipper.details.mockResolvedValue({ data: details({ email: null, wallet: null, cardBrand: 'mastercard', cardLast4: '4444' }) })
+    render(<AdminTipperBlock tipId="t1" />)
+
+    const block = await screen.findByLabelText('Who gave this tip')
+    expect(block).toHaveTextContent('None. Paid with a typed card.')
+    expect(block).toHaveTextContent('Mastercard ···· 4444')
+  })
+
+  it('explains when Stripe could not be read, or the tip was paid in the other mode, without hiding the ids', async () => {
+    tipper.details.mockResolvedValue({ data: details({ email: null, cardLast4: null, stripeStatus: 'unavailable' }) })
+    const { unmount } = render(<AdminTipperBlock tipId="t1" />)
+    expect(await screen.findByText(/Stripe’s details could not be read just now/)).toBeInTheDocument()
+    expect(screen.getByText('3e52f097-3044-48e0-8428-64753b33e40c')).toBeInTheDocument()
+    unmount()
+
+    tipper.details.mockResolvedValue({ data: details({ email: null, cardLast4: null, stripeStatus: 'mode_mismatch' }) })
+    render(<AdminTipperBlock tipId="t1" />)
+    expect(await screen.findByText(/paid in the other Stripe mode/)).toBeInTheDocument()
+  })
+
+  it('lists the same tipper’s other tips to this performer, so similar amounts can be told apart', async () => {
+    tipper.details.mockResolvedValue({ data: details({ otherTips: [{ tipId: 'o1', createdAt: hoursAgo(2), amount: 50, status: 'processed' }, { tipId: 'o2', createdAt: hoursAgo(5), amount: 20, status: 'refunded' }] }) })
+    render(<AdminTipperBlock tipId="t1" />)
+
+    const list = await screen.findByRole('list', { name: 'Other tips from this tipper' })
+    const rows = within(list).getAllByRole('listitem')
+    expect(rows[0]).toHaveTextContent('$50.00')
+    expect(rows[1]).toHaveTextContent('$20.00 · refunded')
+  })
+
+  it('offers to show every tip from this tipper, handing back their id', async () => {
+    tipper.details.mockResolvedValue({ data: details() })
+    const onShowAll = vi.fn()
+    render(<AdminTipperBlock tipId="t1" onShowAllTips={onShowAll} />)
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Show all tips from this tipper' }))
+
+    expect(onShowAll).toHaveBeenCalledWith(expect.objectContaining({ userId: '3e52f097-3044-48e0-8428-64753b33e40c' }))
+  })
+
+  it('says so when the details cannot be loaded', async () => {
+    tipper.details.mockResolvedValue({ error: 'nope' })
+    render(<AdminTipperBlock tipId="t1" />)
+    expect(await screen.findByText('Could not load who gave this tip.')).toBeInTheDocument()
+  })
+
+  it('shows the tipper block on each waiting refund request, so similar tips can be told apart', async () => {
+    refunds.adminList.mockResolvedValue({
+      data: { pendingCount: 1, requests: [{ id: 'r1', tipId: 'tip-9', amount: 50, tipAt: hoursAgo(3), reason: 'mistake', note: null, status: 'pending', requestedAt: hoursAgo(1), profileId: 'p1', performerName: 'Dave Lovett Piano', tipStatus: 'processed', hasSongRequest: false, tipperUserId: '3e52f097-3044-48e0-8428-64753b33e40c' }] }
+    })
+    render(<AdminRefunds />)
+
+    expect(await screen.findByLabelText('Who gave this tip')).toHaveTextContent('Visa ···· 4242')
+    expect(tipper.details).toHaveBeenCalledWith('tip-9')
+  })
+
+  it('shows a performer nothing about who tipped: only the time, amount and kind of tip', async () => {
+    shows.list.mockResolvedValue({ data: { shows: [{ id: 's1', name: null, venueName: null, startedAt: hoursAgo(5), endedAt: hoursAgo(1), isLive: true, tipCount: 2, gross: 100, waitingGross: 0, fees: 0, youKeep: 0, refundedCount: 0, refundedGross: 0 }] } })
+    shows.tips.mockResolvedValue({ data: { tips: [
+      { id: 'a', createdAt: hoursAgo(2), amount: 50, status: 'processed', hasSongRequest: false },
+      { id: 'b', createdAt: hoursAgo(1), amount: 50, status: 'processed', hasSongRequest: false }
+    ] } })
+    render(<ShowTipsSheet open initialShowId="s1" onClose={() => {}} />)
+
+    const list = await screen.findByRole('list', { name: 'Tips in this show' })
+    expect(list.textContent).not.toMatch(/tipper/i)
+    expect(tipper.details).not.toHaveBeenCalled() // the admin lookup is never made from a performer screen
   })
 })
