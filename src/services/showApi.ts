@@ -26,6 +26,14 @@ export interface ShowList {
   pageSize: number
 }
 
+export interface ShowTip {
+  id: string
+  createdAt: string
+  amount: number
+  /** processed, pending or refunded */
+  status: string
+}
+
 export const showApi = {
   /** Whether the shows feature is switched on for this site */
   async enabled(): Promise<boolean> {
@@ -39,5 +47,7 @@ export const showApi = {
   update: (id: string, body: { name: string | null; venueName: string | null }) => apiService.put(`/api/shows/${id}`, body),
   mergeIntoPrevious: (id: string) => apiService.post(`/api/shows/${id}/merge`),
   venues: () => apiService.get('/api/shows/venues'),
+  tips: (id: string) => apiService.get(`/api/shows/${id}/tips`),
+  split: (id: string, tipId: string) => apiService.post(`/api/shows/${id}/split`, { tipId }),
   adminSetShows: (enabled: boolean) => apiService.put('/api/admin/features/shows', { enabled })
 }
