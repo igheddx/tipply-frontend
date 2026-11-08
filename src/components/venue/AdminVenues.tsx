@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Banner, Button, Card, EmptyState, Modal, Switch, Tabs } from '../ui'
 import { useFeedback } from '../ui/Feedback'
+import { showApi } from '../../services/showApi'
 import { venueApi, type AdminVenue, type AuditEntry } from '../../services/venueApi'
 
 type Status = AdminVenue['status']
@@ -22,6 +23,7 @@ export function AdminVenues() {
   const { toast, confirm } = useFeedback()
   const [venues, setVenues] = useState<AdminVenue[]>([])
   const [tab, setTab] = useState<TabId>('pending')
+  const [showsOn, setShowsOn] = useState<boolean | null>(null)
   const [enabled, setEnabled] = useState<boolean | null>(null)
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState<string | null>(null)
@@ -31,7 +33,10 @@ export function AdminVenues() {
   const load = useCallback(async () => {
     const [list, features] = await Promise.all([venueApi.adminVenues(), venueApi.adminFeatures()])
     if (Array.isArray(list.data)) setVenues(list.data)
-    if (features.data) setEnabled(!!features.data.venues)
+    if (features.data) {
+      setEnabled(!!features.data.venues)
+      setShowsOn(!!features.data.shows)
+    }
     setLoading(false)
   }, [])
 
@@ -52,6 +57,21 @@ export function AdminVenues() {
     const res = await venueApi.adminSetVenues(next)
     if (res.error) toast(res.error, 'error')
     else setEnabled(next)
+  }
+
+  const toggleShows = async () => {
+    const next = !showsOn
+    const ok = await confirm({
+      title: next ? 'Turn on performer shows?' : 'Turn off performer shows?',
+      body: next
+        ? 'Performers see a "This show" card and a Shows list that totals each stretch of playing, even past midnight.'
+        : 'The "This show" card and Shows list are hidden. Tips and totals elsewhere are not affected, and shows are kept.',
+      confirmLabel: next ? 'Turn on' : 'Turn off'
+    })
+    if (!ok) return
+    const res = await showApi.adminSetShows(next)
+    if (res.error) toast(res.error, 'error')
+    else setShowsOn(next)
   }
 
   const decide = async (v: AdminVenue, action: 'approve' | 'reject' | 'suspend' | 'reinstate', why?: string) => {
@@ -79,6 +99,18 @@ export function AdminVenues() {
             </div>
           </div>
           <Switch checked={!!enabled} disabled={enabled === null} onChange={toggleFeature} label="Venue accounts" />
+        </div>
+      </Card>
+
+      <Card>
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <div className="font-bold text-ink-900">Performer shows</div>
+            <div className="text-sm text-ink-500">
+              {showsOn === null ? 'Checking…' : showsOn ? 'On for this site: performers see what they made in each show.' : 'Off for this site: performers see only the usual totals.'}
+            </div>
+          </div>
+          <Switch checked={!!showsOn} disabled={showsOn === null} onChange={toggleShows} label="Performer shows" />
         </div>
       </Card>
 

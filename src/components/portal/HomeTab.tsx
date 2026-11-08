@@ -40,6 +40,8 @@ interface HomeTabProps {
   onGoToTips: () => void
   /** Shown when a device takes song requests: a one-tap way into the live requests screen */
   onGoToLive?: () => void
+  /** The "This show" card. When given it sits above the numbers and replaces the "Tips today" tile. */
+  showSlot?: ReactNode
   /** Top right of the greeting, e.g. the Refresh button */
   headerAction?: ReactNode
   formatCurrency: (n: number) => string
@@ -52,7 +54,7 @@ const greeting = () => {
 
 const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`
 
-export function HomeTab({ data, onGoToDevices, onGoToTips, onGoToLive, headerAction, formatCurrency }: HomeTabProps) {
+export function HomeTab({ data, onGoToDevices, onGoToTips, onGoToLive, showSlot, headerAction, formatCurrency }: HomeTabProps) {
   const openSteps = data.nextSteps.filter(s => !s.done)
   const money = (n: number) => (data.balancesLoading ? '…' : formatCurrency(n))
   const trend =
@@ -60,7 +62,7 @@ export function HomeTab({ data, onGoToDevices, onGoToTips, onGoToLive, headerAct
       ? `${data.month.trendDirection === 'up' ? '▲' : '▼'} ${data.month.trendPercent.toFixed(0)}% vs last month`
       : undefined
 
-  const stats = [
+  const allStats = [
     { label: 'Tips today', value: formatCurrency(data.today.amount), caption: `${plural(data.today.count, 'tip')}, before fees`, icon: 'sun' as BrandIconName },
     {
       label: 'Tips this month',
@@ -70,6 +72,8 @@ export function HomeTab({ data, onGoToDevices, onGoToTips, onGoToLive, headerAct
     },
     { label: 'Ready to pay out', value: money(data.available), caption: 'Available in Stripe now', icon: 'wallet' as BrandIconName }
   ]
+  // With shows on, "This show" takes the place of the calendar-day tile
+  const stats = showSlot ? allStats.slice(1) : allStats
 
   const breakdown: { label: string; hint: string; value: string; icon: BrandIconName }[] = [
     { label: 'Tips waiting to be charged', hint: 'Charged in the next batch', value: formatCurrency(data.pendingTips), icon: 'clock' },
@@ -129,8 +133,10 @@ export function HomeTab({ data, onGoToDevices, onGoToTips, onGoToLive, headerAct
         </Banner>
       )}
 
+      {showSlot}
+
       {/* Big numbers: tiles on larger screens, one compact list on phones */}
-      <div className="hidden grid-cols-3 gap-4 sm:grid">
+      <div className={`hidden gap-4 sm:grid ${showSlot ? 'grid-cols-2' : 'grid-cols-3'}`}>
         {stats.map(s => (
           <StatCard key={s.label} {...s} />
         ))}

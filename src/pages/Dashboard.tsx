@@ -4,7 +4,7 @@ import { HomeTab, type HomeData } from '../components/portal/HomeTab'
 import { DemoBanner } from '../components/portal/DemoBanner'
 import { renderQrCard } from '../utils/qrCard'
 import { TipsTimeline } from '../components/charts/TipsTimeline'
-import { Banner, Button, Card, EmptyState, Modal, PageHeader, PageLoader, RefreshControl, StatusChip, useFeedback, type ChipKind } from '../components/ui'
+import { Banner, Button, Card, EmptyState, Modal, PageHeader, PageLoader, RefreshControl, StatusChip, Tabs, useFeedback, type ChipKind } from '../components/ui'
 import { BrandIcon, IconTile } from '../components/icons/BrandIcons'
 import { Switch } from '../components/ui/Switch'
 import React, { useState, useEffect, useRef } from 'react'
@@ -16,6 +16,9 @@ import TipsTab from '../components/portal/TipsTab'
 import AlertsCard from '../components/portal/AlertsCard'
 import { SessionBanner } from '../components/venue/SessionBanner'
 import { RefundNoticeBanner } from '../components/portal/RefundNoticeBanner'
+import { ShowCard } from '../components/shows/ShowCard'
+import { ShowsList } from '../components/shows/ShowsList'
+import { showApi } from '../services/showApi'
 import { VenueInvites } from '../components/venue/VenueInvites'
 import { VenueSection } from '../components/venue/VenueSection'
 import { turnOffAlertsOnSignOut } from '../utils/pushAlerts'
@@ -144,6 +147,18 @@ const Dashboard: React.FC = () => {
     const t = new URLSearchParams(window.location.search).get('tab')
     return t && ['devices', 'tips', 'songs', 'monitor'].includes(t) ? t : 'overview'
   })
+  // Shows (earnings per stretch of playing) appear only where the switch is on
+  const [showsEnabled, setShowsEnabled] = useState(false)
+  const [tipsView, setTipsView] = useState<'tips' | 'shows'>('tips')
+  useEffect(() => {
+    let cancelled = false
+    void showApi.enabled().then(on => {
+      if (!cancelled) setShowsEnabled(on)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [])
   const [showStripeAlert, setShowStripeAlert] = useState(false)
   const [stripeEnabledDevices, setStripeEnabledDevices] = useState<string[]>([])
   const [userProfile, setUserProfile] = useState<any>(null)
@@ -1500,6 +1515,17 @@ const Dashboard: React.FC = () => {
                 onGoToDevices={() => (stats.totalDevices === 0 ? handleAddDeviceClick() : setActiveTab('devices'))}
                 onGoToTips={() => setActiveTab('tips')}
                 onGoToLive={hasSongRequestEnabled ? () => setActiveTab('monitor') : undefined}
+                showSlot={
+                  showsEnabled ? (
+                    <ShowCard
+                      refreshKey={updatedAt?.getTime() ?? 0}
+                      onSeeShows={() => {
+                        setTipsView('shows')
+                        setActiveTab('tips')
+                      }}
+                    />
+                  ) : undefined
+                }
                 headerAction={<RefreshControl onRefresh={refreshPage} busy={refreshing} updatedAt={updatedAt} />}
               />
             )}
@@ -1762,7 +1788,18 @@ const Dashboard: React.FC = () => {
               </div>
             )}
 
-            {activeTab === 'tips' && userProfile?.id && (
+            {activeTab === 'tips' && showsEnabled && (
+              <Tabs
+                className="mb-4"
+                active={tipsView}
+                onChange={id => setTipsView(id as 'tips' | 'shows')}
+                items={[{ id: 'tips', label: 'Tips' }, { id: 'shows', label: 'Shows' }]}
+              />
+            )}
+
+            {activeTab === 'tips' && showsEnabled && tipsView === 'shows' && <ShowsList refreshKey={updatedAt?.getTime() ?? 0} />}
+
+            {activeTab === 'tips' && userProfile?.id && !(showsEnabled && tipsView === 'shows') && (
               <TipsTab
                 profileId={userProfile.id}
                 devices={(stats?.devices ?? []).map(d => ({ id: d.id, uuid: d.uuid, nickname: d.nickname }))}
@@ -1771,7 +1808,7 @@ const Dashboard: React.FC = () => {
               />
             )}
 
-            {activeTab === 'tips' && (
+            {activeTab === 'tips' && !(showsEnabled && tipsView === 'shows') && (
               <div className="mt-5">
                 <TipsTimeline points={tipTimelinePoints} loading={chartsLoading} />
               </div>
