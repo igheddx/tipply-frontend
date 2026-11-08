@@ -62,10 +62,10 @@ export function AdminVenues() {
   const toggleShows = async () => {
     const next = !showsOn
     const ok = await confirm({
-      title: next ? 'Turn on performer shows?' : 'Turn off performer shows?',
+      title: next ? 'Turn performer shows back on?' : 'Turn off performer shows?',
       body: next
-        ? 'Performers see a "This show" card and a Shows list that totals each stretch of playing, even past midnight.'
-        : 'The "This show" card and Shows list are hidden. Tips and totals elsewhere are not affected, and shows are kept.',
+        ? 'Performers see the "This show" card and the Shows list again.'
+        : 'Emergency off-switch. The "This show" card and Shows list are hidden for every performer. Tips and totals elsewhere are not affected, and shows are kept.',
       confirmLabel: next ? 'Turn on' : 'Turn off'
     })
     if (!ok) return
@@ -107,7 +107,7 @@ export function AdminVenues() {
           <div>
             <div className="font-bold text-ink-900">Performer shows</div>
             <div className="text-sm text-ink-500">
-              {showsOn === null ? 'Checking…' : showsOn ? 'On for this site: performers see what they made in each show.' : 'Off for this site: performers see only the usual totals.'}
+              {showsOn === null ? 'Checking…' : showsOn ? 'On for everyone (the normal state). Turn off only as an emergency stop.' : 'Off: performers do not see shows. Turn back on to restore them.'}
             </div>
           </div>
           <Switch checked={!!showsOn} disabled={showsOn === null} onChange={toggleShows} label="Performer shows" />
