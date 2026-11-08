@@ -27,4 +27,9 @@ describe('HomeTab with shows', () => {
     expect(screen.queryByText('Tips today')).toBeNull()
     expect(screen.getAllByText('Tips this month').length).toBeGreaterThan(0)
   })
+
+  it('puts the regulars card on the home screen when one is given', () => {
+    render(<HomeTab {...props} regularsSlot={<div>Your regulars card</div>} />)
+    expect(screen.getByText('Your regulars card')).toBeInTheDocument()
+  })
 })

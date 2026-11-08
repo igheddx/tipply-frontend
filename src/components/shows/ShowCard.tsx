@@ -113,6 +113,12 @@ export function ShowCard({ refreshKey, onSeeShows }: { refreshKey?: string | num
         {plural(show.tipCount, 'tip')}, before fees
         {show.youKeep > 0 ? ` · You keep ${money(show.youKeep)}` : ''}
       </p>
+      {!!show.tipperCount && (
+        <p className="mt-1 text-xs text-ink-500">
+          {plural(show.tipperCount, 'tipper')}
+          {show.returningTipperCount ? ` · ${show.returningTipperCount} had tipped you before` : ''}
+        </p>
+      )}
       {show.waitingGross > 0 && <p className="mt-1 text-xs text-ink-500">{money(show.waitingGross)} is waiting to be charged. You keep counts charged tips only.</p>}
       {show.refundedCount > 0 && (
         <p className="mt-1 text-xs text-ink-500">

@@ -35,6 +35,12 @@ describe('ShowCard', () => {
     expect(screen.getByText('Live')).toBeInTheDocument()
   })
 
+  it('says how many different people tipped, and how many had tipped before', async () => {
+    api.current.mockResolvedValue({ data: { show: show({ tipperCount: 5, returningTipperCount: 2 }) } })
+    render(<ShowCard />)
+    expect(await screen.findByText(/5 tippers · 2 had tipped you before/)).toBeInTheDocument()
+  })
+
   it('names refunded tips and says they are not counted', async () => {
     api.current.mockResolvedValue({ data: { show: show({ refundedCount: 2, refundedGross: 200 }) } })
     render(<ShowCard />)

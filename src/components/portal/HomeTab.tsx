@@ -42,6 +42,8 @@ interface HomeTabProps {
   onGoToLive?: () => void
   /** The "This show" card. When given it sits above the numbers and replaces the "Tips today" tile. */
   showSlot?: ReactNode
+  /** The "Your regulars" card, shown under the numbers */
+  regularsSlot?: ReactNode
   /** Top right of the greeting, e.g. the Refresh button */
   headerAction?: ReactNode
   formatCurrency: (n: number) => string
@@ -54,7 +56,7 @@ const greeting = () => {
 
 const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`
 
-export function HomeTab({ data, onGoToDevices, onGoToTips, onGoToLive, showSlot, headerAction, formatCurrency }: HomeTabProps) {
+export function HomeTab({ data, onGoToDevices, onGoToTips, onGoToLive, showSlot, regularsSlot, headerAction, formatCurrency }: HomeTabProps) {
   const openSteps = data.nextSteps.filter(s => !s.done)
   const money = (n: number) => (data.balancesLoading ? '…' : formatCurrency(n))
   const trend =
@@ -148,6 +150,8 @@ export function HomeTab({ data, onGoToDevices, onGoToTips, onGoToLive, showSlot,
           ))}
         </div>
       </Card>
+
+      {regularsSlot}
 
       {/* Next steps (only while something is left to do) */}
       {openSteps.length > 0 && (

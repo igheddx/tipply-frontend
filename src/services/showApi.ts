@@ -17,6 +17,9 @@ export interface ShowSummary {
   youKeep: number
   refundedCount: number
   refundedGross: number
+  /** Different people who tipped in this show, and how many of them had tipped this performer before */
+  tipperCount?: number
+  returningTipperCount?: number
 }
 
 export interface ShowList {

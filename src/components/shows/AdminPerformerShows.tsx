@@ -131,6 +131,12 @@ export function AdminPerformerShows({ profileId }: { profileId: string }) {
             </div>
           </div>
         </div>
+        {!!selected.tipperCount && (
+          <p className="mt-2 text-xs text-ink-500">
+            {plural(selected.tipperCount, 'tipper')}
+            {selected.returningTipperCount ? ` · ${selected.returningTipperCount} had tipped them before` : ''}
+          </p>
+        )}
         {selected.waitingGross > 0 && <p className="mt-2 text-xs text-ink-500">{money(selected.waitingGross)} is waiting to be charged.</p>}
         {selected.refundedCount > 0 && (
           <p className="mt-1 text-xs text-ink-500">

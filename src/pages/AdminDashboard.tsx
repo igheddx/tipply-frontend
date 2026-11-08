@@ -19,6 +19,9 @@ import PerformerInsights from '../components/PerformerInsights';
 import { AdminPerformerPanel } from '../components/shows/AdminPerformerPanel';
 import { AdminVenues } from '../components/venue/AdminVenues';
 import { AdminFeedback } from '../components/feedback/AdminFeedback';
+import { AdminRepeat } from '../components/repeat/AdminRepeat';
+import { repeatApi, type PerformerRepeatRow } from '../services/repeatApi';
+import { percent } from '../utils/repeat';
 import dayjs from 'dayjs';
 import { PortalShell, type PortalNavItem } from '../components/portal/PortalShell';
 import { Banner, Button as UiButton, Card as UiCard, Modal, PageHeader, PageLoader, RefreshControl, StatCard, StatusChip, useFeedback, type ChipKind } from '../components/ui';
@@ -197,6 +200,7 @@ const AdminDashboard: React.FC = () => {
   const navigate = useNavigate();
   const [stats, setStats] = useState<AdminDashboardStats | null>(null);
   const [performers, setPerformers] = useState<PerformerSummary[]>([]);
+  const [repeatByPerformer, setRepeatByPerformer] = useState<Record<string, PerformerRepeatRow>>({});
   const [platformEarnings, setPlatformEarnings] = useState<PlatformEarningsSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [userProfile, setUserProfile] = useState<any>(null);
@@ -576,6 +580,20 @@ const AdminDashboard: React.FC = () => {
   const performerQueryRef = useRef('');
   const [refreshing, setRefreshing] = useState(false);
   const [updatedAt, setUpdatedAt] = useState<Date | null>(null);
+
+  // Each performer's repeat-tipper numbers for the Performers table
+  useEffect(() => {
+    let cancelled = false;
+    void repeatApi.adminPerformers().then(res => {
+      if (cancelled || !Array.isArray(res.data?.performers)) return;
+      const byId: Record<string, PerformerRepeatRow> = {};
+      for (const row of res.data.performers as PerformerRepeatRow[]) byId[row.profileId] = row;
+      setRepeatByPerformer(byId);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [updatedAt]);
   // Bumped on each refresh so open panels inside the Performers table (song requests) reload too
   const [refreshTick, setRefreshTick] = useState(0);
 
@@ -989,6 +1007,20 @@ const AdminDashboard: React.FC = () => {
       key: 'email',
     },
     {
+      title: 'Repeat tippers',
+      key: 'repeat',
+      render: (record: PerformerSummary) => {
+        const row = repeatByPerformer[record.id];
+        if (!row || row.tippers === 0) return <span className="text-ink-400">–</span>;
+        return (
+          <div>
+            <div className="font-medium text-ink-900">{percent(row.returningTippers, row.tippers)}</div>
+            <div className="text-xs text-ink-500">{row.returningTippers} of {row.tippers} tippers</div>
+          </div>
+        );
+      },
+    },
+    {
       title: 'Platform Fee',
       key: 'platformFee',
       render: (record: PerformerSummary) => (
@@ -1121,6 +1153,8 @@ const AdminDashboard: React.FC = () => {
               <StatCard variant="inline" icon="coin" label="Tips" value={(stats?.totalTips || 0).toLocaleString()} caption={`${(stats?.pendingTips || 0).toLocaleString()} waiting to be charged`} />
               <StatCard variant="inline" icon="mic" label="Performers" value={(stats?.activePerformers || 0).toLocaleString()} caption="With at least one device" />
             </div>
+
+            <AdminRepeat refreshKey={updatedAt?.getTime() ?? 0} />
 
             <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
               <UiCard title="Revenue" subtitle="Tips that were charged successfully">
