@@ -3,8 +3,8 @@ import { feedbackApi, type FeedbackPrompt } from '../services/feedbackApi'
 
 export type FeedbackPhase = 'asking' | 'followup' | 'thanks' | null
 
-/** How long the question stays in the bottom bar before it quietly goes away */
-export const FEEDBACK_ASK_MS = 10000
+/** How long the question stays in the bottom bar, counted from when it is actually on screen */
+export const FEEDBACK_ASK_MS = 20000
 const THANKS_MS = 2200
 
 /**
@@ -15,16 +15,10 @@ export function useFeedbackPrompt(userId: string, deviceUuid: string | undefined
   const [prompt, setPrompt] = useState<FeedbackPrompt | null>(null)
   const [phase, setPhase] = useState<FeedbackPhase>(null)
   const askedThisVisit = useRef(false)
-  // One timer for how long the question waits, and a separate one for how long "Thank you" shows
-  const askTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // How long "Thank you" shows. The question's own timer lives in the bar, so it only runs while the question is visible.
   const thanksTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  const clearAskTimer = () => {
-    if (askTimer.current) clearTimeout(askTimer.current)
-    askTimer.current = null
-  }
   const clearTimer = () => {
-    clearAskTimer()
     if (thanksTimer.current) clearTimeout(thanksTimer.current)
     thanksTimer.current = null
   }
@@ -38,7 +32,6 @@ export function useFeedbackPrompt(userId: string, deviceUuid: string | undefined
     setPrompt(null)
   }, [])
 
-  // The question fades away by itself if nobody answers
   const dismissNow = useCallback(() => {
     if (!prompt || phase !== 'asking') return
     clearTimer()
@@ -46,12 +39,6 @@ export function useFeedbackPrompt(userId: string, deviceUuid: string | undefined
     setPhase(null)
     setPrompt(null)
   }, [prompt, phase, userId])
-
-  useEffect(() => {
-    if (phase !== 'asking') return
-    askTimer.current = setTimeout(dismissNow, FEEDBACK_ASK_MS)
-    return clearAskTimer
-  }, [phase, dismissNow])
 
   /** Call when a tip or song request has been accepted. Asks the server once per visit. */
   const onTipConfirmed = useCallback(

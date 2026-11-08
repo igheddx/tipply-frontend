@@ -1,6 +1,6 @@
 import React from 'react'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
-import { vi, describe, it, expect, beforeEach } from 'vitest'
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
+import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { FeedbackBar } from '@/components/tip/FeedbackBar'
 import { FeedbackFormModal } from '@/components/tip/FeedbackFormModal'
 import { GiveFeedbackLink } from '@/components/tip/GiveFeedbackLink'
@@ -17,6 +17,41 @@ const song = { ...stars, promptId: 'p2', question: 'song_found', kind: 'choice',
 beforeEach(() => {
   Object.values(api).forEach(f => f.mockReset())
   feedback.toast.mockClear()
+})
+
+describe('FeedbackBar timing', () => {
+  afterEach(() => vi.useRealTimers())
+
+  it('stays for twenty seconds from when it is on screen, then closes by itself', () => {
+    vi.useFakeTimers()
+    const onDismiss = vi.fn()
+    render(<FeedbackBar prompt={stars} phase="asking" onRate={() => {}} onChoose={() => {}} onDismiss={onDismiss} />)
+
+    act(() => { vi.advanceTimersByTime(19000) })
+    expect(onDismiss).not.toHaveBeenCalled()
+    act(() => { vi.advanceTimersByTime(1500) })
+    expect(onDismiss).toHaveBeenCalledTimes(1)
+  })
+
+  it('starts the twenty seconds over whenever it is touched', () => {
+    vi.useFakeTimers()
+    const onDismiss = vi.fn()
+    render(<FeedbackBar prompt={stars} phase="asking" onRate={() => {}} onChoose={() => {}} onDismiss={onDismiss} />)
+
+    act(() => { vi.advanceTimersByTime(15000) })
+    fireEvent.pointerDown(screen.getByRole('group', { name: 'Quick question' }))
+    act(() => { vi.advanceTimersByTime(15000) })
+
+    expect(onDismiss).not.toHaveBeenCalled()
+  })
+
+  it('does not run the clock once it has been answered', () => {
+    vi.useFakeTimers()
+    const onDismiss = vi.fn()
+    render(<FeedbackBar prompt={stars} phase="thanks" onRate={() => {}} onChoose={() => {}} onDismiss={onDismiss} />)
+    act(() => { vi.advanceTimersByTime(60000) })
+    expect(onDismiss).not.toHaveBeenCalled()
+  })
 })
 
 describe('FeedbackBar', () => {

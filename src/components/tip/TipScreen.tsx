@@ -135,6 +135,9 @@ export function TipScreen({
   }, [])
 
   return (
+    <>
+    {/* Reaches past every edge of the screen, so a strip the phone leaves uncovered under its toolbar is the same dark color, never white */}
+    <div aria-hidden="true" className="pointer-events-none fixed" style={{ inset: '-80px 0', zIndex: -1, background: '#0d4254' }} />
     <div
       className="fixed inset-0 flex flex-col gap-2.5 overflow-hidden px-4 text-white"
       style={{
@@ -268,7 +271,12 @@ export function TipScreen({
 
       <div
         className="flex flex-none items-center justify-between rounded-[14px] border border-white/10 px-3.5"
-        style={{ height: 'max(2.5rem, 5.2dvh)', background: 'rgba(8,12,40,0.55)' }}
+        style={{
+          height: 'max(2.5rem, 5.2dvh)',
+          // While a question is showing, the bar takes a soft brand-teal tint so it is noticed, then returns to normal
+          background: bottomBarOverride ? 'rgba(6,182,200,0.34)' : 'rgba(8,12,40,0.55)',
+          borderColor: bottomBarOverride ? 'rgba(141,216,227,0.55)' : undefined
+        }}
       >
         {bottomBarOverride ?? (
           <>
@@ -291,5 +299,6 @@ export function TipScreen({
         {footerLink && <span className="absolute right-0 top-1/2 -translate-y-1/2">{footerLink}</span>}
       </footer>
     </div>
+    </>
   )
 }

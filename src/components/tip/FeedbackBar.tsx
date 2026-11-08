@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { FEEDBACK_ASK_MS } from '../../hooks/useFeedbackPrompt'
 import type { FeedbackPrompt } from '../../services/feedbackApi'
 import type { FeedbackPhase } from '../../hooks/useFeedbackPrompt'
 
@@ -25,6 +26,13 @@ interface Props {
 export function FeedbackBar({ prompt, phase, onRate, onChoose, onDismiss }: Props) {
   // The star under the finger, so the stars up to it fill while pressing and the choice is clear
   const [pressed, setPressed] = useState(0)
+  // Counts from the moment the question is on screen, and starts over whenever it is touched, so it never vanishes under a finger
+  const [touches, setTouches] = useState(0)
+  useEffect(() => {
+    if (phase !== 'asking') return
+    const timer = setTimeout(onDismiss, FEEDBACK_ASK_MS)
+    return () => clearTimeout(timer)
+  }, [phase, touches, onDismiss])
 
   if (phase === 'thanks') {
     return (
@@ -35,7 +43,7 @@ export function FeedbackBar({ prompt, phase, onRate, onChoose, onDismiss }: Prop
   }
 
   return (
-    <div className="flex h-full w-full items-center justify-between gap-2" role="group" aria-label="Quick question">
+    <div className="flex h-full w-full items-center justify-between gap-2" role="group" aria-label="Quick question" onPointerDown={() => setTouches(t => t + 1)}>
       <span className="min-w-0 flex-1 text-[12px] font-bold leading-tight text-white">{prompt.text}</span>
       {prompt.kind === 'stars' ? (
         <span className="flex flex-none items-center" role="radiogroup" aria-label="Rating, 1 to 5 stars" onPointerLeave={() => setPressed(0)}>
@@ -65,7 +73,7 @@ export function FeedbackBar({ prompt, phase, onRate, onChoose, onDismiss }: Prop
               key={o.key}
               type="button"
               onClick={() => onChoose(o.key)}
-              className="h-8 rounded-full border border-white/30 bg-white/10 px-2.5 text-[12px] font-bold text-white active:bg-white/25"
+              className="h-8 rounded-full bg-white px-3 text-[12px] font-bold text-ink-900 shadow-sm active:bg-brand-100"
             >
               {o.label}
             </button>

@@ -1,6 +1,6 @@
-import { renderHook, act, waitFor } from '@testing-library/react'
+import { renderHook, act } from '@testing-library/react'
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { useFeedbackPrompt, FEEDBACK_ASK_MS } from '@/hooks/useFeedbackPrompt'
+import { useFeedbackPrompt } from '@/hooks/useFeedbackPrompt'
 
 const api = vi.hoisted(() => ({ prompt: vi.fn(), answer: vi.fn(), dismiss: vi.fn() }))
 vi.mock('@/services/feedbackApi', () => ({ feedbackApi: api }))
@@ -108,18 +108,6 @@ describe('useFeedbackPrompt', () => {
 
     expect(api.dismiss).toHaveBeenCalledWith('p1', 'u1')
     expect(result.current.phase).toBeNull()
-  })
-
-  it('goes away by itself after ten seconds, recorded as a dismissal', async () => {
-    vi.useFakeTimers({ shouldAdvanceTime: true })
-    api.prompt.mockResolvedValue(stars)
-    const { result } = renderHook(() => useFeedbackPrompt('u1', 'dev'))
-    await act(async () => { await result.current.onTipConfirmed(false) })
-
-    act(() => { vi.advanceTimersByTime(FEEDBACK_ASK_MS + 50) })
-
-    await waitFor(() => expect(result.current.phase).toBeNull())
-    expect(api.dismiss).toHaveBeenCalledWith('p1', 'u1')
   })
 
   it('tapping elsewhere after it was answered does not turn the answer into a dismissal', async () => {
