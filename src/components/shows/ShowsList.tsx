@@ -5,6 +5,7 @@ import { useFeedback } from '../ui/Feedback'
 import { showApi, type ShowSummary } from '../../services/showApi'
 import { defaultShowName, showTitle, showTimes } from '../../utils/showName'
 import { VenuePicker } from './VenuePicker'
+import { SplitShowModal } from './SplitShowModal'
 
 const money = (n: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(n)
 const plural = (n: number, one: string) => `${n} ${n === 1 ? one : `${one}s`}`
@@ -24,6 +25,7 @@ export function ShowsList({ refreshKey }: { refreshKey?: string | number }) {
   const [venue, setVenue] = useState<string | null>(null)
   const [pickingVenue, setPickingVenue] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [splitting, setSplitting] = useState<ShowSummary | null>(null)
 
   const load = useCallback(async () => {
     setFailed(false)
@@ -146,6 +148,11 @@ export function ShowsList({ refreshKey }: { refreshKey?: string | number }) {
                 <Button size="sm" variant="ghost" onClick={() => openEdit(show)}>
                   Name and place
                 </Button>
+                {show.tipCount + show.refundedCount >= 2 && (
+                  <Button size="sm" variant="ghost" onClick={() => setSplitting(show)}>
+                    Split
+                  </Button>
+                )}
                 {index < shows.length - 1 || shows.length < total ? (
                   <Button size="sm" variant="ghost" onClick={() => merge(show)}>
                     Join to the show before
@@ -203,6 +210,15 @@ export function ShowsList({ refreshKey }: { refreshKey?: string | number }) {
           </>
         )}
       </Modal>
+      <SplitShowModal
+        show={splitting}
+        allShows={shows}
+        onClose={() => setSplitting(null)}
+        onSplit={async () => {
+          setSplitting(null)
+          await load()
+        }}
+      />
       <VenuePicker
         open={pickingVenue}
         current={venue}
