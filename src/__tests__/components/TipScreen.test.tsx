@@ -141,4 +141,22 @@ describe('formatting', () => {
     expect(cardLabel(null)).toBe('Card on file')
     expect(cardLabel({ brand: 'visa' })).toBe('Card on file')
   })
+
+  it('swaps a quick question into the bottom bar without removing the amounts, and puts the card and total back after', () => {
+    const { rerender } = render(<TipScreen {...base} />)
+    expect(screen.getByText(/Visa/i)).toBeInTheDocument()
+
+    rerender(<TipScreen {...base} bottomBarOverride={<span>How easy was that?</span>} />)
+    expect(screen.getByText('How easy was that?')).toBeInTheDocument()
+    expect(screen.queryByText(/Change/)).toBeNull()
+    expect(screen.getAllByRole('button', { name: /^Tip \$/ })).toHaveLength(6)
+
+    rerender(<TipScreen {...base} />)
+    expect(screen.getByText(/Change/)).toBeInTheDocument()
+  })
+
+  it('shows a quiet footer link when one is given', () => {
+    render(<TipScreen {...base} footerLink={<button>Give feedback</button>} />)
+    expect(screen.getByRole('button', { name: 'Give feedback' })).toBeInTheDocument()
+  })
 })

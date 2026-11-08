@@ -1,5 +1,6 @@
 import { BrandIcon } from '../icons/BrandIcons'
 import { photoSrc } from '../../utils/photoUrl'
+import type React from 'react'
 import { useEffect } from 'react'
 
 /** Gradient behind each of the six amounts, in order. They match the light colors the device shows. */
@@ -60,6 +61,10 @@ export interface TipScreenProps {
   onChangeCard: () => void
   /** What this tipper has given in the last 24 hours */
   total: number
+  /** A quick question shown in the bottom bar in place of the card and total. Same height, so nothing moves. */
+  bottomBarOverride?: React.ReactNode
+  /** A quiet link in the footer, e.g. "Give feedback" */
+  footerLink?: React.ReactNode
 }
 
 /**
@@ -82,7 +87,9 @@ export function TipScreen({
   onClearSong,
   card,
   onChangeCard,
-  total
+  total,
+  bottomBarOverride,
+  footerLink
 }: TipScreenProps) {
   // Phones paint the area behind their status bar and address bar from the page background and the theme color.
   // Match both to this screen while it is open, so there is no light strip at the top or bottom.
@@ -263,20 +270,25 @@ export function TipScreen({
         className="flex flex-none items-center justify-between rounded-[14px] border border-white/10 px-3.5"
         style={{ height: 'max(2.5rem, 5.2dvh)', background: 'rgba(8,12,40,0.55)' }}
       >
-        <button type="button" onClick={onChangeCard} className="flex items-center gap-2 whitespace-nowrap text-xs text-indigo-200">
-          <BrandIcon name="card" size={18} tone="brand" />
-          <span>
-            {cardLabel(card)} · <u>Change</u>
+        {bottomBarOverride ?? (
+          <>
+          <button type="button" onClick={onChangeCard} className="flex items-center gap-2 whitespace-nowrap text-xs text-indigo-200">
+            <BrandIcon name="card" size={18} tone="brand" />
+            <span>
+              {cardLabel(card)} · <u>Change</u>
+            </span>
+          </button>
+          <span className="flex items-baseline gap-2 whitespace-nowrap" aria-live="polite">
+            <span className="text-[11px] uppercase tracking-wider text-white/70">Today</span>
+            <b className="text-[19px] font-black">{formatMoney(total)}</b>
           </span>
-        </button>
-        <span className="flex items-baseline gap-2 whitespace-nowrap" aria-live="polite">
-          <span className="text-[11px] uppercase tracking-wider text-white/70">Today</span>
-          <b className="text-[19px] font-black">{formatMoney(total)}</b>
-        </span>
+          </>
+        )}
       </div>
 
-      <footer className="flex h-6 flex-none items-center justify-center">
+      <footer className="relative flex h-6 flex-none items-center justify-center">
         <img src="/images/logo/tipwave-logo-v2-light.png" alt="Tipwave" className="h-[22px] opacity-90" />
+        {footerLink && <span className="absolute right-0 top-1/2 -translate-y-1/2">{footerLink}</span>}
       </footer>
     </div>
   )
