@@ -3,6 +3,8 @@ import { apiService } from '../../services/api'
 import { Button, Card, EmptyState, StatusChip, useFeedback, type ChipKind } from '../ui'
 import { buildTipsCsv, statusLabel } from '../../utils/tipsCsv'
 import { rangeFor, toDateInput, type RangePreset } from '../../utils/tipsRange'
+import { RefundRequestDialog } from '../refunds/RefundRequestDialog'
+import { REFUND_WINDOW_DAYS } from '../../services/refundRequestApi'
 
 interface DeviceOption {
   id: string
@@ -20,6 +22,8 @@ interface TipRow {
   youKeep: number
   reason?: string | null
   refundedAt?: string | null
+  /** pending or declined when a refund was asked for this tip */
+  refundRequest?: 'pending' | 'declined' | null
 }
 
 interface Summary {
@@ -82,6 +86,7 @@ export default function TipsTab({ profileId, devices, refreshKey, onGoToDevices 
   const [status, setStatus] = useState('all')
 
   const [rows, setRows] = useState<TipRow[]>([])
+  const [asking, setAsking] = useState<TipRow | null>(null)
   const [total, setTotal] = useState(0)
   const [summary, setSummary] = useState<Summary | null>(null)
   const [page, setPage] = useState(1)
@@ -317,7 +322,21 @@ export default function TipsTab({ profileId, devices, refreshKey, onGoToDevices 
                     )}
                     {tip.reason && <div className="mt-0.5 text-sm text-ink-700">{tip.reason}</div>}
                   </div>
-                  <StatusChip kind={chipFor(tip.status)} label={statusLabel(tip.status)} />
+                  <div className="flex flex-col items-end gap-1">
+                    <StatusChip kind={chipFor(tip.status)} label={statusLabel(tip.status)} />
+                    {tip.refundRequest === 'pending' && <StatusChip kind="processing" label="Refund requested" />}
+                    {tip.refundRequest === 'declined' && <StatusChip kind="offline" label="Not refunded" />}
+                    {tip.status === 'processed' && !tip.refundRequest && Date.now() - new Date(tip.createdAt).getTime() <= REFUND_WINDOW_DAYS * 24 * 3600 * 1000 && (
+                      <button
+                        type="button"
+                        onClick={() => setAsking(tip)}
+                        className="text-xs font-semibold text-ink-500 underline hover:text-ink-700"
+                        aria-label={`Request a refund for the ${money(tip.amount)} tip from ${when(tip.createdAt)}`}
+                      >
+                        Request refund
+                      </button>
+                    )}
+                  </div>
                 </li>
               ))}
             </ul>
@@ -331,6 +350,14 @@ export default function TipsTab({ profileId, devices, refreshKey, onGoToDevices 
           </>
         )}
       </Card>
+      <RefundRequestDialog
+        open={!!asking}
+        tips={asking ? [{ tipId: asking.id, amount: asking.amount, createdAt: asking.createdAt }] : []}
+        onClose={() => setAsking(null)}
+        onRequested={() => {
+          if (asking) setRows(prev => prev.map(r => (r.id === asking.id ? { ...r, refundRequest: 'pending' } : r)))
+        }}
+      />
     </div>
   )
 }

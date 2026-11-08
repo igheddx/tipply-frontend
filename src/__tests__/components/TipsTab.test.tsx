@@ -4,6 +4,11 @@ import { vi, describe, it, expect, beforeEach } from 'vitest'
 import TipsTab from '@/components/portal/TipsTab'
 
 const api = vi.hoisted(() => ({ getTipHistory: vi.fn() }))
+const refunds = vi.hoisted(() => ({ create: vi.fn() }))
+vi.mock('@/services/refundRequestApi', async () => {
+  const actual: any = await vi.importActual('@/services/refundRequestApi')
+  return { ...actual, refundRequestApi: { ...actual.refundRequestApi, create: refunds.create } }
+})
 vi.mock('@/services/api', () => ({ apiService: api, default: api }))
 
 const tip = (id: string, over: Record<string, unknown> = {}) => ({
@@ -88,5 +93,45 @@ describe('TipsTab', () => {
     renderTab()
     expect(await screen.findByText(/bank declined the card/i)).toBeInTheDocument()
     expect(screen.getByText('Not charged', { selector: 'span' })).toBeInTheDocument()
+  })
+
+  describe('requesting a refund', () => {
+    const hoursAgo = (h: number) => new Date(Date.now() - h * 3600 * 1000).toISOString()
+    const withTips = (items: unknown[]) =>
+      api.getTipHistory.mockResolvedValue({ data: { items, total: items.length, summary: { ...summary, notChargedCount: 0 } } })
+
+    beforeEach(() => refunds.create.mockReset())
+
+    it('offers Request refund only on a charged tip from the last 7 days with nothing asked yet', async () => {
+      withTips([
+        tip('ok', { createdAt: hoursAgo(5), amount: 50 }),
+        tip('old', { createdAt: hoursAgo(24 * 9), amount: 20 }),
+        tip('refunded', { createdAt: hoursAgo(5), status: 'refunded', fees: 0, youKeep: 0, amount: 100 }),
+        tip('waiting', { createdAt: hoursAgo(1), status: 'pending', fees: 0, youKeep: 0, amount: 5 }),
+        tip('asked', { createdAt: hoursAgo(6), refundRequest: 'pending', amount: 10 }),
+        tip('declined', { createdAt: hoursAgo(7), refundRequest: 'declined', amount: 2 })
+      ])
+      renderTab()
+
+      await screen.findByText('$50.00')
+      expect(screen.getAllByRole('button', { name: /Request a refund/ })).toHaveLength(1)
+      expect(screen.getByRole('button', { name: /Request a refund for the \$50\.00 tip/ })).toBeInTheDocument()
+      expect(screen.getByText('Refund requested')).toBeInTheDocument()
+      expect(screen.getByText('Not refunded')).toBeInTheDocument()
+    })
+
+    it('sends the request for that tip, then shows it as requested without reloading', async () => {
+      withTips([tip('ok', { createdAt: hoursAgo(5), amount: 50 })])
+      refunds.create.mockResolvedValue({ data: { status: 'pending' } })
+      renderTab()
+
+      fireEvent.click(await screen.findByRole('button', { name: /Request a refund for the \$50\.00 tip/ }))
+      fireEvent.click(await screen.findByRole('button', { name: 'Send request' }))
+
+      await waitFor(() => expect(refunds.create).toHaveBeenCalledWith(expect.objectContaining({ tipId: 'ok', reason: 'mistake' })))
+      expect(await screen.findByText('Refund requested')).toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: /Request a refund/ })).toBeNull()
+      expect(api.getTipHistory).toHaveBeenCalledTimes(1)
+    })
   })
 })
