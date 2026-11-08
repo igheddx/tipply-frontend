@@ -95,10 +95,18 @@ export function FeedbackFormModal({ open, title, askStars = false, reasons = [],
       ) : (
         <>
           {askStars && (
-            <div role="radiogroup" aria-label="Rating, 1 to 5 stars" className="mb-4 flex items-center justify-center gap-1 text-amber-500">
+            <div role="radiogroup" aria-label="Rating, 1 to 5 stars" className="mb-4 flex items-center justify-center gap-1">
               {[1, 2, 3, 4, 5].map(n => (
-                <button key={n} type="button" role="radio" aria-checked={rating === n} aria-label={`${n} out of 5`} onClick={() => setRating(n)} className="flex h-12 w-12 items-center justify-center">
-                  <StarGlyph filled={rating !== null && n <= rating} size={34} />
+                <button
+                  key={n}
+                  type="button"
+                  role="radio"
+                  aria-checked={rating === n}
+                  aria-label={`${n} out of 5`}
+                  onClick={() => setRating(n)}
+                  className={`flex h-12 w-12 items-center justify-center ${rating !== null && n <= rating ? 'text-brand-600' : 'text-slate-300'}`}
+                >
+                  <StarGlyph filled={rating !== null && n <= rating} size={34} stroke={1.5} />
                 </button>
               ))}
             </div>

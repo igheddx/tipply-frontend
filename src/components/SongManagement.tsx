@@ -752,7 +752,7 @@ const SongManagement: React.FC<SongManagementProps> = ({ profileId }) => {
                         aria-label={isFav ? `Remove ${song.title} from your favorites` : `Mark ${song.title} as a favorite`}
                         title={isFav ? 'Artist favorite' : 'Mark as an artist favorite'}
                         className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl transition-colors ${
-                          isFav ? 'bg-amber-100 text-amber-600' : 'text-slate-400 hover:bg-slate-100 hover:text-amber-500'
+                          isFav ? 'bg-brand-50 text-brand-700' : 'text-slate-400 hover:bg-slate-100 hover:text-brand-600'
                         }`}
                       >
                         <FavoriteStar filled={isFav} size={22} />
@@ -916,7 +916,7 @@ Hotel California|Eagles|Hotel California|Rock`}</pre>
               <button
                 onClick={() => bulkSetFavorite(true)}
                 disabled={isBulkFavoriting}
-                className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-amber-400 px-4 text-sm font-bold text-ink-900 hover:bg-amber-300 disabled:opacity-50"
+                className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-white px-4 text-sm font-bold text-brand-800 hover:bg-brand-50 disabled:opacity-50"
               >
                 <FavoriteStar filled size={16} />
                 Mark favorite
@@ -962,7 +962,7 @@ Hotel California|Eagles|Hotel California|Rock`}</pre>
                       aria-label={song.isFavorite ? `Remove ${song.songTitle} from your favorites` : `Mark ${song.songTitle} as a favorite`}
                       title={song.isFavorite ? 'Artist favorite' : 'Mark as an artist favorite'}
                       className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl transition-colors ${
-                        song.isFavorite ? 'bg-amber-100 text-amber-600' : 'text-slate-400 hover:bg-slate-100 hover:text-amber-500'
+                        song.isFavorite ? 'bg-brand-50 text-brand-700' : 'text-slate-400 hover:bg-slate-100 hover:text-brand-600'
                       }`}
                     >
                       <FavoriteStar filled={!!song.isFavorite} size={22} />
@@ -1069,7 +1069,7 @@ Hotel California|Eagles|Hotel California|Rock`}</pre>
                       onClick={() => toggleUploadFavorite(index)}
                       aria-pressed={!!song.favorite}
                       aria-label={song.favorite ? `Remove ${song.title} from your favorites` : `Mark ${song.title} as a favorite`}
-                      className={`flex h-11 w-11 items-center justify-center rounded-xl ${song.favorite ? 'bg-amber-100 text-amber-600' : 'text-slate-300 hover:text-amber-500'}`}
+                      className={`flex h-11 w-11 items-center justify-center rounded-xl ${song.favorite ? 'bg-brand-50 text-brand-700' : 'text-slate-300 hover:text-brand-600'}`}
                     >
                       <FavoriteStar filled={!!song.favorite} size={20} />
                     </button>
