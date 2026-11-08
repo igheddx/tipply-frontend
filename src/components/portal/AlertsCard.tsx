@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { apiService } from '../../services/api'
-import { Banner, Button, Card } from '../ui'
+import { Banner, Button, Card, Switch } from '../ui'
 import {
   currentSubscription,
   disablePushAlerts,
@@ -24,6 +24,8 @@ const MAX_ALERT_AMOUNTS = 6
 
 export default function AlertsCard({ tipAmounts }: AlertsCardProps) {
   const [alertAmounts, setAlertAmounts] = useState<number[]>([])
+  // Every tip that came without a song shows in the Live queue (the default); off limits it to the chosen amounts
+  const [showAllTips, setShowAllTips] = useState(true)
   const [amountsLoaded, setAmountsLoaded] = useState(false)
   const [saving, setSaving] = useState(false)
   const [amountError, setAmountError] = useState('')
@@ -37,6 +39,7 @@ export default function AlertsCard({ tipAmounts }: AlertsCardProps) {
     apiService.get('/api/profiles/me/alert-amounts').then(r => {
       if (cancelled) return
       if (Array.isArray(r.data?.amounts)) setAlertAmounts(r.data.amounts)
+      if (typeof r.data?.showAllTips === 'boolean') setShowAllTips(r.data.showAllTips)
       setAmountsLoaded(true)
     })
     return () => {
@@ -98,6 +101,21 @@ export default function AlertsCard({ tipAmounts }: AlertsCardProps) {
     }
   }
 
+  const toggleShowAll = async () => {
+    const next = !showAllTips
+    setShowAllTips(next)
+    setAmountError('')
+    setSaving(true)
+    const response = await apiService.put('/api/profiles/me/alert-amounts', { amounts: alertAmounts, showAllTips: next })
+    setSaving(false)
+    if (typeof response.data?.showAllTips === 'boolean') {
+      setShowAllTips(response.data.showAllTips)
+    } else {
+      setShowAllTips(!next)
+      setAmountError('Could not save. Please try again.')
+    }
+  }
+
   const turnOn = async () => {
     setBusy(true)
     setMessage(null)
@@ -148,8 +166,17 @@ export default function AlertsCard({ tipAmounts }: AlertsCardProps) {
           <h3 id="alert-amounts-title" className="text-sm font-bold text-ink-900">
             Tips with no song
           </h3>
-          <p className="mt-1 text-sm text-ink-500">
-            Tips that come with a song request always show on your Live screen and alert you. Also show and alert for these amounts, even when no song is chosen:
+          <div className="mt-2 flex items-start justify-between gap-4 rounded-xl border border-slate-100 p-3">
+            <div className="min-w-0">
+              <div className="text-sm font-semibold text-ink-900">Show every tip in my Live queue</div>
+              <p className="mt-0.5 text-xs text-ink-500">Tips with no song appear marked “Tips without a song”, with the time they came in.</p>
+            </div>
+            <Switch checked={showAllTips} disabled={!amountsLoaded || saving} onChange={() => void toggleShowAll()} label="Show every tip in my Live queue" />
+          </div>
+          <p className="mt-3 text-sm text-ink-500">
+            {showAllTips
+              ? 'Tips that come with a song request always alert you. Also alert your phone for these amounts, even when no song is chosen:'
+              : 'Tips that come with a song request always show on your Live screen and alert you. Also show and alert for these amounts, even when no song is chosen:'}
           </p>
           <div className="mt-3 flex flex-wrap gap-2" role="group" aria-label="Tip amounts to show without a song">
             {tipAmounts.map(amount => {

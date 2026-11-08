@@ -83,4 +83,17 @@ describe('AlertsCard', () => {
     render(<AlertsCard tipAmounts={amounts} />)
     expect(await screen.findByText('Tip alerts are not switched on yet')).toBeInTheDocument()
   })
+
+  it('shows every tip in the Live queue by default, and can limit it to the chosen amounts', async () => {
+    api.get.mockResolvedValue({ data: { amounts: [20], showAllTips: true } })
+    api.put.mockImplementation(async (_u: string, body: { amounts: number[]; showAllTips?: boolean }) => ({ data: { amounts: body.amounts, showAllTips: body.showAllTips ?? true } }))
+    render(<AlertsCard tipAmounts={amounts} />)
+
+    const toggle = await screen.findByRole('switch', { name: 'Show every tip in my Live queue' })
+    expect(toggle).toHaveAttribute('aria-checked', 'true')
+    fireEvent.click(toggle)
+
+    await waitFor(() => expect(api.put).toHaveBeenCalledWith('/api/profiles/me/alert-amounts', { amounts: [20], showAllTips: false }))
+    await waitFor(() => expect(toggle).toHaveAttribute('aria-checked', 'false'))
+  })
 })

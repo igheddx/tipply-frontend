@@ -6,6 +6,7 @@ import { showApi, type ShowSummary } from '../../services/showApi'
 import { defaultShowName, showTitle, showTimes } from '../../utils/showName'
 import { VenuePicker } from './VenuePicker'
 import { SplitShowModal } from './SplitShowModal'
+import { ShowTipsSheet } from './ShowTipsSheet'
 
 const money = (n: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(n)
 const plural = (n: number, one: string) => `${n} ${n === 1 ? one : `${one}s`}`
@@ -26,6 +27,7 @@ export function ShowsList({ refreshKey }: { refreshKey?: string | number }) {
   const [pickingVenue, setPickingVenue] = useState(false)
   const [saving, setSaving] = useState(false)
   const [splitting, setSplitting] = useState<ShowSummary | null>(null)
+  const [seeingTips, setSeeingTips] = useState<ShowSummary | null>(null)
 
   const load = useCallback(async () => {
     setFailed(false)
@@ -145,6 +147,9 @@ export function ShowsList({ refreshKey }: { refreshKey?: string | number }) {
                 </div>
               )}
               <div className="mt-2 flex flex-wrap gap-1">
+                <Button size="sm" variant="ghost" onClick={() => setSeeingTips(show)}>
+                  Tips
+                </Button>
                 <Button size="sm" variant="ghost" onClick={() => openEdit(show)}>
                   Name and place
                 </Button>
@@ -210,6 +215,7 @@ export function ShowsList({ refreshKey }: { refreshKey?: string | number }) {
           </>
         )}
       </Modal>
+      <ShowTipsSheet open={!!seeingTips} initialShowId={seeingTips?.id} onClose={() => setSeeingTips(null)} />
       <SplitShowModal
         show={splitting}
         allShows={shows}

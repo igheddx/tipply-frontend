@@ -4,6 +4,7 @@ import { useFeedback } from '../ui/Feedback'
 import { showApi, type ShowSummary } from '../../services/showApi'
 import { showTitle, showTimes } from '../../utils/showName'
 import { VenuePicker } from './VenuePicker'
+import { ShowTipsSheet } from './ShowTipsSheet'
 
 const money = (n: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(n)
 const plural = (n: number, one: string) => `${n} ${n === 1 ? one : `${one}s`}`
@@ -18,6 +19,7 @@ export function ShowCard({ refreshKey, onSeeShows }: { refreshKey?: string | num
   const [loaded, setLoaded] = useState(false)
   const [busy, setBusy] = useState(false)
   const [picking, setPicking] = useState(false)
+  const [seeingTips, setSeeingTips] = useState(false)
 
   const load = useCallback(async () => {
     const res = await showApi.current()
@@ -135,6 +137,9 @@ export function ShowCard({ refreshKey, onSeeShows }: { refreshKey?: string | num
             End show
           </Button>
         )}
+        <Button variant="ghost" onClick={() => setSeeingTips(true)}>
+          Tips
+        </Button>
         {onSeeShows && (
           <Button variant="ghost" onClick={onSeeShows}>
             All shows
@@ -143,6 +148,7 @@ export function ShowCard({ refreshKey, onSeeShows }: { refreshKey?: string | num
       </div>
 
       <VenuePicker open={picking} current={show.venueName} onPick={setVenue} onClose={() => setPicking(false)} />
+      <ShowTipsSheet open={seeingTips} initialShowId={show.id} onClose={() => setSeeingTips(false)} onChanged={() => void load()} />
     </Card>
   )
 }

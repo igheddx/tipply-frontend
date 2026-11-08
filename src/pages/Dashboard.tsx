@@ -18,6 +18,7 @@ import { SessionBanner } from '../components/venue/SessionBanner'
 import { RefundNoticeBanner } from '../components/portal/RefundNoticeBanner'
 import { ShowCard } from '../components/shows/ShowCard'
 import { RepeatCard } from '../components/repeat/RepeatCard'
+import { RefundRequestsBanner } from '../components/refunds/RefundRequestsBanner'
 import { ShowsList } from '../components/shows/ShowsList'
 import { showApi } from '../services/showApi'
 import { VenueInvites } from '../components/venue/VenueInvites'
@@ -1528,6 +1529,7 @@ const Dashboard: React.FC = () => {
                   ) : undefined
                 }
                 regularsSlot={<RepeatCard refreshKey={updatedAt?.getTime() ?? 0} />}
+                requestsSlot={<RefundRequestsBanner refreshKey={updatedAt?.getTime() ?? 0} />}
                 headerAction={<RefreshControl onRefresh={refreshPage} busy={refreshing} updatedAt={updatedAt} />}
               />
             )}
