@@ -83,8 +83,9 @@ export function PortalShell({
   const { className: themeClass, dark } = usePortalTheme()
   const logoSrc = dark ? '/images/logo/tipwave-logo-v2-light.png' : '/images/logo/tipwave-logo-v2.png'
   const [moreOpen, setMoreOpen] = useState(false)
-  const overflowing = items.length > BAR_LIMIT
   const pinned = items.filter(i => i.pin).slice(0, BAR_LIMIT - 1)
+  // More items than fit, or some items deliberately left off the bar (the rest wait under "More")
+  const overflowing = items.length > BAR_LIMIT || (pinned.length > 0 && pinned.length < items.length)
   const barItems = !overflowing ? items : pinned.length > 0 ? pinned : items.slice(0, BAR_LIMIT - 1)
   const moreItems = overflowing ? items.filter(i => !barItems.includes(i)) : []
   const moreActive = !profileActive && moreItems.some(i => i.id === active)
