@@ -2,6 +2,8 @@ import { useEffect, useState, type ReactNode } from 'react'
 import { photoSrc } from '../../utils/photoUrl'
 import { usePortalTheme } from '../../theme/ThemeContext'
 import { ThemeToggle, ThemeQuickToggle } from '../ui/ThemeToggle'
+import { UpdateBanner } from '../ui/UpdateBanner'
+import { VersionLabel } from '../ui/VersionLabel'
 import { BrandIcon, type BrandIconName } from '../icons/BrandIcons'
 
 export interface PortalNavItem {
@@ -130,6 +132,7 @@ export function PortalShell({
             <BrandIcon name="logout" size={18} tone="muted" />
             Sign out
           </button>
+          <VersionLabel className="mt-1 px-3" />
         </div>
       </aside>
 
@@ -146,6 +149,7 @@ export function PortalShell({
 
       <main className="lg:pl-60">
         <div className="mx-auto max-w-5xl px-4 pb-28 pt-5 sm:px-6 lg:px-8 lg:pb-10 lg:pt-8">
+          <UpdateBanner />
           {topNotice && <div className="mb-5 empty:hidden">{topNotice}</div>}
           {children}
         </div>
@@ -243,6 +247,7 @@ export function PortalShell({
                 <BrandIcon name="logout" size={20} tone="muted" />
                 Sign out
               </button>
+              <VersionLabel className="px-3 pb-1 pt-1" />
             </div>
           </div>
         </div>

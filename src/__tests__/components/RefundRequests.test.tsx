@@ -47,7 +47,7 @@ describe('RefundRequestDialog', () => {
     fireEvent.change(screen.getByLabelText(/Anything we should know/), { target: { value: ' Meant $5 ' } })
     fireEvent.click(screen.getByRole('button', { name: 'Send request' }))
 
-    await waitFor(() => expect(refunds.create).toHaveBeenCalledWith({ tipId: 't1', reason: 'wrong_amount', note: 'Meant $5' }))
+    await waitFor(() => expect(refunds.create).toHaveBeenCalledWith({ tipId: 't1', reason: 'wrong_amount', note: 'Meant $5', appVersion: 'dev' }))
     expect(onRequested).toHaveBeenCalled()
     expect(onClose).toHaveBeenCalled()
     expect(feedback.toast).toHaveBeenCalledWith(expect.stringContaining('Refund request sent'), 'success')
@@ -57,7 +57,7 @@ describe('RefundRequestDialog', () => {
     refunds.create.mockResolvedValue({ data: {} })
     render(<RefundRequestDialog open tips={[{ songRequestId: 'r9', amount: 20, createdAt: hoursAgo(1) }]} onClose={() => {}} onRequested={() => {}} />)
     fireEvent.click(screen.getByRole('button', { name: 'Send request' }))
-    await waitFor(() => expect(refunds.create).toHaveBeenCalledWith({ songRequestId: 'r9', reason: 'mistake', note: undefined }))
+    await waitFor(() => expect(refunds.create).toHaveBeenCalledWith({ songRequestId: 'r9', reason: 'mistake', note: undefined, appVersion: 'dev' }))
   })
 
   it('lets the performer choose which tip when a request has several', async () => {

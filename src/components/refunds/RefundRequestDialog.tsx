@@ -1,3 +1,4 @@
+import { APP_VERSION } from '../../utils/appVersion'
 import { useEffect, useState } from 'react'
 import { Button } from '../ui'
 import { Modal } from '../ui/Modal'
@@ -53,7 +54,8 @@ export function RefundRequestDialog({ open, tips, onClose, onRequested }: Props)
     const res = await refundRequestApi.create({
       ...(tip.tipId ? { tipId: tip.tipId } : { songRequestId: tip.songRequestId }),
       reason,
-      note: note.trim() || undefined
+      note: note.trim() || undefined,
+      appVersion: APP_VERSION
     })
     setSending(false)
     if (res.error) {
