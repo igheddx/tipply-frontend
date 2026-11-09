@@ -1181,7 +1181,7 @@ const AdminDashboard: React.FC = () => {
 
             <AdminRepeat refreshKey={updatedAt?.getTime() ?? 0} />
 
-            <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
+            <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
               <UiCard title="Revenue" subtitle="Tips that were charged successfully">
                 <dl className="space-y-3 text-sm">
                   <div className="flex justify-between gap-3">
@@ -1210,170 +1210,8 @@ const AdminDashboard: React.FC = () => {
                   </div>
                 </dl>
               </UiCard>
-              <UiCard title="Charge tips" subtitle={`${stats?.pendingTips || 0} tips are waiting to be charged.`}>
-                {batchResultMessage && (
-                  <Alert
-                    className="mb-3"
-                    type={batchResultMessage.type}
-                    message={batchResultMessage.text}
-                    showIcon
-                    closable
-                    onClose={() => setBatchResultMessage(null)}
-                  />
-                )}
-                <div className="flex gap-2">
-                  <Button
-                    type="primary"
-                    icon={batchProcessing ? <ReloadOutlined spin /> : <PlayCircleOutlined />}
-                    onClick={async () => {
-                      const ok = await confirm({
-                        title: 'Run batch processing now?',
-                        body: `This charges ${stats?.pendingTips || 0} waiting tip(s) in ${stripeMode === 'live' ? 'LIVE mode with real money' : 'test mode'}. It cannot be undone.`,
-                        confirmLabel: 'Run batch',
-                        tone: stripeMode === 'live' ? 'danger' : 'default'
-                      });
-                      if (ok) runBatchProcessing();
-                    }}
-                    loading={batchProcessing}
-                    disabled={batchProcessing}
-                    className="flex-1"
-                  >
-                    {batchProcessing ? 'Running…' : 'Run batch now'}
-                  </Button>
-                  <Button
-                    icon={<ReloadOutlined />}
-                    onClick={() => {
-                      setBatchResultMessage(null);
-                      loadDashboardData();
-                    }}
-                    aria-label="Refresh data"
-                    title="Refresh data"
-                  />
-                </div>
-              </UiCard>
             </div>
 
-        {/* Batch Processing Status */}
-        <Row gutter={16}>
-          <Col xs={24} lg={12}>
-            <Card 
-              className="shadow-sm"
-              title={
-                <div className="flex items-center gap-2">
-                  {getBatchStatusIcon()}
-                  <span>Batch Processing Status</span>
-                </div>
-              }
-            >
-              {batchStatus ? (
-                <div className="space-y-3">
-                  <div className="flex justify-between items-center">
-                    <span className="text-ink-500">Type:</span>
-                    <StatusChip kind="info" label={batchStatus.isManual ? 'Manual' : 'Automated'} />
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-ink-500">Status:</span>
-                    {runStatusChip(batchStatus.status)}
-                  </div>
-                  {batchStatus.startedAt && (
-                    <div className="flex justify-between items-center">
-                      <span className="text-ink-500">Started:</span>
-                      <span>{new Date(batchStatus.startedAt).toLocaleString()}</span>
-                    </div>
-                  )}
-                  {batchStatus.completedAt && (
-                    <div className="flex justify-between items-center">
-                      <span className="text-ink-500">Completed:</span>
-                      <span>{new Date(batchStatus.completedAt).toLocaleString()}</span>
-                    </div>
-                  )}
-                  {batchStatus.durationSeconds && (
-                    <div className="flex justify-between items-center">
-                      <span className="text-ink-500">Duration:</span>
-                      <span>{batchStatus.durationSeconds}s</span>
-                    </div>
-                  )}
-                  <Divider className="my-3" />
-                  <div className="grid grid-cols-3 gap-2">
-                    <div className="text-center">
-                      <div className="text-xl font-bold text-green-600">{batchStatus.tipsProcessed}</div>
-                      <div className="text-xs text-ink-500">Processed</div>
-                    </div>
-                    <div className="text-center">
-                      <div className="text-xl font-bold text-red-600">{batchStatus.tipsFailed}</div>
-                      <div className="text-xs text-ink-500">Failed</div>
-                    </div>
-                    <div className="text-center">
-                      <div className="text-xl font-bold text-yellow-600">{batchStatus.tipsPending}</div>
-                      <div className="text-xs text-ink-500">Pending</div>
-                    </div>
-                  </div>
-                  <Divider className="my-3" />
-                  <div className="flex justify-between items-center">
-                    <span className="text-ink-500">Total Amount:</span>
-                    <span className="font-semibold text-lg">${batchStatus.totalAmount?.toFixed(2) || '0.00'}</span>
-                  </div>
-                  {batchStatus.errorMessage && (
-                    batchStatus.status === 'success' ? (
-                      <div className="bg-slate-50 p-3 rounded border border-slate-200">
-                        <p className="text-xs text-slate-700">{friendlyBatchNote(batchStatus.errorMessage)}</p>
-                      </div>
-                    ) : (
-                      <div className="bg-red-50 p-3 rounded border border-red-200">
-                        <p className="text-xs text-red-700"><strong>Why:</strong> {friendlyBatchNote(batchStatus.errorMessage)}</p>
-                      </div>
-                    )
-                  )}
-                  {batchStatus.failureDetails && batchStatus.failureDetails.length > 0 && (
-                    <div className="bg-yellow-50 p-3 rounded border border-yellow-200 max-h-32 overflow-y-auto">
-                      <p className="text-xs font-semibold text-yellow-800 mb-2">Failure Details:</p>
-                      <ul className="space-y-1">
-                        {batchStatus.failureDetails.slice(0, 5).map((detail, idx) => (
-                          <li key={idx} className="text-xs text-yellow-700">• {detail}</li>
-                        ))}
-                        {batchStatus.failureDetails.length > 5 && (
-                          <li className="text-xs text-yellow-700">• ... and {batchStatus.failureDetails.length - 5} more</li>
-                        )}
-                      </ul>
-                    </div>
-                  )}
-                  <Button 
-                    block 
-                    type="link" 
-                    size="small"
-                    onClick={loadBatchHistory}
-                  >
-                    View History
-                  </Button>
-                </div>
-              ) : (
-                <p className="text-ink-500">No batch runs yet</p>
-              )}
-            </Card>
-          </Col>
-          <Col xs={24} lg={12}>
-            <Card 
-              className="shadow-sm"
-              title="Batch History Summary"
-            >
-              {batchHistory.length > 0 ? (
-                <div className="space-y-2 max-h-64 overflow-y-auto">
-                  {batchHistory.slice(0, 10).map((run, idx) => (
-                    <div key={idx} className="flex justify-between items-center p-2 bg-surface rounded text-sm">
-                      <div>
-                        <div className="font-medium">{new Date(run.startedAt || '').toLocaleString()}</div>
-                        <div className="text-xs text-ink-500">{run.tipsProcessed} processed, {run.tipsFailed} failed</div>
-                      </div>
-                      {runStatusChip(run.status)}
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-ink-500 text-center py-4">No history available</p>
-              )}
-            </Card>
-          </Col>
-        </Row>
 
           </div>
         )}
@@ -2071,6 +1909,171 @@ const AdminDashboard: React.FC = () => {
 
           <Tabs.TabPane tab="Aggregated Charges" key="aggregated-charges">
             <div className="space-y-5">
+              {/* Charging waiting tips lives here, with the charges it creates, not on the Overview */}
+              <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
+              <UiCard title="Charge tips" subtitle={`${stats?.pendingTips || 0} tips are waiting to be charged.`}>
+                {batchResultMessage && (
+                  <Alert
+                    className="mb-3"
+                    type={batchResultMessage.type}
+                    message={batchResultMessage.text}
+                    showIcon
+                    closable
+                    onClose={() => setBatchResultMessage(null)}
+                  />
+                )}
+                <div className="flex gap-2">
+                  <Button
+                    type="primary"
+                    icon={batchProcessing ? <ReloadOutlined spin /> : <PlayCircleOutlined />}
+                    onClick={async () => {
+                      const ok = await confirm({
+                        title: 'Run batch processing now?',
+                        body: `This charges ${stats?.pendingTips || 0} waiting tip(s) in ${stripeMode === 'live' ? 'LIVE mode with real money' : 'test mode'}. It cannot be undone.`,
+                        confirmLabel: 'Run batch',
+                        tone: stripeMode === 'live' ? 'danger' : 'default'
+                      });
+                      if (ok) runBatchProcessing();
+                    }}
+                    loading={batchProcessing}
+                    disabled={batchProcessing}
+                    className="flex-1"
+                  >
+                    {batchProcessing ? 'Running…' : 'Run batch now'}
+                  </Button>
+                  <Button
+                    icon={<ReloadOutlined />}
+                    onClick={() => {
+                      setBatchResultMessage(null);
+                      loadDashboardData();
+                    }}
+                    aria-label="Refresh data"
+                    title="Refresh data"
+                  />
+                </div>
+              </UiCard>
+              </div>
+        {/* Batch Processing Status */}
+        <Row gutter={16}>
+          <Col xs={24} lg={12}>
+            <Card 
+              className="shadow-sm"
+              title={
+                <div className="flex items-center gap-2">
+                  {getBatchStatusIcon()}
+                  <span>Batch Processing Status</span>
+                </div>
+              }
+            >
+              {batchStatus ? (
+                <div className="space-y-3">
+                  <div className="flex justify-between items-center">
+                    <span className="text-ink-500">Type:</span>
+                    <StatusChip kind="info" label={batchStatus.isManual ? 'Manual' : 'Automated'} />
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-ink-500">Status:</span>
+                    {runStatusChip(batchStatus.status)}
+                  </div>
+                  {batchStatus.startedAt && (
+                    <div className="flex justify-between items-center">
+                      <span className="text-ink-500">Started:</span>
+                      <span>{new Date(batchStatus.startedAt).toLocaleString()}</span>
+                    </div>
+                  )}
+                  {batchStatus.completedAt && (
+                    <div className="flex justify-between items-center">
+                      <span className="text-ink-500">Completed:</span>
+                      <span>{new Date(batchStatus.completedAt).toLocaleString()}</span>
+                    </div>
+                  )}
+                  {batchStatus.durationSeconds && (
+                    <div className="flex justify-between items-center">
+                      <span className="text-ink-500">Duration:</span>
+                      <span>{batchStatus.durationSeconds}s</span>
+                    </div>
+                  )}
+                  <Divider className="my-3" />
+                  <div className="grid grid-cols-3 gap-2">
+                    <div className="text-center">
+                      <div className="text-xl font-bold text-green-600">{batchStatus.tipsProcessed}</div>
+                      <div className="text-xs text-ink-500">Processed</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-xl font-bold text-red-600">{batchStatus.tipsFailed}</div>
+                      <div className="text-xs text-ink-500">Failed</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-xl font-bold text-yellow-600">{batchStatus.tipsPending}</div>
+                      <div className="text-xs text-ink-500">Pending</div>
+                    </div>
+                  </div>
+                  <Divider className="my-3" />
+                  <div className="flex justify-between items-center">
+                    <span className="text-ink-500">Total Amount:</span>
+                    <span className="font-semibold text-lg">${batchStatus.totalAmount?.toFixed(2) || '0.00'}</span>
+                  </div>
+                  {batchStatus.errorMessage && (
+                    batchStatus.status === 'success' ? (
+                      <div className="bg-slate-50 p-3 rounded border border-slate-200">
+                        <p className="text-xs text-slate-700">{friendlyBatchNote(batchStatus.errorMessage)}</p>
+                      </div>
+                    ) : (
+                      <div className="bg-red-50 p-3 rounded border border-red-200">
+                        <p className="text-xs text-red-700"><strong>Why:</strong> {friendlyBatchNote(batchStatus.errorMessage)}</p>
+                      </div>
+                    )
+                  )}
+                  {batchStatus.failureDetails && batchStatus.failureDetails.length > 0 && (
+                    <div className="bg-yellow-50 p-3 rounded border border-yellow-200 max-h-32 overflow-y-auto">
+                      <p className="text-xs font-semibold text-yellow-800 mb-2">Failure Details:</p>
+                      <ul className="space-y-1">
+                        {batchStatus.failureDetails.slice(0, 5).map((detail, idx) => (
+                          <li key={idx} className="text-xs text-yellow-700">• {detail}</li>
+                        ))}
+                        {batchStatus.failureDetails.length > 5 && (
+                          <li className="text-xs text-yellow-700">• ... and {batchStatus.failureDetails.length - 5} more</li>
+                        )}
+                      </ul>
+                    </div>
+                  )}
+                  <Button 
+                    block 
+                    type="link" 
+                    size="small"
+                    onClick={loadBatchHistory}
+                  >
+                    View History
+                  </Button>
+                </div>
+              ) : (
+                <p className="text-ink-500">No batch runs yet</p>
+              )}
+            </Card>
+          </Col>
+          <Col xs={24} lg={12}>
+            <Card 
+              className="shadow-sm"
+              title="Batch History Summary"
+            >
+              {batchHistory.length > 0 ? (
+                <div className="space-y-2 max-h-64 overflow-y-auto">
+                  {batchHistory.slice(0, 10).map((run, idx) => (
+                    <div key={idx} className="flex justify-between items-center p-2 bg-surface rounded text-sm">
+                      <div>
+                        <div className="font-medium">{new Date(run.startedAt || '').toLocaleString()}</div>
+                        <div className="text-xs text-ink-500">{run.tipsProcessed} processed, {run.tipsFailed} failed</div>
+                      </div>
+                      {runStatusChip(run.status)}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-ink-500 text-center py-4">No history available</p>
+              )}
+            </Card>
+          </Col>
+        </Row>
               <RecoverChargedTips />
               <MarkDemoTips />
               <ClearFailedTestTips />
