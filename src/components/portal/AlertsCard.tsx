@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { apiService } from '../../services/api'
 import { Banner, Button, Card, Switch } from '../ui'
+import { BrandIcon } from '../icons/BrandIcons'
 import {
   currentSubscription,
   disablePushAlerts,
@@ -175,8 +176,8 @@ export default function AlertsCard({ tipAmounts }: AlertsCardProps) {
           </div>
           <p className="mt-3 text-sm text-ink-500">
             {showAllTips
-              ? 'Tips that come with a song request always alert you. Also alert your phone for these amounts, even when no song is chosen:'
-              : 'Tips that come with a song request always show on your Live screen and alert you. Also show and alert for these amounts, even when no song is chosen:'}
+              ? 'Tips with a song always alert you. Also alert you for these amounts when no song is chosen (tap to turn on or off):'
+              : 'Tips with a song always show and alert you. Also show and alert for these amounts when no song is chosen (tap to turn on or off):'}
           </p>
           <div className="mt-3 flex flex-wrap gap-2" role="group" aria-label="Tip amounts to show without a song">
             {tipAmounts.map(amount => {
@@ -188,10 +189,11 @@ export default function AlertsCard({ tipAmounts }: AlertsCardProps) {
                   aria-pressed={selected}
                   disabled={!amountsLoaded || saving}
                   onClick={() => void toggleAmount(amount)}
-                  className={`h-11 min-w-[4.5rem] rounded-xl border px-4 text-sm font-bold transition-colors disabled:opacity-60 ${
-                    selected ? 'border-brand-700 bg-brand-700 text-white' : 'border-slate-300 bg-white text-ink-700 hover:bg-slate-50'
+                  className={`inline-flex h-11 min-w-[4.5rem] items-center justify-center gap-1.5 rounded-xl border px-4 text-sm font-bold transition-colors disabled:opacity-60 ${
+                    selected ? 'border-brand-700 bg-brand-700 text-white' : 'border-slate-300 bg-white text-ink-500 hover:bg-slate-50'
                   }`}
                 >
+                  {selected && <BrandIcon name="check" size={16} tone="inverse" strokeWidth={2.4} />}
                   ${amount}
                 </button>
               )

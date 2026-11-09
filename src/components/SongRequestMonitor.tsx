@@ -387,7 +387,7 @@ const SongRequestMonitor: React.FC<SongRequestMonitorProps> = ({
   useEffect(() => {
     if (!isVisible) return
     const original = document.title
-    document.title = pendingTotal > 0 ? `(${pendingTotal}) Live requests` : 'Live requests'
+    document.title = pendingTotal > 0 ? `(${pendingTotal}) Live` : 'Live'
     return () => {
       document.title = original
     }
@@ -549,7 +549,7 @@ const SongRequestMonitor: React.FC<SongRequestMonitorProps> = ({
       className={`fixed inset-0 z-50 flex flex-col bg-surface text-ink-900 ${themeClass}`}
       style={{ paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}
       role="dialog"
-      aria-label="Live song requests"
+      aria-label="Live queue"
     >
       <style>{`@keyframes monitor-glow{0%{opacity:0}20%{opacity:1}100%{opacity:0}}`}</style>
 
@@ -591,12 +591,12 @@ const SongRequestMonitor: React.FC<SongRequestMonitorProps> = ({
 
       {/* Top bar: slim, so it fits a narrow side window. Less-used controls live in the menu. */}
       <header className="relative flex flex-none items-center gap-2 border-b border-slate-200 bg-white px-3 py-2.5">
-        <button onClick={onClose} className={`${soft} pl-2`} aria-label="Close live requests">
+        <button onClick={onClose} className={`${soft} pl-2`} aria-label="Close Live">
           <BrandIcon name="chevron-left" size={20} tone="current" />
           <span className="hidden sm:inline">Close</span>
         </button>
 
-        <h1 className="truncate text-lg font-bold">Live requests</h1>
+        <h1 className="truncate text-lg font-bold">Live</h1>
         <span
           className={`flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${loadFailed ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-ink-700'}`}
           role="status"
@@ -748,7 +748,7 @@ const SongRequestMonitor: React.FC<SongRequestMonitorProps> = ({
             </select>
           </div>
         )}
-        <div className="mx-auto grid max-w-6xl gap-4 lg:grid-cols-[1fr_22rem]">
+        <div className="mx-auto grid max-w-6xl grid-cols-[minmax(0,1fr)] gap-4 lg:grid-cols-[minmax(0,1fr)_22rem]">
           {/* Playing now */}
           <section
             aria-label="Playing now"
@@ -855,11 +855,11 @@ const SongRequestMonitor: React.FC<SongRequestMonitorProps> = ({
                           <Note r={r} />
                         </div>
                       </div>
-                      <div className="mt-3 flex items-center gap-2">
+                      <div className="mt-3 flex flex-wrap items-center gap-2">
                         <button
                           onClick={() => updateSongStatus(r, 'performing')}
                           disabled={updatingStatus === key}
-                          className={`${btn} h-12 flex-1 bg-brand-700 text-white hover:bg-brand-800`}
+                          className={`${btn} h-12 min-w-[9rem] flex-1 bg-brand-700 text-white hover:bg-brand-800`}
                         >
                           <BrandIcon name="play" size={22} color="#FFFFFF" />
                           {updatingStatus === key ? 'Saving…' : 'Play this'}
@@ -900,9 +900,9 @@ const SongRequestMonitor: React.FC<SongRequestMonitorProps> = ({
                 ) : (
                   <ul className="space-y-2">
                     {newTips.map(t => (
-                      <li key={t.id} className="flex items-center gap-3 rounded-2xl border border-slate-100 bg-white px-4 py-3">
+                      <li key={t.id} className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-2xl border border-slate-100 bg-white px-4 py-3">
                         <span className={`inline-flex items-center rounded-full bg-accent-500 px-3 py-1 font-bold text-white ${size.chip}`}>{money(t.amount)}</span>
-                        <span className="min-w-0 flex-1 truncate text-sm text-ink-500">
+                        <span className="min-w-[8rem] flex-1 truncate text-sm text-ink-500">
                           <span className="font-semibold text-ink-700">{timeOfDay(t.createdAt)}</span> · {ago(t.createdAt, now)}
                         </span>
                         {requestRefundForTip(t)}

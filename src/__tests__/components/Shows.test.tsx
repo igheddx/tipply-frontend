@@ -142,12 +142,34 @@ describe('ShowsList', () => {
     expect(await screen.findByText(/1 tip \(\$100\.00\) refunded to the tipper and not counted/)).toBeInTheDocument()
   })
 
+  it('opens a show’s tips when the row is tapped, with the rarer actions kept in the menu', async () => {
+    api.list.mockResolvedValue(list([show({ id: 'a', isLive: false })]))
+    api.tips.mockResolvedValue({ data: { tips: [{ id: 't1', createdAt: new Date().toISOString(), amount: 50, status: 'processed', hasSongRequest: false }] } })
+    render(<ShowsList />)
+
+    // No row of repeated text links any more
+    await screen.findByRole('button', { name: /See the tips for/ })
+    expect(screen.queryByRole('button', { name: 'Split' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Name and place' })).toBeNull()
+
+    fireEvent.click(screen.getByRole('button', { name: /See the tips for/ }))
+    expect(await screen.findByRole('list', { name: 'Tips in this show' })).toBeInTheDocument()
+  })
+
+  it('keeps End show visible only on the live show', async () => {
+    api.list.mockResolvedValue(list([show({ id: 'a', isLive: true }), show({ id: 'b', isLive: false })]))
+    render(<ShowsList />)
+    await screen.findAllByRole('button', { name: /See the tips for/ })
+    expect(screen.getAllByRole('button', { name: 'End show' })).toHaveLength(1)
+  })
+
   it('joins a show to the one before only after confirming', async () => {
     api.list.mockResolvedValue(list([show({ id: 'a', isLive: false }), show({ id: 'b', isLive: false })]))
     api.mergeIntoPrevious.mockResolvedValue({ data: show() })
     render(<ShowsList />)
 
-    fireEvent.click((await screen.findAllByRole('button', { name: 'Join to the show before' }))[0])
+    fireEvent.click((await screen.findAllByRole('button', { name: /More actions for/ }))[0])
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Join with the show before' }))
 
     await waitFor(() => expect(api.mergeIntoPrevious).toHaveBeenCalledWith('a'))
     expect(feedback.confirm).toHaveBeenCalled()
@@ -156,7 +178,12 @@ describe('ShowsList', () => {
   it('does not offer to join the very first show', async () => {
     api.list.mockResolvedValue(list([show({ id: 'a', isLive: false }), show({ id: 'b', isLive: false })]))
     render(<ShowsList />)
-    expect(await screen.findAllByRole('button', { name: 'Join to the show before' })).toHaveLength(1)
+    const menus = await screen.findAllByRole('button', { name: /More actions for/ })
+    fireEvent.click(menus[0])
+    expect(screen.getAllByRole('menuitem', { name: 'Join with the show before' })).toHaveLength(1)
+    fireEvent.keyDown(document, { key: 'Escape' })
+    fireEvent.click(menus[1]) // the very first show has nothing before it
+    expect(screen.queryByRole('menuitem', { name: 'Join with the show before' })).toBeNull()
   })
 
   it('renames a show; an empty name goes back to the default', async () => {
@@ -164,7 +191,8 @@ describe('ShowsList', () => {
     api.update.mockResolvedValue({ data: show() })
     render(<ShowsList />)
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Name and place' }))
+    fireEvent.click(await screen.findByRole('button', { name: /More actions for/ }))
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Rename or add a place' }))
     fireEvent.change(screen.getByLabelText('Name'), { target: { value: "Friday at Joe's" } })
     fireEvent.click(screen.getByRole('button', { name: 'Save' }))
 

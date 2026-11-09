@@ -97,3 +97,39 @@ describe('RefundNoticeBanner (performer)', () => {
     expect(screen.queryByText('A $100.00 tip was refunded')).toBeNull()
   })
 })
+
+describe('RefundNoticeBanner placement', () => {
+  beforeEach(() => {
+    Object.values(api).forEach(f => f.mockReset())
+    api.performerSeen.mockResolvedValue({})
+    api.forPerformer.mockResolvedValue({ notices: [notice('a', 100), notice('b', 50)] })
+  })
+
+  it('shows on Home', async () => {
+    render(<RefundNoticeBanner tab="overview" onView={() => {}} />)
+    expect(await screen.findByText(/2 tips \(\$150\.00\) were refunded/)).toBeInTheDocument()
+  })
+
+  it('does not show above the other tabs, and does not clear them there', async () => {
+    const { container } = render(<RefundNoticeBanner tab="devices" onView={() => {}} />)
+    await waitFor(() => expect(api.forPerformer).toHaveBeenCalled())
+    expect(container).toBeEmptyDOMElement()
+    expect(api.performerSeen).not.toHaveBeenCalled()
+  })
+
+  it('opening the Tips tab counts as seeing it, so it is cleared for good', async () => {
+    const { rerender } = render(<RefundNoticeBanner tab="overview" onView={() => {}} />)
+    await screen.findByText(/were refunded/)
+    rerender(<RefundNoticeBanner tab="tips" onView={() => {}} />)
+    await waitFor(() => expect(api.performerSeen).toHaveBeenCalledWith(['a', 'b']))
+    rerender(<RefundNoticeBanner tab="overview" onView={() => {}} />)
+    expect(screen.queryByText(/were refunded/)).toBeNull()
+  })
+
+  it('can be dismissed with the X', async () => {
+    render(<RefundNoticeBanner tab="overview" onView={() => {}} />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Dismiss' }))
+    expect(api.performerSeen).toHaveBeenCalledWith(['a', 'b'])
+    expect(screen.queryByText(/were refunded/)).toBeNull()
+  })
+})

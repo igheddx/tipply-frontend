@@ -15,7 +15,10 @@ import { getUniqueDeviceId, detectPlatform, initDeviceId } from '../utils/device
 import { TipScreen } from '../components/tip/TipScreen'
 import { SongPickerSheet, type PickedSong } from '../components/tip/SongPickerSheet'
 import { BrandIcon, type BrandIconName } from '../components/icons/BrandIcons'
-import { Button } from '../components/ui'
+import { APP_VERSION } from '../utils/appVersion'
+import { decideTap } from '../utils/firstTip'
+import { tipGradient, tipPalette } from '../utils/tipTheme'
+import { TestSiteStrip } from '../components/tip/TestSiteStrip'
 
 const PaymentSetupModal = lazy(() => import('../components/PaymentSetupModal'))
 
@@ -65,11 +68,13 @@ function InfoScreen({
   /** Lets anyone, even without a tip, tell us how it went */
   feedback?: { userId: string; deviceUuid?: string }
 }) {
+  const palette = tipPalette(APP_VERSION)
   return (
     <div
       className="fixed inset-0 flex items-center justify-center p-6 text-white"
-      style={{ height: '100dvh', background: 'linear-gradient(135deg,#3b1a78,#1e3a8a 55%,#312e81)' }}
+      style={{ height: '100dvh', background: tipGradient(palette) }}
     >
+      {palette.test && <TestSiteStrip className="absolute inset-x-6 top-4" />}
       <div className="w-full max-w-sm rounded-3xl border border-white/20 bg-white/10 p-8 text-center backdrop-blur-md">
         <span className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-white/15">
           <BrandIcon name={icon} size={30} tone="inverse" />
@@ -94,6 +99,10 @@ const TippingInterface: React.FC = () => {
   const [deviceInfo, setDeviceInfo] = useState<DeviceInfo | null>(null)
   const [showPaymentModal, setShowPaymentModal] = useState(false)
   const [isPaymentSetup, setIsPaymentSetup] = useState(false)
+  // The amount a first-time tipper tapped. Held only while the card sheet is open, and sent the moment the card is saved.
+  const [pendingTip, setPendingTip] = useState<number | null>(null)
+  // The same amount, for sending: taken exactly once, so a repeated "saved" message can never send the tip twice
+  const pendingTipRef = useRef<number | null>(null)
   
   const [userId, setUserId] = useState<string>('')
   const [checkingPaymentMethods, setCheckingPaymentMethods] = useState(true)
@@ -420,9 +429,7 @@ const TippingInterface: React.FC = () => {
         if (paymentCheck.hasPaymentMethods) {
           setSavedCard({ brand: paymentCheck.cardBrand, last4: paymentCheck.cardLast4 })
         }
-        if (!paymentCheck.hasPaymentMethods) {
-          setShowPaymentModal(true)
-        }
+        // No card yet: the tip page shows as normal. The card sheet opens when they tap an amount, never before they have seen who they are tipping.
         setCheckingPaymentMethods(false)
 
       } catch (error) {
@@ -768,10 +775,17 @@ const TippingInterface: React.FC = () => {
     void runConfetti()
   }
 
-  const handleTipClick = (amount: number) => {
+  const handleTipClick = (amount: number, opts?: { cardJustSaved?: boolean }) => {
     // Tapping anything else quietly closes a question that is showing
     feedback.dismissNow()
     if (isDebouncing) return
+    // First tip: ask for a card once. Nothing is sent, no light or sound plays, until there is one. The amount is held for the moment it is saved.
+    if (decideTap({ ready: !!deviceInfo && !!userId, hasCard: isPaymentSetup, cardJustSaved: opts?.cardJustSaved }) === 'ask-for-card') {
+      pendingTipRef.current = amount
+      setPendingTip(amount)
+      setShowPaymentModal(true)
+      return
+    }
     if (!deviceInfo || !userId) {
       logger.log('⏳ [handleTipClick] Not ready yet - deviceInfo:', !!deviceInfo, 'userId:', !!userId)
       toast.error('Still loading, please try again in a moment')
@@ -995,7 +1009,12 @@ const TippingInterface: React.FC = () => {
     <Suspense fallback={null}>
       <PaymentSetupModal
         isOpen={showPaymentModal}
-        onClose={() => setShowPaymentModal(false)}
+        tipAmount={pendingTip}
+        onClose={() => {
+          setShowPaymentModal(false)
+          pendingTipRef.current = null
+          setPendingTip(null) // "Not now": nothing is sent, and nothing is remembered
+        }}
         onComplete={(paymentMethodId) => {
           logger.log('🎉 Payment setup complete! Payment method ID:', paymentMethodId)
           if (paymentMethodId) {
@@ -1008,7 +1027,12 @@ const TippingInterface: React.FC = () => {
           void checkPaymentMethods(deviceInfo).then((result) => {
             if (result.hasPaymentMethods) setSavedCard({ brand: result.cardBrand, last4: result.cardLast4 })
           })
-          toast.success('Payment method saved', { duration: 1200 })
+          // The tip they already chose goes now, with the normal celebration and nothing extra. Without one, a quiet note says what is next.
+          const chosen = pendingTipRef.current
+          pendingTipRef.current = null
+          setPendingTip(null)
+          if (chosen) handleTipClick(chosen, { cardJustSaved: true })
+          else toast.success('All set. Tap an amount to tip.', { duration: 2200 })
         }}
         deviceUuid={deviceInfo?.uuid || ''}
         userId={userId}
@@ -1079,27 +1103,6 @@ const TippingInterface: React.FC = () => {
     )
   }
 
-  if (!isPaymentSetup) {
-    return (
-      <>
-        <InfoScreen
-          feedback={userId ? { userId, deviceUuid: deviceInfo?.uuid } : undefined}
-          icon="card"
-          title="Add a card to tip"
-          action={
-            <Button size="lg" block onClick={() => setShowPaymentModal(true)}>
-              Add a card
-            </Button>
-          }
-        >
-          Add a payment method to continue tipping.
-        </InfoScreen>
-        {paymentModal}
-        <TipperRefundNotice userId={userId} />
-      </>
-    )
-  }
-
   return (
     <>
       <TipScreen
@@ -1121,6 +1124,7 @@ const TippingInterface: React.FC = () => {
         }}
         onClearSong={clearSelectedSong}
         card={savedCard}
+        hasCard={isPaymentSetup}
         onChangeCard={() => {
           feedback.dismissNow()
           setShowPaymentModal(true)

@@ -4,7 +4,7 @@ import { HomeTab, type HomeData } from '../components/portal/HomeTab'
 import { DemoBanner } from '../components/portal/DemoBanner'
 import { renderQrCard } from '../utils/qrCard'
 import { TipsTimeline } from '../components/charts/TipsTimeline'
-import { Banner, Button, Card, EmptyState, Modal, PageHeader, PageLoader, RefreshControl, StatusChip, Tabs, useFeedback, type ChipKind } from '../components/ui'
+import { Banner, Button, Card, EmptyState, Modal, PageHeader, PageLoader, RefreshControl, RowMenu, StatusChip, Tabs, useFeedback, type ChipKind } from '../components/ui'
 import { BrandIcon, IconTile } from '../components/icons/BrandIcons'
 import { Switch } from '../components/ui/Switch'
 import React, { useState, useEffect, useRef } from 'react'
@@ -384,7 +384,7 @@ const Dashboard: React.FC = () => {
           const insightsStart = performance.now()
           const timezoneOffset = new Date().getTimezoneOffset()
           const response = await fetch(
-            `${API_BASE_URL}/api/tips/insights/${profileId}?timezoneOffsetMinutes=${timezoneOffset}${demoQuery('&')}`,
+            `${API_BASE_URL}/api/tips/insights/${profileId}?timezoneOffsetMinutes=${timezoneOffset}&skipStripe=true${demoQuery('&')}`,
             {
               headers: {
                 'Authorization': `Bearer ${token}`,
@@ -557,7 +557,7 @@ const Dashboard: React.FC = () => {
         apiService.getRecentTips(profileId),
         apiService.getDeletedDevices(),
         apiService.getDevices(),
-        fetch(`${API_BASE_URL}/api/tips/insights/${profileId}?timezoneOffsetMinutes=${timezoneOffset}${demoQuery('&')}`,
+        fetch(`${API_BASE_URL}/api/tips/insights/${profileId}?timezoneOffsetMinutes=${timezoneOffset}&skipStripe=true${demoQuery('&')}`,
           {
             headers: {
               'Authorization': `Bearer ${token}`,
@@ -1354,9 +1354,9 @@ const Dashboard: React.FC = () => {
 
   const PAGE_TITLES: Record<string, { title: string; subtitle?: string }> = {
     devices: { title: 'Devices', subtitle: 'Your Tipwave devices, tip amounts and QR codes.' },
-    tips: { title: 'Tips', subtitle: 'Every tip, before and after fees. Pick a date range, or download it as a spreadsheet.' },
+    tips: { title: 'Tips', subtitle: 'Every tip, before and after fees.' },
     songs: { title: 'Song catalog', subtitle: 'The songs your audience can pick from.' },
-    monitor: { title: 'Live requests', subtitle: 'Song requests as they come in.' }
+    monitor: { title: 'Live', subtitle: 'Tips and song requests as they come in.' }
   }
 
   const deviceList = stats.devices ?? []
@@ -1490,7 +1490,7 @@ const Dashboard: React.FC = () => {
         onLogout={handleLogout}
         topNotice={
           <>
-            <RefundNoticeBanner onView={() => setActiveTab('tips')} />
+            <RefundNoticeBanner tab={activeTab} onView={() => setActiveTab('tips')} />
             <SessionBanner />
           </>
         }
@@ -1567,9 +1567,26 @@ const Dashboard: React.FC = () => {
                         <div className="flex items-start justify-between gap-3">
                           <div className="min-w-0">
                             <h3 className="truncate text-lg font-bold text-ink-900">{device.nickname || 'Unnamed device'}</h3>
-                            <p className="mt-0.5 truncate text-xs text-ink-400">ID {device.uuid}</p>
                           </div>
-                          <StatusChip kind={chip} />
+                          <div className="-mr-2 -mt-1 flex items-center gap-1">
+                            <StatusChip kind={chip} />
+                            <RowMenu
+                              label={`More actions for ${device.nickname || 'this device'}`}
+                              items={[
+                                {
+                                  key: 'copy',
+                                  label: 'Copy device ID',
+                                  onSelect: () => {
+                                    void navigator.clipboard?.writeText(device.uuid).then(
+                                      () => toast('Device ID copied', 'success'),
+                                      () => toast('Could not copy the ID', 'error')
+                                    )
+                                  }
+                                },
+                                { key: 'remove', label: isDeletingDevice === device.id ? 'Removing…' : 'Remove device', tone: 'danger', disabled: isDeletingDevice === device.id, onSelect: () => handleSoftDeleteDevice(device) }
+                              ]}
+                            />
+                          </div>
                         </div>
 
                         <dl className="mt-4 grid grid-cols-3 gap-3 rounded-xl bg-surface p-3 text-center">
@@ -1721,31 +1738,21 @@ const Dashboard: React.FC = () => {
                           </div>
                         )}
 
-                        <div className="mt-4 border-t border-slate-100 pt-3">
-                          <Button
-                            variant="danger"
-                            size="sm"
-                            icon="trash"
-                            loading={isDeletingDevice === device.id}
-                            onClick={() => handleSoftDeleteDevice(device)}
-                          >
-                            Remove device
-                          </Button>
-                        </div>
                       </Card>
                     )
                   })}
                 </div>
 
-                <VenueInvites />
-                <VenueSection performerId={userProfile?.id} stageName={userProfile?.stageName || userProfile?.firstName} />
-
+                {/* The amounts on the tip page apply to every device, so they come right after the devices */}
                 <TipAmountsEditor
                   amounts={tipAmounts}
                   saving={tipAmountsSaving}
                   onSave={saveTipAmounts}
                   onReset={resetTipAmounts}
                 />
+
+                <VenueInvites />
+                <VenueSection performerId={userProfile?.id} stageName={userProfile?.stageName || userProfile?.firstName} />
 
                 {/* Removed devices */}
                 <div>
@@ -1953,12 +1960,6 @@ const Dashboard: React.FC = () => {
                     Open in its own window
                   </Button>
                 </div>
-                <p className="text-sm text-ink-500">
-                  On a tablet, open it in its own window to keep it beside your charts or sheet music. Bookmark /monitor or add it to your home screen to jump straight in.
-                </p>
-                <p className="text-sm text-ink-500">
-                  To see both at once on an iPad, swipe up from the bottom for the dock, then drag Safari next to your music app.
-                </p>
                 <Card title="Today's requests" subtitle="The most-tipped songs come first." flush>
                   {songRequests.length === 0 ? (
                     <EmptyState icon="music" title="No song requests today">
@@ -1986,6 +1987,15 @@ const Dashboard: React.FC = () => {
                   )}
                 </Card>
                 {userProfile?.id && <AlertsCard tipAmounts={tipAmounts} />}
+                <details className="group rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-ink-700">
+                  <summary className="cursor-pointer list-none font-semibold text-ink-900">Using a tablet?</summary>
+                  <p className="mt-2 text-ink-500">
+                    Open Live in its own window to keep it beside your charts or sheet music. Bookmark /monitor or add it to your home screen to jump straight in.
+                  </p>
+                  <p className="mt-2 text-ink-500">
+                    To see both at once on an iPad, swipe up from the bottom for the dock, then drag Safari next to your music app.
+                  </p>
+                </details>
               </div>
             )}
         </div>

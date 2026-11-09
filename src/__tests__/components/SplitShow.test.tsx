@@ -106,7 +106,12 @@ describe('ShowsList split button', () => {
     api.list.mockResolvedValue(list([show({ id: 'a', tipCount: 3 }), show({ id: 'b', tipCount: 1, startedAt: '2026-11-06T21:00:00', endedAt: '2026-11-06T21:30:00' })]))
     render(<ShowsList />)
     await screen.findByText('2 shows')
-    expect(screen.getAllByRole('button', { name: 'Split' })).toHaveLength(1)
+    const menus = screen.getAllByRole('button', { name: /More actions for/ })
+    fireEvent.click(menus[0])
+    expect(screen.getAllByRole('menuitem', { name: 'Split this show' })).toHaveLength(1)
+    fireEvent.keyDown(document, { key: 'Escape' })
+    fireEvent.click(menus[1]) // one tip only: nothing to split
+    expect(screen.queryByRole('menuitem', { name: 'Split this show' })).toBeNull()
   })
 
   it('opens the split dialog for that show, and reloads the list after a split', async () => {
@@ -114,7 +119,8 @@ describe('ShowsList split button', () => {
     api.split.mockResolvedValue({ data: { first: show(), second: show() } })
     render(<ShowsList />)
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Split' }))
+    fireEvent.click(await screen.findByRole('button', { name: /More actions for/ }))
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Split this show' }))
     const dialogList = await screen.findByRole('list', { name: 'Tips in this show' })
     fireEvent.click(within(dialogList).getAllByRole('button')[1])
     fireEvent.click(screen.getByRole('button', { name: 'Split here' }))

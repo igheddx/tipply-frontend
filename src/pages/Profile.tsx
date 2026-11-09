@@ -640,7 +640,7 @@ const Profile: React.FC = () => {
               </div>
               <div className="mt-4 grid grid-cols-3 gap-2">
                 {['$2', '$5', '$10'].map((a, i) => (
-                  <div key={a} className="flex h-14 items-center justify-center rounded-xl text-lg font-extrabold" style={{ background: ['linear-gradient(135deg,#2dd4bf,#0f8f86)', 'linear-gradient(135deg,#22b8d6,#0e7490)', 'linear-gradient(135deg,#5b9bf8,#2748b8)'][i] }}>
+                  <div key={a} className="flex h-14 items-center justify-center rounded-xl text-lg font-extrabold" style={{ background: ['linear-gradient(135deg,#139e92,#0b8579)', 'linear-gradient(135deg,#22b8d6,#0e7490)', 'linear-gradient(135deg,#5b9bf8,#2748b8)'][i] }}>
                     {a}
                   </div>
                 ))}

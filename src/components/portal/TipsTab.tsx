@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { apiService } from '../../services/api'
-import { Button, Card, EmptyState, StatusChip, useFeedback, type ChipKind } from '../ui'
+import { BrandIcon } from '../icons/BrandIcons'
+import { Button, Card, EmptyState, RowMenu, StatusChip, useFeedback, type ChipKind } from '../ui'
 import { buildTipsCsv, statusLabel } from '../../utils/tipsCsv'
 import { rangeFor, toDateInput, type RangePreset } from '../../utils/tipsRange'
 import { RefundRequestDialog } from '../refunds/RefundRequestDialog'
@@ -93,6 +94,7 @@ export default function TipsTab({ profileId, devices, refreshKey, onGoToDevices 
   const [loading, setLoading] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
   const [failed, setFailed] = useState(false)
+  const [moreFilters, setMoreFilters] = useState(false)
   const [exporting, setExporting] = useState(false)
   const request = useRef(0)
 
@@ -197,7 +199,7 @@ export default function TipsTab({ profileId, devices, refreshKey, onGoToDevices 
 
   return (
     <div className="space-y-5">
-      <Card title="Your tips" subtitle="Pick a date range, narrow it down, or download it as a spreadsheet.">
+      <Card title="Your tips">
         <div className="space-y-4">
           <div className="flex flex-wrap gap-2" role="group" aria-label="Date range">
             {PRESETS.map(p => (
@@ -206,7 +208,7 @@ export default function TipsTab({ profileId, devices, refreshKey, onGoToDevices 
                 type="button"
                 onClick={() => setPreset(p.id)}
                 aria-pressed={preset === p.id}
-                className={`h-10 rounded-full px-4 text-sm font-semibold transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 ${
+                className={`h-10 rounded-full px-3.5 text-sm font-semibold transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 ${
                   preset === p.id ? 'bg-brand-700 text-white' : 'border border-slate-300 bg-white text-ink-700 hover:bg-slate-50'
                 }`}
               >
@@ -229,7 +231,18 @@ export default function TipsTab({ profileId, devices, refreshKey, onGoToDevices 
           )}
           {!range && <p className="text-sm text-red-700" role="alert">Choose a start and end date, up to 400 days apart.</p>}
 
-          <div className="grid gap-3 sm:grid-cols-3">
+          {/* On a phone the extra filters and the download stay folded away until asked for, so the tips are the first thing seen */}
+          <button
+            type="button"
+            onClick={() => setMoreFilters(v => !v)}
+            aria-expanded={moreFilters}
+            className="flex h-11 items-center gap-2 text-sm font-semibold text-brand-700 sm:hidden"
+          >
+            <BrandIcon name={moreFilters ? 'chevron-down' : 'chevron-right'} size={18} tone="current" />
+            {moreFilters ? 'Fewer filters' : 'More filters and download'}
+            {(status !== 'all' || deviceId !== '') && !moreFilters && <span className="rounded-full bg-brand-50 px-2 py-0.5 text-xs text-brand-800">on</span>}
+          </button>
+          <div className={`gap-3 sm:grid sm:grid-cols-3 ${moreFilters ? 'grid' : 'hidden'}`}>
             {devices.length > 1 && (
               <label className="text-sm font-semibold text-ink-700">
                 Device
@@ -326,17 +339,20 @@ export default function TipsTab({ profileId, devices, refreshKey, onGoToDevices 
                     <StatusChip kind={chipFor(tip.status)} label={statusLabel(tip.status)} />
                     {tip.refundRequest === 'pending' && <StatusChip kind="processing" label="Refund requested" />}
                     {tip.refundRequest === 'declined' && <StatusChip kind="offline" label="Not refunded" />}
-                    {tip.status === 'processed' && !tip.refundRequest && Date.now() - new Date(tip.createdAt).getTime() <= REFUND_WINDOW_DAYS * 24 * 3600 * 1000 && (
-                      <button
-                        type="button"
-                        onClick={() => setAsking(tip)}
-                        className="text-xs font-semibold text-ink-500 underline hover:text-ink-700"
-                        aria-label={`Request a refund for the ${money(tip.amount)} tip from ${when(tip.createdAt)}`}
-                      >
-                        Request refund
-                      </button>
-                    )}
                   </div>
+                  {tip.status === 'processed' && !tip.refundRequest && Date.now() - new Date(tip.createdAt).getTime() <= REFUND_WINDOW_DAYS * 24 * 3600 * 1000 && (
+                    <RowMenu
+                      label={`More actions for the ${money(tip.amount)} tip from ${when(tip.createdAt)}`}
+                      items={[
+                        {
+                          key: 'refund',
+                          label: 'Request a refund',
+                          ariaLabel: `Request a refund for the ${money(tip.amount)} tip from ${when(tip.createdAt)}`,
+                          onSelect: () => setAsking(tip)
+                        }
+                      ]}
+                    />
+                  )}
                 </li>
               ))}
             </ul>

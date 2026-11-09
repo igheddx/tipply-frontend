@@ -1,13 +1,15 @@
 import { BrandIcon } from '../icons/BrandIcons'
 import { photoSrc } from '../../utils/photoUrl'
 import type React from 'react'
-import { useEffect, useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { APP_VERSION } from '../../utils/appVersion'
 import { tipPalette } from '../../utils/tipTheme'
+import { TestSiteStrip } from './TestSiteStrip'
 
 /** Gradient behind each of the six amounts, in order. They match the light colors the device shows. */
 const AMOUNT_STYLES: { background: string; color: string }[] = [
-  { background: 'linear-gradient(135deg,#2dd4bf,#0f8f86)', color: '#FFFFFF' },
+  // The $2 tile is a deeper teal than the light on the device, so the white number reads in sunlight (3:1 or better everywhere)
+  { background: 'linear-gradient(135deg,#139e92,#0b8579)', color: '#FFFFFF' },
   { background: 'linear-gradient(135deg,#22b8d6,#0e7490)', color: '#FFFFFF' },
   { background: 'linear-gradient(135deg,#5b9bf8,#2748b8)', color: '#FFFFFF' },
   { background: 'linear-gradient(135deg,#f472b6,#c92a70)', color: '#FFFFFF' },
@@ -42,6 +44,8 @@ function initials(name: string): string {
 }
 
 export interface TipScreenProps {
+  /** False until the tipper has saved a card. The bar then invites them to add one, and the amounts open the card sheet. */
+  hasCard?: boolean
   performerName: string
   photoUrl?: string
   bio?: string
@@ -88,6 +92,7 @@ export function TipScreen({
   onOpenSongPicker,
   onClearSong,
   card,
+  hasCard = true,
   onChangeCard,
   total,
   bottomBarOverride,
@@ -97,6 +102,8 @@ export function TipScreen({
   // Match both to this screen while it is open, so there is no light strip at the top or bottom.
   // Safari on iPhone only picks up a changed theme color when the tag is replaced, so replace it rather than edit it.
   const palette = useMemo(() => tipPalette(APP_VERSION), [])
+  // A photo that cannot load falls back to the initials, never a broken-image icon
+  const [failedPhoto, setFailedPhoto] = useState<string | null>(null)
   useEffect(() => {
     const root = document.documentElement
     const body = document.body
@@ -155,17 +162,15 @@ export function TipScreen({
           `linear-gradient(180deg,${palette.top} 0%,${palette.mid} 55%,${palette.bottom} 100%)`
       }}
     >
-      {palette.test && (
-        <div
-          role="note"
-          className="flex-none rounded-full bg-amber-300 px-3 py-0.5 text-center text-[11px] font-extrabold uppercase tracking-wide text-amber-950"
-        >
-          Test site · not the live app
-        </div>
-      )}
+      {palette.test && <TestSiteStrip />}
       <header className="flex flex-none items-center gap-3">
-        {photoUrl ? (
-          <img src={photoSrc(photoUrl)} alt="" className="h-10 w-10 flex-none rounded-full border-2 border-white/30 object-cover" />
+        {photoUrl && failedPhoto !== photoUrl ? (
+          <img
+            src={photoSrc(photoUrl)}
+            alt=""
+            onError={() => setFailedPhoto(photoUrl)}
+            className="h-10 w-10 flex-none rounded-full border-2 border-white/30 object-cover"
+          />
         ) : (
           <div
             aria-hidden
@@ -294,12 +299,25 @@ export function TipScreen({
           <button type="button" onClick={onChangeCard} className="flex items-center gap-2 whitespace-nowrap text-xs text-indigo-200">
             <BrandIcon name="card" size={18} tone="brand" />
             <span>
-              {cardLabel(card)} · <u>Change</u>
+              {hasCard ? (
+                <>
+                  {cardLabel(card)} · <u>Change</u>
+                </>
+              ) : (
+                <>
+                  No card yet · <u>Add one</u>
+                </>
+              )}
             </span>
           </button>
+          {/* Nothing is shown until there is something to show: a $0 total only reads as a reminder to tip */}
           <span className="flex items-baseline gap-2 whitespace-nowrap" aria-live="polite">
-            <span className="text-[11px] uppercase tracking-wider text-white/70">Today</span>
-            <b className="text-[19px] font-black">{formatMoney(total)}</b>
+            {total > 0 && (
+              <>
+                <span className="text-[11px] uppercase tracking-wider text-white/70">Tipped today</span>
+                <b className="text-[19px] font-black">{formatMoney(total)}</b>
+              </>
+            )}
           </span>
           </>
         )}

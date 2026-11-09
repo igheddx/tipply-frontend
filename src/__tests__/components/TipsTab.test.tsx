@@ -37,6 +37,17 @@ describe('TipsTab', () => {
     expect(screen.getByText('Waiting', { selector: 'span' })).toBeInTheDocument()
   })
 
+  it('keeps the extra filters and the download folded on a phone until asked for', async () => {
+    renderTab()
+    await screen.findAllByText(/^Patio · /)
+    const toggle = screen.getByRole('button', { name: /more filters and download/i })
+    expect(toggle.textContent).not.toMatch(/\bon$/) // nothing is filtered, so no "on" marker
+    expect(toggle).toHaveAttribute('aria-expanded', 'false')
+    fireEvent.click(toggle)
+    expect(screen.getByRole('button', { name: /fewer filters/i })).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.getByRole('button', { name: /download csv/i })).toBeInTheDocument()
+  })
+
   it('shows a refunded tip struck through and marked, and says it is not counted', async () => {
     api.getTipHistory.mockResolvedValue({
       data: {
@@ -114,8 +125,15 @@ describe('TipsTab', () => {
       renderTab()
 
       await screen.findByText('$50.00')
-      expect(screen.getAllByRole('button', { name: /Request a refund/ })).toHaveLength(1)
-      expect(screen.getByRole('button', { name: /Request a refund for the \$50\.00 tip/ })).toBeInTheDocument()
+      // Only the eligible row has a "..." menu, and the refund action stays tucked inside it until opened
+      expect(screen.queryByRole('button', { name: /Request a refund/ })).toBeNull()
+      const menus = screen.getAllByRole('button', { name: /More actions for the/ })
+      expect(menus).toHaveLength(1)
+      expect(menus[0]).toHaveAccessibleName(/\$50\.00 tip/)
+      fireEvent.click(menus[0])
+      expect(screen.getByRole('menuitem', { name: /Request a refund for the \$50\.00 tip/ })).toBeInTheDocument()
+      fireEvent.keyDown(document, { key: 'Escape' })
+      expect(screen.queryByRole('menuitem')).toBeNull()
       expect(screen.getByText('Refund requested')).toBeInTheDocument()
       expect(screen.getByText('Not refunded')).toBeInTheDocument()
     })
@@ -125,12 +143,13 @@ describe('TipsTab', () => {
       refunds.create.mockResolvedValue({ data: { status: 'pending' } })
       renderTab()
 
-      fireEvent.click(await screen.findByRole('button', { name: /Request a refund for the \$50\.00 tip/ }))
+      fireEvent.click(await screen.findByRole('button', { name: /More actions for the \$50\.00 tip/ }))
+      fireEvent.click(await screen.findByRole('menuitem', { name: /Request a refund for the \$50\.00 tip/ }))
       fireEvent.click(await screen.findByRole('button', { name: 'Send request' }))
 
       await waitFor(() => expect(refunds.create).toHaveBeenCalledWith(expect.objectContaining({ tipId: 'ok', reason: 'mistake' })))
       expect(await screen.findByText('Refund requested')).toBeInTheDocument()
-      expect(screen.queryByRole('button', { name: /Request a refund/ })).toBeNull()
+      expect(screen.queryByRole('button', { name: /More actions for the/ })).toBeNull()
       expect(api.getTipHistory).toHaveBeenCalledTimes(1)
     })
   })

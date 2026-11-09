@@ -58,7 +58,7 @@ const MonitorPage: React.FC = () => {
     }
   }
 
-  if (profileId === null) return <PageLoader label="Opening live requests…" />
+  if (profileId === null) return <PageLoader label="Opening Live…" />
 
   return (
     <SongRequestMonitor
