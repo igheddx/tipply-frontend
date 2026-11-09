@@ -37,6 +37,16 @@ describe('TipsTab', () => {
     expect(screen.getByText('Waiting', { selector: 'span' })).toBeInTheDocument()
   })
 
+  it('keeps the extra filters and the download folded on a phone until asked for', async () => {
+    renderTab()
+    await screen.findAllByText(/^Patio · /)
+    const toggle = screen.getByRole('button', { name: /more filters and download/i })
+    expect(toggle).toHaveAttribute('aria-expanded', 'false')
+    fireEvent.click(toggle)
+    expect(screen.getByRole('button', { name: /fewer filters/i })).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.getByRole('button', { name: /download csv/i })).toBeInTheDocument()
+  })
+
   it('shows a refunded tip struck through and marked, and says it is not counted', async () => {
     api.getTipHistory.mockResolvedValue({
       data: {
