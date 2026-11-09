@@ -384,7 +384,7 @@ const Dashboard: React.FC = () => {
           const insightsStart = performance.now()
           const timezoneOffset = new Date().getTimezoneOffset()
           const response = await fetch(
-            `${API_BASE_URL}/api/tips/insights/${profileId}?timezoneOffsetMinutes=${timezoneOffset}${demoQuery('&')}`,
+            `${API_BASE_URL}/api/tips/insights/${profileId}?timezoneOffsetMinutes=${timezoneOffset}&skipStripe=true${demoQuery('&')}`,
             {
               headers: {
                 'Authorization': `Bearer ${token}`,
@@ -557,7 +557,7 @@ const Dashboard: React.FC = () => {
         apiService.getRecentTips(profileId),
         apiService.getDeletedDevices(),
         apiService.getDevices(),
-        fetch(`${API_BASE_URL}/api/tips/insights/${profileId}?timezoneOffsetMinutes=${timezoneOffset}${demoQuery('&')}`,
+        fetch(`${API_BASE_URL}/api/tips/insights/${profileId}?timezoneOffsetMinutes=${timezoneOffset}&skipStripe=true${demoQuery('&')}`,
           {
             headers: {
               'Authorization': `Bearer ${token}`,
