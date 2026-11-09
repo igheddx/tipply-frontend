@@ -87,9 +87,31 @@ export function HomeTab({ data, onGoToDevices, onGoToTips, onGoToLive, showSlot,
     { label: 'All-time tips', hint: 'Before fees. Payouts are after fees.', value: money(data.lifetime), icon: 'trend-up' }
   ]
 
+  // Missing device or payouts stops tips from working, so those lead the page. Songs and a photo wait lower down.
+  const setupBlocking = openSteps.some(st => st.id === 'device' || st.id === 'payouts')
+  const setupCard =
+    openSteps.length > 0 ? (
+      <Card title="Finish setting up" subtitle={`${openSteps.length} of ${data.nextSteps.length} left`}>
+        <ul className="divide-y divide-slate-100">
+          {openSteps.map(s => (
+            <li key={s.id} className="flex items-center gap-3 py-3">
+              <IconTile name={s.icon} state="current" size={40} />
+              <div className="min-w-0 flex-1">
+                <div className="text-sm font-semibold text-ink-900">{s.title}</div>
+                <div className="text-xs text-ink-500">{s.detail}</div>
+              </div>
+              <Button size="sm" variant="secondary" onClick={s.onAction}>
+                {s.actionLabel}
+              </Button>
+            </li>
+          ))}
+        </ul>
+      </Card>
+    ) : null
+
   return (
     <div className="space-y-5">
-      <div className="flex flex-wrap items-start justify-between gap-3">
+      <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <h1 className="text-2xl font-bold text-ink-900">
             {greeting()}
@@ -97,7 +119,7 @@ export function HomeTab({ data, onGoToDevices, onGoToTips, onGoToLive, showSlot,
           </h1>
           <p className="mt-1 text-sm text-ink-500">Here is how tips are going.</p>
         </div>
-        {headerAction}
+        {headerAction && <div className="shrink-0">{headerAction}</div>}
       </div>
 
       {/* Anything that needs an action comes first, so it is the first thing seen */}
@@ -117,27 +139,7 @@ export function HomeTab({ data, onGoToDevices, onGoToTips, onGoToLive, showSlot,
 
       {requestsSlot}
 
-      {/* Next steps (only while something is left to do) */}
-      {openSteps.length > 0 && (
-        <Card title="Finish setting up" subtitle={`${openSteps.length} left`}>
-          <ul className="divide-y divide-slate-100">
-            {data.nextSteps.map(s => (
-              <li key={s.id} className="flex items-center gap-3 py-3">
-                <IconTile name={s.icon} state={s.done ? 'done' : 'current'} size={40} />
-                <div className="min-w-0 flex-1">
-                  <div className={`text-sm font-semibold ${s.done ? 'text-ink-500' : 'text-ink-900'}`}>{s.title}</div>
-                  {!s.done && <div className="text-xs text-ink-500">{s.detail}</div>}
-                </div>
-                {!s.done && (
-                  <Button size="sm" variant="secondary" onClick={s.onAction}>
-                    {s.actionLabel}
-                  </Button>
-                )}
-              </li>
-            ))}
-          </ul>
-        </Card>
-      )}
+      {setupBlocking && setupCard}
 
       {onGoToLive && (
         <Button icon="mic" size="lg" block onClick={onGoToLive}>
@@ -177,6 +179,8 @@ export function HomeTab({ data, onGoToDevices, onGoToTips, onGoToLive, showSlot,
           </Button>
         </div>
       </Card>
+
+      {!setupBlocking && setupCard}
 
       {regularsSlot}
 

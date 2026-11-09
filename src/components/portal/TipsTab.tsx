@@ -197,7 +197,7 @@ export default function TipsTab({ profileId, devices, refreshKey, onGoToDevices 
 
   return (
     <div className="space-y-5">
-      <Card title="Your tips" subtitle="Pick a date range, narrow it down, or download it as a spreadsheet.">
+      <Card title="Your tips">
         <div className="space-y-4">
           <div className="flex flex-wrap gap-2" role="group" aria-label="Date range">
             {PRESETS.map(p => (

@@ -1354,7 +1354,7 @@ const Dashboard: React.FC = () => {
 
   const PAGE_TITLES: Record<string, { title: string; subtitle?: string }> = {
     devices: { title: 'Devices', subtitle: 'Your Tipwave devices, tip amounts and QR codes.' },
-    tips: { title: 'Tips', subtitle: 'Every tip, before and after fees. Pick a date range, or download it as a spreadsheet.' },
+    tips: { title: 'Tips', subtitle: 'Every tip, before and after fees.' },
     songs: { title: 'Song catalog', subtitle: 'The songs your audience can pick from.' },
     monitor: { title: 'Live', subtitle: 'Tips and song requests as they come in.' }
   }
@@ -1953,12 +1953,6 @@ const Dashboard: React.FC = () => {
                     Open in its own window
                   </Button>
                 </div>
-                <p className="text-sm text-ink-500">
-                  On a tablet, open it in its own window to keep it beside your charts or sheet music. Bookmark /monitor or add it to your home screen to jump straight in.
-                </p>
-                <p className="text-sm text-ink-500">
-                  To see both at once on an iPad, swipe up from the bottom for the dock, then drag Safari next to your music app.
-                </p>
                 <Card title="Today's requests" subtitle="The most-tipped songs come first." flush>
                   {songRequests.length === 0 ? (
                     <EmptyState icon="music" title="No song requests today">
@@ -1986,6 +1980,15 @@ const Dashboard: React.FC = () => {
                   )}
                 </Card>
                 {userProfile?.id && <AlertsCard tipAmounts={tipAmounts} />}
+                <details className="group rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-ink-700">
+                  <summary className="cursor-pointer list-none font-semibold text-ink-900">Using a tablet?</summary>
+                  <p className="mt-2 text-ink-500">
+                    Open Live in its own window to keep it beside your charts or sheet music. Bookmark /monitor or add it to your home screen to jump straight in.
+                  </p>
+                  <p className="mt-2 text-ink-500">
+                    To see both at once on an iPad, swipe up from the bottom for the dock, then drag Safari next to your music app.
+                  </p>
+                </details>
               </div>
             )}
         </div>

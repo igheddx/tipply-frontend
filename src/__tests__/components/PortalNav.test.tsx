@@ -59,7 +59,7 @@ describe('PortalShell with grouped items', () => {
 const data: HomeData = {
   firstName: 'Ada', today: { amount: 0, count: 0 }, month: { amount: 0, count: 0, trendPercent: 0, trendDirection: 'up' },
   pendingTips: 0, failedTips: 12, failedTipsCount: 1, scheduledPayouts: 0, inTransit: 0, available: 0, lifetime: 0, balancesLoading: false,
-  devices: { active: 1, paused: 0, offline: 0, total: 1 }, weeks: [], nextSteps: [{ id: 'a', icon: 'qr', title: 'Print your QR card', detail: 'd', done: false, actionLabel: 'Go', onAction: () => {} }],
+  devices: { active: 1, paused: 0, offline: 0, total: 1 }, weeks: [], nextSteps: [{ id: 'device', icon: 'qr', title: 'Add your first device', detail: 'd', done: false, actionLabel: 'Go', onAction: () => {} }, { id: 'photo', icon: 'user', title: 'Add a profile photo', detail: 'p', done: true, actionLabel: 'Add', onAction: () => {} }],
   weeksLoading: false
 }
 
@@ -78,5 +78,18 @@ describe('Home order', () => {
     expect(at('Open Live')).toBeLessThan(at('SHOW-CARD'))
     expect(at('SHOW-CARD')).toBeLessThan(at('Tips this month'))
     expect(at('Tips this month')).toBeLessThan(at('1 device'))
+  })
+
+  it('puts optional setup steps (songs, photo) lower, and lists only what is left', () => {
+    const optional = { ...data, nextSteps: [
+      { id: 'device', icon: 'qr' as const, title: 'Add your first device', detail: 'd', done: true, actionLabel: 'Go', onAction: () => {} },
+      { id: 'songs', icon: 'music' as const, title: 'Add songs to your catalog', detail: 's', done: false, actionLabel: 'Add songs', onAction: () => {} }
+    ] }
+    render(<HomeTab data={optional} formatCurrency={n => `$${n}`} onGoToDevices={() => {}} onGoToTips={() => {}} onGoToLive={() => {}} />)
+    const text = document.body.textContent || ''
+    expect(text.indexOf('Open Live')).toBeLessThan(text.indexOf('Finish setting up'))
+    expect(text.indexOf('Tips this month')).toBeLessThan(text.indexOf('Finish setting up'))
+    expect(text).toContain('1 of 2 left')
+    expect(text).not.toContain('Add your first device')
   })
 })

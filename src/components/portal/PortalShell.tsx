@@ -110,7 +110,7 @@ export function PortalShell({
         <div className="px-5 pb-4 pt-5">
           <img src={logoSrc} alt="Tipwave" className="h-9 w-auto" />
         </div>
-        <nav className="flex-1 space-y-1 px-3" aria-label="Main">
+        <nav className="min-h-0 flex-1 space-y-1 overflow-y-auto px-3" aria-label="Main">
           {items.map((item, index) => {
             const on = !profileActive && item.id === active
             const startsGroup = !!item.group && item.group !== items[index - 1]?.group
