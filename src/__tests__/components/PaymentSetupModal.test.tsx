@@ -39,12 +39,12 @@ describe('PaymentSetupModal: the first thing a new tipper sees', () => {
   it('says up front that nothing is charged now and what happens next', async () => {
     open()
     expect(await screen.findByText(/Add a card once\. Saving it doesn't charge it\./)).toBeInTheDocument()
-    expect(screen.getByText(/one tap on an amount sends your tip/i)).toBeInTheDocument()
+    expect(screen.getByText(/one tap on an amount sends your tip, charged to this card\./i)).toBeInTheDocument()
   })
 
   it('when a tip was tapped, says that exact tip is sent as soon as the card is saved', async () => {
     open({ tipAmount: 5 })
-    expect(await screen.findByText("Your $5 tip is sent as soon as it's saved.")).toBeInTheDocument()
+    expect(await screen.findByText("Your $5 tip is sent as soon as it's saved, and charged to this card.")).toBeInTheDocument()
     expect(screen.queryByText(/one tap on an amount sends your tip/i)).toBeNull()
   })
 

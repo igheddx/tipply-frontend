@@ -133,7 +133,9 @@ export default function PaymentSetupModal({
           <div className="mb-5 rounded-xl bg-brand-50 px-4 py-3 text-[15px] leading-snug text-ink-700">
             <p className="font-semibold text-ink-900">Add a card once. Saving it doesn't charge it.</p>
             <p className="mt-0.5">
-              {tipAmount ? `Your ${tipText(tipAmount)} tip is sent as soon as it's saved.` : 'After that, one tap on an amount sends your tip.'}
+              {tipAmount
+                ? `Your ${tipText(tipAmount)} tip is sent as soon as it's saved, and charged to this card.`
+                : 'After that, one tap on an amount sends your tip, charged to this card.'}
             </p>
           </div>
           {!stripePromise && (
