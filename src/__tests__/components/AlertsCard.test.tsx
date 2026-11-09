@@ -40,6 +40,14 @@ describe('AlertsCard', () => {
     await waitFor(() => expect(screen.getByRole('button', { name: '$100' })).toHaveAttribute('aria-pressed', 'true'))
   })
 
+  it('marks the chosen amounts with a check, so on and off cannot be confused', async () => {
+    render(<AlertsCard tipAmounts={amounts} />)
+    const twenty = await screen.findByRole('button', { name: '$20' })
+    await waitFor(() => expect(twenty).toHaveAttribute('aria-pressed', 'true'))
+    expect(twenty.querySelector('svg')).not.toBeNull()
+    expect(screen.getByRole('button', { name: '$50' }).querySelector('svg')).toBeNull()
+  })
+
   it('puts the amount back and says so when saving fails', async () => {
     api.put.mockResolvedValue({ error: 'nope' })
     render(<AlertsCard tipAmounts={amounts} />)

@@ -95,6 +95,8 @@ export default function TipsTab({ profileId, devices, refreshKey, onGoToDevices 
   const [loadingMore, setLoadingMore] = useState(false)
   const [failed, setFailed] = useState(false)
   const [moreFilters, setMoreFilters] = useState(false)
+  // The row whose "..." menu is open
+  const [menuFor, setMenuFor] = useState<string | null>(null)
   const [exporting, setExporting] = useState(false)
   const request = useRef(0)
 
@@ -130,6 +132,20 @@ export default function TipsTab({ profileId, devices, refreshKey, onGoToDevices 
   useEffect(() => {
     void load(1)
   }, [load, refreshKey])
+
+  useEffect(() => {
+    if (!menuFor) return
+    const onDown = (e: MouseEvent) => {
+      if (!(e.target as HTMLElement).closest('[data-tip-menu]')) setMenuFor(null)
+    }
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setMenuFor(null)
+    document.addEventListener('mousedown', onDown)
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('mousedown', onDown)
+      document.removeEventListener('keydown', onKey)
+    }
+  }, [menuFor])
 
   const downloadCsv = async () => {
     if (!range) return
@@ -339,17 +355,37 @@ export default function TipsTab({ profileId, devices, refreshKey, onGoToDevices 
                     <StatusChip kind={chipFor(tip.status)} label={statusLabel(tip.status)} />
                     {tip.refundRequest === 'pending' && <StatusChip kind="processing" label="Refund requested" />}
                     {tip.refundRequest === 'declined' && <StatusChip kind="offline" label="Not refunded" />}
-                    {tip.status === 'processed' && !tip.refundRequest && Date.now() - new Date(tip.createdAt).getTime() <= REFUND_WINDOW_DAYS * 24 * 3600 * 1000 && (
+                  </div>
+                  {tip.status === 'processed' && !tip.refundRequest && Date.now() - new Date(tip.createdAt).getTime() <= REFUND_WINDOW_DAYS * 24 * 3600 * 1000 && (
+                    <div className="relative" data-tip-menu>
                       <button
                         type="button"
-                        onClick={() => setAsking(tip)}
-                        className="text-xs font-semibold text-ink-500 underline hover:text-ink-700"
-                        aria-label={`Request a refund for the ${money(tip.amount)} tip from ${when(tip.createdAt)}`}
+                        onClick={() => setMenuFor(menuFor === tip.id ? null : tip.id)}
+                        aria-haspopup="menu"
+                        aria-expanded={menuFor === tip.id}
+                        aria-label={`More actions for the ${money(tip.amount)} tip from ${when(tip.createdAt)}`}
+                        className="flex h-11 w-11 items-center justify-center rounded-full text-ink-500 hover:bg-slate-100 hover:text-ink-700"
                       >
-                        Request refund
+                        <BrandIcon name="more" size={20} tone="current" />
                       </button>
-                    )}
-                  </div>
+                      {menuFor === tip.id && (
+                        <div role="menu" className="absolute right-0 top-full z-10 mt-1 w-48 rounded-xl border border-slate-200 bg-white p-1 shadow-lg">
+                          <button
+                            type="button"
+                            role="menuitem"
+                            onClick={() => {
+                              setMenuFor(null)
+                              setAsking(tip)
+                            }}
+                            className="flex h-11 w-full items-center rounded-lg px-3 text-left text-sm font-semibold text-ink-700 hover:bg-slate-50"
+                            aria-label={`Request a refund for the ${money(tip.amount)} tip from ${when(tip.createdAt)}`}
+                          >
+                            Request a refund
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </li>
               ))}
             </ul>

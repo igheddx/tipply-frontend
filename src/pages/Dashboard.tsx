@@ -1490,7 +1490,7 @@ const Dashboard: React.FC = () => {
         onLogout={handleLogout}
         topNotice={
           <>
-            <RefundNoticeBanner onView={() => setActiveTab('tips')} />
+            <RefundNoticeBanner tab={activeTab} onView={() => setActiveTab('tips')} />
             <SessionBanner />
           </>
         }
