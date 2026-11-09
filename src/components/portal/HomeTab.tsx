@@ -100,29 +100,7 @@ export function HomeTab({ data, onGoToDevices, onGoToTips, onGoToLive, showSlot,
         {headerAction}
       </div>
 
-      {onGoToLive && (
-        <Button icon="mic" size="lg" block onClick={onGoToLive}>
-          Open live song requests
-        </Button>
-      )}
-
-      {/* Device status */}
-      <Card className="!shadow-none">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-sm font-semibold text-ink-900">
-              {data.devices.total === 0 ? 'No devices yet' : plural(data.devices.total, 'device')}
-            </span>
-            {data.devices.active > 0 && <StatusChip kind="active" label={`${data.devices.active} active`} />}
-            {data.devices.paused > 0 && <StatusChip kind="paused" label={`${data.devices.paused} paused`} />}
-            {data.devices.offline > 0 && <StatusChip kind="offline" label={`${data.devices.offline} offline`} />}
-          </div>
-          <Button variant="secondary" size="sm" onClick={onGoToDevices}>
-            {data.devices.total === 0 ? 'Add a device' : 'Manage devices'}
-          </Button>
-        </div>
-      </Card>
-
+      {/* Anything that needs an action comes first, so it is the first thing seen */}
       {data.failedTipsCount > 0 && (
         <Banner
           tone="warning"
@@ -138,24 +116,6 @@ export function HomeTab({ data, onGoToDevices, onGoToTips, onGoToLive, showSlot,
       )}
 
       {requestsSlot}
-
-      {showSlot}
-
-      {/* Big numbers: tiles on larger screens, one compact list on phones */}
-      <div className={`hidden gap-4 sm:grid ${showSlot ? 'grid-cols-2' : 'grid-cols-3'}`}>
-        {stats.map(s => (
-          <StatCard key={s.label} {...s} />
-        ))}
-      </div>
-      <Card className="sm:hidden" flush>
-        <div className="divide-y divide-slate-100 px-4">
-          {stats.map(s => (
-            <StatCard key={s.label} {...s} variant="row" />
-          ))}
-        </div>
-      </Card>
-
-      {regularsSlot}
 
       {/* Next steps (only while something is left to do) */}
       {openSteps.length > 0 && (
@@ -178,6 +138,47 @@ export function HomeTab({ data, onGoToDevices, onGoToTips, onGoToLive, showSlot,
           </ul>
         </Card>
       )}
+
+      {onGoToLive && (
+        <Button icon="mic" size="lg" block onClick={onGoToLive}>
+          Open Live
+        </Button>
+      )}
+
+      {showSlot}
+
+      {/* Big numbers: tiles on larger screens, one compact list on phones */}
+      <div className={`hidden gap-4 sm:grid ${showSlot ? 'grid-cols-2' : 'grid-cols-3'}`}>
+        {stats.map(s => (
+          <StatCard key={s.label} {...s} />
+        ))}
+      </div>
+      <Card className="sm:hidden" flush>
+        <div className="divide-y divide-slate-100 px-4">
+          {stats.map(s => (
+            <StatCard key={s.label} {...s} variant="row" />
+          ))}
+        </div>
+      </Card>
+
+      {/* Device status */}
+      <Card className="!shadow-none">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-sm font-semibold text-ink-900">
+              {data.devices.total === 0 ? 'No devices yet' : plural(data.devices.total, 'device')}
+            </span>
+            {data.devices.active > 0 && <StatusChip kind="active" label={`${data.devices.active} active`} />}
+            {data.devices.paused > 0 && <StatusChip kind="paused" label={`${data.devices.paused} paused`} />}
+            {data.devices.offline > 0 && <StatusChip kind="offline" label={`${data.devices.offline} offline`} />}
+          </div>
+          <Button variant="secondary" size="sm" onClick={onGoToDevices}>
+            {data.devices.total === 0 ? 'Add a device' : 'Manage devices'}
+          </Button>
+        </div>
+      </Card>
+
+      {regularsSlot}
 
       {/* Weekly chart, always from zero */}
       <Card title="Tips per week" subtitle="Last 8 weeks, before fees">

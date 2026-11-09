@@ -57,7 +57,7 @@ describe('SongRequestMonitor', () => {
     const titles = screen.getAllByRole('heading', { level: 3 }).map(h => h.textContent)
     expect(titles).toEqual(['High tip song', 'Low tip song'])
     expect(screen.getByLabelText('2 waiting')).toBeInTheDocument()
-    await waitFor(() => expect(document.title).toBe('(2) Live requests'))
+    await waitFor(() => expect(document.title).toBe('(2) Live'))
   })
 
   it('has a sound option for new tips in the menu, on by default, and remembers when it is turned off', async () => {

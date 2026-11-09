@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react'
+import { Fragment, useEffect, useState, type ReactNode } from 'react'
 import { photoSrc } from '../../utils/photoUrl'
 import { usePortalTheme } from '../../theme/ThemeContext'
 import { ThemeToggle, ThemeQuickToggle } from '../ui/ThemeToggle'
@@ -12,6 +12,10 @@ export interface PortalNavItem {
   icon: BrandIconName
   /** A small count shown on the item, e.g. waiting song requests */
   badge?: number
+  /** Heading this item sits under in the sidebar and the phone menu. Items of one group must be next to each other. */
+  group?: string
+  /** On a phone, pinned items take the bottom bar; the rest go under "More". Without any pinned item, the first ones are used. */
+  pin?: boolean
 }
 
 interface PortalShellProps {
@@ -44,6 +48,21 @@ function Avatar({ name, photoUrl, size = 36 }: { name: string; photoUrl?: string
   )
 }
 
+function GroupLabel({ children, className = '' }: { children: ReactNode; className?: string }) {
+  return <p className={`px-3 pb-1 text-xs font-bold uppercase tracking-wide text-ink-500 ${className}`}>{children}</p>
+}
+
+/** Splits items into runs that share a heading, keeping their order. */
+export function sectionsOf(items: PortalNavItem[]): { label?: string; items: PortalNavItem[] }[] {
+  const out: { label?: string; items: PortalNavItem[] }[] = []
+  for (const item of items) {
+    const last = out[out.length - 1]
+    if (last && last.label === item.group) last.items.push(item)
+    else out.push({ label: item.group, items: [item] })
+  }
+  return out
+}
+
 /** Most items a phone's bottom bar shows at once. With more, the first few stay and the rest go under "More". */
 const BAR_LIMIT = 5
 
@@ -65,9 +84,11 @@ export function PortalShell({
   const logoSrc = dark ? '/images/logo/tipwave-logo-v2-light.png' : '/images/logo/tipwave-logo-v2.png'
   const [moreOpen, setMoreOpen] = useState(false)
   const overflowing = items.length > BAR_LIMIT
-  const barItems = overflowing ? items.slice(0, BAR_LIMIT - 1) : items
-  const moreItems = overflowing ? items.slice(BAR_LIMIT - 1) : []
+  const pinned = items.filter(i => i.pin).slice(0, BAR_LIMIT - 1)
+  const barItems = !overflowing ? items : pinned.length > 0 ? pinned : items.slice(0, BAR_LIMIT - 1)
+  const moreItems = overflowing ? items.filter(i => !barItems.includes(i)) : []
   const moreActive = !profileActive && moreItems.some(i => i.id === active)
+  const moreSections = sectionsOf(moreItems)
   const moreBadge = moreItems.reduce((n, i) => n + (i.badge ?? 0), 0)
 
   useEffect(() => {
@@ -90,11 +111,13 @@ export function PortalShell({
           <img src={logoSrc} alt="Tipwave" className="h-9 w-auto" />
         </div>
         <nav className="flex-1 space-y-1 px-3" aria-label="Main">
-          {items.map(item => {
+          {items.map((item, index) => {
             const on = !profileActive && item.id === active
+            const startsGroup = !!item.group && item.group !== items[index - 1]?.group
             return (
+              <Fragment key={item.id}>
+              {startsGroup && <GroupLabel className={index === 0 ? 'pt-1' : 'pt-4'}>{item.group}</GroupLabel>}
               <button
-                key={item.id}
                 onClick={() => onSelect(item.id)}
                 aria-current={on ? 'page' : undefined}
                 className={`flex h-11 w-full items-center gap-3 rounded-xl px-3 text-sm font-semibold transition-colors ${
@@ -107,6 +130,7 @@ export function PortalShell({
                   <span className="rounded-full bg-accent-500 px-2 py-0.5 text-xs font-bold text-white">{item.badge}</span>
                 )}
               </button>
+              </Fragment>
             )
           })}
         </nav>
@@ -206,22 +230,29 @@ export function PortalShell({
             style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 0.75rem)' }}
           >
             <div className="mx-auto mt-2.5 h-1 w-10 rounded-full bg-slate-300" />
-            <div className={`grid grid-cols-3 gap-2 px-4 pb-3 pt-4 ${moreItems.length === 0 ? 'hidden' : ''}`}>
-              {moreItems.map(item => {
-                const on = !profileActive && item.id === active
-                return (
-                  <button
-                    key={item.id}
-                    onClick={() => choose(item.id)}
-                    aria-current={on ? 'page' : undefined}
-                    className={`relative flex h-20 flex-col items-center justify-center gap-1.5 rounded-2xl text-xs font-semibold ${on ? 'bg-brand-50 text-brand-800' : 'bg-slate-50 text-ink-700'}`}
-                  >
-                    <BrandIcon name={item.icon} size={24} tone={on ? 'brand' : 'muted'} />
-                    {item.label}
-                    {!!item.badge && <span className="absolute right-2 top-2 min-w-[18px] rounded-full bg-accent-500 px-1 text-center text-[10px] font-bold leading-[18px] text-white">{item.badge}</span>}
-                  </button>
-                )
-              })}
+            <div className={`max-h-[55dvh] overflow-y-auto px-4 pb-3 pt-4 ${moreItems.length === 0 ? 'hidden' : ''}`}>
+              {moreSections.map((section, i) => (
+                <div key={section.label ?? i} className={i > 0 ? 'pt-3' : ''}>
+                  {section.label && <GroupLabel>{section.label}</GroupLabel>}
+                  <div className="grid grid-cols-3 gap-2">
+                    {section.items.map(item => {
+                      const on = !profileActive && item.id === active
+                      return (
+                        <button
+                          key={item.id}
+                          onClick={() => choose(item.id)}
+                          aria-current={on ? 'page' : undefined}
+                          className={`relative flex h-20 flex-col items-center justify-center gap-1.5 rounded-2xl text-xs font-semibold ${on ? 'bg-brand-50 text-brand-800' : 'bg-slate-50 text-ink-700'}`}
+                        >
+                          <BrandIcon name={item.icon} size={24} tone={on ? 'brand' : 'muted'} />
+                          {item.label}
+                          {!!item.badge && <span className="absolute right-2 top-2 min-w-[18px] rounded-full bg-accent-500 px-1 text-center text-[10px] font-bold leading-[18px] text-white">{item.badge}</span>}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              ))}
             </div>
             <div className="border-t border-slate-100 px-4 pt-3">
               <button

@@ -1102,19 +1102,20 @@ const AdminDashboard: React.FC = () => {
     );
   }
 
+  const isRootAdmin = userProfile?.role === 'root_admin';
   const adminNav: PortalNavItem[] = [
-    { id: 'overview', label: 'Overview', icon: 'home' },
-    { id: 'performers', label: 'Performers', icon: 'users' },
-    { id: 'venues', label: 'Venues', icon: 'home' },
-    { id: 'feedback', label: 'Feedback', icon: 'sparkle' },
-    { id: 'tips', label: 'Tips', icon: 'coin' },
-    { id: 'refunds', label: 'Refunds', icon: 'wallet', badge: pendingRefunds },
-    { id: 'aggregated-charges', label: 'Charges', icon: 'card' },
-    ...(userProfile?.role === 'root_admin' ? [{ id: 'device-management', label: 'Devices', icon: 'device' } as PortalNavItem] : []),
-    { id: 'performer-insights', label: 'Insights', icon: 'trend-up' },
-    ...(isSimulationVisible ? [{ id: 'device-tip-simulation', label: 'Tools', icon: 'bolt' } as PortalNavItem] : []),
-    { id: 'settings', label: 'Settings', icon: 'sliders' },
-    { id: 'performer-view', label: 'Performer view', icon: 'mic' }
+    { id: 'overview', label: 'Overview', icon: 'home', pin: true },
+    { id: 'performers', label: 'Performers', icon: 'users', group: 'People', pin: true },
+    { id: 'tips', label: 'Tips', icon: 'coin', group: 'Money', pin: true },
+    { id: 'refunds', label: 'Refunds', icon: 'wallet', badge: pendingRefunds, group: 'Money', pin: true },
+    { id: 'aggregated-charges', label: 'Charges', icon: 'card', group: 'Money' },
+    { id: 'performer-insights', label: 'Insights', icon: 'trend-up', group: 'Learn' },
+    { id: 'feedback', label: 'Feedback', icon: 'sparkle', group: 'Learn' },
+    ...(isRootAdmin ? [{ id: 'device-management', label: 'Devices', icon: 'device', group: 'System' } as PortalNavItem] : []),
+    { id: 'venues', label: 'Venues', icon: 'bank', group: 'System' },
+    ...(isSimulationVisible ? [{ id: 'device-tip-simulation', label: 'Tools', icon: 'bolt', group: 'System' } as PortalNavItem] : []),
+    { id: 'settings', label: 'Settings', icon: 'sliders', group: 'System' },
+    { id: 'performer-view', label: 'Performer view', icon: 'mic', group: 'System' }
   ];
 
   const ADMIN_TITLES: Record<string, { title: string; subtitle?: string }> = {

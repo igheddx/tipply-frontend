@@ -27,7 +27,7 @@ const VARIANTS: Record<Variant, string> = {
 }
 
 const SIZES: Record<Size, { className: string; icon: number }> = {
-  sm: { className: 'h-9 px-3 text-sm', icon: 16 },
+  sm: { className: 'h-11 px-3 text-sm sm:h-9', icon: 16 },
   md: { className: 'h-11 px-4 text-sm', icon: 18 },
   lg: { className: 'h-12 px-5 text-base', icon: 20 }
 }

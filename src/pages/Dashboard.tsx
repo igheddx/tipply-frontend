@@ -1356,7 +1356,7 @@ const Dashboard: React.FC = () => {
     devices: { title: 'Devices', subtitle: 'Your Tipwave devices, tip amounts and QR codes.' },
     tips: { title: 'Tips', subtitle: 'Every tip, before and after fees. Pick a date range, or download it as a spreadsheet.' },
     songs: { title: 'Song catalog', subtitle: 'The songs your audience can pick from.' },
-    monitor: { title: 'Live requests', subtitle: 'Song requests as they come in.' }
+    monitor: { title: 'Live', subtitle: 'Tips and song requests as they come in.' }
   }
 
   const deviceList = stats.devices ?? []
