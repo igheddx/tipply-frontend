@@ -41,6 +41,31 @@ describe('TipScreen', () => {
     expect(document.querySelector('meta[name="theme-color"]')?.getAttribute('content')).toBe('#0E7490')
   })
 
+  it('keeps white text readable on every amount tile (3:1 or better at both ends of its gradient)', () => {
+    const lum = (hex: string) => {
+      const [r, g, b] = [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16) / 255).map(c => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4))
+      return 0.2126 * r + 0.7152 * g + 0.0722 * b
+    }
+    const contrast = (fg: string, bg: string) => {
+      const [hi, lo] = [lum(fg), lum(bg)].sort((a, b) => b - a)
+      return (hi + 0.05) / (lo + 0.05)
+    }
+    render(<TipScreen {...base} />)
+    const tile = screen.getByRole('button', { name: 'Tip $2' })
+    const stops = (tile.getAttribute('style') ?? '').match(/#[0-9a-fA-F]{6}/g) ?? []
+    expect(stops.length).toBeGreaterThanOrEqual(2)
+    for (const stop of stops.filter(c => c.toLowerCase() !== '#ffffff')) expect(contrast('#ffffff', stop)).toBeGreaterThanOrEqual(3)
+  })
+
+  it('before a card is saved, the bar invites them to add one instead of showing a card', () => {
+    const onChangeCard = vi.fn()
+    render(<TipScreen {...base} hasCard={false} card={null} onChangeCard={onChangeCard} total={0} />)
+    expect(screen.getByText(/No card yet/)).toBeInTheDocument()
+    expect(screen.queryByText(/Card on file/)).toBeNull()
+    fireEvent.click(screen.getByText('Add one'))
+    expect(onChangeCard).toHaveBeenCalledTimes(1)
+  })
+
   it('shows no total until something has been tipped today', () => {
     render(<TipScreen {...base} total={0} />)
     expect(screen.queryByText('Tipped today')).toBeNull()

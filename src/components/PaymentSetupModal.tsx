@@ -3,7 +3,6 @@ import { photoSrc } from '../utils/photoUrl'
 import React, { useState, useEffect } from 'react'
 import { loadStripe, type Stripe } from '@stripe/stripe-js'
 import { Elements, CardElement, useStripe, useElements } from '@stripe/react-stripe-js'
-import { toast } from 'sonner'
 import { getApiBaseUrl } from '../utils/config'
 import { setCookie } from '../utils/cookies'
 import { getUniqueDeviceId, detectPlatform } from '../utils/deviceId'
@@ -11,6 +10,11 @@ import { AppleFilled } from '@ant-design/icons'
 import googlePayButton from '../assets/plain-button-google-pay.png'
 
 // Stripe will be initialized dynamically with the publishable key from backend
+
+/** What a tipper reads when something goes wrong. Always calm, always says nothing was charged, never a server message. */
+const MSG_TRY_AGAIN = "We couldn't set up your card just now. Nothing was charged. Please try again in a moment."
+const MSG_CONNECTION = "We couldn't reach our payment partner. Please check your connection and try again. Nothing was charged."
+const MSG_NOT_SAVED = "We couldn't save your card. Nothing was charged. Please try again."
 
 let stripePromiseCache: Promise<Stripe | null> | null = null
 
@@ -71,6 +75,7 @@ export default function PaymentSetupModal({
 }: PaymentSetupModalProps) {
   const [stripePromise, setStripePromise] = useState<Promise<Stripe | null> | null>(null)
   const [initError, setInitError] = useState<string | null>(null)
+  const [photoFailed, setPhotoFailed] = useState(false)
 
   useEffect(() => {
     let isMounted = true
@@ -95,31 +100,39 @@ export default function PaymentSetupModal({
     <div className="fixed inset-0 z-[60] flex items-end justify-center bg-ink-900/50 p-0 sm:items-center sm:p-4" role="dialog" aria-modal="true">
       <div className="max-h-[92vh] w-full max-w-md overflow-y-auto rounded-t-2xl bg-white shadow-lift sm:rounded-2xl">
         {/* ========== PERFORMER HERO SECTION ========== */}
-        <div className="bg-gradient-to-b from-brand-50 via-brand-50 to-white px-6 pt-10 pb-8 text-center">
-          <div className="flex flex-col items-center space-y-4">
-            {performerPhotoUrl && (
+        <div className="bg-gradient-to-b from-brand-50 via-brand-50 to-white px-6 pb-4 pt-6 text-center">
+          <div className="flex flex-col items-center space-y-3">
+            {performerPhotoUrl && !photoFailed ? (
               <img
                 src={photoSrc(performerPhotoUrl)}
-                alt="Performer"
-                className="w-24 h-24 rounded-full object-cover border-4 border-white shadow-lg"
+                alt=""
+                onError={() => setPhotoFailed(true)}
+                className="h-16 w-16 rounded-full border-4 border-white object-cover shadow-lg"
               />
+            ) : (
+              <div aria-hidden className="flex h-16 w-16 items-center justify-center rounded-full border-4 border-white bg-brand-100 text-xl font-extrabold text-brand-800 shadow-lg">
+                {(performerStageName || performerFirstName || 'T').trim().charAt(0).toUpperCase()}
+              </div>
             )}
-            <div className="space-y-3">
-              <h1 className="text-3xl font-bold text-ink-900">
+            <div className="space-y-1.5">
+              <h1 className="text-2xl font-bold text-ink-900">
                 {performerStageName || `${performerFirstName} ${performerLastName}`}
               </h1>
-              <p className="text-base text-brand-800 font-medium">
-                You're about to light up their stage
-              </p>
+              <p className="text-base font-medium text-brand-800">You're about to light up their stage</p>
             </div>
           </div>
         </div>
 
         {/* ========== FORM CONTENT ========== */}
-        <div className="px-6 py-8">
+        <div className="px-6 pb-6 pt-4">
+          {/* The two things a first-time tipper wonders: will I be charged now, and what happens next */}
+          <div className="mb-5 rounded-xl bg-brand-50 px-4 py-3 text-[15px] leading-snug text-ink-700">
+            <p className="font-semibold text-ink-900">Add a card once. You won't be charged now.</p>
+            <p className="mt-0.5">After that, one tap on an amount sends your tip.</p>
+          </div>
           {!stripePromise && (
             <div className="text-center py-8">
-              <p className="text-sm text-ink-500">Initializing secure payment...</p>
+              <p className="text-sm text-ink-500">Getting things ready…</p>
               {initError && (
                 <p className="mt-2 text-sm text-red-600">{initError}</p>
               )}
@@ -284,7 +297,7 @@ function PaymentForm({
           
           if (!res.ok) {
             event.complete('fail')
-            setError('Failed to create setup intent')
+            setError(MSG_TRY_AGAIN)
             setLoading(false)
             return
           }
@@ -300,7 +313,7 @@ function PaymentForm({
           if (error) {
             logger.error('Payment Request setup error:', error)
             event.complete('fail')
-            setError(error.message || 'Payment setup failed')
+            setError(error.message || MSG_TRY_AGAIN)
           } else {
             logger.log('Payment Request setup successful:', setupIntent)
             // Extract payment method ID from the SetupIntent, NOT the event
@@ -336,19 +349,18 @@ function PaymentForm({
             if (!stored) {
               // Don't report success: a card the server didn't save is rejected when the tip is sent
               event.complete('fail')
-              setError('We could not save your payment method. Please try again.')
+              setError(MSG_NOT_SAVED)
               return
             }
             
             // Payment method is automatically attached to customer by Stripe during SetupIntent confirmation
             event.complete('success')
-            toast.success('Payment method added successfully!')
             onComplete(paymentMethodId)
           }
         } catch (error) {
           logger.error('Payment Request error:', error)
           event.complete('fail')
-          setError('Payment setup failed')
+          setError(MSG_TRY_AGAIN)
         } finally {
           setLoading(false)
         }
@@ -381,7 +393,7 @@ function PaymentForm({
       if (!res.ok) {
         const errorText = await res.text()
         logger.error('Setup intent error:', errorText)
-        setError(`Server error: ${res.status} - ${errorText}`)
+        setError(MSG_TRY_AGAIN)
         setLoading(false)
         return
       }
@@ -390,19 +402,21 @@ function PaymentForm({
       logger.log('Setup intent response:', data)
       
       if (!data.clientSecret) {
-        setError('Failed to get setup intent - no client secret')
+        logger.error('Setup intent response had no client secret')
+        setError(MSG_TRY_AGAIN)
         setLoading(false)
         return
       }
 
       const cardElement = elements.getElement(CardElement)
       if (!cardElement) {
-        setError('Card input not found')
+        logger.error('Card input not found')
+        setError(MSG_TRY_AGAIN)
         setLoading(false)
         return
       }
 
-      logger.log('Confirming card setup with client secret:', data.clientSecret)
+      logger.log('Confirming card setup')
       const result = await stripe.confirmCardSetup(data.clientSecret, {
         payment_method: {
           card: cardElement,
@@ -412,7 +426,7 @@ function PaymentForm({
       logger.log('Card setup result:', result)
       logger.log('📥 Setup intent response from /api/stripe/setup-intent (card path):', data)
       if (result.error) {
-        setError(result.error.message || 'Card error')
+        setError(result.error.message || "That card didn't work. Please check the details or try another card.")
       } else {
         logger.log('Payment method setup successful:', result.setupIntent)
         // Extract payment method ID from the setup intent
@@ -446,24 +460,22 @@ function PaymentForm({
         const stored = await storePaymentInfo(uniqueDeviceId!, paymentMethodId, customerId, platform, false, result.setupIntent?.id)
         if (!stored) {
           // Don't report success: a card the server didn't save is rejected when the tip is sent
-          setError('We could not save your payment method. Please try again.')
+          setError(MSG_NOT_SAVED)
           return
         }
         
         // Payment method is automatically attached to customer by Stripe during SetupIntent confirmation
-        toast.success('Payment method added successfully!')
         onComplete(paymentMethodId)
       }
     } catch (error) {
       logger.error('Card submission error:', error)
-      setError(`Network error: ${error instanceof Error ? error.message : 'Unknown error'}`)
+      setError(MSG_CONNECTION)
     } finally {
       setLoading(false)
     }
   }
 
   const isWalletOnly = walletMode === 'wallet'
-  const isSetupIntentMode = walletMode !== 'card'
   const [showCardFields, setShowCardFields] = useState(false)
 
   return (
@@ -484,14 +496,6 @@ function PaymentForm({
                 className="h-12 w-auto opacity-80"
               />
             </button>
-          )}
-
-          {!isCheckingWalletAvailability && stripe && paymentRequest && isApplePay && isSetupIntentMode && (
-            <div className="mt-3 mb-3 flex items-start gap-2 text-[15px] text-[#444444]">
-              <p>
-                First-time only: Apple Pay will securely save your payment method. You won’t be charged.
-              </p>
-            </div>
           )}
 
           {!isCheckingWalletAvailability && stripe && paymentRequest && (
@@ -535,7 +539,7 @@ function PaymentForm({
             onClick={() => setShowCardFields(true)}
             className="w-full min-h-[44px] border border-slate-300 text-ink-700 bg-white rounded-xl px-4 py-3 hover:bg-surface active:bg-slate-100 transition-all font-medium text-base"
           >
-            Pay with card
+            Use a card
           </button>
         </div>
       )}
@@ -548,7 +552,7 @@ function PaymentForm({
           }`}
         >
           <div className="flex items-center justify-between mb-4">
-            <label className="text-sm font-semibold text-ink-900">Card Details</label>
+            <label className="text-sm font-semibold text-ink-900">Card details</label>
           </div>
           
           <div className="border-2 border-slate-200 rounded-lg p-4 bg-white hover:border-slate-300 focus-within:border-brand-600 transition-colors">
@@ -585,7 +589,7 @@ function PaymentForm({
                 <span>Processing...</span>
               </span>
             ) : (
-              'Continue with this card'
+              'Save my card'
             )}
           </button>
         </div>
@@ -607,7 +611,7 @@ function PaymentForm({
               if (paymentRequest) {
                 paymentRequest.show()
               } else {
-                setError('Apple Pay or Google Pay is not available on this device.')
+                setError("Apple Pay or Google Pay isn't available on this device. You can use a card instead.")
               }
             }}
             disabled={loading || !stripe || !paymentRequest}
@@ -633,19 +637,14 @@ function PaymentForm({
           disabled={loading}
           className="w-full text-ink-500 py-3 px-4 rounded-xl hover:text-ink-900 hover:bg-surface transition-all disabled:opacity-50 disabled:cursor-not-allowed font-medium text-base"
         >
-          Cancel
+          Not now
         </button>
       </div>
 
-      {/* ========== SECTION 4: SECURITY REASSURANCE ========== */}
-      <div className="pt-4 text-center space-y-4">
+      {/* ========== SECTION 4: WHY THIS IS SAFE ========== */}
+      <div className="space-y-1.5 pt-4 text-center">
         <div className="flex items-center justify-center gap-2">
-          <svg
-            className="w-4 h-4 text-green-600"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
+          <svg className="h-4 w-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
             <path
               strokeLinecap="round"
               strokeLinejoin="round"
@@ -653,13 +652,9 @@ function PaymentForm({
               d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
             />
           </svg>
-          <p className="text-xs text-ink-500 font-medium">
-            Securely processed by Stripe
-          </p>
+          <p className="text-sm font-semibold text-ink-700">Your card goes straight to Stripe</p>
         </div>
-        <p className="text-xs text-ink-400 leading-relaxed px-2">
-          Your card details are encrypted and never stored on your device.
-        </p>
+        <p className="px-2 text-[13px] leading-relaxed text-ink-500">Stripe is the payment company that handles it. Tipwave never sees your card number.</p>
       </div>
     </form>
   )

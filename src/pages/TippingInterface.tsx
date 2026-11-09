@@ -15,7 +15,6 @@ import { getUniqueDeviceId, detectPlatform, initDeviceId } from '../utils/device
 import { TipScreen } from '../components/tip/TipScreen'
 import { SongPickerSheet, type PickedSong } from '../components/tip/SongPickerSheet'
 import { BrandIcon, type BrandIconName } from '../components/icons/BrandIcons'
-import { Button } from '../components/ui'
 import { APP_VERSION } from '../utils/appVersion'
 import { tipGradient, tipPalette } from '../utils/tipTheme'
 import { TestSiteStrip } from '../components/tip/TestSiteStrip'
@@ -425,9 +424,7 @@ const TippingInterface: React.FC = () => {
         if (paymentCheck.hasPaymentMethods) {
           setSavedCard({ brand: paymentCheck.cardBrand, last4: paymentCheck.cardLast4 })
         }
-        if (!paymentCheck.hasPaymentMethods) {
-          setShowPaymentModal(true)
-        }
+        // No card yet: the tip page shows as normal. The card sheet opens when they tap an amount, never before they have seen who they are tipping.
         setCheckingPaymentMethods(false)
 
       } catch (error) {
@@ -777,6 +774,11 @@ const TippingInterface: React.FC = () => {
     // Tapping anything else quietly closes a question that is showing
     feedback.dismissNow()
     if (isDebouncing) return
+    // First tip: ask for a card once. Nothing is sent, no light or sound plays, until there is one.
+    if (!isPaymentSetup && !!deviceInfo && !!userId) {
+      setShowPaymentModal(true)
+      return
+    }
     if (!deviceInfo || !userId) {
       logger.log('⏳ [handleTipClick] Not ready yet - deviceInfo:', !!deviceInfo, 'userId:', !!userId)
       toast.error('Still loading, please try again in a moment')
@@ -1013,7 +1015,7 @@ const TippingInterface: React.FC = () => {
           void checkPaymentMethods(deviceInfo).then((result) => {
             if (result.hasPaymentMethods) setSavedCard({ brand: result.cardBrand, last4: result.cardLast4 })
           })
-          toast.success('Payment method saved', { duration: 1200 })
+          toast.success('All set. Tap an amount to tip.', { duration: 2200 })
         }}
         deviceUuid={deviceInfo?.uuid || ''}
         userId={userId}
@@ -1084,27 +1086,6 @@ const TippingInterface: React.FC = () => {
     )
   }
 
-  if (!isPaymentSetup) {
-    return (
-      <>
-        <InfoScreen
-          feedback={userId ? { userId, deviceUuid: deviceInfo?.uuid } : undefined}
-          icon="card"
-          title="Add a card to tip"
-          action={
-            <Button size="lg" block onClick={() => setShowPaymentModal(true)}>
-              Add a card
-            </Button>
-          }
-        >
-          Add a payment method to continue tipping.
-        </InfoScreen>
-        {paymentModal}
-        <TipperRefundNotice userId={userId} />
-      </>
-    )
-  }
-
   return (
     <>
       <TipScreen
@@ -1126,6 +1107,7 @@ const TippingInterface: React.FC = () => {
         }}
         onClearSong={clearSelectedSong}
         card={savedCard}
+        hasCard={isPaymentSetup}
         onChangeCard={() => {
           feedback.dismissNow()
           setShowPaymentModal(true)

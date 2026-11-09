@@ -8,7 +8,8 @@ import { TestSiteStrip } from './TestSiteStrip'
 
 /** Gradient behind each of the six amounts, in order. They match the light colors the device shows. */
 const AMOUNT_STYLES: { background: string; color: string }[] = [
-  { background: 'linear-gradient(135deg,#2dd4bf,#0f8f86)', color: '#FFFFFF' },
+  // The $2 tile is a deeper teal than the light on the device, so the white number reads in sunlight (3:1 or better everywhere)
+  { background: 'linear-gradient(135deg,#139e92,#0b8579)', color: '#FFFFFF' },
   { background: 'linear-gradient(135deg,#22b8d6,#0e7490)', color: '#FFFFFF' },
   { background: 'linear-gradient(135deg,#5b9bf8,#2748b8)', color: '#FFFFFF' },
   { background: 'linear-gradient(135deg,#f472b6,#c92a70)', color: '#FFFFFF' },
@@ -43,6 +44,8 @@ function initials(name: string): string {
 }
 
 export interface TipScreenProps {
+  /** False until the tipper has saved a card. The bar then invites them to add one, and the amounts open the card sheet. */
+  hasCard?: boolean
   performerName: string
   photoUrl?: string
   bio?: string
@@ -89,6 +92,7 @@ export function TipScreen({
   onOpenSongPicker,
   onClearSong,
   card,
+  hasCard = true,
   onChangeCard,
   total,
   bottomBarOverride,
@@ -295,7 +299,15 @@ export function TipScreen({
           <button type="button" onClick={onChangeCard} className="flex items-center gap-2 whitespace-nowrap text-xs text-indigo-200">
             <BrandIcon name="card" size={18} tone="brand" />
             <span>
-              {cardLabel(card)} · <u>Change</u>
+              {hasCard ? (
+                <>
+                  {cardLabel(card)} · <u>Change</u>
+                </>
+              ) : (
+                <>
+                  No card yet · <u>Add one</u>
+                </>
+              )}
             </span>
           </button>
           {/* Nothing is shown until there is something to show: a $0 total only reads as a reminder to tip */}
