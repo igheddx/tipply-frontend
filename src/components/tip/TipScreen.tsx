@@ -1,7 +1,9 @@
 import { BrandIcon } from '../icons/BrandIcons'
 import { photoSrc } from '../../utils/photoUrl'
 import type React from 'react'
-import { useEffect } from 'react'
+import { useEffect, useMemo } from 'react'
+import { APP_VERSION } from '../../utils/appVersion'
+import { tipPalette } from '../../utils/tipTheme'
 
 /** Gradient behind each of the six amounts, in order. They match the light colors the device shows. */
 const AMOUNT_STYLES: { background: string; color: string }[] = [
@@ -94,6 +96,7 @@ export function TipScreen({
   // Phones paint the area behind their status bar and address bar from the page background and the theme color.
   // Match both to this screen while it is open, so there is no light strip at the top or bottom.
   // Safari on iPhone only picks up a changed theme color when the tag is replaced, so replace it rather than edit it.
+  const palette = useMemo(() => tipPalette(APP_VERSION), [])
   useEffect(() => {
     const root = document.documentElement
     const body = document.body
@@ -116,13 +119,13 @@ export function TipScreen({
       bodyBounce: body.style.overscrollBehavior
     }
     // A solid color under the gradient covers anything the gradient does not (rubber-band pull, bars that are see-through)
-    root.style.backgroundColor = '#0d4254'
-    root.style.backgroundImage = 'linear-gradient(180deg,#0a2533 0%,#0d4254 55%,#0f3447 100%)'
+    root.style.backgroundColor = palette.mid
+    root.style.backgroundImage = `linear-gradient(180deg,${palette.top} 0%,${palette.mid} 55%,${palette.bottom} 100%)`
     root.style.backgroundRepeat = 'no-repeat'
     body.style.background = 'transparent'
     root.style.overscrollBehavior = 'none'
     body.style.overscrollBehavior = 'none'
-    setThemeColor('#0a2533')
+    setThemeColor(palette.top)
     return () => {
       root.style.backgroundColor = before.rootColor
       root.style.backgroundImage = before.rootImage
@@ -132,12 +135,12 @@ export function TipScreen({
       body.style.overscrollBehavior = before.bodyBounce
       setThemeColor(previousTheme)
     }
-  }, [])
+  }, [palette])
 
   return (
     <>
     {/* Reaches past every edge of the screen, so a strip the phone leaves uncovered under its toolbar is the same dark color, never white */}
-    <div aria-hidden="true" className="pointer-events-none fixed" style={{ inset: '-80px 0', zIndex: -1, background: '#0d4254' }} />
+    <div aria-hidden="true" className="pointer-events-none fixed" style={{ inset: '-80px 0', zIndex: -1, background: palette.mid }} />
     <div
       className="fixed inset-0 flex flex-col gap-2.5 overflow-hidden px-4 text-white"
       style={{
@@ -147,11 +150,19 @@ export function TipScreen({
         // The top and bottom edges are plain #0a2533 and #0f3447, the same colors the phone's bars are given,
         // so the screen runs into them with no visible seam. The soft glows sit inside, away from the edges.
         background:
-          'radial-gradient(60% 30% at 88% 22%, rgba(6,182,200,0.26), transparent 70%),' +
-          'radial-gradient(60% 30% at 12% 78%, rgba(229,84,140,0.2), transparent 70%),' +
-          'linear-gradient(180deg,#0a2533 0%,#0d4254 55%,#0f3447 100%)'
+          `radial-gradient(60% 30% at 88% 22%, ${palette.glowA}, transparent 70%),` +
+          `radial-gradient(60% 30% at 12% 78%, ${palette.glowB}, transparent 70%),` +
+          `linear-gradient(180deg,${palette.top} 0%,${palette.mid} 55%,${palette.bottom} 100%)`
       }}
     >
+      {palette.test && (
+        <div
+          role="note"
+          className="flex-none rounded-full bg-amber-300 px-3 py-0.5 text-center text-[11px] font-extrabold uppercase tracking-wide text-amber-950"
+        >
+          Test site · not the live app
+        </div>
+      )}
       <header className="flex flex-none items-center gap-3">
         {photoUrl ? (
           <img src={photoSrc(photoUrl)} alt="" className="h-10 w-10 flex-none rounded-full border-2 border-white/30 object-cover" />
