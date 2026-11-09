@@ -3,7 +3,7 @@ import { Banner, Button, Card, EmptyState, Modal, StatCard, Tabs, Toast } from '
 import { BrandIcon, IconTile } from './icons/BrandIcons'
 import { FavoriteStar } from './icons/FavoriteStar'
 import { parseSongList, TEMPLATE_CSV } from '../utils/songFile'
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { API_BASE_URL } from '../utils/config'
 
 interface Song {
@@ -51,6 +51,12 @@ interface SongManagementProps {
 const SongManagement: React.FC<SongManagementProps> = ({ profileId }) => {
   // State management
   const [activeView, setActiveView] = useState<'search' | 'upload' | 'catalog'>('search')
+  // Someone who already has songs wants their catalog first. Only the opening view is chosen for them, never a later tap.
+  const viewTouched = useRef(false)
+  const chooseView = (view: 'search' | 'upload' | 'catalog') => {
+    viewTouched.current = true
+    setActiveView(view)
+  }
   const [searchQuery, setSearchQuery] = useState('')
   const [searchArtist, setSearchArtist] = useState('')
   const [searchResults, setSearchResults] = useState<any[]>([])
@@ -653,6 +659,14 @@ const SongManagement: React.FC<SongManagementProps> = ({ profileId }) => {
     }
   }, [activeView, profileId])
 
+  // When the count arrives and there are songs, open on the catalog (unless the person already picked a tab)
+  useEffect(() => {
+    if (!viewTouched.current && catalogCount > 0) {
+      viewTouched.current = true
+      setActiveView('catalog')
+    }
+  }, [catalogCount])
+
   // Load catalog count on initial mount regardless of active view
   useEffect(() => {
     if (profileId) {
@@ -684,7 +698,7 @@ const SongManagement: React.FC<SongManagementProps> = ({ profileId }) => {
 
       <Tabs
         active={activeView}
-        onChange={id => setActiveView(id as typeof activeView)}
+        onChange={id => chooseView(id as typeof activeView)}
         items={[
           { id: 'search', label: 'Find songs' },
           { id: 'upload', label: 'Upload a list' },
@@ -708,7 +722,10 @@ const SongManagement: React.FC<SongManagementProps> = ({ profileId }) => {
                     id="song-title"
                     type="text"
                     value={searchQuery}
-                    onChange={e => setSearchQuery(e.target.value)}
+                    onChange={e => {
+                      viewTouched.current = true
+                      setSearchQuery(e.target.value)
+                    }}
                     placeholder="Your Love Is King"
                     className={inputClass}
                   />
@@ -721,7 +738,10 @@ const SongManagement: React.FC<SongManagementProps> = ({ profileId }) => {
                     id="song-artist"
                     type="text"
                     value={searchArtist}
-                    onChange={e => setSearchArtist(e.target.value)}
+                    onChange={e => {
+                      viewTouched.current = true
+                      setSearchArtist(e.target.value)
+                    }}
                     placeholder="Sade"
                     className={inputClass}
                   />
@@ -1022,7 +1042,7 @@ Hotel California|Eagles|Hotel California|Rock`}</pre>
               <EmptyState
                 icon="music"
                 title={catalogFavoritesOnly ? 'No favorites yet' : 'No songs in your catalog yet'}
-                action={<Button onClick={() => setActiveView('search')} icon="search">Find songs</Button>}
+                action={<Button onClick={() => chooseView('search')} icon="search">Find songs</Button>}
               >
                 {catalogFavoritesOnly
                   ? 'Tap the star on the songs you do best. Tippers see them first, marked as your favorites.'

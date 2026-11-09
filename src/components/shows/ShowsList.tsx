@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Button, Card, EmptyState, StatusChip } from '../ui'
+import { Button, Card, EmptyState, RowMenu, StatusChip } from '../ui'
 import { Modal } from '../ui/Modal'
 import { useFeedback } from '../ui/Feedback'
 import { showApi, type ShowSummary } from '../../services/showApi'
@@ -73,7 +73,7 @@ export function ShowsList({ refreshKey }: { refreshKey?: string | number }) {
 
   const merge = async (show: ShowSummary) => {
     const ok = await confirm({
-      title: 'Join to the show before?',
+      title: 'Join with the show before?',
       body: 'The two shows become one, and their totals add together. You can’t split them again.',
       confirmLabel: 'Join them'
     })
@@ -122,53 +122,53 @@ export function ShowsList({ refreshKey }: { refreshKey?: string | number }) {
         <ul className="divide-y divide-slate-100 px-5 pb-2">
           {shows.map((show, index) => (
             <li key={show.id} className="py-4">
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-base font-bold text-ink-900">{showTitle(show, shows)}</span>
-                    {show.isLive && <StatusChip kind="active" label="Live" />}
-                  </div>
-                  <div className="mt-0.5 text-xs text-ink-500">
-                    {dayText(show.startedAt)} · {showTimes(show)}
-                    {show.venueName ? ` · ${show.venueName}` : ''}
-                  </div>
-                </div>
-                <div className="text-right">
-                  <div className="text-xl font-bold text-ink-900">{money(show.gross)}</div>
-                  <div className="text-xs text-ink-500">
-                    {plural(show.tipCount, 'tip')}
-                    {show.youKeep > 0 ? ` · keep ${money(show.youKeep)}` : ''}
-                  </div>
-                </div>
+              <div className="flex items-start gap-1">
+                {/* Tapping the show opens its tips. The rarer actions wait in the "..." menu. */}
+                <button
+                  type="button"
+                  onClick={() => setSeeingTips(show)}
+                  aria-label={`See the tips for ${showTitle(show, shows)}`}
+                  className="-m-1 flex min-w-0 flex-1 items-start justify-between gap-3 rounded-xl p-1 text-left hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
+                >
+                  <span className="min-w-0">
+                    <span className="flex flex-wrap items-center gap-2">
+                      <span className="text-base font-bold text-ink-900">{showTitle(show, shows)}</span>
+                      {show.isLive && <StatusChip kind="active" label="Live" />}
+                    </span>
+                    <span className="mt-0.5 block text-xs text-ink-500">
+                      {dayText(show.startedAt)} · {showTimes(show)}
+                      {show.venueName ? ` · ${show.venueName}` : ''}
+                    </span>
+                  </span>
+                  <span className="text-right">
+                    <span className="block text-xl font-bold text-ink-900">{money(show.gross)}</span>
+                    <span className="block text-xs text-ink-500">
+                      {plural(show.tipCount, 'tip')}
+                      {show.youKeep > 0 ? ` · keep ${money(show.youKeep)}` : ''}
+                    </span>
+                  </span>
+                </button>
+                <RowMenu
+                  label={`More actions for ${showTitle(show, shows)}`}
+                  items={[
+                    { key: 'edit', label: 'Rename or add a place', onSelect: () => openEdit(show) },
+                    ...(show.tipCount + show.refundedCount >= 2 ? [{ key: 'split', label: 'Split this show', onSelect: () => setSplitting(show) }] : []),
+                    ...(index < shows.length - 1 || shows.length < total ? [{ key: 'join', label: 'Join with the show before', onSelect: () => merge(show) }] : [])
+                  ]}
+                />
               </div>
               {show.refundedCount > 0 && (
                 <div className="mt-1 text-xs text-ink-500">
                   {plural(show.refundedCount, 'tip')} ({money(show.refundedGross)}) refunded to the tipper and not counted.
                 </div>
               )}
-              <div className="mt-2 flex flex-wrap gap-1">
-                <Button size="sm" variant="ghost" onClick={() => setSeeingTips(show)}>
-                  Tips
-                </Button>
-                <Button size="sm" variant="ghost" onClick={() => openEdit(show)}>
-                  Name and place
-                </Button>
-                {show.tipCount + show.refundedCount >= 2 && (
-                  <Button size="sm" variant="ghost" onClick={() => setSplitting(show)}>
-                    Split
-                  </Button>
-                )}
-                {index < shows.length - 1 || shows.length < total ? (
-                  <Button size="sm" variant="ghost" onClick={() => merge(show)}>
-                    Join to the show before
-                  </Button>
-                ) : null}
-                {show.isLive && (
-                  <Button size="sm" variant="ghost" onClick={() => end(show)}>
+              {show.isLive && (
+                <div className="mt-2">
+                  <Button size="sm" variant="secondary" onClick={() => end(show)}>
                     End show
                   </Button>
-                )}
-              </div>
+                </div>
+              )}
             </li>
           ))}
         </ul>

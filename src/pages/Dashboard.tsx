@@ -4,7 +4,7 @@ import { HomeTab, type HomeData } from '../components/portal/HomeTab'
 import { DemoBanner } from '../components/portal/DemoBanner'
 import { renderQrCard } from '../utils/qrCard'
 import { TipsTimeline } from '../components/charts/TipsTimeline'
-import { Banner, Button, Card, EmptyState, Modal, PageHeader, PageLoader, RefreshControl, StatusChip, Tabs, useFeedback, type ChipKind } from '../components/ui'
+import { Banner, Button, Card, EmptyState, Modal, PageHeader, PageLoader, RefreshControl, RowMenu, StatusChip, Tabs, useFeedback, type ChipKind } from '../components/ui'
 import { BrandIcon, IconTile } from '../components/icons/BrandIcons'
 import { Switch } from '../components/ui/Switch'
 import React, { useState, useEffect, useRef } from 'react'
@@ -1567,9 +1567,26 @@ const Dashboard: React.FC = () => {
                         <div className="flex items-start justify-between gap-3">
                           <div className="min-w-0">
                             <h3 className="truncate text-lg font-bold text-ink-900">{device.nickname || 'Unnamed device'}</h3>
-                            <p className="mt-0.5 truncate text-xs text-ink-400">ID {device.uuid}</p>
                           </div>
-                          <StatusChip kind={chip} />
+                          <div className="-mr-2 -mt-1 flex items-center gap-1">
+                            <StatusChip kind={chip} />
+                            <RowMenu
+                              label={`More actions for ${device.nickname || 'this device'}`}
+                              items={[
+                                {
+                                  key: 'copy',
+                                  label: 'Copy device ID',
+                                  onSelect: () => {
+                                    void navigator.clipboard?.writeText(device.uuid).then(
+                                      () => toast('Device ID copied', 'success'),
+                                      () => toast('Could not copy the ID', 'error')
+                                    )
+                                  }
+                                },
+                                { key: 'remove', label: isDeletingDevice === device.id ? 'Removing…' : 'Remove device', tone: 'danger', disabled: isDeletingDevice === device.id, onSelect: () => handleSoftDeleteDevice(device) }
+                              ]}
+                            />
+                          </div>
                         </div>
 
                         <dl className="mt-4 grid grid-cols-3 gap-3 rounded-xl bg-surface p-3 text-center">
@@ -1721,31 +1738,21 @@ const Dashboard: React.FC = () => {
                           </div>
                         )}
 
-                        <div className="mt-4 border-t border-slate-100 pt-3">
-                          <Button
-                            variant="danger"
-                            size="sm"
-                            icon="trash"
-                            loading={isDeletingDevice === device.id}
-                            onClick={() => handleSoftDeleteDevice(device)}
-                          >
-                            Remove device
-                          </Button>
-                        </div>
                       </Card>
                     )
                   })}
                 </div>
 
-                <VenueInvites />
-                <VenueSection performerId={userProfile?.id} stageName={userProfile?.stageName || userProfile?.firstName} />
-
+                {/* The amounts on the tip page apply to every device, so they come right after the devices */}
                 <TipAmountsEditor
                   amounts={tipAmounts}
                   saving={tipAmountsSaving}
                   onSave={saveTipAmounts}
                   onReset={resetTipAmounts}
                 />
+
+                <VenueInvites />
+                <VenueSection performerId={userProfile?.id} stageName={userProfile?.stageName || userProfile?.firstName} />
 
                 {/* Removed devices */}
                 <div>
