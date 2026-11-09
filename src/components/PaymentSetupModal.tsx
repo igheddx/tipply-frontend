@@ -8,6 +8,7 @@ import { setCookie } from '../utils/cookies'
 import { getUniqueDeviceId, detectPlatform } from '../utils/deviceId'
 import { AppleFilled } from '@ant-design/icons'
 import googlePayButton from '../assets/plain-button-google-pay.png'
+import { tipText } from '../utils/firstTip'
 
 // Stripe will be initialized dynamically with the publishable key from backend
 
@@ -59,6 +60,8 @@ interface PaymentSetupModalProps {
   performerLastName?: string
   performerPhotoUrl?: string
   walletMode?: 'wallet' | 'card' | 'both'
+  /** The amount the tipper tapped to get here. It is sent as soon as the card is saved. */
+  tipAmount?: number | null
 }
 
 export default function PaymentSetupModal({ 
@@ -71,7 +74,8 @@ export default function PaymentSetupModal({
   performerFirstName,
   performerLastName,
   performerPhotoUrl,
-  walletMode = 'both'
+  walletMode = 'both',
+  tipAmount = null
 }: PaymentSetupModalProps) {
   const [stripePromise, setStripePromise] = useState<Promise<Stripe | null> | null>(null)
   const [initError, setInitError] = useState<string | null>(null)
@@ -127,8 +131,10 @@ export default function PaymentSetupModal({
         <div className="px-6 pb-6 pt-4">
           {/* The two things a first-time tipper wonders: will I be charged now, and what happens next */}
           <div className="mb-5 rounded-xl bg-brand-50 px-4 py-3 text-[15px] leading-snug text-ink-700">
-            <p className="font-semibold text-ink-900">Add a card once. You won't be charged now.</p>
-            <p className="mt-0.5">After that, one tap on an amount sends your tip.</p>
+            <p className="font-semibold text-ink-900">Add a card once. Saving it doesn't charge it.</p>
+            <p className="mt-0.5">
+              {tipAmount ? `Your ${tipText(tipAmount)} tip is sent as soon as it's saved.` : 'After that, one tap on an amount sends your tip.'}
+            </p>
           </div>
           {!stripePromise && (
             <div className="text-center py-8">
@@ -146,6 +152,8 @@ export default function PaymentSetupModal({
                 onComplete={onComplete}
                 onClose={onClose}
                 walletMode={walletMode}
+                tipAmount={tipAmount}
+                performerName={performerStageName || `${performerFirstName ?? ''} ${performerLastName ?? ''}`.trim()}
               />
             </Elements>
           )}
@@ -159,13 +167,17 @@ function PaymentForm({
   deviceUuid, 
   onComplete, 
   onClose,
-  walletMode
+  walletMode,
+  tipAmount,
+  performerName
 }: { 
   deviceUuid: string
   userId: string
   onComplete: (paymentMethodId?: string) => void
   onClose: () => void
   walletMode: 'wallet' | 'card' | 'both'
+  tipAmount?: number | null
+  performerName?: string
 }) {
   const stripe = useStripe()
   const elements = useElements()
@@ -231,11 +243,13 @@ function PaymentForm({
   useEffect(() => {
     if (stripe) {
       setIsCheckingWalletAvailability(true)
+      // Saving a card charges nothing, so the sheet shows $0 and says what saving it is for
       const totalAmount = 0
+      const sheetLabel = tipAmount ? `Save your card to send a ${tipText(tipAmount)} tip` : `Save your card to tip ${performerName || 'your performer'}`
       const baseConfig = {
         country: 'US',
         currency: 'usd',
-        total: { label: '– Select tip amount on next screen', amount: totalAmount },
+        total: { label: sheetLabel, amount: totalAmount },
         requestPayerName: true,
         requestPayerEmail: true,
         displayItems: []
@@ -243,7 +257,7 @@ function PaymentForm({
       const applePaymentRequest = stripe.paymentRequest(baseConfig)
       const googlePaymentRequest = stripe.paymentRequest({
         ...baseConfig,
-        displayItems: [{ label: '– Select tip amount on next screen', amount: totalAmount }]
+        displayItems: [{ label: sheetLabel, amount: totalAmount }]
       })
       
       Promise.all([
@@ -374,7 +388,7 @@ function PaymentForm({
       attachPaymentHandlers(applePaymentRequest)
       attachPaymentHandlers(googlePaymentRequest)
     }
-  }, [stripe, deviceUuid, onComplete])
+  }, [stripe, deviceUuid, onComplete, tipAmount, performerName])
   const handleCardSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!stripe || !elements) return

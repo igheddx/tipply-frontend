@@ -16,6 +16,7 @@ import { TipScreen } from '../components/tip/TipScreen'
 import { SongPickerSheet, type PickedSong } from '../components/tip/SongPickerSheet'
 import { BrandIcon, type BrandIconName } from '../components/icons/BrandIcons'
 import { APP_VERSION } from '../utils/appVersion'
+import { decideTap } from '../utils/firstTip'
 import { tipGradient, tipPalette } from '../utils/tipTheme'
 import { TestSiteStrip } from '../components/tip/TestSiteStrip'
 
@@ -98,6 +99,10 @@ const TippingInterface: React.FC = () => {
   const [deviceInfo, setDeviceInfo] = useState<DeviceInfo | null>(null)
   const [showPaymentModal, setShowPaymentModal] = useState(false)
   const [isPaymentSetup, setIsPaymentSetup] = useState(false)
+  // The amount a first-time tipper tapped. Held only while the card sheet is open, and sent the moment the card is saved.
+  const [pendingTip, setPendingTip] = useState<number | null>(null)
+  // The same amount, for sending: taken exactly once, so a repeated "saved" message can never send the tip twice
+  const pendingTipRef = useRef<number | null>(null)
   
   const [userId, setUserId] = useState<string>('')
   const [checkingPaymentMethods, setCheckingPaymentMethods] = useState(true)
@@ -770,12 +775,14 @@ const TippingInterface: React.FC = () => {
     void runConfetti()
   }
 
-  const handleTipClick = (amount: number) => {
+  const handleTipClick = (amount: number, opts?: { cardJustSaved?: boolean }) => {
     // Tapping anything else quietly closes a question that is showing
     feedback.dismissNow()
     if (isDebouncing) return
-    // First tip: ask for a card once. Nothing is sent, no light or sound plays, until there is one.
-    if (!isPaymentSetup && !!deviceInfo && !!userId) {
+    // First tip: ask for a card once. Nothing is sent, no light or sound plays, until there is one. The amount is held for the moment it is saved.
+    if (decideTap({ ready: !!deviceInfo && !!userId, hasCard: isPaymentSetup, cardJustSaved: opts?.cardJustSaved }) === 'ask-for-card') {
+      pendingTipRef.current = amount
+      setPendingTip(amount)
       setShowPaymentModal(true)
       return
     }
@@ -1002,7 +1009,12 @@ const TippingInterface: React.FC = () => {
     <Suspense fallback={null}>
       <PaymentSetupModal
         isOpen={showPaymentModal}
-        onClose={() => setShowPaymentModal(false)}
+        tipAmount={pendingTip}
+        onClose={() => {
+          setShowPaymentModal(false)
+          pendingTipRef.current = null
+          setPendingTip(null) // "Not now": nothing is sent, and nothing is remembered
+        }}
         onComplete={(paymentMethodId) => {
           logger.log('🎉 Payment setup complete! Payment method ID:', paymentMethodId)
           if (paymentMethodId) {
@@ -1015,7 +1027,12 @@ const TippingInterface: React.FC = () => {
           void checkPaymentMethods(deviceInfo).then((result) => {
             if (result.hasPaymentMethods) setSavedCard({ brand: result.cardBrand, last4: result.cardLast4 })
           })
-          toast.success('All set. Tap an amount to tip.', { duration: 2200 })
+          // The tip they already chose goes now, with the normal celebration and nothing extra. Without one, a quiet note says what is next.
+          const chosen = pendingTipRef.current
+          pendingTipRef.current = null
+          setPendingTip(null)
+          if (chosen) handleTipClick(chosen, { cardJustSaved: true })
+          else toast.success('All set. Tap an amount to tip.', { duration: 2200 })
         }}
         deviceUuid={deviceInfo?.uuid || ''}
         userId={userId}
