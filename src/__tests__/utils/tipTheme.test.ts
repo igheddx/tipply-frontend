@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { tipPalette, isTestSite } from '@/utils/tipTheme'
+import { tipPalette, isTestSite, tipGradient } from '@/utils/tipTheme'
 
 describe('tip page palette', () => {
   it('production keeps its teal-navy exactly', () => {
@@ -19,5 +19,10 @@ describe('tip page palette', () => {
     expect(isTestSite('R11.26.001', 'app.tipwave.live')).toBe(false)
     expect(isTestSite('dev', 'localhost')).toBe(false)
     expect(isTestSite(undefined, 'app.tipwave.live')).toBe(false)
+  })
+
+  it('the notice screens use the same gradient as the tip screen, in each site\'s own colors', () => {
+    expect(tipGradient(tipPalette('R11.26.001', 'app.tipwave.live'))).toBe('linear-gradient(180deg,#0a2533 0%,#0d4254 55%,#0f3447 100%)')
+    expect(tipGradient(tipPalette('T11.26.062', 'apptest.tipwave.live'))).toBe('linear-gradient(180deg,#26091f 0%,#4a1740 55%,#3a1233 100%)')
   })
 })

@@ -16,6 +16,9 @@ import { TipScreen } from '../components/tip/TipScreen'
 import { SongPickerSheet, type PickedSong } from '../components/tip/SongPickerSheet'
 import { BrandIcon, type BrandIconName } from '../components/icons/BrandIcons'
 import { Button } from '../components/ui'
+import { APP_VERSION } from '../utils/appVersion'
+import { tipGradient, tipPalette } from '../utils/tipTheme'
+import { TestSiteStrip } from '../components/tip/TestSiteStrip'
 
 const PaymentSetupModal = lazy(() => import('../components/PaymentSetupModal'))
 
@@ -65,11 +68,13 @@ function InfoScreen({
   /** Lets anyone, even without a tip, tell us how it went */
   feedback?: { userId: string; deviceUuid?: string }
 }) {
+  const palette = tipPalette(APP_VERSION)
   return (
     <div
       className="fixed inset-0 flex items-center justify-center p-6 text-white"
-      style={{ height: '100dvh', background: 'linear-gradient(135deg,#3b1a78,#1e3a8a 55%,#312e81)' }}
+      style={{ height: '100dvh', background: tipGradient(palette) }}
     >
+      {palette.test && <TestSiteStrip className="absolute inset-x-6 top-4" />}
       <div className="w-full max-w-sm rounded-3xl border border-white/20 bg-white/10 p-8 text-center backdrop-blur-md">
         <span className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-white/15">
           <BrandIcon name={icon} size={30} tone="inverse" />

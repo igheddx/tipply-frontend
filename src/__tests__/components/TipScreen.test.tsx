@@ -41,6 +41,21 @@ describe('TipScreen', () => {
     expect(document.querySelector('meta[name="theme-color"]')?.getAttribute('content')).toBe('#0E7490')
   })
 
+  it('shows no total until something has been tipped today', () => {
+    render(<TipScreen {...base} total={0} />)
+    expect(screen.queryByText('Tipped today')).toBeNull()
+    expect(screen.queryByText('$0.00')).toBeNull()
+  })
+
+  it('falls back to the initials when the performer photo cannot load', () => {
+    const { container } = render(<TipScreen {...base} photoUrl="https://example.com/missing.jpg" />)
+    const img = container.querySelector('header img') as HTMLImageElement
+    expect(img).not.toBeNull()
+    fireEvent.error(img)
+    expect(container.querySelector('header img')).toBeNull()
+    expect(screen.getByText('DP')).toBeInTheDocument() // DJ Prototype
+  })
+
   it('shows no test strip on production colors', () => {
     render(<TipScreen {...base} />)
     expect(screen.queryByText(/Test site/)).toBeNull()
@@ -55,7 +70,7 @@ describe('TipScreen', () => {
     }
     expect(screen.getByText(/Visa ••4242/)).toBeInTheDocument()
     expect(screen.getByText('$189')).toBeInTheDocument()
-    expect(screen.getByText('Today')).toBeInTheDocument()
+    expect(screen.getByText('Tipped today')).toBeInTheDocument()
   })
 
   it('sends the tapped amount', () => {

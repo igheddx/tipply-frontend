@@ -36,4 +36,7 @@ const TEST: TipPalette = {
 export const isTestSite = (version?: string, hostname: string = typeof window !== 'undefined' ? window.location.hostname : ''): boolean =>
   isTestVersion(version) || hostname.includes('apptest.')
 
+/** The vertical background of a tip-page screen. The notice screens use it too, so every screen a tipper can land on matches. */
+export const tipGradient = (p: TipPalette): string => `linear-gradient(180deg,${p.top} 0%,${p.mid} 55%,${p.bottom} 100%)`
+
 export const tipPalette = (version?: string, hostname?: string): TipPalette => (isTestSite(version, hostname) ? TEST : PRODUCTION)
