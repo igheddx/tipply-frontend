@@ -13,12 +13,32 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Work out the version number
+        id: version
+        run: |
+          # Production: the release tag on this commit (R<month>.<yy>.<nnn>, set by scripts/release.py).
+          # Test: T<month>.<yy>.<nnn>, nnn = commits on dev so far this month.
+          MONTH=$(date -u +%-m); YEAR=$(date -u +%y)
+          if [ "${{ github.ref }}" = "refs/heads/dev" ]; then
+            COUNT=$(git rev-list --count --since="$(date -u +%Y-%m-01T00:00:00Z)" HEAD)
+            VERSION=$(printf "T%s.%s.%03d" "$MONTH" "$YEAR" "$COUNT")
+          else
+            VERSION=$(git tag --points-at HEAD --list 'R*' | sort -V | tail -n 1)
+            if [ -z "$VERSION" ]; then VERSION="R$(git rev-parse --short HEAD)"; fi
+          fi
+          echo "Version: $VERSION"
+          echo "value=$VERSION" >> "$GITHUB_OUTPUT"
 
       - name: Install dependencies
         run: |
           npm install
           npm run build:production
+          echo "{\"version\":\"$VITE_APP_VERSION\"}" > dist/version.json
         env:
+          VITE_APP_VERSION: ${{ steps.version.outputs.value }}
           VITE_API_URL: ${{ github.ref == 'refs/heads/dev' && 'https://uhxejjh8s1.execute-api.us-east-1.amazonaws.com/dev' || 'https://uhxejjh8s1.execute-api.us-east-1.amazonaws.com/prod' }}
 
       - name: Sync to S3

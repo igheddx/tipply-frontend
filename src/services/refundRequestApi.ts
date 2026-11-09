@@ -51,7 +51,7 @@ export const DEFAULT_REFUND_REASONS: RefundReason[] = [
 export const REFUND_WINDOW_DAYS = 7
 
 export const refundRequestApi = {
-  create: (body: { tipId?: string; songRequestId?: string; reason: string; note?: string }) => apiService.post('/api/refund-requests', body),
+  create: (body: { tipId?: string; songRequestId?: string; reason: string; note?: string; appVersion?: string }) => apiService.post('/api/refund-requests', body),
   mine: () => apiService.get('/api/refund-requests/mine'),
   mineSeen: (ids: string[]) => apiService.post('/api/refund-requests/mine/seen', { ids }),
 
