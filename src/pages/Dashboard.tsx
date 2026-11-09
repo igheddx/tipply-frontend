@@ -1334,11 +1334,12 @@ const Dashboard: React.FC = () => {
   const displayName = userProfile?.stageName || `${userProfile?.firstName || ''} ${userProfile?.lastName || ''}`.trim() || 'Performer'
 
   const navItems: PortalNavItem[] = [
-    { id: 'overview', label: 'Home', icon: 'home' },
+    // Used every night, so on the phone's bar: Home, Tips, Live, Songs. Set-up screens (Devices) wait under More.
+    { id: 'overview', label: 'Home', icon: 'home', pin: true },
+    { id: 'tips', label: 'Tips', icon: 'coin', pin: true },
+    ...(hasSongRequestEnabled ? [{ id: 'monitor', label: 'Live', icon: 'mic', pin: true } as PortalNavItem] : []),
+    { id: 'songs', label: 'Songs', icon: 'music', pin: true },
     { id: 'devices', label: 'Devices', icon: 'device' },
-    { id: 'tips', label: 'Tips', icon: 'coin' },
-    { id: 'songs', label: 'Songs', icon: 'music' },
-    ...(hasSongRequestEnabled ? [{ id: 'monitor', label: 'Live', icon: 'mic' } as PortalNavItem] : []),
     ...(userProfile?.role === 'root_admin' ? [{ id: 'admin', label: 'Admin', icon: 'shield' } as PortalNavItem] : [])
   ]
 

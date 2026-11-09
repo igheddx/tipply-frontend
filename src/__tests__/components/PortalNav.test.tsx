@@ -36,6 +36,60 @@ describe('sectionsOf', () => {
   })
 })
 
+describe('PortalShell with a few items left under More', () => {
+  const performer: PortalNavItem[] = [
+    { id: 'overview', label: 'Home', icon: 'home', pin: true },
+    { id: 'tips', label: 'Tips', icon: 'coin', pin: true },
+    { id: 'monitor', label: 'Live', icon: 'mic', pin: true },
+    { id: 'songs', label: 'Songs', icon: 'music', pin: true },
+    { id: 'devices', label: 'Devices', icon: 'device' }
+  ]
+  const phoneBar = () => document.querySelectorAll('nav[aria-label="Main"]')[1] as HTMLElement
+  const render5 = (list: PortalNavItem[]) =>
+    render(
+      <ThemeProvider>
+        <PortalShell items={list} active="overview" onSelect={() => {}} userName="Ada" onOpenProfile={() => {}} onLogout={() => {}}>
+          <p>page</p>
+        </PortalShell>
+      </ThemeProvider>
+    )
+
+  it('puts Home, Tips, Live and Songs on the phone bar, in that order, and Devices under More', () => {
+    render5(performer)
+    expect(within(phoneBar()).getAllByRole('button').map(b => b.textContent)).toEqual(['Home', 'Tips', 'Live', 'Songs', 'More'])
+    fireEvent.click(within(phoneBar()).getByText('More'))
+    const sheet = screen.getByRole('dialog', { name: 'More' })
+    expect(within(sheet).getByText('Devices')).toBeInTheDocument()
+    expect(within(sheet).queryByText('Live')).toBeNull()
+  })
+
+  it('the desktop sidebar keeps every item, in the same order', () => {
+    render5(performer)
+    const sidebar = document.querySelector('aside') as HTMLElement
+    const nav = within(sidebar).getByRole('navigation', { name: 'Main' })
+    expect(within(nav).getAllByRole('button').map(b => b.textContent)).toEqual(['Home', 'Tips', 'Live', 'Songs', 'Devices'])
+  })
+
+  it('without Live (song requests off) the bar still leaves Devices under More', () => {
+    render5(performer.filter(i => i.id !== 'monitor'))
+    expect(within(phoneBar()).getAllByRole('button').map(b => b.textContent)).toEqual(['Home', 'Tips', 'Songs', 'More'])
+  })
+
+  it('an Admin item joins Devices under More', () => {
+    render5([...performer, { id: 'admin', label: 'Admin', icon: 'shield' }])
+    fireEvent.click(within(phoneBar()).getByText('More'))
+    const sheet = screen.getByRole('dialog', { name: 'More' })
+    expect(within(sheet).getByText('Devices')).toBeInTheDocument()
+    expect(within(sheet).getByText('Admin')).toBeInTheDocument()
+  })
+
+  it('five items with nothing pinned all stay on the bar, as before', () => {
+    render5(performer.map(({ pin, ...rest }) => rest))
+    expect(within(phoneBar()).getAllByRole('button')).toHaveLength(5)
+    expect(within(phoneBar()).queryByText('More')).toBeNull()
+  })
+})
+
 describe('PortalShell with grouped items', () => {
   it('labels the groups in the sidebar', () => {
     shell()
