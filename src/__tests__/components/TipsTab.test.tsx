@@ -41,6 +41,7 @@ describe('TipsTab', () => {
     renderTab()
     await screen.findAllByText(/^Patio · /)
     const toggle = screen.getByRole('button', { name: /more filters and download/i })
+    expect(toggle.textContent).not.toMatch(/\bon$/) // nothing is filtered, so no "on" marker
     expect(toggle).toHaveAttribute('aria-expanded', 'false')
     fireEvent.click(toggle)
     expect(screen.getByRole('button', { name: /fewer filters/i })).toHaveAttribute('aria-expanded', 'true')
