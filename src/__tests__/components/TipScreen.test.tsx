@@ -41,6 +41,11 @@ describe('TipScreen', () => {
     expect(document.querySelector('meta[name="theme-color"]')?.getAttribute('content')).toBe('#0E7490')
   })
 
+  it('shows no test strip on production colors', () => {
+    render(<TipScreen {...base} />)
+    expect(screen.queryByText(/Test site/)).toBeNull()
+  })
+
   it('shows the performer, all six amounts, the saved card and the running total', () => {
     render(<TipScreen {...base} />)
     expect(screen.getByRole('heading', { name: 'Tip DJ Prototype' })).toBeInTheDocument()
