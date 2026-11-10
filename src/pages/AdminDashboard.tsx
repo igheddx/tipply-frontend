@@ -19,6 +19,7 @@ import PerformerInsights from '../components/PerformerInsights';
 import { AdminPerformerPanel } from '../components/shows/AdminPerformerPanel';
 import { AdminVenues } from '../components/venue/AdminVenues';
 import { AdminFeedback } from '../components/feedback/AdminFeedback';
+import { AdminApiHealth } from '../components/health/AdminApiHealth';
 import { AdminRepeat } from '../components/repeat/AdminRepeat';
 import { AdminRefunds } from '../components/refunds/AdminRefunds';
 import { AdminTipperBlock } from '../components/refunds/AdminTipperBlock';
@@ -1113,6 +1114,7 @@ const AdminDashboard: React.FC = () => {
     { id: 'feedback', label: 'Feedback', icon: 'sparkle', group: 'Learn' },
     ...(isRootAdmin ? [{ id: 'device-management', label: 'Devices', icon: 'device', group: 'System' } as PortalNavItem] : []),
     { id: 'venues', label: 'Venues', icon: 'bank', group: 'System' },
+    { id: 'api-health', label: 'API health', icon: 'bars', group: 'System' },
     ...(isSimulationVisible ? [{ id: 'device-tip-simulation', label: 'Tools', icon: 'bolt', group: 'System' } as PortalNavItem] : []),
     { id: 'settings', label: 'Settings', icon: 'sliders', group: 'System' },
     { id: 'performer-view', label: 'Performer view', icon: 'mic', group: 'System' }
@@ -1123,6 +1125,7 @@ const AdminDashboard: React.FC = () => {
     performers: { title: 'Performers', subtitle: 'Everyone who can receive tips, and their fee.' },
     venues: { title: 'Venues', subtitle: 'Approve new venues and manage the venue feature.' },
     refunds: { title: 'Refunds', subtitle: 'Refund requests from performers. Nothing is refunded until you approve it.' },
+    'api-health': { title: 'API health', subtitle: 'How quickly this environment\u2019s API is answering, and whether server errors are rising.' },
     feedback: { title: 'Feedback', subtitle: 'How the audience feels about tipping, and how often we ask.' },
     tips: { title: 'Tips', subtitle: 'Search, export and refund tips.' },
     'aggregated-charges': { title: 'Charges', subtitle: 'What was charged to each card, combined per batch.' },
@@ -1219,6 +1222,7 @@ const AdminDashboard: React.FC = () => {
 
         {activeTab === 'venues' && <AdminVenues />}
         {activeTab === 'feedback' && <AdminFeedback />}
+        {activeTab === 'api-health' && <AdminApiHealth />}
         {activeTab === 'refunds' && <AdminRefunds onChanged={refreshPendingRefunds} />}
 
         {activeTab === 'settings' && (
