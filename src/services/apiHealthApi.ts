@@ -10,6 +10,7 @@ export interface ApiHealthWindow {
   serverErrors?: number | null
   errorRatePercent?: number | null
   p95LatencyMs?: number | null
+  p99LatencyMs?: number | null
 }
 
 export interface ApiHealthData {

@@ -53,6 +53,7 @@ function WindowCard({ window: w, target, stale }: { window: ApiHealthWindow; tar
             <Stat label="Server errors (5xx)" value={count(w.serverErrors)} />
             <Stat label="5xx rate" value={rate(w.errorRatePercent)} />
             <Stat label="p95 gateway latency" value={ms(w.p95LatencyMs)} />
+            <Stat label="p99 gateway latency" value={ms(w.p99LatencyMs)} />
           </dl>
           <TargetLine p95={w.p95LatencyMs} target={target} />
         </>
@@ -74,7 +75,7 @@ function WindowCard({ window: w, target, stale }: { window: ApiHealthWindow; tar
 }
 
 /**
- * API Health: request count, server errors and p95 gateway latency for THIS environment's own API Gateway stage.
+ * API Health: request count, server errors, p95 and p99 gateway latency for THIS environment's own API Gateway stage.
  * Read-only. The server picks the environment; this page only shows what it is told and never assumes a healthy state.
  */
 export function AdminApiHealth() {
@@ -167,7 +168,7 @@ export function AdminApiHealth() {
         <Card title="About these numbers">
           <ul className="space-y-1.5 text-sm text-ink-500">
             <li>Counts and latency from API Gateway for this environment's stage only. This is not an uptime check.</li>
-            <li>p95 is calculated by CloudWatch for each window. It is never an average of smaller windows.</li>
+            <li>p95 and p99 are calculated by CloudWatch for each window. They are never an average of smaller windows.</li>
             <li>Read-only. The numbers refresh at most every {Math.round(data.cacheSeconds / 60)} minutes, however often this page is opened.</li>
             {data.attemptsToday != null && (
               <li>

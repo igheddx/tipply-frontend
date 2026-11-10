@@ -11,8 +11,8 @@ vi.mock('@/services/apiHealthApi', async () => {
 })
 
 const okWindows = [
-  { key: '1h', label: 'Last hour', status: 'ok', requests: 1000, serverErrors: 2, errorRatePercent: 0.2, p95LatencyMs: 180.4 },
-  { key: '24h', label: 'Last 24 hours', status: 'ok', requests: 20000, serverErrors: 30, errorRatePercent: 0.15, p95LatencyMs: 310.2 }
+  { key: '1h', label: 'Last hour', status: 'ok', requests: 1000, serverErrors: 2, errorRatePercent: 0.2, p95LatencyMs: 180.4, p99LatencyMs: 420.9 },
+  { key: '24h', label: 'Last 24 hours', status: 'ok', requests: 20000, serverErrors: 30, errorRatePercent: 0.15, p95LatencyMs: 310.2, p99LatencyMs: 905.5 }
 ]
 
 const data = (over: Partial<ApiHealthData> = {}): ApiHealthData => ({
@@ -40,7 +40,7 @@ describe('API Health page', () => {
     expect(screen.queryByText('Test')).toBeNull()
   })
 
-  it('shows requests, server errors, the 5xx rate and p95 for both windows', async () => {
+  it('shows requests, server errors, the 5xx rate, p95 and p99 for both windows', async () => {
     show(data())
     await screen.findByText('Last hour')
     expect(screen.getByText('Last 24 hours')).toBeInTheDocument()
@@ -50,6 +50,9 @@ describe('API Health page', () => {
     expect(screen.getByText('0.2%')).toBeInTheDocument()
     expect(screen.getByText('180 ms')).toBeInTheDocument()
     expect(screen.getByText('310 ms')).toBeInTheDocument()
+    expect(screen.getAllByText('p99 gateway latency')).toHaveLength(2)
+    expect(screen.getByText('421 ms')).toBeInTheDocument()
+    expect(screen.getByText('906 ms')).toBeInTheDocument()
   })
 
   it('says the internal target is not set until it is configured, and does not claim a result without one', async () => {
