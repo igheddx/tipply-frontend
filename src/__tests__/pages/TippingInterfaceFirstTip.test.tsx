@@ -67,7 +67,11 @@ const open = () =>
     </MemoryRouter>
   )
 
-const tapFive = async () => fireEvent.click(await screen.findByRole('button', { name: 'Tip $5' }))
+// The page shows the default amounts until the device's own load; $2 is only in this device's list, so wait for it before tapping
+const tapFive = async () => {
+  await screen.findByRole('button', { name: 'Tip $2' })
+  fireEvent.click(await screen.findByRole('button', { name: 'Tip $5' }))
+}
 
 describe('a first-time tipper', () => {
   it('sees the real tip page first, with an invitation to add a card, and no card sheet yet', async () => {
