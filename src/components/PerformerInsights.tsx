@@ -138,12 +138,14 @@ const PerformerInsights: React.FC = () => {
         const options = data.map(performer => ({
           value: performer.id,
           label: (
+            // The drop-down is drawn by Ant Design outside the portal, so it takes its text colour from the
+            // pop-up itself (light or dark). The Tailwind text colours are only recoloured inside the portal.
             <div className="py-1">
-              <div className="font-medium text-ink-900">
+              <div className="font-medium" style={{ color: 'inherit' }}>
                 {performer.firstName} {performer.lastName}
-                {performer.stageName && <span className="text-brand-700 ml-2">({performer.stageName})</span>}
+                {performer.stageName && <span className="ml-2" style={{ color: 'inherit', opacity: 0.8 }}>({performer.stageName})</span>}
               </div>
-              <div className="text-sm text-ink-500">{performer.email}</div>
+              <div className="text-sm" style={{ color: 'inherit', opacity: 0.7 }}>{performer.email}</div>
             </div>
           ),
           searchText: `${performer.firstName} ${performer.lastName} ${performer.stageName || ''} ${performer.email}`.toLowerCase()
