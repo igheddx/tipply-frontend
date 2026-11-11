@@ -26,7 +26,7 @@ import { VenueSection } from '../components/venue/VenueSection'
 import { turnOffAlertsOnSignOut } from '../utils/pushAlerts'
 import { API_BASE_URL } from '../utils/config'
 import { setDemoModeOn, setShowDemoData, demoQuery } from '../utils/demoView'
-import { DEFAULT_TIP_AMOUNTS, TIP_AMOUNT_COUNT, LIGHT_EFFECTS, SOUND_OPTIONS, VOLUME_OPTIONS, DEFAULT_SOUND_ID, DEFAULT_SOUND_VOLUME, DEFAULT_EFFECT_CONFIG, normalizeEffectConfig, effectForAmount, buildEffectConfig } from '../utils/deviceConfig'
+import { DEFAULT_TIP_AMOUNTS, TIP_AMOUNT_COUNT, LIGHT_EFFECTS, SOUND_OPTIONS, VOLUME_OPTIONS, DEFAULT_SOUND_ID, DEFAULT_SOUND_VOLUME, defaultEffectConfigFor, normalizeEffectConfig, remapEffectConfigByPosition, effectForAmount, buildEffectConfig } from '../utils/deviceConfig'
 import TipAmountsEditor from '../components/TipAmountsEditor'
 
 interface DashboardStats {
@@ -1223,11 +1223,23 @@ const Dashboard: React.FC = () => {
     patch.soundVolume ?? device.soundVolume ?? DEFAULT_SOUND_VOLUME
   )
 
+  // The server re-keys each device's lights to the new amounts, position by position; show the same result here
+  const remapDeviceLights = (oldAmounts: number[], newAmounts: number[]) =>
+    setStats(prev => prev ? {
+      ...prev,
+      devices: prev.devices.map(d => {
+        let config: Record<string, string> = {}
+        try { if (d.effectConfiguration) config = JSON.parse(d.effectConfiguration) } catch { /* treated as never customised */ }
+        return { ...d, effectConfiguration: JSON.stringify(remapEffectConfigByPosition(config, oldAmounts, newAmounts)) }
+      })
+    } : prev)
+
   const saveTipAmounts = async (amounts: number[]) => {
     setTipAmountsSaving(true)
     try {
       const response = await apiService.put('/api/profiles/me/tip-amounts', { amounts })
       if (response.data?.amounts) {
+        remapDeviceLights(tipAmounts, response.data.amounts)
         setUserProfile((prev: any) => ({ ...prev, tipAmounts: response.data.amounts }))
       } else {
         toast('Failed to save tip amounts: ' + (response.error || 'Unknown error'), 'error')
@@ -1242,6 +1254,7 @@ const Dashboard: React.FC = () => {
     try {
       const response = await apiService.delete('/api/profiles/me/tip-amounts')
       if (response.data?.amounts) {
+        remapDeviceLights(tipAmounts, response.data.amounts)
         setUserProfile((prev: any) => ({ ...prev, tipAmounts: response.data.amounts }))
       } else {
         toast('Failed to reset tip amounts: ' + (response.error || 'Unknown error'), 'error')
@@ -1254,12 +1267,12 @@ const Dashboard: React.FC = () => {
   const getEffectConfig = (device: DeviceSummary): Record<string, string> => {
     try {
       if (device.effectConfiguration) {
-        return normalizeEffectConfig(JSON.parse(device.effectConfiguration))
+        return normalizeEffectConfig(JSON.parse(device.effectConfiguration), tipAmounts)
       }
     } catch (e) {
       logger.error('❌ Error parsing effect configuration:', e, 'Raw value:', device.effectConfiguration)
     }
-    return { ...DEFAULT_EFFECT_CONFIG }
+    return defaultEffectConfigFor(tipAmounts)
   }
 
   const loadSongRequests = async () => {

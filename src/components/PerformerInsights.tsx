@@ -7,7 +7,7 @@ import logger from '../utils/logger'
 import { Button, Modal, Switch, useFeedback } from './ui'
 import { API_BASE_URL } from '../utils/config'
 import apiService from '../services/api'
-import { DEFAULT_TIP_AMOUNTS, LIGHT_EFFECTS, SOUND_OPTIONS, VOLUME_OPTIONS, DEFAULT_SOUND_ID, DEFAULT_SOUND_VOLUME, normalizeEffectConfig, effectForAmount, buildEffectConfig } from '../utils/deviceConfig'
+import { DEFAULT_TIP_AMOUNTS, LIGHT_EFFECTS, SOUND_OPTIONS, VOLUME_OPTIONS, DEFAULT_SOUND_ID, DEFAULT_SOUND_VOLUME, normalizeEffectConfig, remapEffectConfigByPosition, effectForAmount, buildEffectConfig } from '../utils/deviceConfig'
 import TipAmountsEditor from './TipAmountsEditor'
 
 interface PerformerDevice {
@@ -179,12 +179,24 @@ const PerformerInsights: React.FC = () => {
     setPerformerTipAmounts(response.data?.amounts ?? DEFAULT_TIP_AMOUNTS)
   }
 
+  // The server re-keys the performer's device lights to the new amounts, position by position; show the same result here
+  const remapPerformerDeviceLights = (oldAmounts: number[], newAmounts: number[]) =>
+    setSelectedPerformer((prev: any) => prev ? {
+      ...prev,
+      devices: (prev.devices ?? []).map((d: any) => {
+        let config: Record<string, string> = {}
+        try { if (d.effectConfiguration) config = JSON.parse(d.effectConfiguration) } catch { /* treated as never customised */ }
+        return { ...d, effectConfiguration: JSON.stringify(remapEffectConfigByPosition(config, oldAmounts, newAmounts)) }
+      })
+    } : prev)
+
   const savePerformerTipAmounts = async (amounts: number[]) => {
     if (!selectedPerformer) return
     setTipAmountsSaving(true)
     try {
       const response = await apiService.put(`/api/admin/performers/${selectedPerformer.id}/tip-amounts`, { amounts })
       if (response.data?.amounts) {
+        remapPerformerDeviceLights(performerTipAmounts, response.data.amounts)
         setPerformerTipAmounts(response.data.amounts)
       } else {
         toast('Failed to save tip amounts: ' + (response.error || 'Unknown error'), 'error')
@@ -200,6 +212,7 @@ const PerformerInsights: React.FC = () => {
     try {
       const response = await apiService.delete(`/api/admin/performers/${selectedPerformer.id}/tip-amounts`)
       if (response.data?.amounts) {
+        remapPerformerDeviceLights(performerTipAmounts, response.data.amounts)
         setPerformerTipAmounts(response.data.amounts)
       } else {
         toast('Failed to reset tip amounts: ' + (response.error || 'Unknown error'), 'error')
@@ -814,7 +827,7 @@ const DeviceConfigModal: React.FC<{
   const [effectConfig, setEffectConfig] = useState<Record<string, string>>(() => {
     try {
       if (device.effectConfiguration) {
-        return normalizeEffectConfig(JSON.parse(device.effectConfiguration))
+        return normalizeEffectConfig(JSON.parse(device.effectConfiguration), tipAmounts)
       }
     } catch (e) {
       logger.error('Error parsing effect configuration:', e)
