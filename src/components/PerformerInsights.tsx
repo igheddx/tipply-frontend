@@ -9,6 +9,7 @@ import { API_BASE_URL } from '../utils/config'
 import apiService from '../services/api'
 import { DEFAULT_TIP_AMOUNTS, LIGHT_EFFECTS, SOUND_OPTIONS, VOLUME_OPTIONS, DEFAULT_SOUND_ID, DEFAULT_SOUND_VOLUME, normalizeEffectConfig, remapEffectConfigByPosition, effectForAmount, buildEffectConfig } from '../utils/deviceConfig'
 import TipAmountsEditor from './TipAmountsEditor'
+import PayoutsCard, { type PayoutSummary } from './PayoutsCard'
 
 interface PerformerDevice {
   id: string
@@ -78,6 +79,8 @@ interface PerformerInsights {
   totalBalance: number
   futurePayouts: number
   inTransit: number
+  availableToPayOut?: number | null
+  recentPayouts?: PayoutSummary[] | null
   uniqueTippersAllTime: number
   mostTippedDenomination: number
 }
@@ -676,6 +679,13 @@ const PerformerInsights: React.FC = () => {
                   <div className="text-xs text-ink-400">Denomination</div>
                 </div>
               </div>
+
+              <PayoutsCard
+                futurePayouts={insights.futurePayouts || 0}
+                availableToPayOut={insights.availableToPayOut}
+                inTransit={insights.inTransit || 0}
+                recentPayouts={insights.recentPayouts}
+              />
 
               {/* Weekly Tips Chart */}
               <div className="bg-white rounded-lg shadow-sm p-6">
