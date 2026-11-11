@@ -10,6 +10,7 @@ import apiService from '../services/api'
 import { DEFAULT_TIP_AMOUNTS, LIGHT_EFFECTS, SOUND_OPTIONS, VOLUME_OPTIONS, DEFAULT_SOUND_ID, DEFAULT_SOUND_VOLUME, normalizeEffectConfig, remapEffectConfigByPosition, effectForAmount, buildEffectConfig } from '../utils/deviceConfig'
 import TipAmountsEditor from './TipAmountsEditor'
 import PayoutsCard, { type PayoutSummary } from './PayoutsCard'
+import TestTipLauncher from './TestTipLauncher'
 
 interface PerformerDevice {
   id: string
@@ -615,6 +616,11 @@ const PerformerInsights: React.FC = () => {
               )}
             </div>
           </div>
+
+          <TestTipLauncher
+            performerName={selectedPerformer.stageName || `${selectedPerformer.firstName} ${selectedPerformer.lastName}`}
+            devices={selectedPerformer.devices ?? []}
+          />
 
           <TipAmountsEditor
             amounts={performerTipAmounts}

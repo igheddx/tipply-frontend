@@ -37,6 +37,8 @@ function App() {
           <Route path="/add-device" element={<ProtectedRoute><DeviceRegistration /></ProtectedRoute>} />
           <Route path="/manage-devices" element={<ProtectedRoute><ManageDevices /></ProtectedRoute>} />
           <Route path="/tip/:deviceId" element={<TippingInterface />} />
+          {/* An admin's test of a performer's tip page (lights and sound only). Needs an admin sign-in; reached from Admin → Insights. */}
+          <Route path="/admin/test-tip/:deviceId" element={<ProtectedRoute requiredRole="root_admin"><TippingInterface testMode /></ProtectedRoute>} />
           <Route path="/device-setup" element={<DeviceWifiSetup />} />
           <Route path="/stripe-return" element={<StripeReturn />} />
           <Route path="/kyc-return" element={<KYCReturn />} />

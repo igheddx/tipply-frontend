@@ -24,6 +24,8 @@ interface SongRequest {
   note?: string
   // Set while this song was played recently (the server clears it after 90 minutes)
   playedMinutesAgo?: number | null
+  // Made from an admin's test tip: no money, shown marked TEST, never counted
+  isTest?: boolean
   // The individual tips behind this request, so a refund can be asked for one of them
   items?: RequestItem[]
 }
@@ -535,7 +537,12 @@ const SongRequestMonitor: React.FC<SongRequestMonitorProps> = ({
       </div>
     ) : null
 
-  const TipBadge = ({ r }: { r: SongRequest }) => (
+  const TipBadge = ({ r }: { r: SongRequest }) => r.isTest ? (
+    <span className={`inline-flex items-center rounded-full bg-amber-400 px-3 py-1 font-extrabold text-black ${size.chip}`} title="A test from the Tipwave team: no money was sent">
+      TEST · $0.00
+      {r.requestCount > 1 && <span className="ml-2 font-semibold">· {r.requestCount} requests</span>}
+    </span>
+  ) : (
     <span className={`inline-flex items-center rounded-full bg-accent-500 px-3 py-1 font-bold text-white ${size.chip}`}>
       ${r.totalTipAmount.toFixed(2)}
       {r.requestCount > 1 && <span className="ml-2 font-semibold text-white/85">· {r.requestCount} requests</span>}
@@ -771,6 +778,7 @@ const SongRequestMonitor: React.FC<SongRequestMonitorProps> = ({
                       <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-brand-700">
                         <BrandIcon name="music" size={14} />
                         Playing
+                        {r.isTest && <span className="rounded-full bg-amber-400 px-2 py-0.5 text-[11px] font-extrabold text-black">TEST</span>}
                       </div>
                       <div className="truncate font-bold text-ink-900">{r.songTitle}</div>
                     </div>

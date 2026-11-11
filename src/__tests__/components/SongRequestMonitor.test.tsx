@@ -60,6 +60,16 @@ describe('SongRequestMonitor', () => {
     await waitFor(() => expect(document.title).toBe('(2) Live'))
   })
 
+  it('shows a test request marked TEST at $0, and a real request as normal', async () => {
+    mockQueue([{ ...request('t', 'Test song', 0, 1), isTest: true }, request('r', 'Real song', 20, 2)])
+    renderMonitor()
+
+    await screen.findByText('Test song')
+    expect(screen.getByText(/TEST · \$0\.00/)).toBeInTheDocument()
+    expect(screen.getByText('$20.00')).toBeInTheDocument()
+    expect(screen.getAllByText(/TEST/)).toHaveLength(1)
+  })
+
   it('has a sound option for new tips in the menu, on by default, and remembers when it is turned off', async () => {
     mockQueue([request('a', 'Song', 5, 1)])
     renderMonitor()
