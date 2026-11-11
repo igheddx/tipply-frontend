@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react'
-import { Button, Space } from 'antd'
+import { Button } from './ui'
+import { BrandIcon } from './icons/BrandIcons'
 import { ALLOWED_TIP_AMOUNTS, DEFAULT_TIP_AMOUNTS, LIGHT_EFFECTS, TIP_AMOUNT_COUNT, validateTipAmounts } from '../utils/deviceConfig'
 
 interface TipAmountsEditorProps {
@@ -32,20 +33,24 @@ const TipAmountsEditor: React.FC<TipAmountsEditorProps> = ({ amounts, saving, on
         effect ({LIGHT_EFFECTS.map(effect => effect.label).join(', ')}, from left to right).
         Default: {DEFAULT_TIP_AMOUNTS.map(a => `$${a}`).join(', ')}.
       </p>
-      <div className="grid grid-cols-4 gap-2 md:grid-cols-8" role="group" aria-label="Tip amounts to offer">
+      <div className="mt-3 flex flex-wrap gap-2" role="group" aria-label="Tip amounts to offer">
         {/* an amount chosen before the list was limited stays visible so the performer can swap it out */}
         {sorted(Array.from(new Set([...ALLOWED_TIP_AMOUNTS, ...draft]))).map(amount => {
           const selected = draft.includes(amount)
           return (
-            <Button
+            <button
               key={amount}
-              type={selected ? 'primary' : 'default'}
+              type="button"
               aria-pressed={selected}
               disabled={saving || (!selected && full)}
               onClick={() => toggle(amount)}
+              className={`inline-flex h-11 min-w-[4.5rem] items-center justify-center gap-1.5 rounded-xl border px-4 text-sm font-bold transition-colors disabled:opacity-60 ${
+                selected ? 'border-brand-700 bg-brand-700 text-white' : 'border-slate-300 bg-white text-ink-500 hover:bg-slate-50'
+              }`}
             >
+              {selected && <BrandIcon name="check" size={16} tone="inverse" strokeWidth={2.4} />}
               ${amount}
-            </Button>
+            </button>
           )
         })}
       </div>
@@ -53,12 +58,12 @@ const TipAmountsEditor: React.FC<TipAmountsEditorProps> = ({ amounts, saving, on
         {draft.length} of {TIP_AMOUNT_COUNT} picked{draft.length > 0 ? `: ${draft.map(a => `$${a}`).join(', ')}` : ''}
       </p>
       {error && !unchanged && draft.length === TIP_AMOUNT_COUNT && <p className="mt-1 text-sm text-red-600">{error}</p>}
-      <Space className="mt-3">
-        <Button type="primary" onClick={() => onSave(draft)} loading={saving} disabled={!!error || unchanged}>
+      <div className="mt-3 flex flex-wrap gap-2">
+        <Button onClick={() => onSave(draft)} loading={saving} disabled={!!error || unchanged}>
           Save amounts
         </Button>
-        <Button onClick={onReset} disabled={saving}>Reset to defaults</Button>
-      </Space>
+        <Button variant="secondary" onClick={onReset} disabled={saving}>Reset to defaults</Button>
+      </div>
     </div>
   )
 }
