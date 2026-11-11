@@ -9,6 +9,7 @@ import { API_BASE_URL } from '../utils/config'
 import apiService from '../services/api'
 import { DEFAULT_TIP_AMOUNTS, LIGHT_EFFECTS, SOUND_OPTIONS, VOLUME_OPTIONS, DEFAULT_SOUND_ID, DEFAULT_SOUND_VOLUME, normalizeEffectConfig, remapEffectConfigByPosition, effectForAmount, buildEffectConfig } from '../utils/deviceConfig'
 import TipAmountsEditor from './TipAmountsEditor'
+import PayoutsCard, { type PayoutSummary } from './PayoutsCard'
 
 interface PerformerDevice {
   id: string
@@ -78,6 +79,8 @@ interface PerformerInsights {
   totalBalance: number
   futurePayouts: number
   inTransit: number
+  availableToPayOut?: number | null
+  recentPayouts?: PayoutSummary[] | null
   uniqueTippersAllTime: number
   mostTippedDenomination: number
 }
@@ -138,12 +141,14 @@ const PerformerInsights: React.FC = () => {
         const options = data.map(performer => ({
           value: performer.id,
           label: (
+            // The drop-down is drawn by Ant Design outside the portal, so it takes its text colour from the
+            // pop-up itself (light or dark). The Tailwind text colours are only recoloured inside the portal.
             <div className="py-1">
-              <div className="font-medium text-ink-900">
+              <div className="font-medium" style={{ color: 'inherit' }}>
                 {performer.firstName} {performer.lastName}
-                {performer.stageName && <span className="text-brand-700 ml-2">({performer.stageName})</span>}
+                {performer.stageName && <span className="ml-2" style={{ color: 'inherit', opacity: 0.8 }}>({performer.stageName})</span>}
               </div>
-              <div className="text-sm text-ink-500">{performer.email}</div>
+              <div className="text-sm" style={{ color: 'inherit', opacity: 0.7 }}>{performer.email}</div>
             </div>
           ),
           searchText: `${performer.firstName} ${performer.lastName} ${performer.stageName || ''} ${performer.email}`.toLowerCase()
@@ -674,6 +679,13 @@ const PerformerInsights: React.FC = () => {
                   <div className="text-xs text-ink-400">Denomination</div>
                 </div>
               </div>
+
+              <PayoutsCard
+                futurePayouts={insights.futurePayouts || 0}
+                availableToPayOut={insights.availableToPayOut}
+                inTransit={insights.inTransit || 0}
+                recentPayouts={insights.recentPayouts}
+              />
 
               {/* Weekly Tips Chart */}
               <div className="bg-white rounded-lg shadow-sm p-6">
