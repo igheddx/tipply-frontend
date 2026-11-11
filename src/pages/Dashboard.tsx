@@ -28,6 +28,7 @@ import { API_BASE_URL } from '../utils/config'
 import { setDemoModeOn, setShowDemoData, demoQuery } from '../utils/demoView'
 import { DEFAULT_TIP_AMOUNTS, TIP_AMOUNT_COUNT, LIGHT_EFFECTS, SOUND_OPTIONS, VOLUME_OPTIONS, DEFAULT_SOUND_ID, DEFAULT_SOUND_VOLUME, defaultEffectConfigFor, normalizeEffectConfig, remapEffectConfigByPosition, effectForAmount, buildEffectConfig } from '../utils/deviceConfig'
 import TipAmountsEditor from '../components/TipAmountsEditor'
+import { readyToPayOut } from '../utils/payouts'
 
 interface DashboardStats {
   totalDevices: number
@@ -58,6 +59,7 @@ interface DashboardMetrics {
   trendPercentage: number
   trendDirection: string
   stripeAvailableBalance: number
+  stripeReadyToPayOut?: number
   stripeFuturePayouts: number
   stripeInTransit: number
   stripeLifetimeVolume: number
@@ -362,6 +364,7 @@ const Dashboard: React.FC = () => {
               setMetrics(prev => prev ? {
                 ...prev,
                 stripeAvailableBalance: fullMetrics.data.stripeAvailableBalance ?? prev.stripeAvailableBalance,
+                stripeReadyToPayOut: fullMetrics.data.stripeReadyToPayOut ?? prev.stripeReadyToPayOut,
                 stripeFuturePayouts: fullMetrics.data.stripeFuturePayouts ?? prev.stripeFuturePayouts,
                 stripeInTransit: fullMetrics.data.stripeInTransit ?? prev.stripeInTransit,
                 stripeLifetimeVolume: fullMetrics.data.stripeLifetimeVolume ?? prev.stripeLifetimeVolume,
@@ -1392,7 +1395,7 @@ const Dashboard: React.FC = () => {
     failedTipsCount: metrics?.failedTipsCount ?? 0,
     scheduledPayouts: metrics?.stripeFuturePayouts ?? 0,
     inTransit: metrics?.stripeInTransit ?? 0,
-    available: metrics?.stripeAvailableBalance ?? 0,
+    available: readyToPayOut(metrics),
     lifetime: metrics?.stripeLifetimeVolume ?? 0,
     balancesLoading: stripeMetricsLoading,
     devices: {
