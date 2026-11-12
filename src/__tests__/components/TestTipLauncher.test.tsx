@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
-import TestTipLauncher, { testTipPath } from '../../components/TestTipLauncher'
+import TestTipLauncher, { testTipPath, watchLivePath } from '../../components/TestTipLauncher'
 
 describe('TestTipLauncher', () => {
   it('has one button when the performer has one device, and launches that device', () => {
@@ -31,5 +31,28 @@ describe('TestTipLauncher', () => {
 
   it('points at the admin-only page for that device', () => {
     expect(testTipPath('abc')).toBe('/admin/test-tip/abc')
+  })
+
+  it('has a button to watch the performer\'s Live screen, which opens it for that performer', () => {
+    const onWatch = vi.fn()
+    render(<TestTipLauncher performerName="Dave" performerId="perf-1" devices={[{ id: 'd1' }]} onLaunch={() => {}} onWatch={onWatch} />)
+    fireEvent.click(screen.getByRole('button', { name: /Watch Dave's Live screen/ }))
+    expect(onWatch).toHaveBeenCalledWith('perf-1', 'Dave')
+    expect(screen.getByText(/no buttons that change anything/)).toBeInTheDocument()
+  })
+
+  it('offers watching even when the performer has no device, since the Live screen does not need one', () => {
+    render(<TestTipLauncher performerName="Dave" performerId="perf-1" devices={[]} onWatch={() => {}} />)
+    expect(screen.getByRole('button', { name: /Watch Dave's Live screen/ })).toBeInTheDocument()
+    expect(screen.getByText(/no active device/)).toBeInTheDocument()
+  })
+
+  it('has no watch button when the performer is unknown', () => {
+    render(<TestTipLauncher performerName="Dave" devices={[{ id: 'd1' }]} onLaunch={() => {}} />)
+    expect(screen.queryByRole('button', { name: /Live screen/ })).toBeNull()
+  })
+
+  it('the watch link carries the id, and the name only as a safely encoded label', () => {
+    expect(watchLivePath('abc', 'Dave L & Co')).toBe('/admin/watch-live/abc?n=Dave%20L%20%26%20Co')
   })
 })

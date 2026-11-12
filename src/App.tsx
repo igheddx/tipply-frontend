@@ -7,6 +7,7 @@ const Login = lazy(() => import('./pages/Login'))
 const ForgotPassword = lazy(() => import('./pages/ForgotPassword'))
 const Dashboard = lazy(() => import('./pages/Dashboard'))
 const AdminDashboard = lazy(() => import('./pages/AdminDashboard'))
+const AdminWatchLivePage = lazy(() => import('./pages/AdminWatchLivePage'))
 const Profile = lazy(() => import('./pages/Profile'))
 const VenueDashboard = lazy(() => import('./pages/VenueDashboard'))
 const DeviceRegistration = lazy(() => import('./pages/DeviceRegistration'))
@@ -38,6 +39,8 @@ function App() {
           <Route path="/manage-devices" element={<ProtectedRoute><ManageDevices /></ProtectedRoute>} />
           <Route path="/tip/:deviceId" element={<TippingInterface />} />
           {/* An admin's test of a performer's tip page (lights and sound only). Needs an admin sign-in; reached from Admin → Insights. */}
+          {/* An admin watching a performer's Live screen, view only. Needs an admin sign-in; reached from Admin → Insights. */}
+          <Route path="/admin/watch-live/:profileId" element={<ProtectedRoute requiredRole="root_admin"><AdminWatchLivePage /></ProtectedRoute>} />
           <Route path="/admin/test-tip/:deviceId" element={<ProtectedRoute requiredRole="root_admin"><TippingInterface testMode /></ProtectedRoute>} />
           <Route path="/device-setup" element={<DeviceWifiSetup />} />
           <Route path="/stripe-return" element={<StripeReturn />} />
