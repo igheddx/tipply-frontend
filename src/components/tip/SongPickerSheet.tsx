@@ -147,7 +147,7 @@ export function SongPickerSheet({ open, deviceUuid, current, onClose, onPick }: 
     <AnimatePresence>
       {open && (
         <motion.div
-          className="fixed inset-0 z-50 flex items-end bg-slate-950/60"
+          className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/60"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
@@ -156,7 +156,7 @@ export function SongPickerSheet({ open, deviceUuid, current, onClose, onPick }: 
           <motion.div
             role="dialog"
             aria-label="Pick a song"
-            className="flex w-full flex-col rounded-t-[22px] bg-white text-ink-900 shadow-2xl"
+            className="flex w-full max-w-[480px] flex-col rounded-t-[22px] bg-white text-ink-900 shadow-2xl"
             style={{ maxHeight: '85dvh', height: chosen ? 'auto' : '85dvh', paddingBottom: 'calc(env(safe-area-inset-bottom) + 0.75rem)' }}
             initial={{ y: '100%' }}
             animate={{ y: 0 }}

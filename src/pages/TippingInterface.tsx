@@ -191,25 +191,6 @@ const TippingInterface: React.FC<TippingInterfaceProps> = ({ testMode = false })
     const updateOrientation = () => {
       const portrait = window.matchMedia('(orientation: portrait)').matches || window.innerHeight >= window.innerWidth
       setIsPortrait(portrait)
-      
-      // CSS-based fallback for browsers without Screen Orientation API support
-      if (!portrait && window.innerWidth < 768) {
-        logger.log('📱 Landscape detected on mobile - applying CSS rotation lock')
-        document.body.style.transform = 'rotate(-90deg)'
-        document.body.style.transformOrigin = 'center center'
-        document.body.style.width = '100vh'
-        document.body.style.height = '100vw'
-        document.body.style.overflow = 'hidden'
-        document.body.style.position = 'fixed'
-      } else {
-        // Remove forced rotation
-        document.body.style.transform = ''
-        document.body.style.transformOrigin = ''
-        document.body.style.width = ''
-        document.body.style.height = ''
-        document.body.style.overflow = ''
-        document.body.style.position = ''
-      }
     }
 
     updateOrientation()
@@ -1106,6 +1087,16 @@ const TippingInterface: React.FC<TippingInterfaceProps> = ({ testMode = false })
   )
 
   // While the performer loads, show the real layout with placeholders so nothing jumps
+  // A phone turned sideways gets a plain, solid screen: never the tip page stretched out behind a see-through message.
+  // (A wide desktop window is not a turned phone; it gets the "open this on your phone" screen further down.)
+  if (!isPortrait && !testMode && window.innerWidth <= 1024) {
+    return (
+      <InfoScreen icon="refresh" title="Portrait mode only">
+        Please turn your phone upright to keep tipping.
+      </InfoScreen>
+    )
+  }
+
   if (checkingPaymentMethods) {
     return (
       <TipScreen
@@ -1217,14 +1208,6 @@ const TippingInterface: React.FC<TippingInterfaceProps> = ({ testMode = false })
           }}
           onClose={() => feedback.sendFollowUp({})}
         />
-      )}
-
-      {!isPortrait && (
-        <div className="fixed inset-0 z-[60] flex flex-col items-center justify-center bg-slate-950/85 px-6 text-center text-white">
-          <BrandIcon name="refresh" size={36} tone="inverse" />
-          <p className="mt-4 text-lg font-semibold">Portrait mode only</p>
-          <p className="mt-1 text-sm text-white/80">Please turn your phone upright to keep tipping.</p>
-        </div>
       )}
 
       <SongPickerSheet

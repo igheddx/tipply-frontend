@@ -149,7 +149,7 @@ export function TipScreen({
     {/* Reaches past every edge of the screen, so a strip the phone leaves uncovered under its toolbar is the same dark color, never white */}
     <div aria-hidden="true" className="pointer-events-none fixed" style={{ inset: '-80px 0', zIndex: -1, background: palette.mid }} />
     <div
-      className="fixed inset-0 flex flex-col gap-2.5 overflow-hidden px-4 text-white"
+      className="fixed inset-0 overflow-hidden text-white"
       style={{
         height: '100dvh',
         paddingTop: 'calc(env(safe-area-inset-top) + 0.75rem)',
@@ -162,6 +162,8 @@ export function TipScreen({
           `linear-gradient(180deg,${palette.top} 0%,${palette.mid} 55%,${palette.bottom} 100%)`
       }}
     >
+      {/* The colour fills the screen; the tip page itself is always a phone-width column, centred, however wide the window is */}
+      <div className="mx-auto flex h-full w-full max-w-[480px] flex-col gap-2.5 px-4">
       {palette.test && <TestSiteStrip />}
       <header className="flex flex-none items-center gap-3">
         {photoUrl && failedPhoto !== photoUrl ? (
@@ -327,6 +329,7 @@ export function TipScreen({
         <img src="/images/logo/tipwave-logo-v2-light.png" alt="Tipwave" className="h-[22px] opacity-90" />
         {footerLink && <span className="absolute right-0 top-1/2 -translate-y-1/2">{footerLink}</span>}
       </footer>
+      </div>
     </div>
     </>
   )
