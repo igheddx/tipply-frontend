@@ -64,6 +64,13 @@ interface SongRequestMonitorProps {
   devices?: MonitorDevice[]
   pausingDeviceId?: string | null
   onTogglePause?: (deviceId: string) => void
+  /**
+   * An admin watching a performer's Live screen (Admin → Insights). Shows exactly what the performer sees, but has no buttons that
+   * change anything: no play, skip, played, seen, refund or pause. Sound and the "new" glow are local to the watcher's own browser.
+   */
+  readOnly?: boolean
+  /** Shown in a strip across the top while watching, e.g. "Watching Dave Lovett" */
+  watchingLabel?: string
 }
 
 const REFRESH_MS = 5000
@@ -110,7 +117,9 @@ const SongRequestMonitor: React.FC<SongRequestMonitorProps> = ({
   onClose,
   devices = [],
   pausingDeviceId = null,
-  onTogglePause
+  onTogglePause,
+  readOnly = false,
+  watchingLabel
 }) => {
   const [songRequests, setSongRequests] = useState<SongRequest[]>([])
   const [loading, setLoading] = useState(false)
@@ -249,7 +258,8 @@ const SongRequestMonitor: React.FC<SongRequestMonitorProps> = ({
 
   // The list of shows to pick from, loaded when the monitor opens
   useEffect(() => {
-    if (!isVisible) return
+    // Watching someone else's screen: the show list would be the watcher's own, so it is left out; the queue shows their current show
+    if (!isVisible || readOnly) return
     let cancelled = false
     void showApi.list(1, 10).then(res => {
       if (!cancelled && Array.isArray(res.data?.shows)) setShows(res.data.shows)
@@ -257,7 +267,7 @@ const SongRequestMonitor: React.FC<SongRequestMonitorProps> = ({
     return () => {
       cancelled = true
     }
-  }, [isVisible])
+  }, [isVisible, readOnly])
 
   // Switching shows is not new activity: start the "what is new" tracking again so nothing glows or chimes
   useEffect(() => {
@@ -479,6 +489,7 @@ const SongRequestMonitor: React.FC<SongRequestMonitorProps> = ({
     const items = (r.items ?? []).filter(i => Date.now() - new Date(i.createdAt).getTime() <= REFUND_WINDOW_MS)
     if (items.length === 0) return null
     if (items.every(i => i.refundRequest === 'pending')) return <StatusChip kind="processing" label="Refund requested" />
+    if (readOnly) return null
     const open = items.filter(i => i.refundRequest !== 'pending')
     return (
       <button
@@ -498,6 +509,7 @@ const SongRequestMonitor: React.FC<SongRequestMonitorProps> = ({
     if (t.refundRequest === 'declined') return <StatusChip kind="offline" label="Not refunded" />
     if (t.status && t.status !== 'processed') return null
     if (Date.now() - new Date(t.createdAt).getTime() > REFUND_WINDOW_MS) return null
+    if (readOnly) return null
     return (
       <button
         type="button"
@@ -593,6 +605,12 @@ const SongRequestMonitor: React.FC<SongRequestMonitorProps> = ({
           <div className="max-w-full truncate rounded-full bg-accent-500 px-5 py-2.5 text-base font-bold text-white shadow-lift">
             {tipNotice.text}
           </div>
+        </div>
+      )}
+
+      {readOnly && (
+        <div role="status" className="flex-none bg-amber-400 px-3 py-1.5 text-center text-xs font-bold text-black">
+          {watchingLabel || 'Watching a performer'} · view only: nothing here changes their screen
         </div>
       )}
 
@@ -718,9 +736,11 @@ const SongRequestMonitor: React.FC<SongRequestMonitorProps> = ({
       </header>
 
       {/* On a venue's device: how long the session has left, so the end of it is never a surprise */}
-      <div className="flex-none">
-        <SessionBanner compact />
-      </div>
+      {!readOnly && (
+        <div className="flex-none">
+          <SessionBanner compact />
+        </div>
+      )}
 
       {/* Paused devices stay visible even with the menu closed, since tippers get no light or sound */}
       {pausedCount > 0 && (
@@ -736,7 +756,7 @@ const SongRequestMonitor: React.FC<SongRequestMonitorProps> = ({
         onPointerUp={holdEnd}
         onPointerCancel={holdEnd}
       >
-        {shows.length > 1 && (
+        {!readOnly && shows.length > 1 && (
           <div className="mx-auto mb-3 flex max-w-6xl items-center gap-2 text-sm text-ink-500">
             <label htmlFor="monitor-show">Show</label>
             <select
@@ -782,14 +802,16 @@ const SongRequestMonitor: React.FC<SongRequestMonitorProps> = ({
                       </div>
                       <div className="truncate font-bold text-ink-900">{r.songTitle}</div>
                     </div>
-                    <button
-                      onClick={() => updateSongStatus(r, 'completed')}
-                      disabled={updatingStatus === key}
-                      className="inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-brand-700 px-4 font-bold text-white hover:bg-brand-800 disabled:opacity-50"
-                    >
-                      <BrandIcon name="check" size={20} color="#FFFFFF" strokeWidth={2.4} />
-                      {updatingStatus === key ? 'Saving…' : 'Done playing'}
-                    </button>
+                    {!readOnly && (
+                      <button
+                        onClick={() => updateSongStatus(r, 'completed')}
+                        disabled={updatingStatus === key}
+                        className="inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-brand-700 px-4 font-bold text-white hover:bg-brand-800 disabled:opacity-50"
+                      >
+                        <BrandIcon name="check" size={20} color="#FFFFFF" strokeWidth={2.4} />
+                        {updatingStatus === key ? 'Saving…' : 'Done playing'}
+                      </button>
+                    )}
                   </article>
                   <article className="mb-3 hidden rounded-3xl border border-slate-100 bg-white p-4 shadow-lift lg:block">
                     <div className="flex flex-wrap items-center gap-2">
@@ -799,14 +821,16 @@ const SongRequestMonitor: React.FC<SongRequestMonitorProps> = ({
                     <h3 className={`mt-3 font-extrabold leading-tight text-ink-900 ${size.title}`}>{r.songTitle}</h3>
                     <p className={`text-ink-500 ${size.artist}`}>{r.artist}</p>
                     <Note r={r} />
-                    <button
-                      onClick={() => updateSongStatus(r, 'completed')}
-                      disabled={updatingStatus === key}
-                      className={`${btn} mt-4 w-full bg-brand-700 text-white hover:bg-brand-800`}
-                    >
-                      <BrandIcon name="check" size={22} color="#FFFFFF" strokeWidth={2.4} />
-                      {updatingStatus === key ? 'Saving…' : 'Done playing'}
-                    </button>
+                    {!readOnly && (
+                      <button
+                        onClick={() => updateSongStatus(r, 'completed')}
+                        disabled={updatingStatus === key}
+                        className={`${btn} mt-4 w-full bg-brand-700 text-white hover:bg-brand-800`}
+                      >
+                        <BrandIcon name="check" size={22} color="#FFFFFF" strokeWidth={2.4} />
+                        {updatingStatus === key ? 'Saving…' : 'Done playing'}
+                      </button>
+                    )}
                   </article>
                   </React.Fragment>
                 )
@@ -863,6 +887,10 @@ const SongRequestMonitor: React.FC<SongRequestMonitorProps> = ({
                           <Note r={r} />
                         </div>
                       </div>
+                      {readOnly ? (
+                        // Watching: no buttons, only the refund status a performer would see
+                        requestRefundFor(r) ? <div className="mt-3 flex flex-wrap items-center gap-2">{requestRefundFor(r)}</div> : null
+                      ) : (
                       <div className="mt-3 flex flex-wrap items-center gap-2">
                         <button
                           onClick={() => updateSongStatus(r, 'performing')}
@@ -890,6 +918,7 @@ const SongRequestMonitor: React.FC<SongRequestMonitorProps> = ({
                         </button>
                         {requestRefundFor(r)}
                       </div>
+                      )}
                     </li>
                   )
                 })}
@@ -914,14 +943,16 @@ const SongRequestMonitor: React.FC<SongRequestMonitorProps> = ({
                           <span className="font-semibold text-ink-700">{timeOfDay(t.createdAt)}</span> · {ago(t.createdAt, now)}
                         </span>
                         {requestRefundForTip(t)}
-                        <button
-                          onClick={() => markTipSeen(t.id)}
-                          className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-slate-100 px-4 text-sm font-semibold text-ink-700 hover:bg-slate-200"
-                          aria-label={`Mark the ${money(t.amount)} tip as seen`}
-                        >
-                          <BrandIcon name="check" size={18} tone="current" strokeWidth={2.4} />
-                          Seen
-                        </button>
+                        {!readOnly && (
+                          <button
+                            onClick={() => markTipSeen(t.id)}
+                            className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-slate-100 px-4 text-sm font-semibold text-ink-700 hover:bg-slate-200"
+                            aria-label={`Mark the ${money(t.amount)} tip as seen`}
+                          >
+                            <BrandIcon name="check" size={18} tone="current" strokeWidth={2.4} />
+                            Seen
+                          </button>
+                        )}
                       </li>
                     ))}
                   </ul>
@@ -945,9 +976,11 @@ const SongRequestMonitor: React.FC<SongRequestMonitorProps> = ({
                               <span className="font-semibold text-ink-700">{timeOfDay(t.createdAt)}</span> · {ago(t.createdAt, now)}
                             </span>
                             {requestRefundForTip(t)}
-                            <button onClick={() => markTipUnseen(t.id)} className="h-11 rounded-xl px-3 text-sm font-semibold text-ink-500 hover:bg-slate-100">
-                              Undo
-                            </button>
+                            {!readOnly && (
+                              <button onClick={() => markTipUnseen(t.id)} className="h-11 rounded-xl px-3 text-sm font-semibold text-ink-500 hover:bg-slate-100">
+                                Undo
+                              </button>
+                            )}
                           </li>
                         ))}
                       </ul>

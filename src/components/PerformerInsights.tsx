@@ -619,6 +619,7 @@ const PerformerInsights: React.FC = () => {
 
           <TestTipLauncher
             performerName={selectedPerformer.stageName || `${selectedPerformer.firstName} ${selectedPerformer.lastName}`}
+            performerId={selectedPerformer.id}
             devices={selectedPerformer.devices ?? []}
           />
 
