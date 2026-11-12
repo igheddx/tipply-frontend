@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { apiService } from '../../services/api'
 import { Banner, Button, Card, Switch } from '../ui'
-import { BrandIcon } from '../icons/BrandIcons'
 import {
   currentSubscription,
   disablePushAlerts,
@@ -15,21 +14,19 @@ import {
 } from '../../utils/pushAlerts'
 
 interface AlertsCardProps {
-  /** The tip amounts this performer offers, to choose from */
-  tipAmounts: number[]
+  /** No longer used: alerts cover every tip, so there is no amount to choose. Kept so existing callers still compile. */
+  tipAmounts?: number[]
 }
 
 type PushState = 'loading' | 'unavailable' | PushSupport | 'blocked' | 'off' | 'on'
 
-const MAX_ALERT_AMOUNTS = 6
-
-export default function AlertsCard({ tipAmounts }: AlertsCardProps) {
-  const [alertAmounts, setAlertAmounts] = useState<number[]>([])
-  // Every tip that came without a song shows in the Live queue (the default); off limits it to the chosen amounts
-  const [showAllTips, setShowAllTips] = useState(true)
-  const [amountsLoaded, setAmountsLoaded] = useState(false)
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export default function AlertsCard(_props: AlertsCardProps) {
+  // Phone alerts cover every tip (the default). On: only tips that come with a song request alert.
+  const [songsOnly, setSongsOnly] = useState(false)
+  const [loaded, setLoaded] = useState(false)
   const [saving, setSaving] = useState(false)
-  const [amountError, setAmountError] = useState('')
+  const [saveError, setSaveError] = useState('')
 
   const [pushState, setPushState] = useState<PushState>('loading')
   const [busy, setBusy] = useState(false)
@@ -37,11 +34,10 @@ export default function AlertsCard({ tipAmounts }: AlertsCardProps) {
 
   useEffect(() => {
     let cancelled = false
-    apiService.get('/api/profiles/me/alert-amounts').then(r => {
+    apiService.get('/api/profiles/me/alert-preference').then(r => {
       if (cancelled) return
-      if (Array.isArray(r.data?.amounts)) setAlertAmounts(r.data.amounts)
-      if (typeof r.data?.showAllTips === 'boolean') setShowAllTips(r.data.showAllTips)
-      setAmountsLoaded(true)
+      if (typeof r.data?.songsOnly === 'boolean') setSongsOnly(r.data.songsOnly)
+      setLoaded(true)
     })
     return () => {
       cancelled = true
@@ -85,35 +81,18 @@ export default function AlertsCard({ tipAmounts }: AlertsCardProps) {
     return () => navigator.serviceWorker.removeEventListener('message', onMessage)
   }, [])
 
-  const toggleAmount = async (amount: number) => {
-    const next = alertAmounts.includes(amount) ? alertAmounts.filter(a => a !== amount) : [...alertAmounts, amount].sort((a, b) => a - b)
-    if (next.length > MAX_ALERT_AMOUNTS) return
-    const previous = alertAmounts
-    setAlertAmounts(next)
-    setAmountError('')
+  const toggleSongsOnly = async () => {
+    const next = !songsOnly
+    setSongsOnly(next)
+    setSaveError('')
     setSaving(true)
-    const response = await apiService.put('/api/profiles/me/alert-amounts', { amounts: next })
+    const response = await apiService.put('/api/profiles/me/alert-preference', { songsOnly: next })
     setSaving(false)
-    if (Array.isArray(response.data?.amounts)) {
-      setAlertAmounts(response.data.amounts)
+    if (typeof response.data?.songsOnly === 'boolean') {
+      setSongsOnly(response.data.songsOnly)
     } else {
-      setAlertAmounts(previous)
-      setAmountError('Could not save. Please try again.')
-    }
-  }
-
-  const toggleShowAll = async () => {
-    const next = !showAllTips
-    setShowAllTips(next)
-    setAmountError('')
-    setSaving(true)
-    const response = await apiService.put('/api/profiles/me/alert-amounts', { amounts: alertAmounts, showAllTips: next })
-    setSaving(false)
-    if (typeof response.data?.showAllTips === 'boolean') {
-      setShowAllTips(response.data.showAllTips)
-    } else {
-      setShowAllTips(!next)
-      setAmountError('Could not save. Please try again.')
+      setSongsOnly(!next)
+      setSaveError('Could not save. Please try again.')
     }
   }
 
@@ -163,48 +142,23 @@ export default function AlertsCard({ tipAmounts }: AlertsCardProps) {
       subtitle="Get a banner on your phone or tablet when a tip arrives, even while another app is open."
     >
       <div className="space-y-6">
-        <section aria-labelledby="alert-amounts-title">
-          <h3 id="alert-amounts-title" className="text-sm font-bold text-ink-900">
-            Tips with no song
+        <section aria-labelledby="alert-which-title">
+          <h3 id="alert-which-title" className="text-sm font-bold text-ink-900">
+            Which tips alert you
           </h3>
-          <div className="mt-2 flex items-start justify-between gap-4 rounded-xl border border-slate-100 p-3">
+          <p className="mt-1 text-sm text-ink-500">
+            Every tip shows on your Live tab, and every tip sends an alert to your phone or tablet, with or without a song request.
+          </p>
+          <div className="mt-3 flex items-start justify-between gap-4 rounded-xl border border-slate-100 p-3">
             <div className="min-w-0">
-              <div className="text-sm font-semibold text-ink-900">Show every tip in my Live queue</div>
-              <p className="mt-0.5 text-xs text-ink-500">Tips with no song appear marked “Tips without a song”, with the time they came in.</p>
+              <div className="text-sm font-semibold text-ink-900">Only alert me for tips with a song</div>
+              <p className="mt-0.5 text-xs text-ink-500">Tips with no song still show on your Live tab, but they stay quiet.</p>
             </div>
-            <Switch checked={showAllTips} disabled={!amountsLoaded || saving} onChange={() => void toggleShowAll()} label="Show every tip in my Live queue" />
+            <Switch checked={songsOnly} disabled={!loaded || saving} onChange={() => void toggleSongsOnly()} label="Only alert me for tips with a song" />
           </div>
-          <p className="mt-3 text-sm text-ink-500">
-            {showAllTips
-              ? 'Tips with a song always alert you. Also alert you for these amounts when no song is chosen (tap to turn on or off):'
-              : 'Tips with a song always show and alert you. Also show and alert for these amounts when no song is chosen (tap to turn on or off):'}
-          </p>
-          <div className="mt-3 flex flex-wrap gap-2" role="group" aria-label="Tip amounts to show without a song">
-            {tipAmounts.map(amount => {
-              const selected = alertAmounts.includes(amount)
-              return (
-                <button
-                  key={amount}
-                  type="button"
-                  aria-pressed={selected}
-                  disabled={!amountsLoaded || saving}
-                  onClick={() => void toggleAmount(amount)}
-                  className={`inline-flex h-11 min-w-[4.5rem] items-center justify-center gap-1.5 rounded-xl border px-4 text-sm font-bold transition-colors disabled:opacity-60 ${
-                    selected ? 'border-brand-700 bg-brand-700 text-white' : 'border-slate-300 bg-white text-ink-500 hover:bg-slate-50'
-                  }`}
-                >
-                  {selected && <BrandIcon name="check" size={16} tone="inverse" strokeWidth={2.4} />}
-                  ${amount}
-                </button>
-              )
-            })}
-          </div>
-          <p className="mt-2 text-xs text-ink-500">
-            {alertAmounts.length === 0 ? 'None chosen: only tips with a song are shown.' : `Showing tips of ${alertAmounts.map(a => `$${a}`).join(', ')} with no song.`}
-          </p>
-          {amountError && (
+          {saveError && (
             <p className="mt-2 text-sm font-semibold text-red-700" role="alert">
-              {amountError}
+              {saveError}
             </p>
           )}
         </section>

@@ -92,7 +92,15 @@ function InfoScreen({
   )
 }
 
-const TippingInterface: React.FC = () => {
+interface TippingInterfaceProps {
+  /**
+   * An admin's test of the tip page (opened from Admin → Insights). Tapping an amount only fires that performer's light and sound:
+   * nothing is charged, no tip is saved, and no card is asked for. Only the admin route ever sets this.
+   */
+  testMode?: boolean
+}
+
+const TippingInterface: React.FC<TippingInterfaceProps> = ({ testMode = false }) => {
   const { deviceId } = useParams<{ deviceId: string }>()
   const [totalTipped, setTotalTipped] = useState<number>(0)
   const [isDebouncing, setIsDebouncing] = useState(false)
@@ -234,6 +242,11 @@ const TippingInterface: React.FC = () => {
   // Initialize user
   useEffect(() => {
     const initializeUser = async () => {
+      // A test needs no tipper identity, no saved card and no running total
+      if (testMode) {
+        setUserId('admin-test')
+        return
+      }
       // One device ID for the whole page: taken from localStorage straight away, or (first visit / cleared site
       // data) from IndexedDB for at most 1.5 seconds, otherwise newly generated. It never changes afterwards.
       const uniqueDeviceId = await initDeviceId()
@@ -407,6 +420,14 @@ const TippingInterface: React.FC = () => {
           sessionId: device.sessionId || undefined
         }
         setDeviceInfo(deviceInfoData)
+
+        // A test needs no card and no payout set-up: it only sends the light
+        if (testMode) {
+          setIsDeviceVerified(true)
+          setIsPaymentSetup(true)
+          setCheckingPaymentMethods(false)
+          return
+        }
         
         // Check if device is verified (both Stripe and KYC)
         const verified = device.isStripeVerified && device.isKycVerified
@@ -841,7 +862,36 @@ const TippingInterface: React.FC = () => {
     void processTip(amount)
   }
 
+  // Test mode: ask the server for a test tip (admin only). It lights the device and, for a song, adds a $0 request marked TEST.
+  const sendTestTip = async (amount: number, song?: { id: string; requestorName?: string; note?: string }) => {
+    try {
+      const response = await apiService.post('/api/admin/test-tip', {
+        deviceId: deviceInfo!.id,
+        amount,
+        ...(song ? { songId: song.id, requestorName: song.requestorName, note: song.note } : {})
+      })
+      const result = response.data as { status?: string; message?: string; songRequested?: boolean } | undefined
+      if (!result) {
+        setSentAmount(null); setSentSong(null)
+        toast.error(response.error || 'The test could not be sent')
+        return false
+      }
+      if (result.status === 'paused') toast.message(result.message || 'This device is paused, so no light or sound was sent')
+      else if (result.status === 'not_sent') toast.error(result.message || 'The light message could not be delivered')
+      if (song && !result.songRequested) toast.message('The test song request was not added (song requests may be off for this device)')
+      return true
+    } catch {
+      setSentAmount(null); setSentSong(null)
+      toast.error('The test could not be sent')
+      return false
+    }
+  }
+
   const processTip = async (amount: number) => {
+    if (testMode) {
+      await sendTestTip(amount)
+      return
+    }
     // Submit tip
     try {
       // Get stored payment method ID and customer ID using fallback search
@@ -909,6 +959,16 @@ const TippingInterface: React.FC = () => {
     selectedSongSnapshot: { id: string; title: string; artist: string; requestorName?: string; note?: string }
   ) => {
     logger.log('🎵 [processTipWithSong] Starting, selectedSong:', selectedSongSnapshot)
+    if (testMode) {
+      const sent = await sendTestTip(amount, selectedSongSnapshot)
+      if (sent && selectedSong?.id === selectedSongSnapshot.id) {
+        setSelectedSong(null)
+        setShowSongSearch(false)
+        setSongRequestName('')
+        setSongRequestNote('')
+      }
+      return
+    }
     try {
       // Get stored payment method ID and customer ID using fallback search
       const paymentMethodId = getStoredPaymentMethodId()
@@ -1095,7 +1155,7 @@ const TippingInterface: React.FC = () => {
   }
 
   // Block desktop usage and prompt user to open on mobile
-  if (!isMobile) {
+  if (!isMobile && !testMode) {
     return (
       <InfoScreen feedback={userId ? { userId, deviceUuid: deviceInfo?.uuid } : undefined} icon="qr" title="Open this on your phone">
         The tipping page is made for phones. Scan the QR code again with your phone's camera.
@@ -1105,6 +1165,11 @@ const TippingInterface: React.FC = () => {
 
   return (
     <>
+      {testMode && (
+        <div role="status" className="fixed inset-x-0 top-0 z-[60] bg-amber-400 px-3 py-1.5 text-center text-xs font-bold text-black shadow">
+          TEST · nothing is charged or saved · lights and sound only
+        </div>
+      )}
       <TipScreen
         performerName={performerName}
         venueName={deviceInfo?.isVenueDevice ? deviceInfo.venueName : undefined}
@@ -1123,7 +1188,7 @@ const TippingInterface: React.FC = () => {
           setShowSongSearch(true)
         }}
         onClearSong={clearSelectedSong}
-        card={savedCard}
+        card={testMode ? null : savedCard}
         hasCard={isPaymentSetup}
         onChangeCard={() => {
           feedback.dismissNow()
@@ -1135,7 +1200,7 @@ const TippingInterface: React.FC = () => {
             <FeedbackBar prompt={feedback.prompt} phase={feedback.phase} onRate={feedback.rate} onChoose={feedback.choose} onDismiss={feedback.dismissNow} />
           ) : undefined
         }
-        footerLink={<GiveFeedbackLink userId={userId} deviceUuid={deviceInfo?.uuid} />}
+        footerLink={testMode ? undefined : <GiveFeedbackLink userId={userId} deviceUuid={deviceInfo?.uuid} />}
       />
 
       {feedback.prompt && (

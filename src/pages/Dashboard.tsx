@@ -2003,7 +2003,7 @@ const Dashboard: React.FC = () => {
                     </ul>
                   )}
                 </Card>
-                {userProfile?.id && <AlertsCard tipAmounts={tipAmounts} />}
+                {userProfile?.id && <AlertsCard />}
                 <details className="group rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-ink-700">
                   <summary className="cursor-pointer list-none font-semibold text-ink-900">Using a tablet?</summary>
                   <p className="mt-2 text-ink-500">
