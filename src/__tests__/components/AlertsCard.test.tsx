@@ -17,45 +17,51 @@ const push = vi.hoisted(() => ({
 }))
 vi.mock('@/utils/pushAlerts', () => push)
 
-const amounts = [2, 5, 10, 20, 50, 100]
-
 describe('AlertsCard', () => {
   beforeEach(() => {
     Object.values(push).forEach(f => f.mockClear())
     push.getPushSupport.mockReturnValue('ready')
     push.notificationPermission.mockReturnValue('default')
     push.currentSubscription.mockResolvedValue(null)
-    api.get.mockResolvedValue({ data: { amounts: [20] } })
-    api.put.mockImplementation(async (_u: string, body: { amounts: number[] }) => ({ data: { amounts: body.amounts } }))
+    api.get.mockResolvedValue({ data: { songsOnly: false } })
+    api.put.mockImplementation(async (_u: string, body: { songsOnly: boolean }) => ({ data: { songsOnly: body.songsOnly } }))
   })
 
-  it('shows the saved amounts as pressed and saves a change', async () => {
-    render(<AlertsCard tipAmounts={amounts} />)
-    const twenty = await screen.findByRole('button', { name: '$20' })
-    await waitFor(() => expect(twenty).toHaveAttribute('aria-pressed', 'true'))
-    expect(screen.getByRole('button', { name: '$50' })).toHaveAttribute('aria-pressed', 'false')
-
-    fireEvent.click(screen.getByRole('button', { name: '$100' }))
-    await waitFor(() => expect(api.put).toHaveBeenCalledWith('/api/profiles/me/alert-amounts', { amounts: [20, 100] }))
-    await waitFor(() => expect(screen.getByRole('button', { name: '$100' })).toHaveAttribute('aria-pressed', 'true'))
+  it('alerts on every tip by default: there are no amounts to choose, and "songs only" is off', async () => {
+    render(<AlertsCard />)
+    const toggle = await screen.findByRole('switch', { name: 'Only alert me for tips with a song' })
+    await waitFor(() => expect(toggle).toHaveAttribute('aria-checked', 'false'))
+    expect(screen.queryByRole('button', { name: '$20' })).toBeNull()
+    expect(screen.queryByRole('switch', { name: 'Show every tip in my Live queue' })).toBeNull()
+    expect(screen.getByText(/Every tip shows on your Live tab, and every tip sends an alert/)).toBeInTheDocument()
   })
 
-  it('marks the chosen amounts with a check, so on and off cannot be confused', async () => {
-    render(<AlertsCard tipAmounts={amounts} />)
-    const twenty = await screen.findByRole('button', { name: '$20' })
-    await waitFor(() => expect(twenty).toHaveAttribute('aria-pressed', 'true'))
-    expect(twenty.querySelector('svg')).not.toBeNull()
-    expect(screen.getByRole('button', { name: '$50' }).querySelector('svg')).toBeNull()
+  it('saves "songs only" and shows it as on', async () => {
+    render(<AlertsCard />)
+    const toggle = await screen.findByRole('switch', { name: 'Only alert me for tips with a song' })
+    await waitFor(() => expect(toggle).not.toBeDisabled())
+    fireEvent.click(toggle)
+
+    await waitFor(() => expect(api.put).toHaveBeenCalledWith('/api/profiles/me/alert-preference', { songsOnly: true }))
+    await waitFor(() => expect(toggle).toHaveAttribute('aria-checked', 'true'))
   })
 
-  it('puts the amount back and says so when saving fails', async () => {
+  it('shows a saved "songs only" choice as on when it opens', async () => {
+    api.get.mockResolvedValue({ data: { songsOnly: true } })
+    render(<AlertsCard />)
+    const toggle = await screen.findByRole('switch', { name: 'Only alert me for tips with a song' })
+    await waitFor(() => expect(toggle).toHaveAttribute('aria-checked', 'true'))
+  })
+
+  it('puts the switch back and says so when saving fails', async () => {
     api.put.mockResolvedValue({ error: 'nope' })
-    render(<AlertsCard tipAmounts={amounts} />)
-    await waitFor(() => expect(screen.getByRole('button', { name: '$20' })).toHaveAttribute('aria-pressed', 'true'))
+    render(<AlertsCard />)
+    const toggle = await screen.findByRole('switch', { name: 'Only alert me for tips with a song' })
+    await waitFor(() => expect(toggle).not.toBeDisabled())
 
-    fireEvent.click(screen.getByRole('button', { name: '$50' }))
+    fireEvent.click(toggle)
     expect(await screen.findByRole('alert')).toHaveTextContent('Could not save')
-    expect(screen.getByRole('button', { name: '$50' })).toHaveAttribute('aria-pressed', 'false')
+    expect(toggle).toHaveAttribute('aria-checked', 'false')
   })
 
   it('turns alerts on from a tap and then offers a test', async () => {
@@ -64,7 +70,7 @@ describe('AlertsCard', () => {
       push.notificationPermission.mockReturnValue('granted')
       return 'on'
     })
-    render(<AlertsCard tipAmounts={amounts} />)
+    render(<AlertsCard />)
     fireEvent.click(await screen.findByRole('button', { name: 'Turn on tip alerts' }))
 
     expect(await screen.findByText('On for this device')).toBeInTheDocument()
@@ -75,33 +81,20 @@ describe('AlertsCard', () => {
 
   it('tells iPad users to add Tipwave to the Home Screen, with no button to press', async () => {
     push.getPushSupport.mockReturnValue('needs-install')
-    render(<AlertsCard tipAmounts={amounts} />)
+    render(<AlertsCard />)
     expect(await screen.findByText('Add Tipwave to your Home Screen first')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Turn on tip alerts' })).toBeNull()
   })
 
   it('explains blocked notifications', async () => {
     push.notificationPermission.mockReturnValue('denied')
-    render(<AlertsCard tipAmounts={amounts} />)
+    render(<AlertsCard />)
     expect(await screen.findByText('Notifications are blocked for Tipwave')).toBeInTheDocument()
   })
 
   it('says alerts are not switched on when the server has no keys', async () => {
     push.loadPushConfig.mockResolvedValueOnce({ enabled: false } as any)
-    render(<AlertsCard tipAmounts={amounts} />)
+    render(<AlertsCard />)
     expect(await screen.findByText('Tip alerts are not switched on yet')).toBeInTheDocument()
-  })
-
-  it('shows every tip in the Live queue by default, and can limit it to the chosen amounts', async () => {
-    api.get.mockResolvedValue({ data: { amounts: [20], showAllTips: true } })
-    api.put.mockImplementation(async (_u: string, body: { amounts: number[]; showAllTips?: boolean }) => ({ data: { amounts: body.amounts, showAllTips: body.showAllTips ?? true } }))
-    render(<AlertsCard tipAmounts={amounts} />)
-
-    const toggle = await screen.findByRole('switch', { name: 'Show every tip in my Live queue' })
-    expect(toggle).toHaveAttribute('aria-checked', 'true')
-    fireEvent.click(toggle)
-
-    await waitFor(() => expect(api.put).toHaveBeenCalledWith('/api/profiles/me/alert-amounts', { amounts: [20], showAllTips: false }))
-    await waitFor(() => expect(toggle).toHaveAttribute('aria-checked', 'false'))
   })
 })
