@@ -61,6 +61,16 @@ describe('the admin test of a performer\'s tip page', () => {
     expect(screen.getByRole('button', { name: 'Tip $100' })).toBeInTheDocument()
   })
 
+  it('leaves room under the TEST strip, so the performer\'s photo, name and bio are not covered', async () => {
+    const { container } = open()
+    const banner = await loaded()
+
+    // The strip has a fixed height and the page starts below it by exactly that much
+    expect(banner.className).toMatch(/\bh-7\b/)
+    expect(container.querySelector('[data-top-offset="1.75rem"]')).not.toBeNull()
+    expect(screen.getByText('Tip Dave')).toBeInTheDocument()
+  })
+
   it('works even when the performer is not yet set up to be paid, and never asks for a card', async () => {
     open()
     await loaded()

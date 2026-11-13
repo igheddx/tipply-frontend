@@ -37,6 +37,8 @@ interface DeviceInfo {
   stripeAccountId?: string
   isAllowSongRequest?: boolean
   tipAmounts?: number[]
+  // The performer chose to be asked about a song when an amount is tapped (off unless they turn it on)
+  askForSongFirst?: boolean
   // Venue devices: who is on, and the session the page must send back with a tip
   isVenueDevice?: boolean
   venueName?: string
@@ -92,6 +94,9 @@ function InfoScreen({
   )
 }
 
+// The height of the TEST strip (h-7), so the page below it starts underneath it and the performer's photo, name and bio stay visible
+const TEST_BANNER_HEIGHT = '1.75rem'
+
 interface TippingInterfaceProps {
   /**
    * An admin's test of the tip page (opened from Admin → Insights). Tapping an amount only fires that performer's light and sound:
@@ -134,6 +139,8 @@ const TippingInterface: React.FC<TippingInterfaceProps> = ({ testMode = false })
   const [selectedSong, setSelectedSong] = useState<{id: string, title: string, artist: string} | null>(null)
   const [songRequestName, setSongRequestName] = useState('')
   const [songRequestNote, setSongRequestNote] = useState('')
+  // The amount just tapped while the song question is showing (only when the performer asks about a song first)
+  const [askAmount, setAskAmount] = useState<number | null>(null)
   
   const audioRef = useRef<HTMLAudioElement>(null)
   const audioContextRef = useRef<AudioContext | null>(null)
@@ -396,6 +403,7 @@ const TippingInterface: React.FC<TippingInterfaceProps> = ({ testMode = false })
           isStripeVerified: device.isStripeVerified || false,
           isKycVerified: device.isKycVerified || false,
           tipAmounts: device.tipAmounts,
+          askForSongFirst: !!device.askForSongFirst,
           isVenueDevice: !!device.isVenueDevice,
           venueName: device.venueName || undefined,
           sessionId: device.sessionId || undefined
@@ -777,10 +785,22 @@ const TippingInterface: React.FC<TippingInterfaceProps> = ({ testMode = false })
     void runConfetti()
   }
 
-  const handleTipClick = (amount: number, opts?: { cardJustSaved?: boolean }) => {
+  const handleTipClick = (amount: number, opts?: { cardJustSaved?: boolean; skipSongPrompt?: boolean; song?: { id: string; title: string; artist: string; requestorName?: string; note?: string } }) => {
     // Tapping anything else quietly closes a question that is showing
     feedback.dismissNow()
     if (isDebouncing) return
+    // A performer who likes to ask: tapping an amount first asks whether to request a song. Not asked when a song was already chosen
+    // with the "Request a song" button, when the question was already answered, or when there is nothing to pick from.
+    if (
+      deviceInfo?.askForSongFirst && !!userId && !!deviceInfo.isAllowSongRequest && (deviceInfo.songCount ?? 1) > 0 &&
+      !selectedSong && !opts?.song && !opts?.skipSongPrompt && !opts?.cardJustSaved
+    ) {
+      feedback.dismissNow()
+      songPickerUsed.current = true
+      setAskAmount(amount)
+      setShowSongSearch(true)
+      return
+    }
     // First tip: ask for a card once. Nothing is sent, no light or sound plays, until there is one. The amount is held for the moment it is saved.
     if (decideTap({ ready: !!deviceInfo && !!userId, hasCard: isPaymentSetup, cardJustSaved: opts?.cardJustSaved }) === 'ask-for-card') {
       pendingTipRef.current = amount
@@ -817,12 +837,15 @@ const TippingInterface: React.FC<TippingInterfaceProps> = ({ testMode = false })
     if (sentTimer.current) clearTimeout(sentTimer.current)
     sentTimer.current = setTimeout(() => setSentAmount(null), 1600)
 
-    // If song is selected, this completes the song request
-    if (selectedSong) {
-      const trimmedName = songRequestName.trim()
-      const trimmedNote = songRequestNote.trim()
+    // If song is selected (or was just picked from the question), this completes the song request
+    const songForTip = opts?.song ?? selectedSong
+    if (songForTip) {
+      const trimmedName = (opts?.song?.requestorName ?? songRequestName).trim()
+      const trimmedNote = (opts?.song?.note ?? songRequestNote).trim()
       const selectedSongSnapshot = {
-        ...selectedSong,
+        id: songForTip.id,
+        title: songForTip.title,
+        artist: songForTip.artist,
         ...(trimmedName ? { requestorName: trimmedName } : {}),
         ...(trimmedNote ? { note: trimmedNote } : {})
       }
@@ -1032,6 +1055,27 @@ const TippingInterface: React.FC<TippingInterfaceProps> = ({ testMode = false })
     setSongRequestName(song.requestorName ?? '')
     setSongRequestNote(song.note ?? '')
     setShowSongSearch(false)
+    // Picked from the question after tapping an amount: the tip goes now, with the song. (If a card is still needed, the chosen
+    // song waits with the amount and goes with the tip the moment the card is saved.)
+    if (askAmount != null) {
+      const amount = askAmount
+      setAskAmount(null)
+      handleTipClick(amount, { skipSongPrompt: true, song: { id: song.id, title: song.title, artist: song.artist, requestorName: song.requestorName, note: song.note } })
+    }
+  }
+
+  // "No thanks, just tip": the question is answered, the tip goes without a song
+  const handleSkipSong = () => {
+    const amount = askAmount
+    setAskAmount(null)
+    setShowSongSearch(false)
+    if (amount != null) handleTipClick(amount, { skipSongPrompt: true })
+  }
+
+  // Closing the question without answering sends nothing
+  const handleCloseSongPicker = () => {
+    setShowSongSearch(false)
+    setAskAmount(null)
   }
 
   const clearSelectedSong = () => {
@@ -1072,7 +1116,7 @@ const TippingInterface: React.FC<TippingInterfaceProps> = ({ testMode = false })
           const chosen = pendingTipRef.current
           pendingTipRef.current = null
           setPendingTip(null)
-          if (chosen) handleTipClick(chosen, { cardJustSaved: true })
+          if (chosen) handleTipClick(chosen, { cardJustSaved: true, skipSongPrompt: true })
           else toast.success('All set. Tap an amount to tip.', { duration: 2200 })
         }}
         deviceUuid={deviceInfo?.uuid || ''}
@@ -1102,6 +1146,7 @@ const TippingInterface: React.FC<TippingInterfaceProps> = ({ testMode = false })
       <TipScreen
         performerName=""
         amounts={DEFAULT_TIP_AMOUNTS}
+        topOffset={testMode ? TEST_BANNER_HEIGHT : undefined}
         ready={false}
         sentAmount={null}
         onTip={() => {}}
@@ -1157,7 +1202,10 @@ const TippingInterface: React.FC<TippingInterfaceProps> = ({ testMode = false })
   return (
     <>
       {testMode && (
-        <div role="status" className="fixed inset-x-0 top-0 z-[60] bg-amber-400 px-3 py-1.5 text-center text-xs font-bold text-black shadow">
+        <div
+          role="status"
+          className="fixed inset-x-0 top-0 z-[60] flex h-7 items-center justify-center overflow-hidden whitespace-nowrap bg-amber-400 px-3 text-xs font-bold text-black shadow"
+        >
           TEST · nothing is charged or saved · lights and sound only
         </div>
       )}
@@ -1167,6 +1215,7 @@ const TippingInterface: React.FC<TippingInterfaceProps> = ({ testMode = false })
         photoUrl={deviceInfo?.profilePhotoUrl}
         bio={deviceInfo?.bio}
         amounts={tipAmounts}
+        topOffset={testMode ? TEST_BANNER_HEIGHT : undefined}
         ready={ready}
         sentAmount={sentAmount}
         onTip={handleTipClick}
@@ -1214,8 +1263,10 @@ const TippingInterface: React.FC<TippingInterfaceProps> = ({ testMode = false })
         open={showSongSearch}
         deviceUuid={deviceInfo?.uuid || ''}
         current={selectedSong ? { ...selectedSong, requestorName: songRequestName, note: songRequestNote } : null}
-        onClose={() => setShowSongSearch(false)}
+        onClose={handleCloseSongPicker}
         onPick={handleSongPick}
+        askAmount={askAmount}
+        onSkip={handleSkipSong}
       />
 
       {paymentModal}

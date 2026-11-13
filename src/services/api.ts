@@ -505,6 +505,14 @@ class ApiService {
     })
   }
 
+  /** "Ask for a song when an amount is tapped" for one of the performer's own devices (off by default) */
+  async updateSongPromptSetting(deviceId: string, askForSongFirst: boolean): Promise<ApiResponse<any>> {
+    return this.request(`/api/devices/${deviceId}/song-prompt`, {
+      method: 'PUT',
+      body: JSON.stringify({ askForSongFirst })
+    })
+  }
+
   async updateDevicePause(deviceId: string, isPaused: boolean): Promise<ApiResponse<any>> {
     return this.request(`/api/devices/${deviceId}/pause`, {
       method: 'PUT',

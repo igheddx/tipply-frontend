@@ -188,6 +188,32 @@ describe('AdminRefunds', () => {
     profileId: 'p1', performerName: 'Dave Lovett Piano', tipStatus: 'processed', hasSongRequest: false, ...over
   })
 
+  it('says when the decided history is cut, instead of quietly showing only part of it', async () => {
+    const decided = Array.from({ length: 100 }, (_, i) => req({ id: `d${i}`, status: 'approved', decidedAt: hoursAgo(2 + i / 100), requestedAt: hoursAgo(30) }))
+    refunds.adminList.mockResolvedValue({ data: { pendingCount: 0, requests: decided, decidedTotal: 450, decidedShown: 100, directRefunds: [], directRefundsTotal: 0 } })
+    render(<AdminRefunds />)
+
+    expect(await screen.findByText('Showing the newest 100 of 450 refunded or declined in the last 30 days')).toBeInTheDocument()
+  })
+
+  it('does not claim anything was cut when everything is shown', async () => {
+    const decided = [req({ id: 'd1', status: 'declined', decidedAt: hoursAgo(2), requestedAt: hoursAgo(30) })]
+    refunds.adminList.mockResolvedValue({ data: { pendingCount: 0, requests: decided, decidedTotal: 1, decidedShown: 1, directRefunds: [], directRefundsTotal: 0 } })
+    render(<AdminRefunds />)
+
+    expect(await screen.findByText('Everything refunded or declined in the last 30 days')).toBeInTheDocument()
+    expect(screen.queryByText(/Showing the newest/)).toBeNull()
+  })
+
+  it('shows every waiting request, including a long queue', async () => {
+    const waiting = Array.from({ length: 250 }, (_, i) => req({ id: `w${i}`, tipId: `t${i}`, performerName: `Performer ${i}`, requestedAt: hoursAgo(300 - i) }))
+    refunds.adminList.mockResolvedValue({ data: { pendingCount: 250, requests: waiting, decidedTotal: 0, directRefundsTotal: 0 } })
+    render(<AdminRefunds />)
+
+    expect(await screen.findByText('Performer 0')).toBeInTheDocument()
+    expect(screen.getByText('Performer 249')).toBeInTheDocument() // the last one is there, not cut at a page
+  })
+
   it('lists what is waiting with the performer, amount, reason and their words', async () => {
     refunds.adminList.mockResolvedValue({ data: { pendingCount: 1, requests: [req()] } })
     render(<AdminRefunds />)

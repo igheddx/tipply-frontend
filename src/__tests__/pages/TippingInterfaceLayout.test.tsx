@@ -62,6 +62,16 @@ describe('the tip page layout', () => {
     expect(screen.queryByText('Portrait mode only')).toBeNull()
   })
 
+  it('the real tip page has no TEST strip and leaves no gap at the top', async () => {
+    setScreen(390, 844, true)
+    const { container } = open()
+
+    await screen.findByRole('button', { name: 'Tip $5' })
+    await waitFor(() => expect(container.querySelector('.max-w-\\[480px\\]')).not.toBeNull())
+    expect(container.querySelector('[data-top-offset]')).toBeNull()
+    expect(screen.queryByText(/nothing is charged or saved/)).toBeNull()
+  })
+
   it('a wide desktop window is not treated as a turned phone: it is asked to open the page on a phone', async () => {
     setScreen(1440, 900, false)
     open()

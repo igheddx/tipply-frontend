@@ -147,6 +147,8 @@ const SongRequestMonitor: React.FC<SongRequestMonitorProps> = ({
   const knownKeys = useRef<Set<string> | null>(null)
   // Tips with no song: the list, which the performer has marked seen (kept on this device), and which were already announced
   const [plainTips, setPlainTips] = useState<PlainTip[]>([])
+  // All the tips without a song in this show, against how many the list holds, so a long show says that older ones are not listed
+  const [plainTipsTotal, setPlainTipsTotal] = useState(0)
   // The queue is for one show: the current one, or an earlier one the performer picks. null means "the current show".
   const [shows, setShows] = useState<ShowSummary[]>([])
   const [pickedShowId, setPickedShowId] = useState<string | null>(null)
@@ -227,6 +229,7 @@ const SongRequestMonitor: React.FC<SongRequestMonitorProps> = ({
         // Tips of the chosen amounts that came with no song: list them, and announce new ones like song tips
         const plain: PlainTip[] = data.tipsWithoutSong || []
         setPlainTips(plain)
+        setPlainTipsTotal(typeof data.tipsWithoutSongTotal === 'number' ? data.tipsWithoutSongTotal : plain.length)
         if (knownTipIds.current) {
           const addedTips = plain.filter(t => !knownTipIds.current!.has(t.id))
           if (addedTips.length > 0) {
@@ -932,6 +935,11 @@ const SongRequestMonitor: React.FC<SongRequestMonitorProps> = ({
                   Tips without a song
                   <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-ink-700">{newTips.length}</span>
                 </h2>
+                {plainTipsTotal > plainTips.length && (
+                  <p className="mb-2 text-xs text-ink-500" role="note">
+                    Showing the newest {plainTips.length} of {plainTipsTotal} tips without a song in this show.
+                  </p>
+                )}
                 {newTips.length === 0 ? (
                   <p className="rounded-2xl border border-slate-100 bg-white px-4 py-3 text-sm text-ink-500">All seen.</p>
                 ) : (

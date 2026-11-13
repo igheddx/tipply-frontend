@@ -71,6 +71,8 @@ export interface TipScreenProps {
   bottomBarOverride?: React.ReactNode
   /** A quiet link in the footer, e.g. "Give feedback" */
   footerLink?: React.ReactNode
+  /** Space to leave above the page for a banner drawn over the top (the admin TEST strip), e.g. "1.75rem" */
+  topOffset?: string
 }
 
 /**
@@ -96,7 +98,8 @@ export function TipScreen({
   onChangeCard,
   total,
   bottomBarOverride,
-  footerLink
+  footerLink,
+  topOffset
 }: TipScreenProps) {
   // Phones paint the area behind their status bar and address bar from the page background and the theme color.
   // Match both to this screen while it is open, so there is no light strip at the top or bottom.
@@ -149,10 +152,11 @@ export function TipScreen({
     {/* Reaches past every edge of the screen, so a strip the phone leaves uncovered under its toolbar is the same dark color, never white */}
     <div aria-hidden="true" className="pointer-events-none fixed" style={{ inset: '-80px 0', zIndex: -1, background: palette.mid }} />
     <div
+      data-top-offset={topOffset || undefined}
       className="fixed inset-0 overflow-hidden text-white"
       style={{
         height: '100dvh',
-        paddingTop: 'calc(env(safe-area-inset-top) + 0.75rem)',
+        paddingTop: `calc(env(safe-area-inset-top) + 0.75rem${topOffset ? ` + ${topOffset}` : ''})`,
         paddingBottom: 'calc(env(safe-area-inset-bottom) + 0.5rem)',
         // The top and bottom edges are plain #0a2533 and #0f3447, the same colors the phone's bars are given,
         // so the screen runs into them with no visible seam. The soft glows sit inside, away from the edges.

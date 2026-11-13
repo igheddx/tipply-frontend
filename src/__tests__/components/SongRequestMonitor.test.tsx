@@ -60,6 +60,23 @@ describe('SongRequestMonitor', () => {
     await waitFor(() => expect(document.title).toBe('(2) Live'))
   })
 
+  it('says when older tips without a song are not listed, so nothing is hidden quietly', async () => {
+    const tips = Array.from({ length: 200 }, (_, i) => ({ id: `t${i}`, amount: 10, createdAt: new Date(Date.now() - i * 60000).toISOString(), status: 'processed' }))
+    global.fetch = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ songRequests: [request('a', 'Some song', 5, 1)], tipsWithoutSong: tips, tipsWithoutSongTotal: 350 }) }) as any
+    renderMonitor()
+
+    expect(await screen.findByText('Showing the newest 200 of 350 tips without a song in this show.')).toBeInTheDocument()
+  })
+
+  it('does not say anything was cut when every tip is listed', async () => {
+    const tips = [{ id: 't1', amount: 10, createdAt: new Date().toISOString(), status: 'processed' }]
+    global.fetch = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ songRequests: [], tipsWithoutSong: tips, tipsWithoutSongTotal: 1 }) }) as any
+    renderMonitor()
+
+    await screen.findByText('Tips without a song')
+    expect(screen.queryByRole('note')).toBeNull()
+  })
+
   it('shows a test request marked TEST at $0, and a real request as normal', async () => {
     mockQueue([{ ...request('t', 'Test song', 0, 1), isTest: true }, request('r', 'Real song', 20, 2)])
     renderMonitor()
