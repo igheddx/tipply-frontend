@@ -7,11 +7,11 @@ const NOW = new Date('2026-11-11T12:00:00Z')
 describe('PayoutsCard', () => {
   it('shows the three stages of the money in order', () => {
     render(<PayoutsCard futurePayouts={487.22} availableToPayOut={0} inTransit={359.99} recentPayouts={[]} now={NOW} />)
-    expect(screen.getByText('1. Pending (Future Payouts)')).toBeInTheDocument()
+    expect(screen.getByText('1. Coming from Stripe')).toBeInTheDocument()
     expect(screen.getByText('$487.22')).toBeInTheDocument()
-    expect(screen.getByText('2. Available to pay out')).toBeInTheDocument()
+    expect(screen.getByText('2. Ready to pay out')).toBeInTheDocument()
     expect(screen.getByText('$0.00')).toBeInTheDocument()
-    expect(screen.getByText('3. In transit')).toBeInTheDocument()
+    expect(screen.getByText('3. On its way to the bank')).toBeInTheDocument()
     expect(screen.getByText('$359.99')).toBeInTheDocument()
   })
 

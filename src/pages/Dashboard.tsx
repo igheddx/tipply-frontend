@@ -26,10 +26,11 @@ import { VenueSection } from '../components/venue/VenueSection'
 import { turnOffAlertsOnSignOut } from '../utils/pushAlerts'
 import { API_BASE_URL } from '../utils/config'
 import { setDemoModeOn, setShowDemoData, demoQuery } from '../utils/demoView'
-import { DEFAULT_TIP_AMOUNTS, TIP_AMOUNT_COUNT, LIGHT_EFFECTS, SOUND_OPTIONS, VOLUME_OPTIONS, DEFAULT_SOUND_ID, DEFAULT_SOUND_VOLUME, defaultEffectConfigFor, normalizeEffectConfig, remapEffectConfigByPosition, effectForAmount, buildEffectConfig } from '../utils/deviceConfig'
-import TipAmountsEditor from '../components/TipAmountsEditor'
+import { DEFAULT_TIP_AMOUNTS, TIP_AMOUNT_COUNT, SOUND_OPTIONS, VOLUME_OPTIONS, DEFAULT_SOUND_ID, DEFAULT_SOUND_VOLUME, defaultEffectConfigFor, normalizeEffectConfig, remapEffectConfigByPosition, effectForAmount, buildEffectConfig } from '../utils/deviceConfig'
+import TipButtonsCard from '../components/TipButtonsCard'
 import DeviceSongPromptSwitch from '../components/DeviceSongPromptSwitch'
 import { readyToPayOut } from '../utils/payouts'
+import AlertsPrompt from '../components/portal/AlertsPrompt'
 
 interface DashboardStats {
   totalDevices: number
@@ -151,7 +152,7 @@ const Dashboard: React.FC = () => {
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState(() => {
     const t = new URLSearchParams(window.location.search).get('tab')
-    return t && ['devices', 'tips', 'songs', 'monitor'].includes(t) ? t : 'overview'
+    return t && ['devices', 'tips', 'songs'].includes(t) ? t : 'overview'
   })
   // Shows (earnings per stretch of playing) appear only where the switch is on
   const [showsEnabled, setShowsEnabled] = useState(false)
@@ -159,7 +160,10 @@ const Dashboard: React.FC = () => {
   useEffect(() => {
     let cancelled = false
     void showApi.enabled().then(on => {
-      if (!cancelled) setShowsEnabled(on)
+      if (cancelled) return
+      setShowsEnabled(on)
+      // Per-show earnings is how a performer thinks about a night, so the Tips tab opens on Shows (the list of every tip is one tap away)
+      if (on) setTipsView('shows')
     })
     return () => {
       cancelled = true
@@ -224,8 +228,8 @@ const Dashboard: React.FC = () => {
   const [updatingDeviceConfig, setUpdatingDeviceConfig] = useState<string | null>(null)
   
   // Song Request Monitoring States
-  const [showMonitorFullscreen, setShowMonitorFullscreen] = useState(false)
-  const [songRequests, setSongRequests] = useState<any[]>([])
+  // Live is the screen itself, not a page of buttons: the tab (and the link in a tip alert, /dashboard?tab=monitor) opens it
+  const [showMonitorFullscreen, setShowMonitorFullscreen] = useState(() => new URLSearchParams(window.location.search).get('tab') === 'monitor')
   
   // Song Catalog Alert States
   const [, setShowSongCatalogAlert] = useState(false)
@@ -493,10 +497,6 @@ const Dashboard: React.FC = () => {
             const deletedResp = await apiService.getDeletedDevices()
             if (deletedResp.data) setDeletedDevices(deletedResp.data)
           }
-          break
-          
-        case 'monitor':
-          loadSongRequests()
           break
           
         default:
@@ -1286,34 +1286,6 @@ const Dashboard: React.FC = () => {
     return defaultEffectConfigFor(tipAmounts)
   }
 
-  const loadSongRequests = async () => {
-    if (!userProfile?.id) return
-    
-    try {
-      const token = localStorage.getItem('token')
-      // Add cache-busting query parameter to ensure fresh data
-      const cacheBuster = Date.now()
-      const response = await fetch(`${API_BASE_URL}/api/SongCatalog/monitor/${userProfile.id}?_t=${cacheBuster}`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Cache-Control': 'no-cache, no-store, must-revalidate',
-          'Pragma': 'no-cache',
-          'Expires': '0'
-        }
-      })
-      if (response.ok) {
-        const data = await response.json()
-        setSongRequests(data.songRequests || [])
-      } else {
-        const errorText = await response.text()
-        logger.error(`🔴 [Dashboard Monitor] Failed to load song requests: ${response.status} ${response.statusText}`, errorText)
-      }
-    } catch (error) {
-      logger.error('🔴 [Dashboard Monitor] Error loading song requests:', error)
-    }
-  }
-
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
@@ -1361,7 +1333,8 @@ const Dashboard: React.FC = () => {
     // Used every night, so on the phone's bar: Home, Tips, Live, Songs. Set-up screens (Devices) wait under More.
     { id: 'overview', label: 'Home', icon: 'home', pin: true },
     { id: 'tips', label: 'Tips', icon: 'coin', pin: true },
-    ...(hasSongRequestEnabled ? [{ id: 'monitor', label: 'Live', icon: 'mic', pin: true } as PortalNavItem] : []),
+    // Live shows every tip as well as song requests, so everyone has it
+    { id: 'monitor', label: 'Live', icon: 'mic', pin: true },
     { id: 'songs', label: 'Songs', icon: 'music', pin: true },
     { id: 'devices', label: 'Devices', icon: 'device' },
     ...(userProfile?.role === 'root_admin' ? [{ id: 'admin', label: 'Admin', icon: 'shield' } as PortalNavItem] : [])
@@ -1370,6 +1343,10 @@ const Dashboard: React.FC = () => {
   const handleNavSelect = (id: string) => {
     if (id === 'admin') {
       navigate('/admin')
+      return
+    }
+    if (id === 'monitor') {
+      setShowMonitorFullscreen(true)
       return
     }
     setShowAddDeviceForm(false)
@@ -1541,7 +1518,8 @@ const Dashboard: React.FC = () => {
                 formatCurrency={formatCurrency}
                 onGoToDevices={() => (stats.totalDevices === 0 ? handleAddDeviceClick() : setActiveTab('devices'))}
                 onGoToTips={() => setActiveTab('tips')}
-                onGoToLive={hasSongRequestEnabled ? () => setActiveTab('monitor') : undefined}
+                onGoToLive={() => setShowMonitorFullscreen(true)}
+                alertsSlot={<AlertsPrompt />}
                 showSlot={
                   showsEnabled ? (
                     <ShowCard
@@ -1685,8 +1663,8 @@ const Dashboard: React.FC = () => {
                           className="mt-4 flex w-full items-center justify-between border-t border-slate-100 pt-4 text-left"
                         >
                           <span>
-                            <span className="block text-sm font-semibold text-ink-900">Sound and lights</span>
-                            <span className="block text-xs text-ink-500">Volume, tones and light effects for each tip amount</span>
+                            <span className="block text-sm font-semibold text-ink-900">Sound and effects</span>
+                            <span className="block text-xs text-ink-500">Tone, volume and random light. The light for each button is under Your six tip buttons.</span>
                           </span>
                           <BrandIcon name={expandedDeviceConfig === device.id ? 'chevron-down' : 'chevron-right'} size={18} tone="muted" />
                         </button>
@@ -1741,33 +1719,6 @@ const Dashboard: React.FC = () => {
                                 onChange={() => saveDeviceConfig(device, { isRandomLightEffect: !(device.isRandomLightEffect ?? false) })}
                               />
                             </div>
-                            <div className="border-t border-slate-200 pt-3">
-                              <div className="mb-2 text-sm font-semibold text-ink-900">Light effect for each tip amount</div>
-                              <div className="space-y-2">
-                                {(() => {
-                                  const effectConfig = getEffectConfig(device)
-                                  return tipAmounts.map(amount => (
-                                    <div key={amount} className="flex items-center justify-between text-sm">
-                                      <span className="font-medium text-ink-700">${amount}</span>
-                                      <select
-                                        value={effectForAmount(effectConfig, amount)}
-                                        onChange={e =>
-                                          saveDeviceConfig(device, { effectConfig: { ...effectConfig, [amount.toString()]: e.target.value } })
-                                        }
-                                        disabled={busyConfig}
-                                        className="h-9 rounded-lg border border-slate-300 bg-white px-2 text-sm"
-                                      >
-                                        {LIGHT_EFFECTS.map(effect => (
-                                          <option key={effect.value} value={effect.value}>
-                                            {effect.label}
-                                          </option>
-                                        ))}
-                                      </select>
-                                    </div>
-                                  ))
-                                })()}
-                              </div>
-                            </div>
                             {busyConfig && <div className="text-center text-xs text-brand-700">Saving…</div>}
                           </div>
                         )}
@@ -1777,16 +1728,38 @@ const Dashboard: React.FC = () => {
                   })}
                 </div>
 
-                {/* The amounts on the tip page apply to every device, so they come right after the devices */}
-                <TipAmountsEditor
+                {/* The tip page's six buttons: the amounts (shared by every device) and the light each one fires (per device) */}
+                <TipButtonsCard
                   amounts={tipAmounts}
-                  saving={tipAmountsSaving}
-                  onSave={saveTipAmounts}
-                  onReset={resetTipAmounts}
+                  devices={(stats?.devices ?? []).map(d => ({ id: d.id, nickname: d.nickname }))}
+                  lightFor={(deviceId, amount) => {
+                    const device = stats?.devices.find(d => d.id === deviceId)
+                    return device ? effectForAmount(getEffectConfig(device), amount) : 'effect1'
+                  }}
+                  onLightChange={(deviceId, amount, effect) => {
+                    const device = stats?.devices.find(d => d.id === deviceId)
+                    if (device) saveDeviceConfig(device, { effectConfig: { ...getEffectConfig(device), [amount.toString()]: effect } })
+                  }}
+                  busyDeviceId={updatingDeviceConfig}
+                  savingAmounts={tipAmountsSaving}
+                  onSaveAmounts={saveTipAmounts}
+                  onResetAmounts={resetTipAmounts}
                 />
 
                 <VenueInvites />
                 <VenueSection performerId={userProfile?.id} stageName={userProfile?.stageName || userProfile?.firstName} />
+
+                {/* Tip alerts: the full settings live here; Home only offers to turn them on */}
+                {userProfile?.id && <AlertsCard />}
+                <details className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-ink-700">
+                  <summary className="cursor-pointer list-none font-semibold text-ink-900">Using a tablet for Live?</summary>
+                  <p className="mt-2 text-ink-500">
+                    Live can open in its own window, to keep it beside your charts or sheet music: open /monitor, bookmark it, or add it to your home screen.
+                  </p>
+                  <p className="mt-2 text-ink-500">
+                    To see both at once on an iPad, swipe up from the bottom for the dock, then drag Safari next to your music app.
+                  </p>
+                </details>
 
                 {/* Removed devices */}
                 <div>
@@ -1838,7 +1811,7 @@ const Dashboard: React.FC = () => {
                 className="mb-4"
                 active={tipsView}
                 onChange={id => setTipsView(id as 'tips' | 'shows')}
-                items={[{ id: 'tips', label: 'Tips' }, { id: 'shows', label: 'Shows' }]}
+                items={[{ id: 'shows', label: 'Shows' }, { id: 'tips', label: 'All tips' }]}
               />
             )}
 
@@ -1984,54 +1957,6 @@ const Dashboard: React.FC = () => {
               </div>
             )}
 
-            {activeTab === 'monitor' && (
-              <div className="space-y-5">
-                <div className="flex flex-wrap items-center gap-3">
-                  <Button icon="mic" onClick={() => setShowMonitorFullscreen(true)}>
-                    Open full-screen view
-                  </Button>
-                  <Button variant="secondary" icon="qr" onClick={() => window.open('/monitor', '_blank')}>
-                    Open in its own window
-                  </Button>
-                </div>
-                <Card title="Today's requests" subtitle="The most-tipped songs come first." flush>
-                  {songRequests.length === 0 ? (
-                    <EmptyState icon="music" title="No song requests today">
-                      When someone tips and picks a song, it shows up here.
-                    </EmptyState>
-                  ) : (
-                    <ul className="divide-y divide-slate-100 px-5 pb-2">
-                      {songRequests.map(request => (
-                        <li key={request.songId} className="flex items-center gap-3 py-3">
-                          <div className="min-w-0 flex-1">
-                            <div className="truncate font-bold text-ink-900">{request.songTitle}</div>
-                            <div className="truncate text-sm text-ink-500">{request.artist}</div>
-                            <div className="mt-0.5 text-xs text-ink-400">
-                              {formatCurrency(request.totalTipAmount)} · {request.requestCount} {request.requestCount === 1 ? 'request' : 'requests'} ·{' '}
-                              {new Date(request.firstRequestTime).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
-                            </div>
-                          </div>
-                          <StatusChip
-                            kind={request.status === 'completed' ? 'paid' : request.status === 'performing' ? 'active' : 'processing'}
-                            label={request.status === 'completed' ? 'Played' : request.status === 'performing' ? 'Playing' : 'Waiting'}
-                          />
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </Card>
-                {userProfile?.id && <AlertsCard />}
-                <details className="group rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-ink-700">
-                  <summary className="cursor-pointer list-none font-semibold text-ink-900">Using a tablet?</summary>
-                  <p className="mt-2 text-ink-500">
-                    Open Live in its own window to keep it beside your charts or sheet music. Bookmark /monitor or add it to your home screen to jump straight in.
-                  </p>
-                  <p className="mt-2 text-ink-500">
-                    To see both at once on an iPad, swipe up from the bottom for the dock, then drag Safari next to your music app.
-                  </p>
-                </details>
-              </div>
-            )}
         </div>
       </PortalShell>
 

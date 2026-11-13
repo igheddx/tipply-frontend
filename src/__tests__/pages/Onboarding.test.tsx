@@ -130,6 +130,15 @@ describe('Onboarding, step 1: the account', () => {
     expect(screen.queryByLabelText('Verification code')).toBeNull()
   })
 
+  it('is three steps for a performer: account, email, payouts. The device comes later', async () => {
+    await open()
+    expect(screen.getAllByText('Create account').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('Verify email').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('Get paid').length).toBeGreaterThan(0)
+    expect(screen.queryByText('Add your device')).toBeNull()
+    expect(screen.getByText(/You can add your device afterwards/)).toBeInTheDocument()
+  })
+
   it('offers sign-in to someone who already has an account', async () => {
     await open()
     await userEvent.click(screen.getByRole('button', { name: 'Sign in' }))
@@ -155,14 +164,16 @@ describe('Onboarding, step 2: the email code', () => {
     expect(screen.getByRole('button', { name: 'Verify' })).toBeDisabled()
   })
 
-  it('checks the code by itself once the sixth digit is in, against the same email, and moves on when it is right', async () => {
+  it('checks the code by itself once the sixth digit is in, against the same email, and goes on to payouts when it is right', async () => {
     api.validateOnboardingCode.mockResolvedValue({ data: { message: 'ok' } })
     await toCodeStep()
 
     await userEvent.type(screen.getByLabelText('Verification code'), '123456') // no button to press
 
     await waitFor(() => expect(api.validateOnboardingCode).toHaveBeenCalledWith('dave@example.com', '123456'))
-    expect(await screen.findByLabelText('Serial number')).toBeInTheDocument() // on to adding a device
+    // straight on to payouts: there is no device step in sign-up (the device is added afterwards)
+    expect(await screen.findByRole('button', { name: 'Verify identity with Stripe' })).toBeInTheDocument()
+    expect(screen.queryByLabelText('Serial number')).toBeNull()
   })
 
   it('says the code is wrong and stays, without moving the person on', async () => {
@@ -172,6 +183,6 @@ describe('Onboarding, step 2: the email code', () => {
     await userEvent.type(screen.getByLabelText('Verification code'), '000000')
 
     expect(await screen.findByText('That code is not right')).toBeInTheDocument()
-    expect(screen.queryByLabelText('Serial number')).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Verify identity with Stripe' })).toBeNull()
   })
 })

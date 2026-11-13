@@ -29,7 +29,7 @@ const STATUS: Record<string, { kind: ChipKind; label: string }> = {
 }
 
 /**
- * Where a performer's money is, in the order it moves: pending (Future Payouts), then available, then a payout that is on its way
+ * Where a performer's money is, in the order it moves: coming from Stripe (pending), then ready to pay out (available), then a payout that is on its way
  * (In transit), then paid. Read from Stripe; nothing here can move money.
  */
 const PayoutsCard: React.FC<PayoutsCardProps> = ({ futurePayouts, availableToPayOut, inTransit, recentPayouts, now = new Date() }) => (
@@ -41,17 +41,17 @@ const PayoutsCard: React.FC<PayoutsCardProps> = ({ futurePayouts, availableToPay
 
     <dl className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
       <div>
-        <dt className="text-sm text-ink-500">1. Pending (Future Payouts)</dt>
+        <dt className="text-sm text-ink-500">1. Coming from Stripe</dt>
         <dd className="text-xl font-bold text-ink-900">{money(futurePayouts)}</dd>
         <dd className="text-xs text-ink-400">Held by Stripe for a few days</dd>
       </div>
       <div>
-        <dt className="text-sm text-ink-500">2. Available to pay out</dt>
+        <dt className="text-sm text-ink-500">2. Ready to pay out</dt>
         <dd className="text-xl font-bold text-ink-900">{availableToPayOut == null ? 'Not available' : money(availableToPayOut)}</dd>
         <dd className="text-xs text-ink-400">Ready for the next payout</dd>
       </div>
       <div>
-        <dt className="text-sm text-ink-500">3. In transit</dt>
+        <dt className="text-sm text-ink-500">3. On its way to the bank</dt>
         <dd className="text-xl font-bold text-ink-900">{money(inTransit)}</dd>
         <dd className="text-xs text-ink-400">On its way to the bank</dd>
       </div>

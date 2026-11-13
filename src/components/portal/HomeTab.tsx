@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { BrandIcon, IconTile, type BrandIconName } from '../icons/BrandIcons'
 import { Banner, Button, Card, EmptyState, StatCard, StatusChip } from '../ui'
@@ -46,6 +46,8 @@ interface HomeTabProps {
   regularsSlot?: ReactNode
   /** Refund requests waiting for review, shown near the top */
   requestsSlot?: ReactNode
+  /** The one-time offer to turn on tip alerts on this phone or tablet; it shows nothing once that is done */
+  alertsSlot?: ReactNode
   /** Top right of the greeting, e.g. the Refresh button */
   headerAction?: ReactNode
   formatCurrency: (n: number) => string
@@ -58,8 +60,24 @@ const greeting = () => {
 
 const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`
 
-export function HomeTab({ data, onGoToDevices, onGoToTips, onGoToLive, showSlot, regularsSlot, requestsSlot, headerAction, formatCurrency }: HomeTabProps) {
+function MoneyRow({ row }: { row: { label: string; hint: string; value: string; icon: BrandIconName } }) {
+  return (
+    <li className="flex items-center gap-3 py-3">
+      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand-50">
+        <BrandIcon name={row.icon} size={18} />
+      </span>
+      <div className="min-w-0 flex-1">
+        <div className="text-sm font-semibold text-ink-900">{row.label}</div>
+        <div className="text-xs text-ink-500">{row.hint}</div>
+      </div>
+      <div className="text-sm font-bold text-ink-900">{row.value}</div>
+    </li>
+  )
+}
+
+export function HomeTab({ data, onGoToDevices, onGoToTips, onGoToLive, showSlot, regularsSlot, requestsSlot, alertsSlot, headerAction, formatCurrency }: HomeTabProps) {
   const openSteps = data.nextSteps.filter(s => !s.done)
+  const [showMore, setShowMore] = useState(false)
   const money = (n: number) => (data.balancesLoading ? '…' : formatCurrency(n))
   const trend =
     data.month.trendPercent > 0
@@ -79,11 +97,17 @@ export function HomeTab({ data, onGoToDevices, onGoToTips, onGoToLive, showSlot,
   // With shows on, "This show" takes the place of the calendar-day tile
   const stats = showSlot ? allStats.slice(1) : allStats
 
-  const breakdown: { label: string; hint: string; value: string; icon: BrandIconName }[] = [
-    { label: 'Tips waiting to be charged', hint: 'Charged in the next batch', value: formatCurrency(data.pendingTips), icon: 'clock' },
-    { label: 'Scheduled payouts', hint: 'Coming from Stripe', value: money(data.scheduledPayouts), icon: 'calendar-check' },
-    { label: 'On its way to your bank', hint: 'Usually 1 to 2 business days', value: money(data.inTransit), icon: 'transit' },
+  type Row = { label: string; hint: string; value: string; icon: BrandIconName }
+  // The money in the order it moves: coming from Stripe, ready to pay out, on its way to the bank. These three words mean the same on the
+  // admin's performer page.
+  const moneyPath: Row[] = [
+    { label: 'Coming from Stripe', hint: 'Held for a couple of days after a tip', value: money(data.scheduledPayouts), icon: 'calendar-check' },
     { label: 'Ready to pay out', hint: 'Available in Stripe now', value: money(data.available), icon: 'wallet' },
+    { label: 'On its way to your bank', hint: 'Usually 1 to 2 business days', value: money(data.inTransit), icon: 'transit' }
+  ]
+  // Useful now and then, not every day: kept behind "More details"
+  const moreDetails: Row[] = [
+    { label: 'Tips waiting to be charged', hint: 'Charged in the next batch', value: formatCurrency(data.pendingTips), icon: 'clock' },
     { label: 'All-time tips', hint: 'Before fees. Payouts are after fees.', value: money(data.lifetime), icon: 'trend-up' }
   ]
 
@@ -140,6 +164,8 @@ export function HomeTab({ data, onGoToDevices, onGoToTips, onGoToLive, showSlot,
       {requestsSlot}
 
       {setupBlocking && setupCard}
+
+      {alertsSlot}
 
       {onGoToLive && (
         <Button icon="mic" size="lg" block onClick={onGoToLive}>
@@ -224,19 +250,28 @@ export function HomeTab({ data, onGoToDevices, onGoToTips, onGoToLive, showSlot,
       {/* Where the money is */}
       <Card title="Where your money is" subtitle={data.balancesLoading ? 'Updating from Stripe…' : undefined} flush>
         <ul className="divide-y divide-slate-100 px-5 pb-2">
-          {breakdown.map(r => (
-            <li key={r.label} className="flex items-center gap-3 py-3">
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand-50">
-                <BrandIcon name={r.icon} size={18} />
-              </span>
-              <div className="min-w-0 flex-1">
-                <div className="text-sm font-semibold text-ink-900">{r.label}</div>
-                <div className="text-xs text-ink-500">{r.hint}</div>
-              </div>
-              <div className="text-sm font-bold text-ink-900">{r.value}</div>
-            </li>
+          {moneyPath.map(r => (
+            <MoneyRow key={r.label} row={r} />
           ))}
         </ul>
+        <div className="border-t border-slate-100 px-5 py-2">
+          <button
+            type="button"
+            onClick={() => setShowMore(v => !v)}
+            aria-expanded={showMore}
+            className="flex h-10 items-center gap-1.5 text-sm font-semibold text-ink-500 hover:text-ink-700"
+          >
+            <BrandIcon name={showMore ? 'chevron-down' : 'chevron-right'} size={16} tone="muted" />
+            {showMore ? 'Fewer details' : 'More details'}
+          </button>
+          {showMore && (
+            <ul className="divide-y divide-slate-100" aria-label="More details">
+              {moreDetails.map(r => (
+                <MoneyRow key={r.label} row={r} />
+              ))}
+            </ul>
+          )}
+        </div>
       </Card>
     </div>
   )

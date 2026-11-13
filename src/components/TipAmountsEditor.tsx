@@ -8,12 +8,14 @@ interface TipAmountsEditorProps {
   saving: boolean
   onSave: (amounts: number[]) => void
   onReset: () => void
+  /** Drawn without its own card and heading, to sit inside another card (the performer's "tip buttons" card) */
+  bare?: boolean
 }
 
 const sorted = (values: number[]) => [...values].sort((a, b) => a - b)
 
 // Picks the six amounts shown on a performer's tip page, from a fixed list. They are always shown smallest to largest.
-const TipAmountsEditor: React.FC<TipAmountsEditorProps> = ({ amounts, saving, onSave, onReset }) => {
+const TipAmountsEditor: React.FC<TipAmountsEditorProps> = ({ amounts, saving, onSave, onReset, bare = false }) => {
   const [draft, setDraft] = useState<number[]>(sorted(amounts))
 
   useEffect(() => setDraft(sorted(amounts)), [amounts])
@@ -26,9 +28,9 @@ const TipAmountsEditor: React.FC<TipAmountsEditorProps> = ({ amounts, saving, on
   const full = draft.length >= TIP_AMOUNT_COUNT
 
   return (
-    <div className="rounded-2xl border border-slate-100 bg-white p-5 shadow-card">
-      <h3 className="text-base font-bold text-ink-900">Tip amounts</h3>
-      <p className="mb-3 mt-0.5 text-sm text-ink-500">
+    <div className={bare ? '' : 'rounded-2xl border border-slate-100 bg-white p-5 shadow-card'}>
+      {!bare && <h3 className="text-base font-bold text-ink-900">Tip amounts</h3>}
+      <p className={`mb-3 text-sm text-ink-500 ${bare ? '' : 'mt-0.5'}`}>
         Pick the {TIP_AMOUNT_COUNT} amounts shown on the tip page. They are shown lowest to highest, and each position keeps its light
         effect ({LIGHT_EFFECTS.map(effect => effect.label).join(', ')}, from left to right).
         Default: {DEFAULT_TIP_AMOUNTS.map(a => `$${a}`).join(', ')}.

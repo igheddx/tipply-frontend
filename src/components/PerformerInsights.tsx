@@ -649,12 +649,12 @@ const PerformerInsights: React.FC = () => {
                 </div>
                 
                 <div className="bg-white rounded-lg shadow-sm p-6">
-                  <div className="text-sm text-ink-500">Future Payouts</div>
+                  <div className="text-sm text-ink-500">Coming from Stripe</div>
                   <div className="text-2xl font-bold text-ink-900">${(insights.futurePayouts || 0).toFixed(2)}</div>
                 </div>
                 
                 <div className="bg-white rounded-lg shadow-sm p-6">
-                  <div className="text-sm text-ink-500">In Transit</div>
+                  <div className="text-sm text-ink-500">On its way to the bank</div>
                   <div className="text-2xl font-bold text-ink-900">${(insights.inTransit || 0).toFixed(2)}</div>
                 </div>
                 

@@ -9,12 +9,6 @@ import { Banner, Button, Modal, PageLoader } from '../components/ui'
 
 const RESEND_SECONDS = 30
 
-const STEPS: { id: number; title: string; subtitle: string; icon: BrandIconName }[] = [
-  { id: 1, title: 'Create account', subtitle: 'Your name, email and password', icon: 'user' },
-  { id: 2, title: 'Verify email', subtitle: 'Enter the 6-digit code', icon: 'mail' },
-  { id: 3, title: 'Add your device', subtitle: 'Optional: you can add it later', icon: 'device' },
-  { id: 4, title: 'Get paid', subtitle: 'Verify your identity with Stripe', icon: 'bank' }
-]
 // A venue has no payouts to set up, so it has one step fewer
 const VENUE_STEPS: { id: number; title: string; subtitle: string; icon: BrandIconName }[] = [
   { id: 1, title: 'Create account', subtitle: 'Your venue and contact details', icon: 'user' },
@@ -22,8 +16,9 @@ const VENUE_STEPS: { id: number; title: string; subtitle: string; icon: BrandIco
   { id: 3, title: 'Add your device', subtitle: 'Optional: you can add it later', icon: 'device' }
 ]
 
-// A performer invited by a venue does not have a device yet: no device step, straight to payouts
-const INVITED_STEPS: { id: number; title: string; subtitle: string; icon: BrandIconName }[] = [
+// A performer signs up without a device: account, email, then payouts. The device is added afterwards from Home (Finish setting up) or Devices,
+// so nobody has to find a serial number before they can be paid.
+const PERFORMER_STEPS: { id: number; title: string; subtitle: string; icon: BrandIconName }[] = [
   { id: 1, title: 'Create account', subtitle: 'Your name, email and password', icon: 'user' },
   { id: 2, title: 'Verify email', subtitle: 'Enter the 6-digit code', icon: 'mail' },
   { id: 3, title: 'Get paid', subtitle: 'Verify your identity with Stripe', icon: 'bank' }
@@ -144,11 +139,12 @@ const Onboarding: React.FC = () => {
 
   const isVenue = accountType === 'venue'
   // Invited by a venue: no device yet, so the device step is skipped (it stays internal step 3, hidden)
-  const invited = !isVenue && !!inviteToken
-  const steps = isVenue ? VENUE_STEPS : invited ? INVITED_STEPS : STEPS
+  // Every performer signs up without the device step (a venue still has its own steps)
+  const noDeviceStep = !isVenue
+  const steps = isVenue ? VENUE_STEPS : PERFORMER_STEPS
   const finishStep = isVenue ? 4 : 5
-  // The step number shown to the person (an invited performer sees "3 of 3" on the payouts step, which is internal step 4)
-  const shownStep = invited && step === 4 ? 3 : step
+  // The step number shown to the person (a performer sees "3 of 3" on the payouts step, which is internal step 4)
+  const shownStep = noDeviceStep && step === 4 ? 3 : step
 
   // Resend countdown
   useEffect(() => {
@@ -357,7 +353,7 @@ const Onboarding: React.FC = () => {
       try {
         const verified = await verifyEmail()
         if (!verified) return
-        setStep(invited ? 4 : 3)
+        setStep(noDeviceStep ? 4 : 3)
       } finally {
         verifyingRef.current = false
         setIsLoading(false)
@@ -1268,7 +1264,7 @@ const Onboarding: React.FC = () => {
         {step === 1 && (
           <div className="mb-6">
             <h1 className="text-3xl font-bold text-ink-900">Set up Tipwave</h1>
-            <p className="mt-1 text-ink-500">{isVenue ? "About 3 minutes. Your device's serial number is optional for now." : invited ? "About 5 minutes. You'll need a photo ID to set up payouts." : "About 5 minutes. You'll need a photo ID. Your device is optional for now."}</p>
+            <p className="mt-1 text-ink-500">{isVenue ? "About 3 minutes. Your device's serial number is optional for now." : "About 5 minutes. You'll need a photo ID to set up payouts. You can add your device afterwards."}</p>
           </div>
         )}
 
@@ -1311,7 +1307,7 @@ const Onboarding: React.FC = () => {
               {renderCurrentStep()}
 
               <div className="mt-8 flex flex-col-reverse gap-3 border-t border-slate-100 pt-6 sm:flex-row sm:items-center sm:justify-between">
-                {step > 1 && step <= (isVenue ? 3 : 4) && step !== 2 && !(invited && step === 4) ? (
+                {step > 1 && step <= (isVenue ? 3 : 4) && step !== 2 && !(noDeviceStep && step === 4) ? (
                   <Button variant="ghost" onClick={handleBack} icon="chevron-left" disabled={isLoading}>
                     Back
                   </Button>
