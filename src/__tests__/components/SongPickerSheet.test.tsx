@@ -40,7 +40,7 @@ describe('SongPickerSheet', () => {
     expect(await screen.findByText('Zebra Song')).toBeInTheDocument() // past the first 100
     const urls = (global.fetch as any).mock.calls.map((c: any[]) => c[0] as string)
     expect(urls[0]).toContain('limit=100')
-    expect(urls[1]).toContain('limit=2000')
+    expect(urls[1]).toContain('limit=5000')
   })
 
   it('makes only one request when the catalog fits on the first page', async () => {

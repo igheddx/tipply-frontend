@@ -92,7 +92,7 @@ function SongRow({ song, onChoose, showMarker }: { song: Song; onChoose: (song: 
  */
 // How many songs the first request asks for (shown immediately), and the most the whole-list request asks for
 const FIRST_PAGE = 100
-const WHOLE_LIST = 2000
+const WHOLE_LIST = 5000 // the same as the most the server returns in one request
 
 export function SongPickerSheet({ open, deviceUuid, current, onClose, onPick, askAmount = null, onSkip }: SongPickerSheetProps) {
   const [query, setQuery] = useState('')

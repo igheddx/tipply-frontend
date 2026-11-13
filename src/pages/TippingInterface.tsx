@@ -94,6 +94,9 @@ function InfoScreen({
   )
 }
 
+// The height of the TEST strip (h-7), so the page below it starts underneath it and the performer's photo, name and bio stay visible
+const TEST_BANNER_HEIGHT = '1.75rem'
+
 interface TippingInterfaceProps {
   /**
    * An admin's test of the tip page (opened from Admin → Insights). Tapping an amount only fires that performer's light and sound:
@@ -1143,6 +1146,7 @@ const TippingInterface: React.FC<TippingInterfaceProps> = ({ testMode = false })
       <TipScreen
         performerName=""
         amounts={DEFAULT_TIP_AMOUNTS}
+        topOffset={testMode ? TEST_BANNER_HEIGHT : undefined}
         ready={false}
         sentAmount={null}
         onTip={() => {}}
@@ -1198,7 +1202,10 @@ const TippingInterface: React.FC<TippingInterfaceProps> = ({ testMode = false })
   return (
     <>
       {testMode && (
-        <div role="status" className="fixed inset-x-0 top-0 z-[60] bg-amber-400 px-3 py-1.5 text-center text-xs font-bold text-black shadow">
+        <div
+          role="status"
+          className="fixed inset-x-0 top-0 z-[60] flex h-7 items-center justify-center overflow-hidden whitespace-nowrap bg-amber-400 px-3 text-xs font-bold text-black shadow"
+        >
           TEST · nothing is charged or saved · lights and sound only
         </div>
       )}
@@ -1208,6 +1215,7 @@ const TippingInterface: React.FC<TippingInterfaceProps> = ({ testMode = false })
         photoUrl={deviceInfo?.profilePhotoUrl}
         bio={deviceInfo?.bio}
         amounts={tipAmounts}
+        topOffset={testMode ? TEST_BANNER_HEIGHT : undefined}
         ready={ready}
         sentAmount={sentAmount}
         onTip={handleTipClick}
