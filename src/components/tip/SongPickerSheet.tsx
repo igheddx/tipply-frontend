@@ -34,6 +34,12 @@ interface SongPickerSheetProps {
   current?: PickedSong | null
   onClose: () => void
   onPick: (song: PickedSong) => void
+  /**
+   * Set when the sheet opened because a tip amount was tapped and the performer likes to ask about a song first. The sheet then offers
+   * "No thanks, just tip $X" and its confirm button sends the tip with the song. Closing the sheet sends nothing.
+   */
+  askAmount?: number | null
+  onSkip?: () => void
 }
 
 /**
@@ -88,7 +94,7 @@ function SongRow({ song, onChoose, showMarker }: { song: Song; onChoose: (song: 
 const FIRST_PAGE = 100
 const WHOLE_LIST = 2000
 
-export function SongPickerSheet({ open, deviceUuid, current, onClose, onPick }: SongPickerSheetProps) {
+export function SongPickerSheet({ open, deviceUuid, current, onClose, onPick, askAmount = null, onSkip }: SongPickerSheetProps) {
   const [query, setQuery] = useState('')
   const [songs, setSongs] = useState<Song[]>([])
   const [loading, setLoading] = useState(false)
@@ -96,6 +102,7 @@ export function SongPickerSheet({ open, deviceUuid, current, onClose, onPick }: 
   const [name, setName] = useState('')
   const [note, setNote] = useState('')
   const requestId = useRef(0)
+  const asking = askAmount != null && !!onSkip
   // Read at the moment the sheet opens, so a new `current` object on every parent render cannot reset the fields
   const currentRef = useRef(current)
   currentRef.current = current
@@ -223,25 +230,45 @@ export function SongPickerSheet({ open, deviceUuid, current, onClose, onPick }: 
                 <div className="flex items-start gap-2.5 rounded-xl bg-slate-50 px-3 py-2.5 text-sm text-ink-700">
                   <BrandIcon name="info" size={18} />
                   <span>
-                    <strong className="text-ink-900">Next, choose a tip amount.</strong> Your song request is sent together with your tip.
+                    {asking ? (
+                      <>
+                        <strong className="text-ink-900">Your ${askAmount} tip goes with this song.</strong> Tap send when you are ready.
+                      </>
+                    ) : (
+                      <>
+                        <strong className="text-ink-900">Next, choose a tip amount.</strong> Your song request is sent together with your tip.
+                      </>
+                    )}
                   </span>
                 </div>
                 <Button size="lg" block onClick={confirm}>
-                  Choose a tip amount
-                  <BrandIcon name="chevron-right" size={18} tone="inverse" strokeWidth={2.2} />
+                  {asking ? `Send $${askAmount} tip with this song` : 'Choose a tip amount'}
+                  {!asking && <BrandIcon name="chevron-right" size={18} tone="inverse" strokeWidth={2.2} />}
                 </Button>
                 <Button variant="ghost" block onClick={() => setChosen(null)}>
                   Choose a different song
                 </Button>
+                {asking && (
+                  <Button variant="ghost" block onClick={onSkip}>
+                    No thanks, just tip ${askAmount}
+                  </Button>
+                )}
               </div>
             ) : (
               <>
                 <div className="flex flex-none items-center justify-between px-4 pb-2 pt-3">
-                  <h2 className="text-lg font-extrabold">Pick a song</h2>
+                  <h2 className="text-lg font-extrabold">{asking ? `Request a song with your $${askAmount} tip?` : 'Pick a song'}</h2>
                   <button type="button" onClick={onClose} aria-label="Close" className="flex h-9 w-9 items-center justify-center rounded-full active:bg-slate-100">
                     <BrandIcon name="close" size={18} color="#64748B" />
                   </button>
                 </div>
+                {asking && (
+                  <div className="flex-none px-4 pb-2">
+                    <Button variant="secondary" block onClick={onSkip}>
+                      No thanks, just tip ${askAmount}
+                    </Button>
+                  </div>
+                )}
                 <div className="mx-4 mb-1 flex flex-none items-center gap-2 rounded-xl border-[1.5px] border-brand-600 px-3 py-2.5">
                   <BrandIcon name="search" size={18} tone="muted" />
                   <input
