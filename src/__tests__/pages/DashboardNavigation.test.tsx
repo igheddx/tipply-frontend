@@ -124,17 +124,23 @@ describe('the performer dashboard, Devices', () => {
     expect(screen.queryByText('Light effect for each tip amount')).toBeNull()
   })
 
-  it('keeps sound, tone, volume and random light under "Sound and effects", closed until asked for', async () => {
+  it('keeps sound, tone, volume, random light and the tip page link under "Advanced", closed until asked for', async () => {
     await openDevices()
 
-    const fold = await screen.findByRole('button', { name: /Sound and effects/ })
+    const fold = await screen.findByRole('button', { name: /Advanced/ })
     expect(fold).toHaveAttribute('aria-expanded', 'false')
     expect(screen.queryByText('Random light effect')).toBeNull()
+    // by default a device shows only: status, QR code, pause and song requests
+    expect(screen.getByRole('button', { name: /Download QR code/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Pause/ })).toBeInTheDocument()
+    expect(screen.getByText('Song requests')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Open tip page' })).toBeNull()
 
     fireEvent.click(fold)
     expect(await screen.findByText('Random light effect')).toBeInTheDocument()
     expect(screen.getByText('Tone')).toBeInTheDocument()
     expect(screen.getByText('Volume')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Open tip page' })).toBeInTheDocument()
   })
 
   it('shows "ask when an amount is tapped" only under a device that takes song requests', async () => {

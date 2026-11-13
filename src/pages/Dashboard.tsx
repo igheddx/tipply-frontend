@@ -1617,9 +1617,6 @@ const Dashboard: React.FC = () => {
                           >
                             Download QR code
                           </Button>
-                          <Button variant="secondary" icon="qr" onClick={() => window.open(device.qrCodeUrl, '_blank')}>
-                            Open tip page
-                          </Button>
                           <Button
                             variant="secondary"
                             icon={device.isPaused ? 'play' : 'pause'}
@@ -1638,7 +1635,7 @@ const Dashboard: React.FC = () => {
                         <div className="mt-4 flex items-center justify-between gap-4 border-t border-slate-100 pt-4">
                           <div>
                             <div className="text-sm font-semibold text-ink-900">Song requests</div>
-                            <div className="text-xs text-ink-500">Let people pick a song when they tip.</div>
+                            <div className="text-xs text-ink-500">Let people pick a song when they tip. Applies to this device.</div>
                           </div>
                           <Switch
                             checked={device.isAllowSongRequest}
@@ -1663,8 +1660,8 @@ const Dashboard: React.FC = () => {
                           className="mt-4 flex w-full items-center justify-between border-t border-slate-100 pt-4 text-left"
                         >
                           <span>
-                            <span className="block text-sm font-semibold text-ink-900">Sound and effects</span>
-                            <span className="block text-xs text-ink-500">Tone, volume and random light. The light for each button is under Your six tip buttons.</span>
+                            <span className="block text-sm font-semibold text-ink-900">Advanced</span>
+                            <span className="block text-xs text-ink-500">Sound and effects: tone, volume and random light, for this device only. The light for each button is under Your six tip buttons.</span>
                           </span>
                           <BrandIcon name={expandedDeviceConfig === device.id ? 'chevron-down' : 'chevron-right'} size={18} tone="muted" />
                         </button>
@@ -1718,6 +1715,11 @@ const Dashboard: React.FC = () => {
                                 label="Random light effect"
                                 onChange={() => saveDeviceConfig(device, { isRandomLightEffect: !(device.isRandomLightEffect ?? false) })}
                               />
+                            </div>
+                            <div className="border-t border-slate-200 pt-3">
+                              <Button variant="secondary" icon="qr" onClick={() => window.open(device.qrCodeUrl, '_blank')}>
+                                Open tip page
+                              </Button>
                             </div>
                             {busyConfig && <div className="text-center text-xs text-brand-700">Saving…</div>}
                           </div>
