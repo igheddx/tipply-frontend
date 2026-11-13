@@ -6,6 +6,7 @@ import { photoSrc } from '../../utils/photoUrl'
 import { venueApi, type PerformerDevice, type PerformerVenue } from '../../services/venueApi'
 import { localInputToIso, timeOnly, toLocalInput, untilLabel } from '../../utils/venueTime'
 import { QrCardDialog } from '../QrCardDialog'
+import VenueSongPromptSwitch from './VenueSongPromptSwitch'
 
 const AVAILABILITY: Record<PerformerDevice['availability'], { label: string; cls: string }> = {
   available: { label: 'Available', cls: 'bg-emerald-50 text-emerald-700' },
@@ -118,6 +119,8 @@ export function VenueSection({ onChanged, performerId, stageName }: { onChanged?
         <h2 className="text-lg font-bold text-ink-900">At venues</h2>
         <p className="text-sm text-ink-500">Devices owned by venues you can perform at. Tips go to you while you are on one.</p>
       </div>
+
+      <VenueSongPromptSwitch />
 
       {venues.map(v => (
         <div key={v.linkId} className="overflow-hidden rounded-2xl border border-slate-100 border-l-4 border-l-accent-500 bg-white shadow-card">

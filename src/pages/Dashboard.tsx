@@ -28,7 +28,7 @@ import { API_BASE_URL } from '../utils/config'
 import { setDemoModeOn, setShowDemoData, demoQuery } from '../utils/demoView'
 import { DEFAULT_TIP_AMOUNTS, TIP_AMOUNT_COUNT, LIGHT_EFFECTS, SOUND_OPTIONS, VOLUME_OPTIONS, DEFAULT_SOUND_ID, DEFAULT_SOUND_VOLUME, defaultEffectConfigFor, normalizeEffectConfig, remapEffectConfigByPosition, effectForAmount, buildEffectConfig } from '../utils/deviceConfig'
 import TipAmountsEditor from '../components/TipAmountsEditor'
-import SongPromptCard from '../components/SongPromptCard'
+import DeviceSongPromptSwitch from '../components/DeviceSongPromptSwitch'
 import { readyToPayOut } from '../utils/payouts'
 
 interface DashboardStats {
@@ -78,6 +78,7 @@ interface DeviceSummary {
   lastTipReceived: string
   qrCodeUrl: string
   isAllowSongRequest: boolean
+  askForSongFirst?: boolean
   isSoundEnabled?: boolean
   isRandomLightEffect?: boolean
   soundId?: number
@@ -1662,6 +1663,15 @@ const Dashboard: React.FC = () => {
                             onChange={() => toggleSongRequestSetting(device)}
                           />
                         </div>
+                        {device.isAllowSongRequest && (
+                          <DeviceSongPromptSwitch
+                            deviceId={device.id}
+                            checked={!!device.askForSongFirst}
+                            onSaved={value =>
+                              setStats(prev => (prev ? { ...prev, devices: prev.devices.map(d => (d.id === device.id ? { ...d, askForSongFirst: value } : d)) } : prev))
+                            }
+                          />
+                        )}
 
                         <button
                           onClick={() => setExpandedDeviceConfig(expandedDeviceConfig === device.id ? null : device.id)}
@@ -1768,8 +1778,6 @@ const Dashboard: React.FC = () => {
                   onSave={saveTipAmounts}
                   onReset={resetTipAmounts}
                 />
-
-                <SongPromptCard />
 
                 <VenueInvites />
                 <VenueSection performerId={userProfile?.id} stageName={userProfile?.stageName || userProfile?.firstName} />
