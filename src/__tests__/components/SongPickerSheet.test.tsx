@@ -28,6 +28,28 @@ describe('SongPickerSheet', () => {
     expect(url).not.toContain('search=')
   })
 
+  it('shows the whole catalog, not just the first 100 songs', async () => {
+    const make = (n: number) => Array.from({ length: n }, (_, i) => ({ id: `s${i}`, songTitle: `Song ${String(i).padStart(3, '0')}`, artist: 'Artist' }))
+    const everything = [...make(149), { id: 'z', songTitle: 'Zebra Song', artist: 'Artist' }]
+    global.fetch = vi.fn().mockImplementation((url: string) =>
+      Promise.resolve({ ok: true, json: async () => (String(url).includes('limit=100') ? everything.slice(0, 100) : everything) })
+    ) as any
+
+    render(<SongPickerSheet open deviceUuid="dev-1" onClose={() => {}} onPick={() => {}} />)
+
+    expect(await screen.findByText('Zebra Song')).toBeInTheDocument() // past the first 100
+    const urls = (global.fetch as any).mock.calls.map((c: any[]) => c[0] as string)
+    expect(urls[0]).toContain('limit=100')
+    expect(urls[1]).toContain('limit=2000')
+  })
+
+  it('makes only one request when the catalog fits on the first page', async () => {
+    render(<SongPickerSheet open deviceUuid="dev-1" onClose={() => {}} onPick={() => {}} />)
+    await screen.findByText('Blinding Lights')
+    await new Promise(r => setTimeout(r, 100))
+    expect((global.fetch as any).mock.calls).toHaveLength(1)
+  })
+
   it('does not load anything while closed', () => {
     render(<SongPickerSheet open={false} deviceUuid="dev-1" onClose={() => {}} onPick={() => {}} />)
     expect(global.fetch).not.toHaveBeenCalled()

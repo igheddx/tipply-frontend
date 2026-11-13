@@ -84,6 +84,10 @@ function SongRow({ song, onChoose, showMarker }: { song: Song; onChoose: (song: 
  * Bottom sheet for choosing a song. The tip page behind it never scrolls; the list inside the sheet is the
  * only scrolling region. The catalog shows straight away (A to Z), and typing narrows it down.
  */
+// How many songs the first request asks for (shown immediately), and the most the whole-list request asks for
+const FIRST_PAGE = 100
+const WHOLE_LIST = 2000
+
 export function SongPickerSheet({ open, deviceUuid, current, onClose, onPick }: SongPickerSheetProps) {
   const [query, setQuery] = useState('')
   const [songs, setSongs] = useState<Song[]>([])
@@ -113,11 +117,19 @@ export function SongPickerSheet({ open, deviceUuid, current, onClose, onPick }: 
       setLoading(true)
       try {
         const search = query.trim()
-        const url =
-          `${getApiBaseUrl()}/api/songcatalog/performer/${deviceUuid}?limit=${search ? 50 : 100}` +
-          (search ? `&search=${encodeURIComponent(search)}` : '')
-        const response = await fetch(url)
-        if (response.ok && id === requestId.current) setSongs(await response.json())
+        const base = `${getApiBaseUrl()}/api/songcatalog/performer/${deviceUuid}`
+        const suffix = search ? `&search=${encodeURIComponent(search)}` : ''
+        // The first page appears at once. A catalog is often bigger than one page (the list used to stop after the first 100,
+        // partway through the B songs), so when the page came back full the whole list is fetched right behind it.
+        const response = await fetch(`${base}?limit=${FIRST_PAGE}${suffix}`)
+        if (response.ok && id === requestId.current) {
+          const first = await response.json()
+          setSongs(first)
+          if (Array.isArray(first) && first.length >= FIRST_PAGE) {
+            const all = await fetch(`${base}?limit=${WHOLE_LIST}${suffix}`)
+            if (all.ok && id === requestId.current) setSongs(await all.json())
+          }
+        }
       } catch (error) {
         logger.error('Error loading songs:', error)
       } finally {
