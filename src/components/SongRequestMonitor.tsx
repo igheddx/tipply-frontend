@@ -7,7 +7,7 @@ import { usePortalTheme, useTheme } from '../theme/ThemeContext'
 import { playTipChime, unlockTipChime, isTipChimeReady } from '../utils/tipChime'
 import { SessionBanner } from './venue/SessionBanner'
 import { RefundRequestDialog, type RefundableTip } from './refunds/RefundRequestDialog'
-import { showApi, type ShowSummary } from '../services/showApi'
+import { useShowList } from '../hooks/useShowList'
 import { showTitle } from '../utils/showName'
 
 interface SongRequest {
@@ -150,7 +150,6 @@ const SongRequestMonitor: React.FC<SongRequestMonitorProps> = ({
   // All the tips without a song in this show, against how many the list holds, so a long show says that older ones are not listed
   const [plainTipsTotal, setPlainTipsTotal] = useState(0)
   // The queue is for one show: the current one, or an earlier one the performer picks. null means "the current show".
-  const [shows, setShows] = useState<ShowSummary[]>([])
   const [pickedShowId, setPickedShowId] = useState<string | null>(null)
   const [refundTips, setRefundTips] = useState<RefundableTip[] | null>(null)
   const [seenTips, setSeenTips] = useState<Set<string>>(() => new Set(readPref(SEEN_TIPS_KEY, '').split(',').filter(Boolean)))
@@ -259,18 +258,9 @@ const SongRequestMonitor: React.FC<SongRequestMonitorProps> = ({
     }
   }, [profileId, pickedShowId])
 
-  // The list of shows to pick from, loaded when the monitor opens
-  useEffect(() => {
-    // Watching someone else's screen: the show list would be the watcher's own, so it is left out; the queue shows their current show
-    if (!isVisible || readOnly) return
-    let cancelled = false
-    void showApi.list(1, 10).then(res => {
-      if (!cancelled && Array.isArray(res.data?.shows)) setShows(res.data.shows)
-    })
-    return () => {
-      cancelled = true
-    }
-  }, [isVisible, readOnly])
+  // The list of shows to pick from, loaded when the monitor opens (a page at a time, with "older shows" for the rest).
+  // Watching someone else's screen: the show list would be the watcher's own, so it is left out; the queue shows their current show.
+  const { shows, hasMore: moreShows, loadMore: loadMoreShows, loadingMore: loadingMoreShows } = useShowList(isVisible && !readOnly)
 
   // Switching shows is not new activity: start the "what is new" tracking again so nothing glows or chimes
   useEffect(() => {
@@ -776,6 +766,16 @@ const SongRequestMonitor: React.FC<SongRequestMonitorProps> = ({
                 </option>
               ))}
             </select>
+            {moreShows && (
+              <button
+                type="button"
+                onClick={() => void loadMoreShows()}
+                disabled={loadingMoreShows}
+                className="rounded-lg px-2 py-1.5 text-sm font-semibold text-brand-700 hover:bg-slate-100 disabled:opacity-50"
+              >
+                {loadingMoreShows ? 'Loading…' : 'Older shows'}
+              </button>
+            )}
           </div>
         )}
         <div className="mx-auto grid max-w-6xl grid-cols-[minmax(0,1fr)] gap-4 lg:grid-cols-[minmax(0,1fr)_22rem]">

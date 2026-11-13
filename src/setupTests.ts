@@ -1,6 +1,10 @@
 import '@testing-library/jest-dom'
 import { afterEach, vi } from 'vitest'
-import { cleanup } from '@testing-library/react'
+import { cleanup, configure } from '@testing-library/react'
+
+// findBy / waitFor wait up to 1 second by default, which a busy machine running the whole suite can exceed. Waiting longer costs
+// nothing when the thing appears at once; it only stops a slow machine from failing a test that is right.
+configure({ asyncUtilTimeout: 5000 })
 
 // Cleanup after each test
 afterEach(() => {

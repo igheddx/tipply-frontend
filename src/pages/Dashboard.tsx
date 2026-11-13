@@ -179,6 +179,8 @@ const Dashboard: React.FC = () => {
   const [demoMode, setDemoMode] = useState(false)
   const [showDemo, setShowDemo] = useState(false)
   const [tipTimelinePoints, setTipTimelinePoints] = useState<TipPoint[]>([])
+  // All the tips the chart could use, against how many it holds, so a very busy account says the chart shows only the newest
+  const [tipTimelineTotal, setTipTimelineTotal] = useState<number | undefined>(undefined)
   // True until the charts' data (weekly totals and every tip) has arrived
   const [chartsLoading, setChartsLoading] = useState(true)
   
@@ -415,6 +417,8 @@ const Dashboard: React.FC = () => {
           )
 
           if (timelineResp.ok) {
+            const headerTotal = parseInt(timelineResp.headers.get('X-Total-Count') ?? '', 10)
+            setTipTimelineTotal(Number.isFinite(headerTotal) ? headerTotal : undefined)
             const timelineData = await timelineResp.json()
             const points: TipPoint[] = timelineData.map((tip: any) => {
               const timestamp = new Date(tip.createdAt).getTime()
@@ -608,6 +612,8 @@ const Dashboard: React.FC = () => {
       }
 
       if (timelineResp.ok) {
+        const headerTotal = parseInt(timelineResp.headers.get('X-Total-Count') ?? '', 10)
+        setTipTimelineTotal(Number.isFinite(headerTotal) ? headerTotal : undefined)
         const timelineData = await timelineResp.json()
         const points: TipPoint[] = timelineData.map((tip: any) => {
           const timestamp = new Date(tip.createdAt).getTime()
@@ -1849,7 +1855,7 @@ const Dashboard: React.FC = () => {
 
             {activeTab === 'tips' && !(showsEnabled && tipsView === 'shows') && (
               <div className="mt-5">
-                <TipsTimeline points={tipTimelinePoints} loading={chartsLoading} />
+                <TipsTimeline points={tipTimelinePoints} loading={chartsLoading} totalTips={tipTimelineTotal} />
               </div>
             )}
 

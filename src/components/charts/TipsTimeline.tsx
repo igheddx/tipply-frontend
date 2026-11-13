@@ -49,7 +49,7 @@ const axisTick = { fontSize: 12, fill: '#64748B' }
  *  Each tip   every tip as a dot, time across and amount up
  * and a table of when each amount came in most.
  */
-export function TipsTimeline({ points, loading = false }: { points: TipPointInput[]; loading?: boolean }) {
+export function TipsTimeline({ points, loading = false, totalTips }: { points: TipPointInput[]; loading?: boolean; totalTips?: number }) {
   const [preset, setPreset] = useState<Preset>('3h')
   const [view, setView] = useState<View>('totals')
   const [hidden, setHidden] = useState<Set<number>>(new Set())
@@ -179,6 +179,11 @@ export function TipsTimeline({ points, loading = false }: { points: TipPointInpu
       title="Tips over time"
       subtitle={data.count > 0 && (data.peak.total as number) > 0 ? `Busiest ${bucketName}: ${labelFor(data.peak.t as number, data.bucket, true)} with ${money(data.peak.total as number)}` : undefined}
     >
+      {totalTips != null && totalTips > points.length && (
+        <p className="mb-3 text-xs text-ink-500" role="note">
+          This chart uses the newest {points.length.toLocaleString()} of {totalTips.toLocaleString()} tips. Older tips are not included.
+        </p>
+      )}
       <Tabs
         active={preset}
         onChange={id => setPreset(id as Preset)}
