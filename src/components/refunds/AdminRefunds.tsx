@@ -95,6 +95,9 @@ export function AdminRefunds({ onChanged }: { onChanged?: () => void }) {
   const [requests, setRequests] = useState<AdminRefundRequest[]>([])
   const [direct, setDirect] = useState<AdminDirectRefund[]>([])
   const [historyDays, setHistoryDays] = useState(30)
+  // How many decided requests and direct refunds there are in all, against how many the list holds, so a long history says it was cut
+  const [decidedTotal, setDecidedTotal] = useState(0)
+  const [directTotal, setDirectTotal] = useState(0)
   const [loaded, setLoaded] = useState(false)
   const [failed, setFailed] = useState(false)
   const [busy, setBusy] = useState<string | null>(null)
@@ -109,6 +112,8 @@ export function AdminRefunds({ onChanged }: { onChanged?: () => void }) {
       setRequests(res.data.requests)
       setDirect(Array.isArray(res.data.directRefunds) ? res.data.directRefunds : [])
       if (typeof res.data.historyDays === 'number') setHistoryDays(res.data.historyDays)
+      setDecidedTotal(typeof res.data.decidedTotal === 'number' ? res.data.decidedTotal : 0)
+      setDirectTotal(typeof res.data.directRefundsTotal === 'number' ? res.data.directRefundsTotal : 0)
     }
     setLoaded(true)
     onChanged?.()
@@ -159,6 +164,10 @@ export function AdminRefunds({ onChanged }: { onChanged?: () => void }) {
     ...requests.filter(r => r.status !== 'pending').map(r => ({ kind: 'request' as const, id: r.id, at: r.decidedAt ?? r.requestedAt, request: r })),
     ...direct.map(d => ({ kind: 'direct' as const, id: d.tipId, at: d.refundedAt, refund: d }))
   ].sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime())
+
+  // Requests and direct refunds each come with their total; whatever the lists leave out is said out loud, never dropped quietly
+  const decidedShown = requests.filter(r => r.status !== 'pending').length
+  const cutBy = Math.max(0, decidedTotal - decidedShown) + Math.max(0, directTotal - direct.length)
 
   return (
     <div className="space-y-5">
@@ -216,7 +225,15 @@ export function AdminRefunds({ onChanged }: { onChanged?: () => void }) {
       </Card>
 
       {history.length > 0 && (
-        <Card title="Recently decided" subtitle={`Everything refunded or declined in the last ${historyDays} days`} flush>
+        <Card
+          title="Recently decided"
+          subtitle={
+            cutBy > 0
+              ? `Showing the newest ${history.length} of ${history.length + cutBy} refunded or declined in the last ${historyDays} days`
+              : `Everything refunded or declined in the last ${historyDays} days`
+          }
+          flush
+        >
           <ul className="divide-y divide-slate-100 px-5 pb-2" aria-label="Recently decided">
             {history.map(item =>
               item.kind === 'request' ? (
