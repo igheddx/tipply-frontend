@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from 'react'
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { BrandIcon, IconTile, type BrandIconName } from '../icons/BrandIcons'
-import { Banner, Button, Card, EmptyState, StatCard, StatusChip } from '../ui'
+import { Banner, Button, Card, DisclosureChevron, EmptyState, StatCard, StatusChip } from '../ui'
 import { ChartTooltip } from '../charts/ChartTooltip'
 
 export interface HomeNextStep {
@@ -261,7 +261,7 @@ export function HomeTab({ data, onGoToDevices, onGoToTips, onGoToLive, showSlot,
             aria-expanded={showMore}
             className="flex h-10 items-center gap-1.5 text-sm font-semibold text-ink-500 hover:text-ink-700"
           >
-            <BrandIcon name={showMore ? 'chevron-down' : 'chevron-right'} size={16} tone="muted" />
+            <DisclosureChevron open={showMore} />
             {showMore ? 'Fewer details' : 'More details'}
           </button>
           {showMore && (

@@ -2,7 +2,7 @@ import logger from "../utils/logger";
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { API_BASE_URL } from '../utils/config'
 import { BrandIcon } from './icons/BrandIcons'
-import { StatusChip } from './ui'
+import { DisclosureChevron, StatusChip } from './ui'
 import { usePortalTheme, useTheme } from '../theme/ThemeContext'
 import { playTipChime, unlockTipChime, isTipChimeReady } from '../utils/tipChime'
 import { SessionBanner } from './venue/SessionBanner'
@@ -976,7 +976,7 @@ const SongRequestMonitor: React.FC<SongRequestMonitorProps> = ({
                       aria-expanded={showSeenTips}
                       className="flex h-11 items-center gap-2 text-sm font-semibold text-ink-500 hover:text-ink-700"
                     >
-                      <BrandIcon name={showSeenTips ? 'chevron-down' : 'chevron-right'} size={18} tone="current" />
+                      <DisclosureChevron open={showSeenTips} />
                       {showSeenTips ? 'Hide' : 'Show'} seen ({seenList.length})
                     </button>
                     {showSeenTips && (
@@ -1010,7 +1010,7 @@ const SongRequestMonitor: React.FC<SongRequestMonitorProps> = ({
                   aria-expanded={showDone}
                   className="flex h-11 items-center gap-2 text-sm font-semibold text-ink-500 hover:text-ink-700"
                 >
-                  <BrandIcon name={showDone ? 'chevron-down' : 'chevron-right'} size={18} tone="current" />
+                  <DisclosureChevron open={showDone} />
                   {showDone ? 'Hide' : 'Show'} finished ({done.length})
                 </button>
                 {showDone && (

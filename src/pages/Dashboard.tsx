@@ -4,7 +4,7 @@ import { HomeTab, type HomeData } from '../components/portal/HomeTab'
 import { DemoBanner } from '../components/portal/DemoBanner'
 import { renderQrCard } from '../utils/qrCard'
 import { TipsTimeline } from '../components/charts/TipsTimeline'
-import { Banner, Button, Card, EmptyState, Modal, PageHeader, PageLoader, RefreshControl, RowMenu, StatusChip, Tabs, useFeedback, type ChipKind } from '../components/ui'
+import { Banner, Button, Card, DisclosureChevron, EmptyState, Modal, PageHeader, PageLoader, RefreshControl, RowMenu, StatusChip, Tabs, useFeedback, type ChipKind } from '../components/ui'
 import { BrandIcon, IconTile } from '../components/icons/BrandIcons'
 import { Switch } from '../components/ui/Switch'
 import React, { useState, useEffect, useRef } from 'react'
@@ -1663,7 +1663,7 @@ const Dashboard: React.FC = () => {
                             <span className="block text-sm font-semibold text-ink-900">Advanced</span>
                             <span className="block text-xs text-ink-500">Sound and effects: tone, volume and random light, for this device only. The light for each button is under Your six tip buttons.</span>
                           </span>
-                          <BrandIcon name={expandedDeviceConfig === device.id ? 'chevron-down' : 'chevron-right'} size={18} tone="muted" />
+                          <DisclosureChevron open={expandedDeviceConfig === device.id} />
                         </button>
 
                         {expandedDeviceConfig === device.id && (
@@ -1770,7 +1770,7 @@ const Dashboard: React.FC = () => {
                     aria-expanded={showDeletedDevices}
                     className="flex items-center gap-2 text-sm font-semibold text-ink-500 hover:text-ink-700"
                   >
-                    <BrandIcon name={showDeletedDevices ? 'chevron-down' : 'chevron-right'} size={16} tone="muted" />
+                    <DisclosureChevron open={showDeletedDevices} />
                     {showDeletedDevices ? 'Hide' : 'Show'} removed devices
                   </button>
 

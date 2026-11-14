@@ -18,8 +18,25 @@ vi.mock('@/services/api', () => ({
   default: mockApiService
 }))
 
+// The refund flow lives on the Tips tab. The other admin screens render at the same time and are heavy (big tables, charts), which made this
+// test take most of its time limit, so they are stubbed here; each has its own tests.
+vi.mock('@/components/PerformerInsights', () => ({ default: () => null }))
+vi.mock('@/components/AggregatedChargesTable', () => ({ default: () => null }))
+vi.mock('@/components/RecoverChargedTips', () => ({ default: () => null }))
+vi.mock('@/components/ClearFailedTestTips', () => ({ default: () => null }))
+vi.mock('@/components/MarkDemoTips', () => ({ default: () => null }))
+vi.mock('@/components/venue/AdminVenues', () => ({ AdminVenues: () => null }))
+vi.mock('@/components/feedback/AdminFeedback', () => ({ AdminFeedback: () => null }))
+vi.mock('@/components/health/AdminApiHealth', () => ({ AdminApiHealth: () => null }))
+vi.mock('@/components/repeat/AdminRepeat', () => ({ AdminRepeat: () => null }))
+vi.mock('@/components/refunds/AdminRefunds', () => ({ AdminRefunds: () => null }))
+
+// Role queries below pass `hidden: true`: by default they check every element's visibility, which is very slow on this big page and says nothing
+// about what is being tested.
 // Clicks use fireEvent, not userEvent: userEvent inspects the style of every parent before each click, which is very slow on this big page
-vi.setConfig({ testTimeout: 60000 })
+// Alone this takes about 40 s (the admin page is very large); the full suite runs many files at once and slows it further, so the limit is
+// twice what a quiet machine needs. A real hang still fails, only later.
+vi.setConfig({ testTimeout: 120000 })
 
 // The table library asks for the style of pseudo-elements, which the test browser cannot compute: each ask logs a long error and is slow.
 // Answering without the pseudo-element is what it needs.
@@ -97,7 +114,7 @@ describe('AdminDashboard refund flow', () => {
   it('shows the refund button on a recent charged tip, asks first, lets the admin keep the tip, and only refunds on confirm', async () => {
     await goToTips()
 
-    const tableRefund = await screen.findByRole('button', { name: 'Refund' })
+    const tableRefund = await screen.findByRole('button', { name: 'Refund', hidden: true })
     fireEvent.click(tableRefund)
 
     // a question first: nothing is refunded by the first click
@@ -105,14 +122,14 @@ describe('AdminDashboard refund flow', () => {
     expect(mockApiService.post).not.toHaveBeenCalledWith('/api/admin/tips/tip-1/refund')
 
     // "Keep tip" closes the question and refunds nothing
-    fireEvent.click(await screen.findByRole('button', { name: 'Keep tip' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Keep tip', hidden: true }))
     await waitFor(() => expect(screen.queryByText('Refund this tip?')).toBeNull())
     expect(mockApiService.post).not.toHaveBeenCalledWith('/api/admin/tips/tip-1/refund')
 
     // asked again, and this time confirmed: exactly one refund
-    fireEvent.click(await screen.findByRole('button', { name: 'Refund' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Refund', hidden: true }))
     await screen.findByText('Refund this tip?')
-    const buttons = await screen.findAllByRole('button', { name: 'Refund' })
+    const buttons = await screen.findAllByRole('button', { name: 'Refund', hidden: true })
     fireEvent.click(buttons[buttons.length - 1]) // the confirm button in the question
 
     await waitFor(() => {
@@ -141,6 +158,6 @@ describe('AdminDashboard refund flow', () => {
 
     await waitFor(() => expect(mockApiService.post).toHaveBeenCalledWith('/api/admin/tips/search', expect.anything()))
     await new Promise(r => setTimeout(r, 200))
-    expect(screen.queryByRole('button', { name: 'Refund' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Refund', hidden: true })).toBeNull()
   })
 })
