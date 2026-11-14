@@ -410,6 +410,8 @@ const DeviceWifiSetup = () => {
     const sinceStart = () => `${Math.round(performance.now() - attemptStarted)} ms`;
     let failureCode = '';
     let retryAfter = false;
+    // True when the device said nothing at all before our timeout (as opposed to answering with a failure)
+    let silent = false;
     // Tells the server how this attempt went (never the password) so failures can be traced; "saved" means the details came from the saved list
     const report = (outcome: 'success' | 'failure', extra: Record<string, unknown> = {}) => {
       const edge = (t: string) => t !== t.trim();
@@ -479,10 +481,10 @@ const DeviceWifiSetup = () => {
           }
         };
         const onDrop = () => reject(new Error('Bluetooth connection to the device dropped. Move closer and try again.'));
-        const timer = setTimeout(
-          () => reject(new Error(`The device did not report back within ${JOIN_TIMEOUT_MS / 1000} seconds. Check the Wi-Fi name and password and try again.`)),
-          JOIN_TIMEOUT_MS
-        );
+        const timer = setTimeout(() => {
+          silent = deviceMessages.length === 0;
+          reject(new Error(`The device did not answer within ${JOIN_TIMEOUT_MS / 1000} seconds. That usually means it could not join this network. Check the Wi-Fi name and password, keep the device close to the router, and try again.`));
+        }, JOIN_TIMEOUT_MS);
         statusChar.addEventListener('characteristicvaluechanged', onStatus);
         selectedDevice.device.addEventListener('gattserverdisconnected', onDrop);
         cleanup = () => {
@@ -518,9 +520,10 @@ const DeviceWifiSetup = () => {
       report('failure', { errorCode: failureCode || 'no_report', error: message });
       // Field logs show the device often reports "auth_failed" after ~25 s for a first try with details that then work
       // on the very next try. Try once more automatically before telling the performer it failed.
-      if (failureCode === 'auth_failed' && autoRetried !== true) {
+      // A device that says nothing at all is the same first-try fault seen from the other side, so it gets the same second try
+      if ((failureCode === 'auth_failed' || silent) && autoRetried !== true) {
         retryAfter = true;
-        toast.info('The device did not join. Trying once more with the same details…');
+        toast.info(silent ? 'The device did not answer. Trying once more with the same details…' : 'The device did not join. Trying once more with the same details…');
       } else {
         setFailure({
           code: failureCode || 'no_report',

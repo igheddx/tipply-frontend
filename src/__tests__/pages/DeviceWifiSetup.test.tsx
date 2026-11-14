@@ -1,6 +1,6 @@
 import React from 'react'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
-import { vi, describe, it, expect, beforeEach } from 'vitest'
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
+import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest'
 import DeviceWifiSetup from '@/pages/DeviceWifiSetup'
 
 const vault = vi.hoisted(() => ({
@@ -132,6 +132,58 @@ describe('DeviceWifiSetup', () => {
 
     await screen.findByText(/your device is online/i)
     expect(vault.save).toHaveBeenCalledWith('Flying J', 'piano-bar-1')
+  })
+
+  describe('when the device says nothing at all', () => {
+    const fill = async (fake: ReturnType<typeof makeDevice>) => {
+      await reachWifiStep(fake)
+      fireEvent.change(screen.getByLabelText(/network name/i), { target: { value: 'Flying J' } })
+      fireEvent.change(screen.getByLabelText(/^password/i), { target: { value: 'piano-bar-1' } })
+      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+      fireEvent.click(screen.getByRole('button', { name: /connect to wi-fi/i }))
+    }
+    const wait = async (ms: number) => { await act(async () => { await vi.advanceTimersByTimeAsync(ms) }) }
+    const sends = (fake: ReturnType<typeof makeDevice>) => fake.events.filter(e => e === 'write:password').length
+    afterEach(() => vi.useRealTimers())
+
+    it('tries once more by itself after 45 silent seconds, and finishes if the second try is answered', async () => {
+      const fake = makeDevice()
+      await fill(fake)
+      await wait(0)
+      expect(sends(fake)).toBe(1)
+
+      await wait(45000) // nothing from the device
+      expect(sends(fake)).toBe(2) // the page sent the details again by itself
+      expect(screen.queryByText(/did not answer within/i)).toBeNull() // and did not show a failure yet
+
+      await act(async () => { fake.emit({ state: 'success', ip: '10.0.0.5' }) })
+      vi.useRealTimers()
+      expect((await screen.findAllByText(/your device is online/i)).length).toBeGreaterThan(0)
+    })
+
+    it('only tries once more: a second silence shows the failure, in words that do not blame the password alone', async () => {
+      const fake = makeDevice()
+      await fill(fake)
+      await wait(0)
+      await wait(45000)
+      await wait(45000)
+
+      expect(sends(fake)).toBe(2) // not a third
+      expect(screen.getByText(/did not answer within 45 seconds/i)).toBeInTheDocument()
+      expect(screen.getByText(/usually means it could not join this network/i)).toBeInTheDocument()
+      expect(apiMock.logDeviceSetupAttempt.mock.calls.at(-1)?.[0]).toMatchObject({ outcome: 'failure', errorCode: 'no_report' })
+    })
+
+    it('does not retry when the device did talk and then went quiet', async () => {
+      const fake = makeDevice()
+      await fill(fake)
+      await wait(0)
+      await act(async () => { fake.emit({ state: 'connecting' }) })
+      await wait(45000)
+
+      expect(sends(fake)).toBe(1)
+      expect(screen.getByText(/did not answer within 45 seconds/i)).toBeInTheDocument()
+    })
   })
 
   it('lets the person copy what the device reported, without the password in it', async () => {
