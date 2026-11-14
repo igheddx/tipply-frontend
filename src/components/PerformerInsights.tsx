@@ -107,6 +107,8 @@ const PerformerInsights: React.FC = () => {
   const [allPerformers, setAllPerformers] = useState<PerformerSearchResult[]>([])
   const [isDownloadingQR, setIsDownloadingQR] = useState(false)
   const [tipTimelinePoints, setTipTimelinePoints] = useState<TipPoint[]>([])
+  // All the tips the chart could use, against how many it holds, so a very busy account says the chart shows only the newest
+  const [tipTimelineTotal, setTipTimelineTotal] = useState<number | undefined>(undefined)
   
   // Time window filter for hourly chart
   const [startDateTime, setStartDateTime] = useState('')
@@ -276,6 +278,8 @@ const PerformerInsights: React.FC = () => {
       )
 
       if (timelineResp.ok) {
+        const headerTotal = parseInt(timelineResp.headers.get('X-Total-Count') ?? '', 10)
+        setTipTimelineTotal(Number.isFinite(headerTotal) ? headerTotal : undefined)
         const timelineData = await timelineResp.json()
         const points: TipPoint[] = timelineData.map((tip: any) => {
           const timestamp = new Date(tip.createdAt).getTime()
@@ -645,12 +649,12 @@ const PerformerInsights: React.FC = () => {
                 </div>
                 
                 <div className="bg-white rounded-lg shadow-sm p-6">
-                  <div className="text-sm text-ink-500">Future Payouts</div>
+                  <div className="text-sm text-ink-500">Coming from Stripe</div>
                   <div className="text-2xl font-bold text-ink-900">${(insights.futurePayouts || 0).toFixed(2)}</div>
                 </div>
                 
                 <div className="bg-white rounded-lg shadow-sm p-6">
-                  <div className="text-sm text-ink-500">In Transit</div>
+                  <div className="text-sm text-ink-500">On its way to the bank</div>
                   <div className="text-2xl font-bold text-ink-900">${(insights.inTransit || 0).toFixed(2)}</div>
                 </div>
                 
@@ -809,6 +813,11 @@ const PerformerInsights: React.FC = () => {
                 <p className="text-sm text-ink-500 mt-4">
                   Showing {filteredTipPoints.length} tips in the selected time window
                 </p>
+                {tipTimelineTotal != null && tipTimelineTotal > tipTimelinePoints.length && (
+                  <p className="text-xs text-ink-500 mt-1" role="note">
+                    The chart uses the newest {tipTimelinePoints.length.toLocaleString()} of {tipTimelineTotal.toLocaleString()} tips. Older tips are not included.
+                  </p>
+                )}
               </div>
             </>
           ) : null}

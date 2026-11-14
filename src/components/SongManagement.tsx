@@ -121,8 +121,8 @@ const SongManagement: React.FC<SongManagementProps> = ({ profileId }) => {
         if (headerCount) {
           totalCount = parseInt(headerCount, 10)
         } else {
-          // Fallback: if header is not accessible, fetch without limit to count
-          const fullResponse = await fetch(`${API_BASE_URL}/api/songcatalog/my-songs/${profileId}?page=1&limit=1000`, {
+          // Fallback, only when the browser cannot read X-Total-Count (the server exposes it): ask for the most the server returns in one request
+          const fullResponse = await fetch(`${API_BASE_URL}/api/songcatalog/my-songs/${profileId}?page=1&limit=5000`, {
             headers: {
               'Authorization': `Bearer ${token}`,
               'Content-Type': 'application/json'
@@ -176,7 +176,7 @@ const SongManagement: React.FC<SongManagementProps> = ({ profileId }) => {
         } else {
           // Fallback: if header is not accessible, fetch without limit to count
           try {
-            const fullResponse = await fetch(`${API_BASE_URL}/api/songcatalog/my-songs/${profileId}?page=1&limit=1000`, {
+            const fullResponse = await fetch(`${API_BASE_URL}/api/songcatalog/my-songs/${profileId}?page=1&limit=5000`, {
               headers: {
                 'Authorization': `Bearer ${token}`,
                 'Content-Type': 'application/json'

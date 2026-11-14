@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Button, StatusChip } from '../ui'
 import { Modal } from '../ui/Modal'
-import { showApi, type ShowSummary, type ShowTip } from '../../services/showApi'
+import { showApi, type ShowTip } from '../../services/showApi'
+import { useShowList } from '../../hooks/useShowList'
 import { showTitle } from '../../utils/showName'
 import { RefundRequestDialog } from '../refunds/RefundRequestDialog'
 import { REFUND_WINDOW_DAYS } from '../../services/refundRequestApi'
@@ -25,27 +26,28 @@ interface Props {
  * earlier shows too, so a tip from last night is as easy to find as one from tonight.
  */
 export function ShowTipsSheet({ open, initialShowId, onClose, onChanged }: Props) {
-  const [shows, setShows] = useState<ShowSummary[]>([])
+  const { shows, hasMore: moreShows, loadMore: loadMoreShows, loadingMore: loadingMoreShows } = useShowList(open)
   const [showId, setShowId] = useState<string | null>(null)
   const [tips, setTips] = useState<ShowTip[] | null>(null)
   const [failed, setFailed] = useState(false)
   const [asking, setAsking] = useState<ShowTip | null>(null)
 
+  // When the list arrives, open on the chosen show (else the newest)
   useEffect(() => {
     if (!open) return
-    let cancelled = false
     setTips(null)
     setFailed(false)
-    void showApi.list(1, 10).then(res => {
-      if (cancelled) return
-      const list: ShowSummary[] = res.data?.shows ?? []
-      setShows(list)
-      setShowId(initialShowId && list.some(s => s.id === initialShowId) ? initialShowId : list[0]?.id ?? null)
-    })
-    return () => {
-      cancelled = true
-    }
   }, [open, initialShowId])
+
+  useEffect(() => {
+    if (!open || shows.length === 0) return
+    setShowId(prev => prev ?? (initialShowId && shows.some(s => s.id === initialShowId) ? initialShowId : shows[0]?.id ?? null))
+  }, [open, shows, initialShowId])
+
+  // A fresh opening starts again from the chosen show
+  useEffect(() => {
+    if (!open) setShowId(null)
+  }, [open])
 
   const loadTips = useCallback(async () => {
     if (!showId) return
@@ -84,6 +86,16 @@ export function ShowTipsSheet({ open, initialShowId, onClose, onChanged }: Props
                 </option>
               ))}
             </select>
+            {moreShows && (
+              <button
+                type="button"
+                onClick={() => void loadMoreShows()}
+                disabled={loadingMoreShows}
+                className="rounded-lg px-2 py-1.5 text-sm font-semibold text-brand-700 hover:bg-slate-100 disabled:opacity-50"
+              >
+                {loadingMoreShows ? 'Loading…' : 'Older shows'}
+              </button>
+            )}
           </label>
         )}
         {selected && (

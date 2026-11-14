@@ -47,16 +47,15 @@ describe('the device is optional in onboarding', () => {
     navigation.href = ''
   })
 
-  it('a performer without an invite can skip the device step and go straight to payouts', async () => {
+  it('a performer is never asked for a device: after the code it goes straight to payouts', async () => {
     renderAt()
     await screen.findByLabelText('Stage name')
     await createPerformerAccount()
 
-    expect(await screen.findByLabelText('Serial number')).toBeInTheDocument()
-    expect(screen.getByText(/Optional: you can add it later/)).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: 'Skip for now' }))
-
+    // no device step is asked for: after the code it goes straight to payouts
     expect(await screen.findByRole('button', { name: 'Verify identity with Stripe' })).toBeEnabled()
+    expect(screen.queryByLabelText('Serial number')).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Skip for now' })).toBeNull()
     expect(screen.getByText('Stripe handles payouts. They will ask you to verify who you are.')).toBeInTheDocument()
     expect(api.registerDeviceOnboarding).not.toHaveBeenCalled()
   })
@@ -65,7 +64,6 @@ describe('the device is optional in onboarding', () => {
     renderAt()
     await screen.findByLabelText('Stage name')
     await createPerformerAccount()
-    fireEvent.click(await screen.findByRole('button', { name: 'Skip for now' }))
     fireEvent.click(await screen.findByRole('button', { name: 'Verify identity with Stripe' }))
 
     await waitFor(() => expect(api.post).toHaveBeenCalledWith('/api/stripe/profile-onboarding-link', {}))
@@ -81,7 +79,6 @@ describe('the device is optional in onboarding', () => {
     renderAt()
     await screen.findByLabelText('Stage name')
     await createPerformerAccount()
-    fireEvent.click(await screen.findByRole('button', { name: 'Skip for now' }))
     fireEvent.click(await screen.findByRole('button', { name: 'Verify identity with Stripe' }))
 
     await waitFor(() => expect(navigation.href).toBe('https://connect.stripe.test/verify'))
@@ -93,7 +90,6 @@ describe('the device is optional in onboarding', () => {
     renderAt()
     await screen.findByLabelText('Stage name')
     await createPerformerAccount()
-    fireEvent.click(await screen.findByRole('button', { name: 'Skip for now' }))
     fireEvent.click(await screen.findByRole('button', { name: 'Verify identity with Stripe' }))
 
     expect(await screen.findByText('Failed to create onboarding link')).toBeInTheDocument()

@@ -28,7 +28,7 @@ import { repeatApi, type PerformerRepeatRow } from '../services/repeatApi';
 import { percent } from '../utils/repeat';
 import dayjs from 'dayjs';
 import { PortalShell, type PortalNavItem } from '../components/portal/PortalShell';
-import { Banner, Button as UiButton, Card as UiCard, Modal, PageHeader, PageLoader, RefreshControl, StatCard, StatusChip, useFeedback, type ChipKind } from '../components/ui';
+import { Tabs as SegmentTabs, Banner, Button as UiButton, Card as UiCard, Modal, PageHeader, PageLoader, RefreshControl, StatCard, StatusChip, useFeedback, type ChipKind } from '../components/ui';
 import { BrandIcon } from '../components/icons/BrandIcons';
 
 const { Search } = Input;
@@ -1104,15 +1104,15 @@ const AdminDashboard: React.FC = () => {
   }
 
   const isRootAdmin = userProfile?.role === 'root_admin';
+  // One People > Performers page: the list, what each performer earns by time of day, and (root admin) their devices
+  const PERFORMER_PAGES = ['performers', 'performer-insights', 'device-management'];
   const adminNav: PortalNavItem[] = [
     { id: 'overview', label: 'Overview', icon: 'home', pin: true },
     { id: 'performers', label: 'Performers', icon: 'users', group: 'People', pin: true },
+    { id: 'feedback', label: 'Feedback', icon: 'sparkle', group: 'People' },
     { id: 'tips', label: 'Tips', icon: 'coin', group: 'Money', pin: true },
     { id: 'refunds', label: 'Refunds', icon: 'wallet', badge: pendingRefunds, group: 'Money', pin: true },
     { id: 'aggregated-charges', label: 'Charges', icon: 'card', group: 'Money' },
-    { id: 'performer-insights', label: 'Insights', icon: 'trend-up', group: 'Learn' },
-    { id: 'feedback', label: 'Feedback', icon: 'sparkle', group: 'Learn' },
-    ...(isRootAdmin ? [{ id: 'device-management', label: 'Devices', icon: 'device', group: 'System' } as PortalNavItem] : []),
     { id: 'venues', label: 'Venues', icon: 'bank', group: 'System' },
     { id: 'api-health', label: 'API health', icon: 'bars', group: 'System' },
     ...(isSimulationVisible ? [{ id: 'device-tip-simulation', label: 'Tools', icon: 'bolt', group: 'System' } as PortalNavItem] : []),
@@ -1122,7 +1122,7 @@ const AdminDashboard: React.FC = () => {
 
   const ADMIN_TITLES: Record<string, { title: string; subtitle?: string }> = {
     overview: { title: 'Overview', subtitle: 'How the platform is doing right now.' },
-    performers: { title: 'Performers', subtitle: 'Everyone who can receive tips, and their fee.' },
+    performers: { title: 'Performers', subtitle: 'Everyone who can receive tips, and their fee. Switch to Insights or Devices for one performer.' },
     venues: { title: 'Venues', subtitle: 'Approve new venues and manage the venue feature.' },
     refunds: { title: 'Refunds', subtitle: 'Refund requests from performers. Nothing is refunded until you approve it.' },
     'api-health': { title: 'API health', subtitle: 'How quickly this environment\u2019s API is answering, and whether server errors are rising.' },
@@ -1150,7 +1150,7 @@ const AdminDashboard: React.FC = () => {
   return (
     <PortalShell
       items={adminNav}
-      active={activeTab}
+      active={PERFORMER_PAGES.includes(activeTab) ? 'performers' : activeTab}
       onSelect={id => (id === 'performer-view' ? navigate('/dashboard') : setActiveTab(id))}
       userName={userProfile?.firstName ? `${userProfile.firstName} ${userProfile.lastName || ''}`.trim() : 'Admin'}
       userPhotoUrl={userProfile?.profilePhotoUrl || undefined}
@@ -1172,6 +1172,18 @@ const AdminDashboard: React.FC = () => {
           ) : undefined
         }
       />
+      {PERFORMER_PAGES.includes(activeTab) && (
+        <SegmentTabs
+          className="mb-4"
+          active={activeTab}
+          onChange={setActiveTab}
+          items={[
+            { id: 'performers', label: 'All performers' },
+            { id: 'performer-insights', label: 'Insights' },
+            ...(isRootAdmin ? [{ id: 'device-management', label: 'Devices' }] : [])
+          ]}
+        />
+      )}
       <div>
         {activeTab === 'overview' && (
           <div className="space-y-5">

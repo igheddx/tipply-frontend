@@ -1,29 +1,37 @@
 import React from 'react'
-import { render, screen, waitFor } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
+import { render, screen, waitFor, within, fireEvent } from '@testing-library/react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import AdminDashboard from '@/pages/AdminDashboard'
 
-const mockNavigate = vi.fn()
+// vi.mock is hoisted above the file's other code, so the mocks it uses have to be created with vi.hoisted
+const { mockNavigate, mockApiService } = vi.hoisted(() => ({
+  mockNavigate: vi.fn(),
+  mockApiService: { getProfile: vi.fn(), get: vi.fn(), post: vi.fn(), put: vi.fn() }
+}))
 
 vi.mock('react-router-dom', () => ({
   useNavigate: () => mockNavigate
 }))
 
-const mockApiService = {
-  getProfile: vi.fn(),
-  get: vi.fn(),
-  post: vi.fn(),
-  put: vi.fn()
-}
-
 vi.mock('@/services/api', () => ({
-  apiService: mockApiService
+  apiService: mockApiService,
+  default: mockApiService
 }))
+
+// Clicks use fireEvent, not userEvent: userEvent inspects the style of every parent before each click, which is very slow on this big page
+vi.setConfig({ testTimeout: 60000 })
+
+// The table library asks for the style of pseudo-elements, which the test browser cannot compute: each ask logs a long error and is slow.
+// Answering without the pseudo-element is what it needs.
+const realGetComputedStyle = window.getComputedStyle.bind(window)
+window.getComputedStyle = ((element: Element) => realGetComputedStyle(element)) as typeof window.getComputedStyle
 
 describe('AdminDashboard refund flow', () => {
   beforeEach(() => {
-    localStorage.setItem('token', 'test-token')
+    // each test starts with a clean record of what was called
+    Object.values(mockApiService).forEach(f => f.mockReset())
+    // the test setup replaces localStorage with a stub, so the token has to be answered by getItem
+    localStorage.getItem = vi.fn((key: string) => (key === 'token' ? 'test-token' : null))
     mockApiService.getProfile.mockResolvedValue({ data: { role: 'root_admin' } })
     mockApiService.get.mockImplementation((url: string) => {
       if (url.includes('/api/admin/dashboard-stats')) {
@@ -78,18 +86,61 @@ describe('AdminDashboard refund flow', () => {
     })
   })
 
-  it('shows refund button and triggers refund request', async () => {
+  const goToTips = async () => {
     render(<AdminDashboard />)
+    // the page opens on Overview; the refund button is on the Tips tab, reached from the main navigation
+    // (there is a side menu and a bottom bar; either one works)
+    const navs = await screen.findAllByRole('navigation', { name: 'Main' })
+    fireEvent.click(within(navs[0]).getByRole('button', { name: /Tips/ }))
+  }
 
-    const refundButton = await screen.findByRole('button', { name: /refund/i })
-    expect(refundButton).toBeInTheDocument()
+  it('shows the refund button on a recent charged tip, asks first, lets the admin keep the tip, and only refunds on confirm', async () => {
+    await goToTips()
 
-    await userEvent.click(refundButton)
-    const confirmButton = await screen.findByRole('button', { name: /^refund$/i })
-    await userEvent.click(confirmButton)
+    const tableRefund = await screen.findByRole('button', { name: 'Refund' })
+    fireEvent.click(tableRefund)
+
+    // a question first: nothing is refunded by the first click
+    expect(await screen.findByText('Refund this tip?')).toBeInTheDocument()
+    expect(mockApiService.post).not.toHaveBeenCalledWith('/api/admin/tips/tip-1/refund')
+
+    // "Keep tip" closes the question and refunds nothing
+    fireEvent.click(await screen.findByRole('button', { name: 'Keep tip' }))
+    await waitFor(() => expect(screen.queryByText('Refund this tip?')).toBeNull())
+    expect(mockApiService.post).not.toHaveBeenCalledWith('/api/admin/tips/tip-1/refund')
+
+    // asked again, and this time confirmed: exactly one refund
+    fireEvent.click(await screen.findByRole('button', { name: 'Refund' }))
+    await screen.findByText('Refund this tip?')
+    const buttons = await screen.findAllByRole('button', { name: 'Refund' })
+    fireEvent.click(buttons[buttons.length - 1]) // the confirm button in the question
 
     await waitFor(() => {
       expect(mockApiService.post).toHaveBeenCalledWith('/api/admin/tips/tip-1/refund')
     })
+    expect(mockApiService.post.mock.calls.filter(([u]: [string]) => u.includes('/refund'))).toHaveLength(1)
+  })
+
+  it('offers no refund on a tip that is old, not charged, or has no payment to refund', async () => {
+    const day = 24 * 3600 * 1000
+    const tip = (id: string, over: Record<string, unknown>) => ({
+      id, createdAt: new Date().toISOString(), amount: 12, deviceNickname: 'Stage', performerFirstName: 'Jane', performerLastName: 'Doe',
+      performerEmail: 'jane@example.com', status: 'processed', stripePaymentIntentId: 'pi_123', effect: 'x', duration: 1000, platformFee: 1, performerEarnings: 11, ...over
+    })
+    mockApiService.post.mockImplementation((url: string) =>
+      Promise.resolve(url.includes('/api/admin/tips/search')
+        ? { data: { tips: [
+            tip('old', { createdAt: new Date(Date.now() - 8 * day).toISOString() }),
+            tip('pending', { status: 'pending' }),
+            tip('failed', { status: 'failed' }),
+            tip('nopay', { stripePaymentIntentId: null })
+          ], totalCount: 4 } }
+        : { data: {} }))
+
+    await goToTips()
+
+    await waitFor(() => expect(mockApiService.post).toHaveBeenCalledWith('/api/admin/tips/search', expect.anything()))
+    await new Promise(r => setTimeout(r, 200))
+    expect(screen.queryByRole('button', { name: 'Refund' })).toBeNull()
   })
 })

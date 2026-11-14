@@ -129,6 +129,9 @@ html.theme-dark, html.theme-dark body { background-color: #0a1c27; color-scheme:
 .portal-dark .hover\:bg-white:hover { background-color: #16384a; }
 .portal-dark .hover\:bg-brand-50:hover { background-color: rgba(34,170,190,.2); }
 .portal-dark .active\:bg-slate-50:active { background-color: #16384a; }
+.portal-dark .disabled\:bg-slate-100:disabled { background-color: #16384a; }
+.portal-dark .hover\:bg-red-50:hover { background-color: rgba(239,68,68,.2); }
+.portal-dark .hover\:bg-white\/70:hover { background-color: rgba(255,255,255,.12); }
 
 .portal-dark .border-slate-100 { border-color: rgba(255,255,255,.07); }
 .portal-dark .border-slate-200 { border-color: rgba(255,255,255,.12); }
