@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { apiService } from '../../services/api'
-import { BrandIcon } from '../icons/BrandIcons'
-import { Button, Card, EmptyState, RowMenu, StatusChip, useFeedback, type ChipKind } from '../ui'
+import { Button, Card, DisclosureChevron, EmptyState, RowMenu, StatusChip, useFeedback, type ChipKind } from '../ui'
 import { buildTipsCsv, statusLabel } from '../../utils/tipsCsv'
 import { rangeFor, toDateInput, type RangePreset } from '../../utils/tipsRange'
 import { RefundRequestDialog } from '../refunds/RefundRequestDialog'
@@ -238,7 +237,7 @@ export default function TipsTab({ profileId, devices, refreshKey, onGoToDevices 
             aria-expanded={moreFilters}
             className="flex h-11 items-center gap-2 text-sm font-semibold text-brand-700 sm:hidden"
           >
-            <BrandIcon name={moreFilters ? 'chevron-down' : 'chevron-right'} size={18} tone="current" />
+            <DisclosureChevron open={moreFilters} />
             {moreFilters ? 'Fewer filters' : 'More filters and download'}
             {(status !== 'all' || deviceId !== '') && !moreFilters && <span className="rounded-full bg-brand-50 px-2 py-0.5 text-xs text-brand-800">on</span>}
           </button>
