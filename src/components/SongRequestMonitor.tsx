@@ -8,6 +8,7 @@ import { playTipChime, unlockTipChime, isTipChimeReady } from '../utils/tipChime
 import { SessionBanner } from './venue/SessionBanner'
 import { RefundRequestDialog, type RefundableTip } from './refunds/RefundRequestDialog'
 import { useShowList } from '../hooks/useShowList'
+import { ShowTotalsStrip } from './shows/ShowTotalsStrip'
 import { showTitle } from '../utils/showName'
 
 interface SongRequest {
@@ -727,6 +728,9 @@ const SongRequestMonitor: React.FC<SongRequestMonitorProps> = ({
           </>
         )}
       </header>
+
+      {/* The night's running total, so nothing needs a trip to another page during a show. Not on someone else's screen. */}
+      {!readOnly && <ShowTotalsStrip active={isVisible} picked={pickedShowId ? shows.find(x => x.id === pickedShowId) ?? null : null} refreshMs={REFRESH_MS} />}
 
       {/* On a venue's device: how long the session has left, so the end of it is never a surprise */}
       {!readOnly && (
