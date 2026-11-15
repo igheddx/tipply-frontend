@@ -113,7 +113,7 @@ describe('PortalShell with grouped items', () => {
 const data: HomeData = {
   firstName: 'Ada', today: { amount: 0, count: 0 }, month: { amount: 0, count: 0, trendPercent: 0, trendDirection: 'up' },
   pendingTips: 0, failedTips: 12, failedTipsCount: 1, scheduledPayouts: 0, inTransit: 0, available: 0, lifetime: 0, balancesLoading: false,
-  devices: { active: 1, paused: 0, offline: 0, total: 1 }, weeks: [], nextSteps: [{ id: 'device', icon: 'qr', title: 'Add your first device', detail: 'd', done: false, actionLabel: 'Go', onAction: () => {} }, { id: 'photo', icon: 'user', title: 'Add a profile photo', detail: 'p', done: true, actionLabel: 'Add', onAction: () => {} }],
+  devices: { paused: 0, total: 1 }, weeks: [], nextSteps: [{ id: 'device', icon: 'qr', title: 'Add your first device', detail: 'd', done: false, actionLabel: 'Go', onAction: () => {} }, { id: 'photo', icon: 'user', title: 'Add a profile photo', detail: 'p', done: true, actionLabel: 'Add', onAction: () => {} }],
   weeksLoading: false
 }
 

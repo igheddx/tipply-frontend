@@ -124,6 +124,24 @@ describe('the performer dashboard, Devices', () => {
     expect(screen.queryByText('Light effect for each tip amount')).toBeNull()
   })
 
+  it('does not claim a device is online: it says to check the Wi-Fi light, and still shows Paused', async () => {
+    api.getDashboardStats.mockResolvedValue({ data: stats([device({ isOnline: true, isPaused: false })]) })
+    await openDevices()
+
+    expect(await screen.findByText('Check the Wi-Fi light')).toBeInTheDocument()
+    expect(screen.getByText(/Steady Wi-Fi light: connected/)).toBeInTheDocument()
+    expect(screen.queryByText('Active')).toBeNull()
+    expect(screen.queryByText('Offline')).toBeNull()
+  })
+
+  it('shows Paused for a paused device, with no Wi-Fi hint', async () => {
+    api.getDashboardStats.mockResolvedValue({ data: stats([device({ isPaused: true })]) })
+    await openDevices()
+
+    expect(await screen.findByText('Paused')).toBeInTheDocument()
+    expect(screen.queryByText('Check the Wi-Fi light')).toBeNull()
+  })
+
   it('keeps sound, tone, volume, random light and the tip page link under "Advanced", closed until asked for', async () => {
     await openDevices()
 

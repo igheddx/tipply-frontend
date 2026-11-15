@@ -11,7 +11,7 @@ vi.mock('recharts', () => ({
 const base: HomeData = {
   firstName: 'Dave', today: { amount: 20, count: 2 }, month: { amount: 500, count: 30, trendPercent: 0, trendDirection: 'up' },
   pendingTips: 35, failedTips: 0, failedTipsCount: 0, scheduledPayouts: 487.22, inTransit: 90.94, available: 120, lifetime: 1199, balancesLoading: false,
-  devices: { active: 1, paused: 0, offline: 0, total: 1 }, weeks: [], nextSteps: []
+  devices: { paused: 0, total: 1 }, weeks: [], nextSteps: []
 }
 const props = (data: Partial<HomeData> = {}) => ({ data: { ...base, ...data }, formatCurrency: (n: number) => `$${n.toFixed(2)}`, onGoToDevices: () => {}, onGoToTips: () => {} })
 

@@ -27,7 +27,7 @@ export interface HomeData {
   lifetime: number
   /** True while Stripe balances are still loading */
   balancesLoading: boolean
-  devices: { active: number; paused: number; offline: number; total: number }
+  devices: { paused: number; total: number }
   weeks: { week: string; total: number }[]
   /** True until the weekly totals have arrived */
   weeksLoading?: boolean
@@ -196,9 +196,7 @@ export function HomeTab({ data, onGoToDevices, onGoToTips, onGoToLive, showSlot,
             <span className="text-sm font-semibold text-ink-900">
               {data.devices.total === 0 ? 'No devices yet' : plural(data.devices.total, 'device')}
             </span>
-            {data.devices.active > 0 && <StatusChip kind="active" label={`${data.devices.active} active`} />}
             {data.devices.paused > 0 && <StatusChip kind="paused" label={`${data.devices.paused} paused`} />}
-            {data.devices.offline > 0 && <StatusChip kind="offline" label={`${data.devices.offline} offline`} />}
           </div>
           <Button variant="secondary" size="sm" onClick={onGoToDevices}>
             {data.devices.total === 0 ? 'Add a device' : 'Manage devices'}
