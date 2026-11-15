@@ -483,7 +483,7 @@ const DeviceWifiSetup = () => {
         const onDrop = () => reject(new Error('Bluetooth connection to the device dropped. Move closer and try again.'));
         const timer = setTimeout(() => {
           silent = deviceMessages.length === 0;
-          reject(new Error(`The device did not answer within ${JOIN_TIMEOUT_MS / 1000} seconds. That usually means it could not join this network. Check the Wi-Fi name and password, keep the device close to the router, and try again.`));
+          reject(new Error(`The device did not answer within ${JOIN_TIMEOUT_MS / 1000} seconds. That usually means it could not join this network. Check the Wi-Fi name and password, keep the device close to the router, and try again. If its Wi-Fi light is still blinking, unplug the device for 10 seconds, plug it back in, and try again.`));
         }, JOIN_TIMEOUT_MS);
         statusChar.addEventListener('characteristicvaluechanged', onStatus);
         selectedDevice.device.addEventListener('gattserverdisconnected', onDrop);
@@ -534,6 +534,7 @@ const DeviceWifiSetup = () => {
               when: new Date().toISOString(),
               browser: navigator.userAgent,
               device: selectedDevice?.name,
+              attempt: autoRetried === true ? '2 of 2 (the page retried by itself once)' : '1 of 2',
               deviceReported: failureCode || '(nothing before the error)',
               error: message,
               deviceMessages,

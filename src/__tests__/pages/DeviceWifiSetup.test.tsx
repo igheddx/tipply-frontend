@@ -171,6 +171,7 @@ describe('DeviceWifiSetup', () => {
       expect(sends(fake)).toBe(2) // not a third
       expect(screen.getByText(/did not answer within 45 seconds/i)).toBeInTheDocument()
       expect(screen.getByText(/usually means it could not join this network/i)).toBeInTheDocument()
+      expect(screen.getByText(/unplug the device for 10 seconds/i)).toBeInTheDocument() // what to do next
       expect(apiMock.logDeviceSetupAttempt.mock.calls.at(-1)?.[0]).toMatchObject({ outcome: 'failure', errorCode: 'no_report' })
     })
 
@@ -203,6 +204,7 @@ describe('DeviceWifiSetup', () => {
     await waitFor(() => expect(writeText).toHaveBeenCalled())
     const copied = writeText.mock.calls[0][0] as string
     expect(copied).toContain('auth_failed')
+    expect(copied).toContain('"attempt"')
     expect(copied).toContain('"length": 13')
     expect(copied).not.toContain('secret-pass-9')
   })

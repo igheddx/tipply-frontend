@@ -4,7 +4,7 @@ import { HomeTab, type HomeData } from '../components/portal/HomeTab'
 import { DemoBanner } from '../components/portal/DemoBanner'
 import { renderQrCard } from '../utils/qrCard'
 import { TipsTimeline } from '../components/charts/TipsTimeline'
-import { Banner, Button, Card, DisclosureChevron, EmptyState, Modal, PageHeader, PageLoader, RefreshControl, RowMenu, StatusChip, Tabs, useFeedback, type ChipKind } from '../components/ui'
+import { Banner, Button, Card, DisclosureChevron, EmptyState, Modal, PageHeader, PageLoader, RefreshControl, RowMenu, StatusChip, Tabs, useFeedback } from '../components/ui'
 import { BrandIcon, IconTile } from '../components/icons/BrandIcons'
 import { Switch } from '../components/ui/Switch'
 import React, { useState, useEffect, useRef } from 'react'
@@ -1385,9 +1385,7 @@ const Dashboard: React.FC = () => {
     balancesLoading: stripeMetricsLoading,
     devices: {
       total: deviceList.length,
-      paused: deviceList.filter(d => d.isPaused).length,
-      active: deviceList.filter(d => d.isOnline && !d.isPaused).length,
-      offline: deviceList.filter(d => !d.isOnline && !d.isPaused).length
+      paused: deviceList.filter(d => d.isPaused).length
     },
     weeks: weekRows,
     weeksLoading: chartsLoading,
@@ -1563,16 +1561,20 @@ const Dashboard: React.FC = () => {
 
                 <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
                   {stats.devices.map(device => {
-                    const chip: ChipKind = device.isPaused ? 'paused' : device.isOnline ? 'active' : 'offline'
                     const busyConfig = updatingDeviceConfig === device.id
                     return (
                       <Card key={device.id}>
                         <div className="flex items-start justify-between gap-3">
                           <div className="min-w-0">
                             <h3 className="truncate text-lg font-bold text-ink-900">{device.nickname || 'Unnamed device'}</h3>
+                            {!device.isPaused && (
+                              <p className="mt-0.5 text-xs text-ink-500">Steady Wi-Fi light: connected. Blinking: not on Wi-Fi yet.</p>
+                            )}
                           </div>
                           <div className="-mr-2 -mt-1 flex items-center gap-1">
-                            <StatusChip kind={chip} />
+                            {/* The app cannot see the device's Wi-Fi (it only knows when the device's record was last changed), so it
+                                does not say "online". The light on the device is the truth. */}
+                            {device.isPaused ? <StatusChip kind="paused" /> : <StatusChip kind="info" label="Check the Wi-Fi light" />}
                             <RowMenu
                               label={`More actions for ${device.nickname || 'this device'}`}
                               items={[
