@@ -629,8 +629,8 @@ const DeviceWifiSetup = () => {
       <div className="mx-auto max-w-2xl">
         <header className="mb-8 text-center">
           <img src="/images/logo/tipwave-logo-v2.png" alt="Tipwave" className="mx-auto h-10 w-auto" />
-          <h1 className="mt-6 text-3xl font-bold text-ink-900">Connect your device to Wi-Fi</h1>
-          <p className="mt-2 text-ink-500">Your phone talks to the device over Bluetooth and gives it your Wi-Fi details.</p>
+          <h1 className="mt-6 text-3xl font-bold text-ink-900">Set up Wi-Fi for your device</h1>
+          <p className="mt-2 text-ink-500">Your device connects by cellular on its own. Wi-Fi is the backup, used only when there is no cellular signal. Your phone talks to the device over Bluetooth and gives it your Wi-Fi details. You only need this if the device light keeps blinking.</p>
           {import.meta.env.DEV && demoMode && (
             <span className="mt-3 inline-block rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-800">Demo mode</span>
           )}
@@ -667,7 +667,7 @@ const DeviceWifiSetup = () => {
         {failure && !connecting && currentStep === 2 && (
           <Banner
             tone="error"
-            title="The device could not join the Wi-Fi"
+            title="The device could not join the Wi-Fi (it may still work by cellular)"
             className="mb-5"
             onDismiss={() => setFailure(null)}
             action={
