@@ -124,12 +124,12 @@ describe('the performer dashboard, Devices', () => {
     expect(screen.queryByText('Light effect for each tip amount')).toBeNull()
   })
 
-  it('does not claim a device is online: it says to check the Wi-Fi light, and still shows Paused', async () => {
+  it('does not claim a device is online: it says to check the light, and still shows Paused', async () => {
     api.getDashboardStats.mockResolvedValue({ data: stats([device({ isOnline: true, isPaused: false })]) })
     await openDevices()
 
-    expect(await screen.findByText('Check the Wi-Fi light')).toBeInTheDocument()
-    expect(screen.getByText(/Steady Wi-Fi light: connected/)).toBeInTheDocument()
+    expect(await screen.findByText('Check the light')).toBeInTheDocument()
+    expect(screen.getByText(/Connects by cellular on its own/)).toBeInTheDocument()
     expect(screen.queryByText('Active')).toBeNull()
     expect(screen.queryByText('Offline')).toBeNull()
   })
@@ -139,7 +139,7 @@ describe('the performer dashboard, Devices', () => {
     await openDevices()
 
     expect(await screen.findByText('Paused')).toBeInTheDocument()
-    expect(screen.queryByText('Check the Wi-Fi light')).toBeNull()
+    expect(screen.queryByText('Check the light')).toBeNull()
   })
 
   it('keeps sound, tone, volume, random light and the tip page link under "Advanced", closed until asked for', async () => {

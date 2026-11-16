@@ -1542,7 +1542,7 @@ const Dashboard: React.FC = () => {
                     Add device
                   </Button>
                   <Button variant="secondary" icon="wifi" onClick={() => window.open(getDeviceSetupUrl(), '_blank')}>
-                    Connect a device to Wi-Fi
+                    Set up Wi-Fi backup
                   </Button>
                   <Button variant="ghost" icon="refresh" onClick={refreshDashboard} aria-label="Refresh device status" title="Refresh device status" />
                 </div>
@@ -1568,13 +1568,13 @@ const Dashboard: React.FC = () => {
                           <div className="min-w-0">
                             <h3 className="truncate text-lg font-bold text-ink-900">{device.nickname || 'Unnamed device'}</h3>
                             {!device.isPaused && (
-                              <p className="mt-0.5 text-xs text-ink-500">Steady Wi-Fi light: connected. Blinking: not on Wi-Fi yet.</p>
+                              <p className="mt-0.5 text-xs text-ink-500">Connects by cellular on its own. A blinking light means it has no connection yet.</p>
                             )}
                           </div>
                           <div className="-mr-2 -mt-1 flex items-center gap-1">
-                            {/* The app cannot see the device's Wi-Fi (it only knows when the device's record was last changed), so it
+                            {/* The app cannot see the device's connection (it only knows when the device's record was last changed), so it
                                 does not say "online". The light on the device is the truth. */}
-                            {device.isPaused ? <StatusChip kind="paused" /> : <StatusChip kind="info" label="Check the Wi-Fi light" />}
+                            {device.isPaused ? <StatusChip kind="paused" /> : <StatusChip kind="info" label="Check the light" />}
                             <RowMenu
                               label={`More actions for ${device.nickname || 'this device'}`}
                               items={[
