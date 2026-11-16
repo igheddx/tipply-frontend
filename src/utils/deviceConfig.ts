@@ -16,14 +16,18 @@ export const validateTipAmounts = (amounts: number[]): string | null => {
   return null
 }
 
-export const LIGHT_EFFECTS: { value: string; label: string }[] = [
-  { value: 'effect1', label: 'Flash' },
-  { value: 'effect2', label: 'Swirl' },
-  { value: 'effect3', label: 'Breathing' },
-  { value: 'effect4', label: 'Light Effect 4' },
-  { value: 'effect5', label: 'Light Effect 5' },
-  { value: 'effect6', label: 'Light Effect 6' },
+// The device is still sent effect1 to effect6. The name is what people see in the dropdown; the description says what the light does.
+export const LIGHT_EFFECTS: { value: string; label: string; description: string }[] = [
+  { value: 'effect1', label: 'Emerald Rise', description: 'Green lights up at the base and spreads upward into a bright mint-white glow with a hint of violet at the top.' },
+  { value: 'effect2', label: 'Neon Pulse', description: 'A bright white-violet flash gives way to quick pulses of hot pink and purple.' },
+  { value: 'effect3', label: 'Solar Flare', description: 'The device warms from red-orange to amber, then fills with bright yellow.' },
+  { value: 'effect4', label: 'Color Flip', description: 'An icy cyan glow brightens toward white, then abruptly switches to vivid magenta.' },
+  { value: 'effect5', label: 'Aqua Bloom', description: 'A soft green glow gradually brightens into a full turquoise glow, with green still visible around the top.' },
+  { value: 'effect6', label: 'Spectrum Rush', description: 'A red-orange flash moves quickly through hot pink and violet before landing on deep blue.' },
 ]
+
+/** The description of an effect, for showing under or beside its name */
+export const lightEffectDescription = (value: string): string => LIGHT_EFFECTS.find(effect => effect.value === value)?.description ?? ''
 
 export const SOUND_OPTIONS: { value: number; label: string }[] = [
   { value: 1, label: 'Cash Register' },
@@ -40,7 +44,7 @@ export const VOLUME_OPTIONS: { value: string; label: string }[] = [
 export const DEFAULT_SOUND_ID = 1
 export const DEFAULT_SOUND_VOLUME = 'low'
 
-// One light per position, smallest amount to largest: Flash, Swirl, Breathing, then Light Effects 4 to 6.
+// One light per position, smallest amount to largest: Emerald Rise, Neon Pulse, Solar Flare, Color Flip, Aqua Bloom, Spectrum Rush.
 // The light belongs to the position, not to the dollar value.
 export const EFFECT_BY_POSITION = LIGHT_EFFECTS.map(effect => effect.value)
 
