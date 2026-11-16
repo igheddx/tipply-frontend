@@ -4,6 +4,8 @@ import {
   DEFAULT_TIP_AMOUNTS,
   defaultEffectConfigFor,
   effectForAmount,
+  LIGHT_EFFECTS,
+  lightEffectDescription,
   normalizeEffectConfig,
   remapEffectConfigByPosition,
   validateTipAmounts,
@@ -35,8 +37,23 @@ describe('tip amounts', () => {
   })
 })
 
+describe('the six light effects', () => {
+  it('keep the values the device is sent (effect1 to effect6) with their names in order', () => {
+    expect(LIGHT_EFFECTS.map(e => [e.value, e.label])).toEqual([
+      ['effect1', 'Emerald Rise'], ['effect2', 'Neon Pulse'], ['effect3', 'Solar Flare'],
+      ['effect4', 'Color Flip'], ['effect5', 'Aqua Bloom'], ['effect6', 'Spectrum Rush'],
+    ])
+  })
+
+  it('each has a description, and an unknown value has none', () => {
+    for (const effect of LIGHT_EFFECTS) expect(effect.description.length).toBeGreaterThan(20)
+    expect(lightEffectDescription('effect4')).toMatch(/icy cyan/)
+    expect(lightEffectDescription('nope')).toBe('')
+  })
+})
+
 describe('lights follow the position', () => {
-  it('the default is Flash, Swirl, Breathing, then effects 4 to 6, left to right', () => {
+  it('the default is Emerald Rise, Neon Pulse, Solar Flare, Color Flip, Aqua Bloom, Spectrum Rush, left to right', () => {
     expect(defaultEffectConfigFor(DEFAULT_TIP_AMOUNTS)).toEqual({
       '5': 'effect1', '10': 'effect2', '15': 'effect3', '20': 'effect4', '50': 'effect5', '100': 'effect6',
     })

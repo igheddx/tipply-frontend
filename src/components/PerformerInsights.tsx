@@ -989,7 +989,7 @@ const DeviceConfigModal: React.FC<{
                     className="px-3 py-1.5 border border-slate-300 rounded-md text-sm focus:ring-2 focus:ring-brand-600 focus:border-transparent disabled:bg-slate-100 disabled:cursor-not-allowed"
                   >
                     {LIGHT_EFFECTS.map(effect => (
-                      <option key={effect.value} value={effect.value}>
+                      <option key={effect.value} value={effect.value} title={effect.description}>
                         {effect.label}
                       </option>
                     ))}

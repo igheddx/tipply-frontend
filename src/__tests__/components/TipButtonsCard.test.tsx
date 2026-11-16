@@ -36,7 +36,20 @@ describe('TipButtonsCard', () => {
   it('offers all six effects in each row', () => {
     setup()
     const select = screen.getByLabelText('Light for the $10 button')
-    expect(within(select).getAllByRole('option').map(o => o.textContent)).toEqual(['Flash', 'Swirl', 'Breathing', 'Light Effect 4', 'Light Effect 5', 'Light Effect 6'])
+    expect(within(select).getAllByRole('option').map(o => o.textContent)).toEqual(['Emerald Rise', 'Neon Pulse', 'Solar Flare', 'Color Flip', 'Aqua Bloom', 'Spectrum Rush'])
+  })
+
+  it('shows what the chosen light does under each row, and follows a change', () => {
+    setup()
+    expect(screen.getByText(/Green lights up at the base and spreads upward/)).toBeInTheDocument() // $5 is Emerald Rise
+    expect(screen.getByText(/An icy cyan glow brightens toward white/)).toBeInTheDocument() // $20 is Color Flip
+    expect(screen.getByText(/A red-orange flash moves quickly through hot pink and violet/)).toBeInTheDocument() // $100 is Spectrum Rush
+  })
+
+  it('shows the description on each option too, for a long press or hover', () => {
+    setup()
+    const options = within(screen.getByLabelText('Light for the $5 button')).getAllByRole('option')
+    expect(options[1]).toHaveAttribute('title', 'A bright white-violet flash gives way to quick pulses of hot pink and purple.')
   })
 
   it('has no device picker with one device', () => {

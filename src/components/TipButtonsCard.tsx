@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import { Button, Card } from './ui'
 import TipAmountsEditor from './TipAmountsEditor'
-import { LIGHT_EFFECTS } from '../utils/deviceConfig'
+import { LIGHT_EFFECTS, lightEffectDescription } from '../utils/deviceConfig'
 
 export interface TipButtonsDevice {
   id: string
@@ -57,7 +57,8 @@ const TipButtonsCard: React.FC<TipButtonsCardProps> = ({ amounts, devices, light
 
       <ol className="divide-y divide-slate-100" aria-label="Tip buttons, left to right">
         {amounts.map((amount, i) => (
-          <li key={amount} className="flex items-center justify-between gap-3 py-2.5">
+          <li key={amount} className="py-2.5">
+           <div className="flex items-center justify-between gap-3">
             <span className="flex items-center gap-3">
               <span className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-100 text-xs font-bold text-ink-700" aria-hidden>
                 {i + 1}
@@ -73,7 +74,7 @@ const TipButtonsCard: React.FC<TipButtonsCardProps> = ({ amounts, devices, light
                 className="h-9 rounded-lg border border-slate-300 bg-white px-2 text-sm"
               >
                 {LIGHT_EFFECTS.map(effect => (
-                  <option key={effect.value} value={effect.value}>
+                  <option key={effect.value} value={effect.value} title={effect.description}>
                     {effect.label}
                   </option>
                 ))}
@@ -81,6 +82,9 @@ const TipButtonsCard: React.FC<TipButtonsCardProps> = ({ amounts, devices, light
             ) : (
               <span className="text-sm text-ink-400">Add a device to choose lights</span>
             )}
+           </div>
+           {/* What the chosen light does, so the name is never a guess */}
+           {current && <p className="mt-1.5 pl-10 text-xs text-ink-500">{lightEffectDescription(lightFor(current.id, amount))}</p>}
           </li>
         ))}
       </ol>
