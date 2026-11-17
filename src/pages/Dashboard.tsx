@@ -1564,9 +1564,9 @@ const Dashboard: React.FC = () => {
                     const busyConfig = updatingDeviceConfig === device.id
                     return (
                       <Card key={device.id}>
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="min-w-0">
-                            <h3 className="truncate text-lg font-bold text-ink-900">{device.nickname || 'Unnamed device'}</h3>
+                        <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-1">
+                          <div className="min-w-0 flex-1 basis-44">
+                            <h3 className="break-words text-lg font-bold text-ink-900">{device.nickname || 'Unnamed device'}</h3>
                             {!device.isPaused && (
                               <p className="mt-0.5 text-xs text-ink-500">Connects by cellular on its own. A blinking light means it has no connection yet.</p>
                             )}
