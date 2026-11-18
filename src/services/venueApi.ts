@@ -107,7 +107,7 @@ export interface VenueProfile {
   timeZoneId?: string | null
   venueType?: string | null
   logoUrl?: string | null
-  status: 'pending' | 'approved' | 'rejected' | 'suspended'
+  status: 'pending' | 'approved' | 'rejected' | 'suspended' | 'closed'
   statusReason?: string | null
 }
 
@@ -122,7 +122,7 @@ export interface AdminVenue {
   longitude?: number | null
   timeZoneId?: string | null
   venueType?: string | null
-  status: 'pending' | 'approved' | 'rejected' | 'suspended'
+  status: 'pending' | 'approved' | 'rejected' | 'suspended' | 'closed'
   statusReason?: string | null
   statusAt?: string | null
   createdAt: string
@@ -188,7 +188,7 @@ export const venueApi = {
 
   // Tipwave admin
   adminVenues: (status?: string) => apiService.get(`/api/admin/venues${status ? `?status=${enc(status)}` : ''}`),
-  adminDecide: (venueId: string, action: 'approve' | 'reject' | 'suspend' | 'reinstate', reason?: string) =>
+  adminDecide: (venueId: string, action: 'approve' | 'reject' | 'suspend' | 'reinstate' | 'delete', reason?: string) =>
     apiService.post(`/api/admin/venues/${venueId}/${action}`, { reason }),
   adminAudit: (page = 1, action?: string, venueId?: string) =>
     apiService.get(`/api/admin/venues/audit?page=${page}&pageSize=50${action ? `&action=${enc(action)}` : ''}${venueId ? `&venueId=${enc(venueId)}` : ''}`),

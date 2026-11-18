@@ -61,6 +61,11 @@ export function VenueHome({ venue, devices, requests, linkedCount, onChanged, on
           {venue.statusReason || 'Contact Tipwave for details.'}
         </Banner>
       )}
+      {venue.status === 'closed' && (
+        <Banner tone="error" title="This venue was closed">
+          Its devices were removed and performers were unlinked. Contact Tipwave if this is a mistake.
+        </Banner>
+      )}
       {venue.status === 'suspended' && (
         <Banner tone="warning" title="Your venue is paused">
           {venue.statusReason || 'Contact Tipwave for details.'} No performer can use your devices until this is lifted.
