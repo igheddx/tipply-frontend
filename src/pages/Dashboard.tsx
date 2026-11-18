@@ -1067,6 +1067,9 @@ const Dashboard: React.FC = () => {
         await refreshDashboard()
         setShowDeleteModal(false)
         setDeviceToDelete(null)
+        // A venue's device can be linked to performers: say that they were told it is no longer linked
+        const told = (response.data as { performersNotified?: number; message?: string })
+        if (told.performersNotified && told.performersNotified > 0 && told.message) toast(told.message, 'success')
       } else {
         toast('Failed to delete device: ' + (response.error || 'Unknown error'), 'error')
       }

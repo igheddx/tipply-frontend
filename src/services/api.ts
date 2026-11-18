@@ -424,14 +424,14 @@ class ApiService {
     }, true) // Use API key for onboarding
   }
 
-  // Check if device UUID exists in DetectedDevices table with status "new"
+  // Check if device UUID exists in the DetectedDevices table (only an available device, one not assigned to anyone, can be linked)
   async checkDetectedDevice(uuid: string): Promise<ApiResponse<any>> {
     return this.request(`/api/devices/check-detected-device/${uuid}`, {
       method: 'GET',
     }, true) // Use API key for onboarding
   }
 
-  // Check if device SerialNumber exists in DetectedDevices table with status "new"
+  // Check if device SerialNumber exists in the DetectedDevices table (only an available device, one not assigned to anyone, can be linked)
   async checkDetectedDeviceBySerialNumber(serialNumber: string): Promise<ApiResponse<any>> {
     return this.request(`/api/devices/check-detected-device-serial/${serialNumber}`, {
       method: 'GET',
