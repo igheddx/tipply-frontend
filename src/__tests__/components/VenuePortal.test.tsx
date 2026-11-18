@@ -227,6 +227,35 @@ describe('admin venue review', () => {
     await waitFor(() => expect(venueApi.adminDecide).toHaveBeenCalledWith('v1', 'reject', 'Not a real business'))
   })
 
+  it('deletes a venue only with a reason, and says what will happen to its devices and performers', async () => {
+    venueApi.adminVenues.mockResolvedValue({ data: [v({ status: 'approved' })] })
+    render(<AdminVenues />)
+
+    fireEvent.click(await screen.findByRole('tab', { name: /Approved/ }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Delete venue' }))
+
+    const dialog = await screen.findByRole('dialog')
+    expect(within(dialog).getByText(/become available again/)).toBeInTheDocument()
+    expect(within(dialog).getByText(/every performer is unlinked and emailed/)).toBeInTheDocument()
+    const confirmButton = within(dialog).getByRole('button', { name: 'Delete venue' })
+    expect(confirmButton).toBeDisabled()
+    fireEvent.change(within(dialog).getByLabelText('Reason'), { target: { value: 'Closed its doors' } })
+    fireEvent.click(confirmButton)
+    await waitFor(() => expect(venueApi.adminDecide).toHaveBeenCalledWith('v1', 'delete', 'Closed its doors'))
+  })
+
+  it('can delete a waiting or a suspended venue too, and a deleted one has no buttons left', async () => {
+    venueApi.adminVenues.mockResolvedValue({ data: [v({ status: 'pending' }), v({ id: 'v3', businessName: 'Gone Bar', status: 'closed', statusReason: 'Closed its doors' })] })
+    render(<AdminVenues />)
+
+    expect(await screen.findByRole('button', { name: 'Delete venue' })).toBeInTheDocument() // the waiting one
+    fireEvent.click(screen.getByRole('tab', { name: /Deleted/ }))
+    expect(await screen.findByText('Gone Bar')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Delete venue' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Approve' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Reinstate' })).toBeNull()
+  })
+
   it('suspends an approved venue and reinstates a suspended one', async () => {
     venueApi.adminVenues.mockResolvedValue({ data: [v({ status: 'approved' }), v({ id: 'v3', businessName: 'Paused Bar', status: 'suspended', statusReason: 'Complaint' })] })
     render(<AdminVenues />)

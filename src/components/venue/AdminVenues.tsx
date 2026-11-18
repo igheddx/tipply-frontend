@@ -10,7 +10,8 @@ const TABS: { id: Status; label: string }[] = [
   { id: 'pending', label: 'Waiting' },
   { id: 'approved', label: 'Approved' },
   { id: 'suspended', label: 'Suspended' },
-  { id: 'rejected', label: 'Rejected' }
+  { id: 'rejected', label: 'Rejected' },
+  { id: 'closed', label: 'Deleted' }
 ]
 
 const mapLink = (v: AdminVenue) =>
@@ -27,7 +28,7 @@ export function AdminVenues() {
   const [enabled, setEnabled] = useState<boolean | null>(null)
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState<string | null>(null)
-  const [reasonFor, setReasonFor] = useState<{ venue: AdminVenue; action: 'reject' | 'suspend' } | null>(null)
+  const [reasonFor, setReasonFor] = useState<{ venue: AdminVenue; action: 'reject' | 'suspend' | 'delete' } | null>(null)
   const [reason, setReason] = useState('')
 
   const load = useCallback(async () => {
@@ -74,12 +75,12 @@ export function AdminVenues() {
     else setShowsOn(next)
   }
 
-  const decide = async (v: AdminVenue, action: 'approve' | 'reject' | 'suspend' | 'reinstate', why?: string) => {
+  const decide = async (v: AdminVenue, action: 'approve' | 'reject' | 'suspend' | 'reinstate' | 'delete', why?: string) => {
     setBusy(v.id)
     const res = await venueApi.adminDecide(v.id, action, why)
     setBusy(null)
     if (res.error) toast(res.error, 'error')
-    else toast(`${v.businessName}: ${action === 'approve' ? 'approved' : action === 'reject' ? 'rejected' : action === 'suspend' ? 'suspended' : 'reinstated'}`, 'success')
+    else toast(`${v.businessName}: ${action === 'approve' ? 'approved' : action === 'reject' ? 'rejected' : action === 'suspend' ? 'suspended' : action === 'delete' ? 'deleted' : 'reinstated'}`, 'success')
     setReasonFor(null)
     setReason('')
     await load()
@@ -162,6 +163,11 @@ export function AdminVenues() {
                         Approve after all
                       </Button>
                     )}
+                    {v.status !== 'closed' && (
+                      <Button variant="danger" disabled={busy === v.id} onClick={() => setReasonFor({ venue: v, action: 'delete' })}>
+                        Delete venue
+                      </Button>
+                    )}
                   </div>
                 </div>
 
@@ -208,7 +214,7 @@ export function AdminVenues() {
 
       <Modal
         open={!!reasonFor}
-        title={reasonFor?.action === 'reject' ? `Reject ${reasonFor.venue.businessName}?` : `Suspend ${reasonFor?.venue.businessName ?? ''}?`}
+        title={reasonFor?.action === 'reject' ? `Reject ${reasonFor.venue.businessName}?` : reasonFor?.action === 'delete' ? `Delete ${reasonFor.venue.businessName}?` : `Suspend ${reasonFor?.venue.businessName ?? ''}?`}
         onClose={() => setReasonFor(null)}
         footer={
           <>
@@ -219,7 +225,7 @@ export function AdminVenues() {
               loading={!!reasonFor && busy === reasonFor.venue.id}
               onClick={() => reasonFor && decide(reasonFor.venue, reasonFor.action, reason.trim())}
             >
-              {reasonFor?.action === 'reject' ? 'Reject venue' : 'Suspend venue'}
+              {reasonFor?.action === 'reject' ? 'Reject venue' : reasonFor?.action === 'delete' ? 'Delete venue' : 'Suspend venue'}
             </Button>
           </>
         }
@@ -227,7 +233,9 @@ export function AdminVenues() {
         <p className="mb-3 text-sm text-ink-700">
           {reasonFor?.action === 'reject'
             ? 'The venue is emailed this reason.'
-            : 'Every session on its devices ends now and nobody can start a new one. The reason is kept on record.'}
+            : reasonFor?.action === 'delete'
+              ? 'This cannot be undone. Its devices are removed and become available again, every session on them ends, every performer is unlinked and emailed, and the venue is emailed too. The record is kept for tip history. The reason is kept on record.'
+              : 'Every session on its devices ends now and nobody can start a new one. The reason is kept on record.'}
         </p>
         <label htmlFor="venue-reason" className="mb-1.5 block text-sm font-semibold text-ink-700">Reason</label>
         <textarea id="venue-reason" rows={3} value={reason} onChange={e => setReason(e.target.value)} className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-ink-900 focus:outline-none focus:ring-2 focus:ring-brand-500" />
@@ -251,6 +259,7 @@ const ACTION_TEXT: Record<string, string> = {
   venue_reject: 'was rejected',
   venue_suspend: 'was suspended',
   venue_reinstate: 'was reinstated',
+  venue_delete: 'was deleted',
   venue_profile_updated: 'updated their profile',
   invited: 'invited a performer',
   invited_by_email: 'invited someone by email',
