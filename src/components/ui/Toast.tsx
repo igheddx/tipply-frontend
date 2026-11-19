@@ -14,14 +14,14 @@ interface ToastProps {
   onDismiss?: () => void
 }
 
-/** A short confirmation: a dark pill at the bottom of the screen. */
+/** A short message: a dark pill at the top of the screen. In the dark theme it is lifted and outlined (see .toast-pill in index.css) so it stands out from the page. */
 export function Toast({ tone = 'info', message, onDismiss }: ToastProps) {
   const t = ICONS[tone]
   return (
     <div
       role="status"
       aria-live="polite"
-      className="fixed inset-x-4 top-4 z-[70] mx-auto flex max-w-md items-center gap-3 rounded-2xl bg-ink-900 px-4 py-3 text-white shadow-lift"
+      className="toast-pill fixed inset-x-4 top-4 z-[70] mx-auto flex max-w-md items-center gap-3 rounded-2xl border border-white/15 bg-ink-900 px-4 py-3 text-white shadow-lift"
     >
       <BrandIcon name={t.icon} size={22} color={t.color} />
       <span className="min-w-0 flex-1 text-sm font-semibold">{message}</span>
