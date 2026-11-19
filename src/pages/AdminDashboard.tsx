@@ -724,19 +724,22 @@ const AdminDashboard: React.FC = () => {
     try {
       setDeviceActionLoading(true);
       if (pendingDeviceAction.type === 'add') {
-        await apiService.post(`/api/admin/performers/${pendingDeviceAction.performer.id}/devices/add`, {
+        const added = await apiService.post(`/api/admin/performers/${pendingDeviceAction.performer.id}/devices/add`, {
           serialNumber: pendingDeviceAction.serialNumber,
           sendEmail
         });
+        // a refused request comes back as an error value, not a thrown one: do not say it worked
+        if (added.error) throw new Error(added.error);
         message.success('Device added successfully');
         setSelectedSerials((prev) => ({
           ...prev,
           [pendingDeviceAction.performer.id]: undefined
         }));
       } else {
-        await apiService.post(`/api/admin/performers/${pendingDeviceAction.performer.id}/devices/${pendingDeviceAction.deviceId}/delete`, {
+        const removed = await apiService.post(`/api/admin/performers/${pendingDeviceAction.performer.id}/devices/${pendingDeviceAction.deviceId}/delete`, {
           sendEmail
         });
+        if (removed.error) throw new Error(removed.error);
         message.success('Device deleted successfully');
       }
 

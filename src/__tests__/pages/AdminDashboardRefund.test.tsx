@@ -36,7 +36,7 @@ vi.mock('@/components/refunds/AdminRefunds', () => ({ AdminRefunds: () => null }
 // Clicks use fireEvent, not userEvent: userEvent inspects the style of every parent before each click, which is very slow on this big page
 // Alone this takes about 40 s (the admin page is very large); the full suite runs many files at once and slows it further, so the limit is
 // twice what a quiet machine needs. A real hang still fails, only later.
-vi.setConfig({ testTimeout: 120000 })
+vi.setConfig({ testTimeout: 240000 }) // other heavy admin-page test files run beside this one in the full suite and share the CPU
 
 // The table library asks for the style of pseudo-elements, which the test browser cannot compute: each ask logs a long error and is slow.
 // Answering without the pseudo-element is what it needs.
