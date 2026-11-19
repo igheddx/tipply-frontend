@@ -1,7 +1,7 @@
 import logger from "../utils/logger";
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Row, Col, Table, Button, Input, InputNumber, message, Spin, Card, Select, DatePicker, Space, Divider, Alert, Tabs } from 'antd';
+import { Row, Col, Table, Button, Input, InputNumber, Spin, Card, Select, DatePicker, Space, Divider, Alert, Tabs } from 'antd';
 import { 
   ReloadOutlined,
   PlayCircleOutlined,
@@ -203,6 +203,8 @@ const runStatusChip = (status?: string) => {
 
 const AdminDashboard: React.FC = () => {
   const { confirm, toast: showError } = useFeedback();
+  // one kind of message everywhere: the app's own toast, which is readable in light and dark (Ant Design's message is not)
+  const showSuccess = (text: string) => showError(text, 'success');
   const navigate = useNavigate();
   const [stats, setStats] = useState<AdminDashboardStats | null>(null);
   const [performers, setPerformers] = useState<PerformerSummary[]>([]);
@@ -399,7 +401,7 @@ const AdminDashboard: React.FC = () => {
       
       logger.log('🔧 [DEBUG] Update response:', response);
 
-      message.success(`Platform fee updated to ${newFeePercentage}%`);
+      showSuccess(`Platform fee updated to ${newFeePercentage}%`);
       setUpdateFeeModal(false);
       setSelectedPerformer(null);
       setNewFeePercentage(10);
@@ -458,7 +460,7 @@ const AdminDashboard: React.FC = () => {
         showError(response.error, 'error');
       } else if (response.data) {
         applyRateLimitResponse(response.data);
-        message.success('Payment security limits saved');
+        showSuccess('Payment security limits saved');
       }
     } catch (error) {
       logger.error('Error saving payment security limits:', error);
@@ -476,7 +478,7 @@ const AdminDashboard: React.FC = () => {
         showError(response.error, 'error');
       } else if (response.data) {
         applyRateLimitResponse(response.data);
-        message.success('Payment security limits reset to defaults');
+        showSuccess('Payment security limits reset to defaults');
       }
     } catch (error) {
       logger.error('Error resetting payment security limits:', error);
@@ -730,7 +732,7 @@ const AdminDashboard: React.FC = () => {
         });
         // a refused request comes back as an error value, not a thrown one: do not say it worked
         if (added.error) throw new Error(added.error);
-        message.success('Device added successfully');
+        showSuccess('Device added successfully');
         setSelectedSerials((prev) => ({
           ...prev,
           [pendingDeviceAction.performer.id]: undefined
@@ -740,7 +742,7 @@ const AdminDashboard: React.FC = () => {
           sendEmail
         });
         if (removed.error) throw new Error(removed.error);
-        message.success('Device deleted successfully');
+        showSuccess('Device deleted successfully');
       }
 
       // Keep user on the same tab and preserve search context
@@ -996,7 +998,7 @@ const AdminDashboard: React.FC = () => {
       link.href = window.URL.createObjectURL(blob);
       link.download = `tips_export_${new Date().toISOString().split('T')[0]}.csv`;
       link.click();
-      message.success('Tips exported successfully');
+      showSuccess('Tips exported successfully');
     } catch (error) {
       logger.error('Error exporting tips:', error);
       showError('Failed to export tips', 'error');

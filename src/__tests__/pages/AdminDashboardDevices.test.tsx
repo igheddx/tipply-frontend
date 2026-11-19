@@ -2,6 +2,7 @@ import React from 'react'
 import { render, screen, fireEvent, within, waitFor } from '@testing-library/react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import AdminDashboard from '@/pages/AdminDashboard'
+import { FeedbackProvider } from '@/components/ui/Feedback'
 
 // Admin, Performers, Devices: delete a device on a performer's behalf. The screen must only say it worked when the server said so.
 const { mockNavigate, api } = vi.hoisted(() => ({
@@ -50,7 +51,7 @@ const startDelete = async () => {
 describe('admin device delete', () => {
   // one render of the big admin page for both cases: rendering it is most of the time
   it('does not say it worked when the server refused, and does when the server says it worked', async () => {
-    render(<AdminDashboard />)
+    render(<FeedbackProvider><AdminDashboard /></FeedbackProvider>)
     const nav = (await screen.findAllByRole('navigation', { name: 'Main' }))[0]
     fireEvent.click(within(nav).getByRole('button', { name: /Performers/ }))
     fireEvent.click(await screen.findByRole('tab', { name: 'Devices' }))
@@ -64,6 +65,7 @@ describe('admin device delete', () => {
     await waitFor(() => expect(screen.queryByText('Delete this device?')).toBeNull())
     expect(api.post).toHaveBeenCalledWith('/api/admin/performers/p1/devices/d1/delete', expect.objectContaining({ sendEmail: expect.any(Boolean) }))
     expect(screen.queryByText('Device deleted successfully')).toBeNull()
+    expect(await screen.findByText('Device not found for performer')).toBeInTheDocument() // the reason is shown
 
     // worked: the server says so, and so does the screen
     api.post.mockResolvedValue({ data: { message: 'Device deleted successfully' } })
