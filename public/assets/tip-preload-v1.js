@@ -1,5 +1,6 @@
 // Starts the tip page's first request (who is being tipped) while the page code is still downloading, so a QR scan does not wait for it.
 // Plain script, no build step: the page picks the response up from window.__tipPreload (see src/utils/tipPreload.ts).
+// Cached for a year with the other files in /assets: when this changes, rename it (tip-preload-v2.js) and update index.html.
 // Keep the API addresses in step with src/utils/config.ts (a test checks that).
 (function () {
   try {

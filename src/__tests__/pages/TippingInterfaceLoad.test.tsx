@@ -148,12 +148,14 @@ describe('the first request, started before the page code finished loading', () 
 
 describe('the early-request script', () => {
   const root = join(__dirname, '..', '..', '..')
-  const script = readFileSync(join(root, 'public', 'tip-preload.js'), 'utf8')
+  const script = readFileSync(join(root, 'public', 'assets', 'tip-preload-v1.js'), 'utf8')
 
   it('is loaded by the page before the app code, and asks only for the tip page', () => {
     const html = readFileSync(join(root, 'index.html'), 'utf8')
-    expect(html.indexOf('/tip-preload.js')).toBeGreaterThan(-1)
-    expect(html.indexOf('/tip-preload.js')).toBeLessThan(html.indexOf('type="module"'))
+    const tag = html.match(/<script src="\/assets\/tip-preload-v1\.js"><\/script>/)
+    expect(tag).not.toBeNull() // a plain script: not deferred, so it does not wait for the styles or the app code
+    expect(html.indexOf('/assets/tip-preload-v1.js')).toBeLessThan(html.indexOf('type="module"'))
+    expect(html.indexOf('/assets/tip-preload-v1.js')).toBeLessThan(html.indexOf('<title>'))
     expect(script).toContain("/^\\/tip\\/([A-Za-z0-9_-]{1,64})\\/?$/")
   })
 
