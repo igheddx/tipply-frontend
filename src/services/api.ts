@@ -494,10 +494,6 @@ class ApiService {
     return this.request('/api/stripe-config/demo-mode')
   }
 
-  async getAwsIotStatus(): Promise<ApiResponse<any>> {
-    return this.request('/api/tips/aws-iot-status')
-  }
-
   async updateSongRequestSetting(deviceId: string, isAllowSongRequest: boolean): Promise<ApiResponse<any>> {
     return this.request(`/api/devices/${deviceId}/song-request`, {
       method: 'PUT',

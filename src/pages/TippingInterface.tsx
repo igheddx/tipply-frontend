@@ -12,6 +12,7 @@ import { GiveFeedbackLink } from '../components/tip/GiveFeedbackLink'
 import { useFeedbackPrompt } from '../hooks/useFeedbackPrompt'
 import { DEFAULT_TIP_AMOUNTS, TIP_AMOUNT_COUNT } from '../utils/deviceConfig'
 import { getUniqueDeviceId, detectPlatform, initDeviceId } from '../utils/deviceId'
+import { takeTipPreload } from '../utils/tipPreload'
 import { TipScreen } from '../components/tip/TipScreen'
 import { SongPickerSheet, type PickedSong } from '../components/tip/SongPickerSheet'
 import { BrandIcon, type BrandIconName } from '../components/icons/BrandIcons'
@@ -119,6 +120,8 @@ const TippingInterface: React.FC<TippingInterfaceProps> = ({ testMode = false })
   
   const [userId, setUserId] = useState<string>('')
   const [checkingPaymentMethods, setCheckingPaymentMethods] = useState(true)
+  // The page shows who is being tipped as soon as the performer arrives; the saved-card check runs behind it, and the amounts wait for it
+  const [paymentCheckPending, setPaymentCheckPending] = useState(false)
   const [isDeviceVerified, setIsDeviceVerified] = useState<boolean | null>(null)
   const [audioEnabled, setAudioEnabled] = useState(false)
   // The amount tapped most recently: its button shows "Sent" for a moment
@@ -360,9 +363,11 @@ const TippingInterface: React.FC<TippingInterfaceProps> = ({ testMode = false })
       try {
         // A poster printed for one performer carries their id (?p=...), so a different performer is never paid by mistake
         const expectedPerformer = new URLSearchParams(window.location.search).get('p')
-        const deviceResponse = await fetch(
-          `${getApiBaseUrl()}/api/devices/${deviceId}/public${expectedPerformer ? `?performerId=${encodeURIComponent(expectedPerformer)}` : ''}`
-        )
+        const deviceUrl = `${getApiBaseUrl()}/api/devices/${deviceId}/public${expectedPerformer ? `?performerId=${encodeURIComponent(expectedPerformer)}` : ''}`
+        // /tip-preload.js may already have asked while the page code was loading; if that failed, ask again
+        const early = takeTipPreload(deviceUrl)
+        let deviceResponse: Response
+        try { deviceResponse = early ? await early : await fetch(deviceUrl) } catch { deviceResponse = await fetch(deviceUrl) }
         if (!deviceResponse.ok) {
           toast.error('Device not found')
           return
@@ -428,24 +433,22 @@ const TippingInterface: React.FC<TippingInterfaceProps> = ({ testMode = false })
           return
         }
 
-        // Check AWS IoT status in background (non-blocking for tip UI readiness)
-        void apiService.getAwsIotStatus()
-          .then((response) => logger.log('AWS IoT Status:', response))
-          .catch((error) => logger.log('AWS IoT Status check failed:', error))
-
-        // Check payment methods using the device UUID
+        // Show who is being tipped now; the saved-card check (a second round trip) finishes behind the page, and the amounts stay unavailable until it does
+        setPaymentCheckPending(true)
+        setCheckingPaymentMethods(false)
         const paymentCheck = await checkPaymentMethods(deviceInfoData)
         setIsPaymentSetup(paymentCheck.hasPaymentMethods)
         if (paymentCheck.hasPaymentMethods) {
           setSavedCard({ brand: paymentCheck.cardBrand, last4: paymentCheck.cardLast4 })
         }
         // No card yet: the tip page shows as normal. The card sheet opens when they tap an amount, never before they have seen who they are tipping.
-        setCheckingPaymentMethods(false)
+        setPaymentCheckPending(false)
 
       } catch (error) {
         logger.error('Error fetching device data:', error)
         toast.error('Failed to load device information')
         setCheckingPaymentMethods(false)
+        setPaymentCheckPending(false)
       }
     }
 
@@ -802,13 +805,13 @@ const TippingInterface: React.FC<TippingInterfaceProps> = ({ testMode = false })
       return
     }
     // First tip: ask for a card once. Nothing is sent, no light or sound plays, until there is one. The amount is held for the moment it is saved.
-    if (decideTap({ ready: !!deviceInfo && !!userId, hasCard: isPaymentSetup, cardJustSaved: opts?.cardJustSaved }) === 'ask-for-card') {
+    if (decideTap({ ready: !!deviceInfo && !!userId && !paymentCheckPending, hasCard: isPaymentSetup, cardJustSaved: opts?.cardJustSaved }) === 'ask-for-card') {
       pendingTipRef.current = amount
       setPendingTip(amount)
       setShowPaymentModal(true)
       return
     }
-    if (!deviceInfo || !userId) {
+    if (!deviceInfo || !userId || paymentCheckPending) {
       logger.log('⏳ [handleTipClick] Not ready yet - deviceInfo:', !!deviceInfo, 'userId:', !!userId)
       toast.error('Still loading, please try again in a moment')
       return
@@ -1086,11 +1089,12 @@ const TippingInterface: React.FC<TippingInterfaceProps> = ({ testMode = false })
 
   const performerName =
     deviceInfo?.stageName || `${deviceInfo?.ownerFirstName ?? ''} ${deviceInfo?.ownerLastName ?? ''}`.trim()
-  const ready = !!deviceInfo && !!userId
+  const ready = !!deviceInfo && !!userId && !paymentCheckPending
   // Always offer the button when the performer allows song requests; the picker explains an empty catalog
   const canRequestSong = !!deviceInfo?.isAllowSongRequest
 
-  const paymentModal = (
+  // The card sheet (and Stripe with it) is only loaded once someone needs it, so a tipper with a saved card never downloads it
+  const paymentModal = !showPaymentModal ? null : (
     <Suspense fallback={null}>
       <PaymentSetupModal
         isOpen={showPaymentModal}

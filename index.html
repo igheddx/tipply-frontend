@@ -7,6 +7,10 @@
     <link rel="icon" type="image/png" sizes="64x64" href="/images/logo/favicon-64.png?v=2" />
     <link rel="apple-touch-icon" href="/images/logo/apple-touch-icon.png?v=2" />
     <link rel="manifest" href="/manifest.webmanifest" />
+    <!-- Open the connection to the API while the page code loads, so the first request does not wait for it (the tip page asks for the performer straight away) -->
+    <link rel="preconnect" href="https://uhxejjh8s1.execute-api.us-east-1.amazonaws.com" crossorigin />
+    <!-- The tip page's first request starts here, while the page code downloads (see public/tip-preload.js) -->
+    <script src="/tip-preload.js?v=1" defer></script>
     <meta name="theme-color" content="#0E7490" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
