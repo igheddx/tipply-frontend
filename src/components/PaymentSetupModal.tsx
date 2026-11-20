@@ -1,7 +1,9 @@
 import logger from "../utils/logger";
 import { photoSrc } from '../utils/photoUrl'
 import React, { useState, useEffect } from 'react'
-import { loadStripe, type Stripe } from '@stripe/stripe-js'
+// The pure build adds Stripe's script only when loadStripe is called (a tipper with a saved card never loads it), not when this file is imported
+import { loadStripe } from '@stripe/stripe-js/pure'
+import type { Stripe } from '@stripe/stripe-js'
 import { Elements, CardElement, useStripe, useElements } from '@stripe/react-stripe-js'
 import { getApiBaseUrl } from '../utils/config'
 import { setCookie } from '../utils/cookies'

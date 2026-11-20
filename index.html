@@ -2,6 +2,10 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <!-- First thing in the head: open the connection to the API and start the tip page's first request (who is being tipped) while the page code
+         and styles download. A plain script on purpose: it must not wait for them. When it changes, rename the file (it is cached for a year). -->
+    <link rel="preconnect" href="https://uhxejjh8s1.execute-api.us-east-1.amazonaws.com" crossorigin />
+    <script src="/assets/tip-preload-v1.js"></script>
     <link rel="icon" href="/favicon.ico" sizes="any" />
     <link rel="icon" type="image/png" sizes="32x32" href="/images/logo/favicon-32.png?v=2" />
     <link rel="icon" type="image/png" sizes="64x64" href="/images/logo/favicon-64.png?v=2" />
