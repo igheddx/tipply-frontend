@@ -21,6 +21,7 @@ import { decideTap } from '../utils/firstTip'
 import { tipGradient, tipPalette } from '../utils/tipTheme'
 import { TestSiteStrip } from '../components/tip/TestSiteStrip'
 import { PaymentFailedDialog } from '../components/PaymentFailedDialog'
+import { TipperFailedTipNotice } from '../components/tip/TipperFailedTipNotice'
 
 const PaymentSetupModal = lazy(() => import('../components/PaymentSetupModal'))
 
@@ -1298,6 +1299,13 @@ const TippingInterface: React.FC<TippingInterfaceProps> = ({ testMode = false })
       />
 
       <TipperRefundNotice userId={userId} />
+      <TipperFailedTipNotice
+        userId={userId}
+        onChangeCard={() => {
+          feedback.dismissNow()
+          setShowPaymentModal(true)
+        }}
+      />
 
       {/* Audio Element */}
       <audio ref={audioRef} src="/cash-register.mp3" preload="auto" />
