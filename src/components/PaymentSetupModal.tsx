@@ -142,7 +142,7 @@ export default function PaymentSetupModal({
           </div>
           {!stripePromise && (
             <div className="text-center py-8">
-              <p className="text-sm text-ink-500">Getting things ready…</p>
+              <p className="text-sm text-ink-700">Getting things ready…</p>
               {initError && (
                 <p className="mt-2 text-sm text-red-600">{initError}</p>
               )}
@@ -653,7 +653,7 @@ function PaymentForm({
           type="button"
           onClick={onClose}
           disabled={loading}
-          className="w-full text-ink-500 py-3 px-4 rounded-xl hover:text-ink-900 hover:bg-surface transition-all disabled:opacity-50 disabled:cursor-not-allowed font-medium text-base"
+          className="w-full text-ink-700 py-3 px-4 rounded-xl hover:text-ink-900 hover:bg-surface transition-all disabled:opacity-50 disabled:cursor-not-allowed font-medium text-base"
         >
           Not now
         </button>
@@ -672,7 +672,7 @@ function PaymentForm({
           </svg>
           <p className="text-sm font-semibold text-ink-700">Your card goes straight to Stripe</p>
         </div>
-        <p className="px-2 text-[13px] leading-relaxed text-ink-500">Stripe is the payment company that handles it. Tipwave never sees your card number.</p>
+        <p className="px-2 text-sm leading-relaxed text-ink-700">Stripe is the payment company that handles it. Tipwave never sees your card number.</p>
       </div>
     </form>
   )

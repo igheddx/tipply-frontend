@@ -44,7 +44,7 @@ export function FeedbackBar({ prompt, phase, onRate, onChoose, onDismiss }: Prop
 
   return (
     <div className="flex h-full w-full items-center justify-between gap-2" role="group" aria-label="Quick question" onPointerDown={() => setTouches(t => t + 1)}>
-      <span className="min-w-0 flex-1 text-[12px] font-bold leading-tight text-white">{prompt.text}</span>
+      <span className="min-w-0 flex-1 text-sm font-bold leading-tight text-white">{prompt.text}</span>
       {prompt.kind === 'stars' ? (
         <span className="flex flex-none items-center" role="radiogroup" aria-label="Rating, 1 to 5 stars" onPointerLeave={() => setPressed(0)}>
           {[1, 2, 3, 4, 5].map(n => (
@@ -58,7 +58,7 @@ export function FeedbackBar({ prompt, phase, onRate, onChoose, onDismiss }: Prop
               onPointerUp={() => setPressed(0)}
               onPointerCancel={() => setPressed(0)}
               onClick={() => onRate(n)}
-              className="flex h-10 w-[29px] items-center justify-center text-white/85"
+              className="flex h-10 w-[29px] items-center justify-center text-white"
               style={n <= pressed ? { color: '#FFFFFF', filter: 'drop-shadow(0 0 5px rgba(34,184,214,0.85))' } : undefined}
             >
               {/* Thin white line stars, like the rest of our icons; they fill white with a soft teal glow under the finger */}
@@ -73,7 +73,7 @@ export function FeedbackBar({ prompt, phase, onRate, onChoose, onDismiss }: Prop
               key={o.key}
               type="button"
               onClick={() => onChoose(o.key)}
-              className="h-8 rounded-full bg-white px-3 text-[12px] font-bold text-ink-900 shadow-sm active:bg-brand-100"
+              className="h-9 rounded-full bg-white px-3 text-sm font-bold text-ink-900 shadow-sm active:bg-brand-100"
             >
               {o.label}
             </button>
@@ -82,7 +82,7 @@ export function FeedbackBar({ prompt, phase, onRate, onChoose, onDismiss }: Prop
       )}
       {/* A gap and a divider keep the close button well away from the fifth star */}
       <span className="ml-1 h-5 w-px flex-none bg-white/20" aria-hidden="true" />
-      <button type="button" onClick={onDismiss} aria-label="Not now" className="flex h-10 w-7 flex-none items-center justify-center text-white/70">
+      <button type="button" onClick={onDismiss} aria-label="Not now" className="flex h-10 w-7 flex-none items-center justify-center text-white/90">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" aria-hidden="true">
           <path d="M6 6l12 12M18 6L6 18" />
         </svg>

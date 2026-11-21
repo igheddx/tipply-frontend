@@ -192,8 +192,8 @@ export function TipScreen({
           ) : (
             <div aria-hidden className="h-5 w-40 animate-pulse rounded bg-white/20" />
           )}
-          {venueName && performerName && <p className="truncate text-xs font-semibold text-white/80">Performing at {venueName}</p>}
-          {bio && <p className="truncate text-xs text-white/70 [@media(max-height:640px)]:hidden">{bio}</p>}
+          {venueName && performerName && <p className="truncate text-sm font-semibold text-white/95">Performing at {venueName}</p>}
+          {bio && <p className="truncate text-sm text-white/90 [@media(max-height:640px)]:hidden">{bio}</p>}
         </div>
       </header>
 
@@ -206,8 +206,8 @@ export function TipScreen({
         >
           <BrandIcon name="check-circle" size={26} color="#86EFAC" />
           <span className="flex min-w-0 flex-col leading-tight">
-            <span className="text-[13px] font-extrabold">Request sent</span>
-            <span className="truncate text-[12px] text-white/80">
+            <span className="text-sm font-extrabold">Request sent</span>
+            <span className="truncate text-sm text-white/95">
               {sentSong.title} · {sentSong.artist}
             </span>
           </span>
@@ -222,18 +222,18 @@ export function TipScreen({
               <BrandIcon name="music" size={20} tone="inverse" />
             </span>
             <span className="flex min-w-0 flex-1 flex-col leading-tight">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-white/70">Your request</span>
+              <span className="text-xs font-bold uppercase tracking-wider text-white/90">Your request</span>
               <span className="truncate text-[14px] font-extrabold">{selectedSong.title}</span>
-              <span className="truncate text-[12px] text-white/70">{selectedSong.artist}</span>
+              <span className="truncate text-sm text-white/90">{selectedSong.artist}</span>
             </span>
-            <button type="button" onClick={onOpenSongPicker} className="flex-none px-1 text-[12px] font-semibold text-white/85 underline">
+            <button type="button" onClick={onOpenSongPicker} className="flex-none px-1 text-sm font-semibold text-white underline">
               Change
             </button>
             <button type="button" onClick={onClearSong} aria-label="Remove song request" className="flex h-8 w-8 flex-none items-center justify-center rounded-full active:bg-white/10">
               <BrandIcon name="close" size={16} tone="inverse" />
             </button>
           </div>
-          <div className="mt-2 flex items-center gap-1.5 border-t border-white/15 pt-2 text-[13px] font-bold">
+          <div className="mt-2 flex items-center gap-1.5 border-t border-white/15 pt-2 text-sm font-bold">
             <span className="motion-safe:animate-bounce"><BrandIcon name="chevron-down" size={18} tone="inverse" strokeWidth={2.4} /></span>
             Tap an amount to send your request
           </div>
@@ -274,13 +274,13 @@ export function TipScreen({
               {sent ? (
                 <span className="flex flex-col items-center gap-0.5" style={{ fontSize: '1rem' }}>
                   <BrandIcon name="check" size={34} tone="inverse" strokeWidth={2.6} color={style.color} />
-                  <span className="text-xs font-bold uppercase tracking-wider">{sentSong ? 'Request sent' : 'Sent'}</span>
+                  <span className="text-sm font-bold uppercase tracking-wider">{sentSong ? 'Request sent' : 'Sent'}</span>
                 </span>
               ) : (
                 <>
                   {formatMoney(amount)}
                   {selectedSong && ready && (
-                    <span className="mt-0.5 text-[11px] font-bold uppercase tracking-wider opacity-85" style={{ fontSize: 'clamp(0.6rem, 1.6dvh, 0.75rem)' }}>
+                    <span className="mt-0.5 text-xs font-bold uppercase tracking-wider" style={{ fontSize: 'clamp(0.75rem, 1.8dvh, 0.875rem)' }}>
                       Send request
                     </span>
                   )}
@@ -302,7 +302,7 @@ export function TipScreen({
       >
         {bottomBarOverride ?? (
           <>
-          <button type="button" onClick={onChangeCard} className="flex items-center gap-2 whitespace-nowrap text-xs text-indigo-200">
+          <button type="button" onClick={onChangeCard} className="flex items-center gap-2 whitespace-nowrap text-sm text-indigo-100">
             <BrandIcon name="card" size={18} tone="brand" />
             <span>
               {hasCard ? (
@@ -320,7 +320,7 @@ export function TipScreen({
           <span className="flex items-baseline gap-2 whitespace-nowrap" aria-live="polite">
             {total > 0 && (
               <>
-                <span className="text-[11px] uppercase tracking-wider text-white/70">Tipped today</span>
+                <span className="text-xs uppercase tracking-wider text-white/90">Tipped today</span>
                 <b className="text-[19px] font-black">{formatMoney(total)}</b>
               </>
             )}

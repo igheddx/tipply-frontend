@@ -104,7 +104,7 @@ export function FeedbackFormModal({ open, title, askStars = false, reasons = [],
                   aria-checked={rating === n}
                   aria-label={`${n} out of 5`}
                   onClick={() => setRating(n)}
-                  className={`flex h-12 w-12 items-center justify-center ${rating !== null && n <= rating ? 'text-brand-600' : 'text-slate-300'}`}
+                  className={`flex h-12 w-12 items-center justify-center ${rating !== null && n <= rating ? 'text-brand-600' : 'text-slate-400'}`}
                 >
                   <StarGlyph filled={rating !== null && n <= rating} size={34} stroke={1.5} />
                 </button>
