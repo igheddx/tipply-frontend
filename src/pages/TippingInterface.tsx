@@ -20,6 +20,7 @@ import { APP_VERSION } from '../utils/appVersion'
 import { decideTap } from '../utils/firstTip'
 import { tipGradient, tipPalette } from '../utils/tipTheme'
 import { TestSiteStrip } from '../components/tip/TestSiteStrip'
+import { PaymentFailedDialog } from '../components/PaymentFailedDialog'
 
 const PaymentSetupModal = lazy(() => import('../components/PaymentSetupModal'))
 
@@ -112,6 +113,8 @@ const TippingInterface: React.FC<TippingInterfaceProps> = ({ testMode = false })
   const [isDebouncing, setIsDebouncing] = useState(false)
   const [deviceInfo, setDeviceInfo] = useState<DeviceInfo | null>(null)
   const [showPaymentModal, setShowPaymentModal] = useState(false)
+  // Set when a tip is refused at payment (a declined card): a message the tipper has to dismiss, not a toast
+  const [paymentFailure, setPaymentFailure] = useState<string | null>(null)
   const [isPaymentSetup, setIsPaymentSetup] = useState(false)
   // The amount a first-time tipper tapped. Held only while the card sheet is open, and sent the moment the card is saved.
   const [pendingTip, setPendingTip] = useState<number | null>(null)
@@ -936,6 +939,11 @@ const TippingInterface: React.FC<TippingInterfaceProps> = ({ testMode = false })
           setTimeout(() => window.location.reload(), 1800)
           return
         }
+        if (response.raw?.code === 'payment_failed') {
+          setSentAmount(null)
+          setPaymentFailure(response.error || 'Your payment did not go through.')
+          return
+        }
         let errorMsg = response.error || 'Failed to submit tip. Please try again.'
         if (response.errorType === 'timeout') {
           errorMsg = '⏱️ Request timeout - the server took too long to respond. Please check your internet connection and try again.'
@@ -1025,6 +1033,11 @@ const TippingInterface: React.FC<TippingInterfaceProps> = ({ testMode = false })
           setSentAmount(null); setSentSong(null)
           toast.error(response.error || 'The performer just changed. Please refresh.')
           setTimeout(() => window.location.reload(), 1800)
+          return
+        }
+        if (response.raw?.code === 'payment_failed') {
+          setSentAmount(null); setSentSong(null)
+          setPaymentFailure(response.error || 'Your payment did not go through.')
           return
         }
         let errorMsg = response.error || 'Failed to submit tip. Please try again.'
@@ -1274,6 +1287,15 @@ const TippingInterface: React.FC<TippingInterfaceProps> = ({ testMode = false })
       />
 
       {paymentModal}
+      <PaymentFailedDialog
+        reason={paymentFailure}
+        onDismiss={() => setPaymentFailure(null)}
+        onChangeCard={() => {
+          setPaymentFailure(null)
+          feedback.dismissNow()
+          setShowPaymentModal(true)
+        }}
+      />
 
       <TipperRefundNotice userId={userId} />
 
