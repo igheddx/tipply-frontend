@@ -20,7 +20,7 @@ export function GiveFeedbackLink({ userId, deviceUuid, className = '' }: { userI
   return (
     <>
       {/* The look stays small and quiet; the padding makes the tap area comfortable for a thumb */}
-      <button type="button" onClick={() => setOpen(true)} className={`inline-flex min-h-[36px] items-center px-2 text-[11px] text-white/70 underline underline-offset-2 ${className}`}>
+      <button type="button" onClick={() => setOpen(true)} className={`inline-flex min-h-[36px] items-center px-2 text-xs text-white/90 underline underline-offset-2 ${className}`}>
         Give feedback
       </button>
       {/* Drawn at the top of the page: inside the footer, a positioned parent would squeeze the dialog to one side */}

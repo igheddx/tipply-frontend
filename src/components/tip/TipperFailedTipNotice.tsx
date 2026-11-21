@@ -47,7 +47,7 @@ export function TipperFailedTipNotice({ userId, onChangeCard }: { userId?: strin
         <BrandIcon name="info" size={22} color="#7EE3EF" />
         <div className="min-w-0 flex-1 text-sm">
           <p className="font-semibold">A tip didn't go through</p>
-          <p className="mt-1 text-white/85">{message} You're welcome to add a different card and tip again.</p>
+          <p className="mt-1 text-white/95">{message} You're welcome to add a different card and tip again.</p>
           <div className="mt-3 flex flex-wrap gap-2">
             <Button
               size="sm"

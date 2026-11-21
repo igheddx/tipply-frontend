@@ -85,7 +85,7 @@ function InfoScreen({
           <BrandIcon name={icon} size={30} tone="inverse" />
         </span>
         <h2 className="mt-5 text-2xl font-bold">{title}</h2>
-        <p className="mt-3 text-white/80">{children}</p>
+        <p className="mt-3 text-white/95">{children}</p>
         {action && <div className="mt-6">{action}</div>}
       </div>
       {feedback && (

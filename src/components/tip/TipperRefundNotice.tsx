@@ -77,7 +77,7 @@ export function TipperRefundNotice({ userId }: { userId?: string }) {
           ))}
         </ul>
       )}
-      <p className="mt-4 text-sm text-ink-500">
+      <p className="mt-4 text-sm text-ink-700">
         Refunds usually reach your card within 5 to 10 business days, depending on your bank. You do not need to do anything.
       </p>
     </Modal>

@@ -62,7 +62,7 @@ function SongRow({ song, onChoose, showMarker }: { song: Song; onChoose: (song: 
           <FavoriteStar filled size={18} className="flex-none text-brand-600" />
           <span className="min-w-0 flex-1">
             <span className="block text-[15px] font-bold text-ink-900">{song.songTitle}</span>
-            <span className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-ink-600">
+            <span className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-ink-700">
               <span>{song.artist}</span>
               {showMarker && <span className="font-semibold text-brand-700">Artist favorite</span>}
               {played}
@@ -77,7 +77,7 @@ function SongRow({ song, onChoose, showMarker }: { song: Song; onChoose: (song: 
     <li>
       <button type="button" onClick={() => onChoose(song)} className="w-full border-b border-slate-100 py-3 text-left active:bg-slate-50">
         <div className="text-[15px] font-semibold">{song.songTitle}</div>
-        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-ink-500">
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-ink-700">
           <span>{song.artist}</span>
           {played}
         </div>
@@ -193,7 +193,7 @@ export function SongPickerSheet({ open, deviceUuid, current, onClose, onPick, as
                   </span>
                   <div className="min-w-0">
                     <div className="truncate font-bold">{chosen.songTitle}</div>
-                    <div className="truncate text-sm text-ink-500">{chosen.artist}</div>
+                    <div className="truncate text-sm text-ink-700">{chosen.artist}</div>
                   </div>
                 </div>
                 {chosen.isFavorite && (
@@ -277,7 +277,7 @@ export function SongPickerSheet({ open, deviceUuid, current, onClose, onPick, as
                     onChange={(e) => setQuery(e.target.value)}
                     placeholder="Search songs or artists"
                     aria-label="Search songs or artists"
-                    className="min-w-0 flex-1 bg-transparent text-base outline-none placeholder:text-ink-400"
+                    className="min-w-0 flex-1 bg-transparent text-base outline-none placeholder:text-ink-500"
                   />
                 </div>
                 <ul className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4">
@@ -287,7 +287,7 @@ export function SongPickerSheet({ open, deviceUuid, current, onClose, onPick, as
                         <FavoriteStar filled size={14} className="text-brand-600" />
                         Artist favorites
                       </div>
-                      <p className="text-xs text-ink-500">Songs they do best</p>
+                      <p className="text-sm text-ink-700">Songs they do best</p>
                     </li>
                   )}
                   {(showSections ? favorites : songs).map((song) => (
@@ -295,12 +295,12 @@ export function SongPickerSheet({ open, deviceUuid, current, onClose, onPick, as
                   ))}
                   {showSections && others.length > 0 && (
                     <li className="px-1 pb-1 pt-4">
-                      <div className="text-xs font-extrabold uppercase tracking-wider text-ink-500">All songs</div>
+                      <div className="text-xs font-extrabold uppercase tracking-wider text-ink-700">All songs</div>
                     </li>
                   )}
                   {showSections && others.map((song) => <SongRow key={song.id} song={song} onChoose={setChosen} showMarker={!showSections} />)}
                   {!loading && songs.length === 0 && (
-                    <li className="px-2 py-10 text-center text-sm text-ink-500">
+                    <li className="px-2 py-10 text-center text-sm text-ink-700">
                       {query.trim() ? `No songs match “${query.trim()}”.` : 'This performer has not added any songs yet. You can still send a tip.'}
                       {query.trim() && (
                         <button type="button" onClick={() => setQuery('')} className="mt-2 block w-full font-semibold text-brand-700">
