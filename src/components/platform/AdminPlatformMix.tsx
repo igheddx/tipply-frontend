@@ -77,11 +77,20 @@ export function AdminPlatformMix({ refreshKey }: { refreshKey?: string | number 
   }
 
   const row = (key: PlatformKey): PlatformRow =>
-    mix.rows.find(r => r.key === key) ?? { key, tippers: 0, tips: 0, totalAmount: 0, walletTippers: 0, songRequesters: 0, songRequests: 0 }
+    mix.rows.find(r => r.key === key) ?? { key, tippers: 0, tips: 0, totalAmount: 0, walletTippers: 0, walletTips: 0, walletAmount: 0, songRequesters: 0, songRequests: 0 }
   const ios = row('ios')
   const android = row('android')
   const others = [row('desktop'), row('unknown')]
   const otherTippers = sum(others, r => r.tippers)
+  const wallet = mix.wallet
+  const card = mix.card
+  const payTips = (wallet?.tips ?? 0) + (card?.tips ?? 0)
+  const ways = wallet && card
+    ? [
+        { name: 'Apple / Google Pay', way: wallet, bar: 'bg-brand-700', testId: 'pay-wallet' },
+        { name: 'Card typed in', way: card, bar: 'bg-slate-400', testId: 'pay-card' }
+      ]
+    : []
   const groups = [
     { name: 'iPhone / iPad', tippers: ios.tippers, bar: 'bg-brand-700', testId: 'phones-ios' },
     { name: 'Android', tippers: android.tippers, bar: 'bg-emerald-500', testId: 'phones-android' },
@@ -112,6 +121,33 @@ export function AdminPlatformMix({ refreshKey }: { refreshKey?: string | number 
             ))}
           </div>
 
+          {ways.length > 0 && (
+            <div data-testid="how-they-pay" className="space-y-3 border-t border-slate-100 pt-5">
+              <h3 className="text-sm font-bold text-ink-900">How they pay</h3>
+              <div className="grid grid-cols-2 gap-3">
+                {ways.map(w => (
+                  <div key={w.name} data-testid={w.testId}>
+                    <div className="text-3xl font-bold text-ink-900">{percent(w.way.tips, payTips)}</div>
+                    <div className="text-sm font-semibold text-ink-900">{w.name}</div>
+                    <div className="text-xs text-ink-700">
+                      {w.way.tips.toLocaleString()} {w.way.tips === 1 ? 'tip' : 'tips'} · {w.way.tippers.toLocaleString()} {w.way.tippers === 1 ? 'tipper' : 'tippers'} · {money(w.way.totalAmount)}
+                    </div>
+                  </div>
+                ))}
+              </div>
+              {payTips > 0 && (
+                <div role="img" aria-label="Share of tips by way of paying" className="flex h-3 w-full overflow-hidden rounded-full bg-slate-100">
+                  {ways.map(w => (
+                    <div key={w.name} className={w.bar} style={{ width: `${(w.way.tips / payTips) * 100}%` }} title={`${w.name}: ${w.way.tips}`} />
+                  ))}
+                </div>
+              )}
+              <p className="text-xs text-ink-700">
+                Share of tips. The app saves how a person pays, not how each tip was paid, so all of a tipper’s tips count under the way they paid most recently.
+              </p>
+            </div>
+          )}
+
           <div className="overflow-x-auto">
             <table className="w-full min-w-[640px] text-left text-sm">
               <thead>
@@ -122,7 +158,7 @@ export function AdminPlatformMix({ refreshKey }: { refreshKey?: string | number 
                   <th className="py-2 pr-3 text-right">Tips</th>
                   <th className="py-2 pr-3 text-right">Tipped</th>
                   <th className="py-2 pr-3 text-right">Average tip</th>
-                  <th className="py-2 pr-3 text-right">Apple / Google Pay</th>
+                  <th className="py-2 pr-3 text-right">Apple / Google Pay (share of tips)</th>
                   <th className="py-2 text-right">Asked for a song</th>
                 </tr>
               </thead>
@@ -137,7 +173,14 @@ export function AdminPlatformMix({ refreshKey }: { refreshKey?: string | number 
                       <td className="py-2 pr-3 text-right text-ink-900">{r.tips.toLocaleString()}</td>
                       <td className="py-2 pr-3 text-right text-ink-900">{money(r.totalAmount)}</td>
                       <td className="py-2 pr-3 text-right text-ink-900">{r.tips > 0 ? money(r.totalAmount / r.tips) : '–'}</td>
-                      <td className="py-2 pr-3 text-right text-ink-900">{r.tippers > 0 ? `${r.walletTippers} (${percent(r.walletTippers, r.tippers)})` : '–'}</td>
+                      <td className="py-2 pr-3 text-right text-ink-900">
+                        {r.tips > 0 ? percent(r.walletTips, r.tips) : '–'}
+                        {r.tippers > 0 && (
+                          <span className="block text-xs text-ink-700">
+                            {r.walletTippers} of {r.tippers} {r.tippers === 1 ? 'tipper' : 'tippers'}
+                          </span>
+                        )}
+                      </td>
                       <td className="py-2 text-right text-ink-900">
                         {r.tippers > 0 ? `${r.songRequesters} (${percent(r.songRequesters, r.tippers)})` : '–'}
                         {r.songRequests > 0 && (
