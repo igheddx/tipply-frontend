@@ -21,6 +21,7 @@ import { AdminVenues } from '../components/venue/AdminVenues';
 import { AdminFeedback } from '../components/feedback/AdminFeedback';
 import { AdminApiHealth } from '../components/health/AdminApiHealth';
 import { AdminRepeat } from '../components/repeat/AdminRepeat';
+import { AdminPlatformMix } from '../components/platform/AdminPlatformMix';
 import { AdminRefunds } from '../components/refunds/AdminRefunds';
 import { AdminTipperBlock } from '../components/refunds/AdminTipperBlock';
 import { refundRequestApi } from '../services/refundRequestApi';
@@ -1200,6 +1201,8 @@ const AdminDashboard: React.FC = () => {
             </div>
 
             <AdminRepeat refreshKey={updatedAt?.getTime() ?? 0} />
+
+            <AdminPlatformMix refreshKey={updatedAt?.getTime() ?? 0} />
 
             <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
               <UiCard title="Revenue" subtitle="Tips that were charged successfully">
