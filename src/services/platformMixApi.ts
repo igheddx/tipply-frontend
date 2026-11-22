@@ -43,28 +43,6 @@ export interface PlatformMix {
   card?: PaymentWay
   estimatedTips?: number
   walletReach?: WalletReach
-  /** One row per phone, for a single show only */
-  tipperList?: ShowTipper[] | null
-  /** How many different names were typed on the show's song requests (a single show only) */
-  requestNames?: number
-}
-
-/**
- * One phone's tipping in a show, so the count can be checked row by row. There is no identifier: phones are numbered in the order of their first
- * tip. A phone is one tipper as far as the app can tell; it cannot know how many people used it.
- */
-export interface ShowTipper {
-  number: number
-  phone: PlatformKey
-  tips: number
-  totalAmount: number
-  firstTipAt: string
-  lastTipAt: string
-  walletTips: number
-  cardTips: number
-  estimatedTips: number
-  songRequests: number
-  names: string[]
 }
 
 export const platformMixApi = {

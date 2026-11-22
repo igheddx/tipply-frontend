@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react'
 import { DisclosureChevron } from '../ui'
 import { platformMixApi, type PlatformMix } from '../../services/platformMixApi'
 import { PlatformMixView } from './PlatformMixView'
-import { ShowTippersTable } from './ShowTippersTable'
 
 /**
  * The phones and ways of paying for one show, closed until the admin opens it. Nothing is asked of the server while it is closed, so the show
@@ -61,10 +60,7 @@ export function ShowPlatformMix({ profileId, showId }: { profileId: string; show
           ) : mix.tippers === 0 ? (
             <p className="text-sm text-ink-700">Nobody tipped in this show.</p>
           ) : (
-            <div className="space-y-5">
-              <PlatformMixView mix={mix} scope="in this show" />
-              <ShowTippersTable mix={mix} />
-            </div>
+            <PlatformMixView mix={mix} scope="in this show" />
           )}
         </div>
       )}
