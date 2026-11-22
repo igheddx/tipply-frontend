@@ -1,6 +1,6 @@
 import React from 'react'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
-import { vi, describe, it, expect, beforeEach } from 'vitest'
+import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest'
 
 vi.mock('@/utils/config', () => ({ getApiBaseUrl: () => 'http://api.test', API_BASE_URL: 'http://api.test' }))
 vi.mock('../../utils/config', () => ({ getApiBaseUrl: () => 'http://api.test', API_BASE_URL: 'http://api.test' }))
@@ -121,5 +121,61 @@ describe('PaymentSetupModal: the first thing a new tipper sees', () => {
   it('shows nothing when closed', () => {
     const { container } = open({ isOpen: false })
     expect(container).toBeEmptyDOMElement()
+  })
+})
+
+// The admin phones report needs to know who could have paid with Apple Pay or Google Pay: the save-payment request says whether the phone could
+describe('PaymentSetupModal: telling the server whether a wallet was available', () => {
+  const defaultPaymentRequest = (_config: unknown) => ({ canMakePayment: async () => null, on: () => {} })
+  const withWallet = () =>
+    stripeMock.paymentRequest.mockImplementation(() => ({ canMakePayment: async () => ({ applePay: true }), on: () => {}, update: () => {}, show: () => {} }) as never)
+
+  /** Every request made to save the payment, as the body the server would receive */
+  const savedBodies = () =>
+    (global.fetch as unknown as { mock: { calls: [string, RequestInit?][] } }).mock.calls
+      .filter(([url]) => String(url).includes('store-payment-info'))
+      .map(([, init]) => JSON.parse(String(init?.body)))
+
+  beforeEach(() => {
+    stripeMock.confirmCardSetup.mockReset()
+    stripeMock.confirmCardSetup.mockResolvedValue({ setupIntent: { payment_method: 'pm_test_1' } })
+    stripeMock.paymentRequest.mockImplementation(defaultPaymentRequest as never)
+    global.fetch = vi.fn(async (url: string) => {
+      if (String(url).includes('publishable-key')) return { ok: true, json: async () => ({ publishableKey: 'pk_test_x' }) } as Response
+      return { ok: true, status: 200, text: async () => '{"success":true}', json: async () => ({ clientSecret: 'cs_x', customerId: 'cus_x' }) } as Response
+    }) as unknown as typeof fetch
+  })
+  afterEach(() => {
+    stripeMock.paymentRequest.mockImplementation(defaultPaymentRequest as never)
+  })
+
+  const saveTypedCard = async () => {
+    fireEvent.click(await screen.findByRole('button', { name: 'Use a card' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Save my card' }))
+    await waitFor(() => expect(savedBodies().length).toBeGreaterThan(0))
+    return savedBodies()[0]
+  }
+
+  it('says no wallet was available when the phone cannot pay with one', async () => {
+    open()
+    const body = await saveTypedCard()
+    expect(body.walletAvailable).toBe(false)
+    expect(body.isPayWallet).not.toBe(true)
+  })
+
+  it('says a wallet was available when someone typed a card although their phone could have paid with one', async () => {
+    withWallet()
+    open()
+    await waitFor(() => expect(stripeMock.paymentRequest).toHaveBeenCalled())
+    await new Promise(r => setTimeout(r, 50)) // let the wallet check finish
+    const body = await saveTypedCard()
+    expect(body.walletAvailable).toBe(true)
+    expect(body.isPayWallet).not.toBe(true) // they typed a card: that is the point of the number
+  })
+
+  it('leaves it out when the wallet check never ran (card-only sheet), instead of claiming no wallet', async () => {
+    open({ walletMode: 'card' })
+    const body = await saveTypedCard()
+    expect('walletAvailable' in body).toBe(false)
   })
 })
