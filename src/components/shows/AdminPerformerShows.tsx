@@ -4,6 +4,7 @@ import { Banner, StatusChip } from '../ui'
 import { showApi, type ShowSummary } from '../../services/showApi'
 import { showTitle, showTimes } from '../../utils/showName'
 import { songRequestColumns, type SongRequestRow } from '../PerformerSongRequests'
+import { ShowPlatformMix } from '../platform/ShowPlatformMix'
 
 interface RequestPage {
   total: number
@@ -144,6 +145,8 @@ export function AdminPerformerShows({ profileId }: { profileId: string }) {
           </p>
         )}
       </section>
+
+      <ShowPlatformMix profileId={profileId} showId={selected.id} />
 
       <div>
         <div className="mb-2">

@@ -1,6 +1,6 @@
 import logger from "../utils/logger";
 import { photoSrc } from '../utils/photoUrl'
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 // The pure build adds Stripe's script only when loadStripe is called (a tipper with a saved card never loads it), not when this file is imported
 import { loadStripe } from '@stripe/stripe-js/pure'
 import type { Stripe } from '@stripe/stripe-js'
@@ -190,6 +190,9 @@ function PaymentForm({
   const [paymentRequest, setPaymentRequest] = useState<any>(null)
   const [isApplePay, setIsApplePay] = useState(false)
   const [isCheckingWalletAvailability, setIsCheckingWalletAvailability] = useState(walletMode !== 'card')
+  // Could this phone pay with Apple Pay or Google Pay? Known once the check below finishes; stays undefined if it never ran (card only) or failed,
+  // and is then not sent. The admin phones report uses it to see who had a wallet and typed a card anyway.
+  const walletAvailableRef = useRef<boolean | undefined>(undefined)
 
   // Persist payment details to backend so ownership verification passes
   const storePaymentInfo = async (
@@ -219,7 +222,8 @@ function PaymentForm({
         setupIntentId,
         deviceUuid,
         platform: platform || detectPlatform(),
-        isPayWallet: payWallet
+        isPayWallet: payWallet,
+        walletAvailable: walletAvailableRef.current
       }
       logger.log('📤 [storePaymentInfo] Request body:', requestBody)
       
@@ -283,6 +287,8 @@ function PaymentForm({
           ? 'apple'
           : (googleAvailable ? 'google' : (appleAvailable ? 'apple' : null))
 
+        // Only counts when the wallet was actually offered. The card-only sheet never shows it, so "available but typed a card" would be unfair there.
+        if (walletMode !== 'card') walletAvailableRef.current = !!preferredWallet
         if (preferredWallet) {
           setPaymentRequest(preferredWallet === 'google' ? googlePaymentRequest : applePaymentRequest)
           setIsApplePay(preferredWallet === 'apple')

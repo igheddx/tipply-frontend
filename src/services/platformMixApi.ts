@@ -7,7 +7,7 @@ export interface PlatformRow {
   tippers: number
   tips: number
   totalAmount: number
-  /** Tippers who pay with Apple Pay or Google Pay, and their tips */
+  /** Tippers who paid with Apple Pay or Google Pay at least once, and the tips paid that way */
   walletTippers: number
   walletTips: number
   walletAmount: number
@@ -16,16 +16,24 @@ export interface PlatformRow {
   songRequests: number
 }
 
-/** One way of paying: Apple Pay or Google Pay, or a typed-in card */
+/** One way of paying: Apple Pay or Google Pay, or a typed-in card. A tipper who used both is counted under each. */
 export interface PaymentWay {
   tippers: number
   tips: number
   totalAmount: number
 }
 
+/** Of the tippers whose phone was checked for a wallet, how many could have used one and whether they did */
+export interface WalletReach {
+  known: number
+  available: number
+  usedWallet: number
+  typedCardInstead: number
+}
+
 /**
- * The people who tip, by phone, and by how they pay. Counts and totals only. `days` 0 is all time. A tipper's tips all count under the way they
- * paid most recently, because the app saves how a person pays, not how each tip was paid.
+ * The people who tip, by phone and by how they pay: counts and totals only. `days` 0 is all time (and always 0 for one show).
+ * `estimatedTips` is how many of the tips predate the record of how each tip was paid, so they count under the way that tipper pays now.
  */
 export interface PlatformMix {
   days: number
@@ -33,8 +41,11 @@ export interface PlatformMix {
   rows: PlatformRow[]
   wallet?: PaymentWay
   card?: PaymentWay
+  estimatedTips?: number
+  walletReach?: WalletReach
 }
 
 export const platformMixApi = {
-  admin: (days: number) => apiService.get(`/api/admin/platform-mix?days=${days}`)
+  admin: (days: number) => apiService.get(`/api/admin/platform-mix?days=${days}`),
+  show: (profileId: string, showId: string) => apiService.get(`/api/admin/performers/${profileId}/shows/${showId}/platform-mix`)
 }

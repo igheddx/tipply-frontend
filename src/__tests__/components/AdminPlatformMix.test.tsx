@@ -12,8 +12,10 @@ const row = (key: string, over: Record<string, number> = {}) => ({
 
 const way = (tippers: number, tips: number, totalAmount: number) => ({ tippers, tips, totalAmount })
 
-const mix = (rows: ReturnType<typeof row>[], days = 30, wallet = way(0, 0, 0), card = way(0, 0, 0)) => ({
-  data: { days, tippers: rows.reduce((n, r) => n + r.tippers, 0), rows, wallet, card }
+const reach = (known = 0, available = 0, usedWallet = 0, typedCardInstead = 0) => ({ known, available, usedWallet, typedCardInstead })
+
+const mix = (rows: ReturnType<typeof row>[], days = 30, wallet = way(0, 0, 0), card = way(0, 0, 0), estimatedTips = 0, walletReach = reach()) => ({
+  data: { days, tippers: rows.reduce((n, r) => n + r.tippers, 0), rows, wallet, card, estimatedTips, walletReach }
 })
 
 // 100 tippers, 170 tips. Wallet: 110 tips ($1,100) from 51 tippers. Card: 60 tips ($530) from 49 tippers.
@@ -27,7 +29,9 @@ const sample = () =>
     ],
     30,
     way(51, 110, 1100),
-    way(49, 60, 530)
+    way(49, 60, 530),
+    0,
+    reach(80, 60, 45, 15)
   )
 
 describe('AdminPlatformMix', () => {
@@ -83,7 +87,53 @@ describe('AdminPlatformMix', () => {
     expect(within(card).getByText('35%')).toBeInTheDocument() // 60 of 170 tips
     expect(within(card).getByText('Card typed in')).toBeInTheDocument()
     expect(within(card).getByText('60 tips · 49 tippers · $530.00')).toBeInTheDocument()
-    expect(within(box).getByText(/not how each tip was paid/)).toBeInTheDocument() // says plainly how it is counted
+    expect(within(box).getByTestId('pay-note')).toHaveTextContent('counted tip by tip') // nothing estimated, so it says so plainly
+  })
+
+  it('says how many tips are estimated when some were made before each tip recorded how it was paid', async () => {
+    api.admin.mockResolvedValue(mix(sample().data.rows, 30, way(51, 110, 1100), way(49, 60, 530), 42, reach(80, 60, 45, 15)))
+    render(<AdminPlatformMix />)
+
+    const note = await screen.findByTestId('pay-note')
+    expect(note).toHaveTextContent('42 tips of 170 were made before each tip recorded how it was paid')
+    expect(note).toHaveTextContent('under the way that tipper pays now')
+  })
+
+  it('uses the singular for one estimated tip', async () => {
+    api.admin.mockResolvedValue(mix(sample().data.rows, 30, way(51, 110, 1100), way(49, 60, 530), 1, reach(80, 60, 45, 15)))
+    render(<AdminPlatformMix />)
+    expect(await screen.findByTestId('pay-note')).toHaveTextContent('1 tip of 170 was made before')
+  })
+
+  it('shows who had Apple or Google Pay available, who used it, and who typed a card anyway', async () => {
+    api.admin.mockResolvedValue(sample())
+    render(<AdminPlatformMix />)
+
+    const box = await screen.findByTestId('wallet-reach')
+    expect(box).toHaveTextContent('75% of 80 checked phones had one available (60)') // 60 of 80
+    expect(box).toHaveTextContent('75% use it (45)') // 45 of 60
+    expect(within(box).getByTestId('reach-typed')).toHaveTextContent('25%') // 15 of 60 typed a card although a wallet was available
+    expect(box).toHaveTextContent('typed a card instead (15)')
+    expect(box).toHaveTextContent('Only people whose phone was checked are counted')
+  })
+
+  it('says it is not recorded yet when no phone has been checked, and shows no percentages', async () => {
+    api.admin.mockResolvedValue(mix(sample().data.rows, 30, way(51, 110, 1100), way(49, 60, 530), 0, reach(0, 0, 0, 0)))
+    render(<AdminPlatformMix />)
+
+    const box = await screen.findByTestId('wallet-reach')
+    expect(box).toHaveTextContent('Not recorded yet. It fills in as people save a payment.')
+    expect(within(box).queryByTestId('reach-typed')).toBeNull()
+  })
+
+  it('leaves out the typed-a-card line when nobody had a wallet available', async () => {
+    api.admin.mockResolvedValue(mix(sample().data.rows, 30, way(51, 110, 1100), way(49, 60, 530), 0, reach(10, 0, 0, 0)))
+    render(<AdminPlatformMix />)
+
+    const box = await screen.findByTestId('wallet-reach')
+    expect(box).toHaveTextContent('0% of 10 checked phones had one available (0)')
+    expect(within(box).queryByTestId('reach-typed')).toBeNull() // no division by zero
+    expect(screen.queryByText('NaN%')).toBeNull()
   })
 
   it('shows the Android share of tips from wallet payers in its own row', async () => {
