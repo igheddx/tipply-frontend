@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { AnimatePresence, motion } from 'framer-motion'
+import { useSheetPresence } from '../../hooks/useSheetPresence'
 import { getApiBaseUrl } from '../../utils/config'
 import logger from '../../utils/logger'
 import { BrandIcon } from '../icons/BrandIcons'
@@ -94,6 +94,14 @@ function SongRow({ song, onChoose, showMarker }: { song: Song; onChoose: (song: 
 const FIRST_PAGE = 100
 const WHOLE_LIST = 5000 // the same as the most the server returns in one request
 
+// The sheet's motion, in CSS. It used to be a spring (damping 32, stiffness 320) from the animation library. That spring settles in 328 ms and
+// overshoots by 0.2% (invisible), and this cubic-bezier follows it to within 1% of the travel at every moment. The backdrop fades over 300 ms
+// with the library's default fade curve.
+const SHEET_MS = 330
+const SHEET_EASE = 'cubic-bezier(0.25, 0.16, 0.2, 1)'
+const FADE_MS = 300
+const FADE_EASE = 'cubic-bezier(0.25, 0.1, 0.35, 1)'
+
 export function SongPickerSheet({ open, deviceUuid, current, onClose, onPick, askAmount = null, onSkip }: SongPickerSheetProps) {
   const [query, setQuery] = useState('')
   const [songs, setSongs] = useState<Song[]>([])
@@ -103,6 +111,7 @@ export function SongPickerSheet({ open, deviceUuid, current, onClose, onPick, as
   const [note, setNote] = useState('')
   const requestId = useRef(0)
   const asking = askAmount != null && !!onSkip
+  const { mounted, shown } = useSheetPresence(open, SHEET_MS)
   // Read at the moment the sheet opens, so a new `current` object on every parent render cannot reset the fields
   const currentRef = useRef(current)
   currentRef.current = current
@@ -162,159 +171,158 @@ export function SongPickerSheet({ open, deviceUuid, current, onClose, onPick, as
     })
   }
 
-  return (
-    <AnimatePresence>
-      {open && (
-        <motion.div
-          className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/60"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          onClick={onClose}
-        >
-          <motion.div
-            role="dialog"
-            aria-label="Pick a song"
-            className="flex w-full max-w-[480px] flex-col rounded-t-[22px] bg-white text-ink-900 shadow-2xl"
-            style={{ maxHeight: '85dvh', height: chosen ? 'auto' : '85dvh', paddingBottom: 'calc(env(safe-area-inset-bottom) + 0.75rem)' }}
-            initial={{ y: '100%' }}
-            animate={{ y: 0 }}
-            exit={{ y: '100%' }}
-            transition={{ type: 'spring', damping: 32, stiffness: 320 }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="mx-auto mt-2.5 h-1 w-10 flex-none rounded-full bg-slate-300" />
+  if (!mounted) return null
 
-            {chosen ? (
-              <div className="flex flex-col gap-3 px-4 pb-1 pt-3">
-                <div className="flex items-center gap-3 rounded-2xl bg-brand-50 p-3">
-                  <span className="flex h-10 w-10 flex-none items-center justify-center rounded-full bg-white">
-                    <BrandIcon name="music" size={22} />
-                  </span>
-                  <div className="min-w-0">
-                    <div className="truncate font-bold">{chosen.songTitle}</div>
-                    <div className="truncate text-sm text-ink-700">{chosen.artist}</div>
-                  </div>
-                </div>
-                {chosen.isFavorite && (
-                  <div className="flex items-start gap-2.5 rounded-xl border border-brand-100 border-l-4 border-l-brand-500 bg-brand-50/70 px-3 py-2.5 text-sm text-ink-900">
-                    <FavoriteStar filled size={18} className="mt-0.5 flex-none text-brand-600" />
-                    <span>
-                      <strong>Artist favorite.</strong> One of the songs they do best. Great pick!
-                    </span>
-                  </div>
-                )}
-                {chosen.playedMinutesAgo != null && (
-                  <div className="flex items-start gap-2.5 rounded-xl bg-amber-50 px-3 py-2.5 text-sm text-amber-900">
-                    <BrandIcon name="info" size={18} />
-                    <span>
-                      <strong>{playedLabel(chosen.playedMinutesAgo)}.</strong> You can still request it, or pick a different song.
-                    </span>
-                  </div>
-                )}
-                <input
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  maxLength={50}
-                  placeholder="Your name (optional)"
-                  className="rounded-xl border border-slate-300 px-3 py-3 text-base focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-100"
-                />
-                <textarea
-                  value={note}
-                  onChange={(e) => setNote(e.target.value)}
-                  maxLength={200}
-                  rows={2}
-                  placeholder="Add a note (optional)"
-                  className="resize-none rounded-xl border border-slate-300 px-3 py-3 text-base focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-100"
-                />
-                <div className="flex items-start gap-2.5 rounded-xl bg-slate-50 px-3 py-2.5 text-sm text-ink-700">
-                  <BrandIcon name="info" size={18} />
-                  <span>
-                    {asking ? (
-                      <>
-                        <strong className="text-ink-900">Your ${askAmount} tip goes with this song.</strong> Tap send when you are ready.
-                      </>
-                    ) : (
-                      <>
-                        <strong className="text-ink-900">Next, choose a tip amount.</strong> Your song request is sent together with your tip.
-                      </>
-                    )}
-                  </span>
-                </div>
-                <Button size="lg" block onClick={confirm}>
-                  {asking ? `Send $${askAmount} tip with this song` : 'Choose a tip amount'}
-                  {!asking && <BrandIcon name="chevron-right" size={18} tone="inverse" strokeWidth={2.2} />}
-                </Button>
-                <Button variant="ghost" block onClick={() => setChosen(null)}>
-                  Choose a different song
-                </Button>
-                {asking && (
-                  <Button variant="ghost" block onClick={onSkip}>
-                    No thanks, just tip ${askAmount}
-                  </Button>
-                )}
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/60"
+      style={{ opacity: shown ? 1 : 0, transition: `opacity ${FADE_MS}ms ${FADE_EASE}` }}
+      onClick={onClose}
+    >
+      <div
+        role="dialog"
+        aria-label="Pick a song"
+        className="flex w-full max-w-[480px] flex-col rounded-t-[22px] bg-white text-ink-900 shadow-2xl"
+        style={{
+          maxHeight: '85dvh',
+          height: chosen ? 'auto' : '85dvh',
+          paddingBottom: 'calc(env(safe-area-inset-bottom) + 0.75rem)',
+          transform: shown ? 'translateY(0)' : 'translateY(100%)',
+          transition: `transform ${SHEET_MS}ms ${SHEET_EASE}`,
+          willChange: 'transform'
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="mx-auto mt-2.5 h-1 w-10 flex-none rounded-full bg-slate-300" />
+
+        {chosen ? (
+          <div className="flex flex-col gap-3 px-4 pb-1 pt-3">
+            <div className="flex items-center gap-3 rounded-2xl bg-brand-50 p-3">
+              <span className="flex h-10 w-10 flex-none items-center justify-center rounded-full bg-white">
+                <BrandIcon name="music" size={22} />
+              </span>
+              <div className="min-w-0">
+                <div className="truncate font-bold">{chosen.songTitle}</div>
+                <div className="truncate text-sm text-ink-700">{chosen.artist}</div>
               </div>
-            ) : (
-              <>
-                <div className="flex flex-none items-center justify-between px-4 pb-2 pt-3">
-                  <h2 className="text-lg font-extrabold">{asking ? `Request a song with your $${askAmount} tip?` : 'Pick a song'}</h2>
-                  <button type="button" onClick={onClose} aria-label="Close" className="flex h-9 w-9 items-center justify-center rounded-full active:bg-slate-100">
-                    <BrandIcon name="close" size={18} color="#64748B" />
-                  </button>
-                </div>
-                {asking && (
-                  <div className="flex-none px-4 pb-2">
-                    <Button variant="secondary" block onClick={onSkip}>
-                      No thanks, just tip ${askAmount}
-                    </Button>
-                  </div>
-                )}
-                <div className="mx-4 mb-1 flex flex-none items-center gap-2 rounded-xl border-[1.5px] border-brand-600 px-3 py-2.5">
-                  <BrandIcon name="search" size={18} tone="muted" />
-                  <input
-                    type="search"
-                    value={query}
-                    onChange={(e) => setQuery(e.target.value)}
-                    placeholder="Search songs or artists"
-                    aria-label="Search songs or artists"
-                    className="min-w-0 flex-1 bg-transparent text-base outline-none placeholder:text-ink-500"
-                  />
-                </div>
-                <ul className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4">
-                  {showSections && (
-                    <li className="px-1 pb-1 pt-2">
-                      <div className="flex items-center gap-1.5 text-xs font-extrabold uppercase tracking-wider text-brand-700">
-                        <FavoriteStar filled size={14} className="text-brand-600" />
-                        Artist favorites
-                      </div>
-                      <p className="text-sm text-ink-700">Songs they do best</p>
-                    </li>
-                  )}
-                  {(showSections ? favorites : songs).map((song) => (
-                    <SongRow key={song.id} song={song} onChoose={setChosen} showMarker={!showSections} />
-                  ))}
-                  {showSections && others.length > 0 && (
-                    <li className="px-1 pb-1 pt-4">
-                      <div className="text-xs font-extrabold uppercase tracking-wider text-ink-700">All songs</div>
-                    </li>
-                  )}
-                  {showSections && others.map((song) => <SongRow key={song.id} song={song} onChoose={setChosen} showMarker={!showSections} />)}
-                  {!loading && songs.length === 0 && (
-                    <li className="px-2 py-10 text-center text-sm text-ink-700">
-                      {query.trim() ? `No songs match “${query.trim()}”.` : 'This performer has not added any songs yet. You can still send a tip.'}
-                      {query.trim() && (
-                        <button type="button" onClick={() => setQuery('')} className="mt-2 block w-full font-semibold text-brand-700">
-                          Show all songs
-                        </button>
-                      )}
-                    </li>
-                  )}
-                </ul>
-              </>
+            </div>
+            {chosen.isFavorite && (
+              <div className="flex items-start gap-2.5 rounded-xl border border-brand-100 border-l-4 border-l-brand-500 bg-brand-50/70 px-3 py-2.5 text-sm text-ink-900">
+                <FavoriteStar filled size={18} className="mt-0.5 flex-none text-brand-600" />
+                <span>
+                  <strong>Artist favorite.</strong> One of the songs they do best. Great pick!
+                </span>
+              </div>
             )}
-          </motion.div>
-        </motion.div>
-      )}
-    </AnimatePresence>
+            {chosen.playedMinutesAgo != null && (
+              <div className="flex items-start gap-2.5 rounded-xl bg-amber-50 px-3 py-2.5 text-sm text-amber-900">
+                <BrandIcon name="info" size={18} />
+                <span>
+                  <strong>{playedLabel(chosen.playedMinutesAgo)}.</strong> You can still request it, or pick a different song.
+                </span>
+              </div>
+            )}
+            <input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              maxLength={50}
+              placeholder="Your name (optional)"
+              className="rounded-xl border border-slate-300 px-3 py-3 text-base focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-100"
+            />
+            <textarea
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              maxLength={200}
+              rows={2}
+              placeholder="Add a note (optional)"
+              className="resize-none rounded-xl border border-slate-300 px-3 py-3 text-base focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-100"
+            />
+            <div className="flex items-start gap-2.5 rounded-xl bg-slate-50 px-3 py-2.5 text-sm text-ink-700">
+              <BrandIcon name="info" size={18} />
+              <span>
+                {asking ? (
+                  <>
+                    <strong className="text-ink-900">Your ${askAmount} tip goes with this song.</strong> Tap send when you are ready.
+                  </>
+                ) : (
+                  <>
+                    <strong className="text-ink-900">Next, choose a tip amount.</strong> Your song request is sent together with your tip.
+                  </>
+                )}
+              </span>
+            </div>
+            <Button size="lg" block onClick={confirm}>
+              {asking ? `Send $${askAmount} tip with this song` : 'Choose a tip amount'}
+              {!asking && <BrandIcon name="chevron-right" size={18} tone="inverse" strokeWidth={2.2} />}
+            </Button>
+            <Button variant="ghost" block onClick={() => setChosen(null)}>
+              Choose a different song
+            </Button>
+            {asking && (
+              <Button variant="ghost" block onClick={onSkip}>
+                No thanks, just tip ${askAmount}
+              </Button>
+            )}
+          </div>
+        ) : (
+          <>
+            <div className="flex flex-none items-center justify-between px-4 pb-2 pt-3">
+              <h2 className="text-lg font-extrabold">{asking ? `Request a song with your $${askAmount} tip?` : 'Pick a song'}</h2>
+              <button type="button" onClick={onClose} aria-label="Close" className="flex h-9 w-9 items-center justify-center rounded-full active:bg-slate-100">
+                <BrandIcon name="close" size={18} color="#64748B" />
+              </button>
+            </div>
+            {asking && (
+              <div className="flex-none px-4 pb-2">
+                <Button variant="secondary" block onClick={onSkip}>
+                  No thanks, just tip ${askAmount}
+                </Button>
+              </div>
+            )}
+            <div className="mx-4 mb-1 flex flex-none items-center gap-2 rounded-xl border-[1.5px] border-brand-600 px-3 py-2.5">
+              <BrandIcon name="search" size={18} tone="muted" />
+              <input
+                type="search"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Search songs or artists"
+                aria-label="Search songs or artists"
+                className="min-w-0 flex-1 bg-transparent text-base outline-none placeholder:text-ink-500"
+              />
+            </div>
+            <ul className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4">
+              {showSections && (
+                <li className="px-1 pb-1 pt-2">
+                  <div className="flex items-center gap-1.5 text-xs font-extrabold uppercase tracking-wider text-brand-700">
+                    <FavoriteStar filled size={14} className="text-brand-600" />
+                    Artist favorites
+                  </div>
+                  <p className="text-sm text-ink-700">Songs they do best</p>
+                </li>
+              )}
+              {(showSections ? favorites : songs).map((song) => (
+                <SongRow key={song.id} song={song} onChoose={setChosen} showMarker={!showSections} />
+              ))}
+              {showSections && others.length > 0 && (
+                <li className="px-1 pb-1 pt-4">
+                  <div className="text-xs font-extrabold uppercase tracking-wider text-ink-700">All songs</div>
+                </li>
+              )}
+              {showSections && others.map((song) => <SongRow key={song.id} song={song} onChoose={setChosen} showMarker={!showSections} />)}
+              {!loading && songs.length === 0 && (
+                <li className="px-2 py-10 text-center text-sm text-ink-700">
+                  {query.trim() ? `No songs match “${query.trim()}”.` : 'This performer has not added any songs yet. You can still send a tip.'}
+                  {query.trim() && (
+                    <button type="button" onClick={() => setQuery('')} className="mt-2 block w-full font-semibold text-brand-700">
+                      Show all songs
+                    </button>
+                  )}
+                </li>
+              )}
+            </ul>
+          </>
+        )}
+      </div>
+    </div>
   )
 }
