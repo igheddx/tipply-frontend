@@ -3,6 +3,7 @@ import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxi
 import { BrandIcon, IconTile, type BrandIconName } from '../icons/BrandIcons'
 import { Banner, Button, Card, DisclosureChevron, EmptyState, StatCard, StatusChip } from '../ui'
 import { ChartTooltip } from '../charts/ChartTooltip'
+import { ManagePayouts } from './ManagePayouts'
 
 export interface HomeNextStep {
   id: string
@@ -252,6 +253,9 @@ export function HomeTab({ data, onGoToDevices, onGoToTips, onGoToLive, showSlot,
             <MoneyRow key={r.label} row={r} />
           ))}
         </ul>
+        <div className="border-t border-slate-100 px-5 py-3">
+          <ManagePayouts />
+        </div>
         <div className="border-t border-slate-100 px-5 py-2">
           <button
             type="button"
