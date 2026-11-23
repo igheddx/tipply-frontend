@@ -38,7 +38,7 @@ export function ManagePayouts() {
 
   return (
     <div className="flex flex-wrap items-center justify-between gap-3">
-      <p className="min-w-0 flex-1 text-sm text-ink-700">See your balance, withdraw, and choose automatic or manual payouts in your Stripe dashboard.</p>
+      <p className="min-w-0 flex-1 text-sm text-ink-700">See your balance and choose automatic or manual payouts in your Stripe dashboard.</p>
       <Button size="sm" variant="secondary" icon="wallet" loading={busy} onClick={() => void open()}>
         Manage payouts
       </Button>

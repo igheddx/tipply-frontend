@@ -4,6 +4,7 @@ import { BrandIcon, IconTile, type BrandIconName } from '../icons/BrandIcons'
 import { Banner, Button, Card, DisclosureChevron, EmptyState, StatCard, StatusChip } from '../ui'
 import { ChartTooltip } from '../charts/ChartTooltip'
 import { ManagePayouts } from './ManagePayouts'
+import { WithdrawMoney } from './WithdrawMoney'
 
 export interface HomeNextStep {
   id: string
@@ -51,6 +52,8 @@ interface HomeTabProps {
   alertsSlot?: ReactNode
   /** Top right of the greeting, e.g. the Refresh button */
   headerAction?: ReactNode
+  /** Called after a withdrawal is sent, so the balances can be read again */
+  onWithdrawn?: () => void
   formatCurrency: (n: number) => string
 }
 
@@ -76,7 +79,7 @@ function MoneyRow({ row }: { row: { label: string; hint: string; value: string; 
   )
 }
 
-export function HomeTab({ data, onGoToDevices, onGoToTips, onGoToLive, showSlot, regularsSlot, requestsSlot, alertsSlot, headerAction, formatCurrency }: HomeTabProps) {
+export function HomeTab({ data, onGoToDevices, onGoToTips, onGoToLive, showSlot, regularsSlot, requestsSlot, alertsSlot, headerAction, onWithdrawn, formatCurrency }: HomeTabProps) {
   const openSteps = data.nextSteps.filter(s => !s.done)
   const [showMore, setShowMore] = useState(false)
   const money = (n: number) => (data.balancesLoading ? '…' : formatCurrency(n))
@@ -253,7 +256,8 @@ export function HomeTab({ data, onGoToDevices, onGoToTips, onGoToLive, showSlot,
             <MoneyRow key={r.label} row={r} />
           ))}
         </ul>
-        <div className="border-t border-slate-100 px-5 py-3">
+        <div className="space-y-3 border-t border-slate-100 px-5 py-3">
+          <WithdrawMoney onWithdrawn={onWithdrawn} />
           <ManagePayouts />
         </div>
         <div className="border-t border-slate-100 px-5 py-2">

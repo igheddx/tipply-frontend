@@ -31,7 +31,7 @@ describe('ManagePayouts', () => {
 
   it('says what it is for, in plain words', () => {
     render(<ManagePayouts />)
-    expect(screen.getByText(/See your balance, withdraw, and choose automatic or manual payouts in your Stripe dashboard/)).toBeInTheDocument()
+    expect(screen.getByText(/See your balance and choose automatic or manual payouts in your Stripe dashboard/)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Manage payouts/ })).toBeInTheDocument()
   })
 
