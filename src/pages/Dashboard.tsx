@@ -1535,6 +1535,7 @@ const Dashboard: React.FC = () => {
                 regularsSlot={<RepeatCard refreshKey={updatedAt?.getTime() ?? 0} />}
                 requestsSlot={<RefundRequestsBanner refreshKey={updatedAt?.getTime() ?? 0} />}
                 headerAction={<RefreshControl onRefresh={refreshPage} busy={refreshing} updatedAt={updatedAt} />}
+                onWithdrawn={() => void refreshPage()}
               />
             )}
 
