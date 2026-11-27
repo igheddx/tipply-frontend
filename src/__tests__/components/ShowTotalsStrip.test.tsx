@@ -15,7 +15,7 @@ afterEach(() => vi.useRealTimers())
 
 describe('ShowTotalsStrip, the night total on Live', () => {
   it('shows what the performer keeps, the tip count and the amount tipped', async () => {
-    api.current.mockResolvedValue({ data: show() })
+    api.current.mockResolvedValue({ data: { show: show() } })
     render(<ShowTotalsStrip active />)
 
     expect(await screen.findByText('Tonight')).toBeInTheDocument()
@@ -25,7 +25,7 @@ describe('ShowTotalsStrip, the night total on Live', () => {
   })
 
   it('says "1 tip" for one, and mentions tips not charged yet', async () => {
-    api.current.mockResolvedValue({ data: show({ tipCount: 1, waitingGross: 20 }) })
+    api.current.mockResolvedValue({ data: { show: show({ tipCount: 1, waitingGross: 20 }) } })
     render(<ShowTotalsStrip active />)
 
     expect(await screen.findByText('1 tip')).toBeInTheDocument()
@@ -33,7 +33,7 @@ describe('ShowTotalsStrip, the night total on Live', () => {
   })
 
   it('shows nothing when there is no show, or shows are off', async () => {
-    api.current.mockResolvedValue({ data: null })
+    api.current.mockResolvedValue({ data: { show: null } })
     const { container } = render(<ShowTotalsStrip active />)
     await act(async () => {})
     expect(container).toBeEmptyDOMElement()
@@ -47,12 +47,12 @@ describe('ShowTotalsStrip, the night total on Live', () => {
 
   it('updates as tips arrive, and keeps the last total when a refresh fails', async () => {
     vi.useFakeTimers()
-    api.current.mockResolvedValueOnce({ data: show({ tipCount: 7, youKeep: 129.5 }) })
+    api.current.mockResolvedValueOnce({ data: { show: show({ tipCount: 7, youKeep: 129.5 }) } })
     render(<ShowTotalsStrip active refreshMs={1000} />)
     await act(async () => {})
     expect(screen.getByText('7 tips')).toBeInTheDocument()
 
-    api.current.mockResolvedValueOnce({ data: show({ tipCount: 8, youKeep: 140 }) })
+    api.current.mockResolvedValueOnce({ data: { show: show({ tipCount: 8, youKeep: 140 }) } })
     await act(async () => { await vi.advanceTimersByTimeAsync(1000) })
     expect(screen.getByText('8 tips')).toBeInTheDocument()
     expect(screen.getByLabelText('You keep $140.00')).toBeInTheDocument()
@@ -68,5 +68,15 @@ describe('ShowTotalsStrip, the night total on Live', () => {
     expect(screen.getByText('This show')).toBeInTheDocument()
     expect(screen.getByText('30 tips')).toBeInTheDocument()
     expect(api.current).not.toHaveBeenCalled()
+  })
+
+  it('never shows NaN: the numbers come from inside the { show } the API answers with', async () => {
+    api.current.mockResolvedValue({ data: { show: show({ isLive: false, tipCount: 0, gross: 0, youKeep: 0 }) } })
+    const { container } = render(<ShowTotalsStrip active />)
+
+    expect(await screen.findByText('This show')).toBeInTheDocument()
+    expect(container.textContent).not.toContain('NaN')
+    expect(screen.getByText('0 tips')).toBeInTheDocument()
+    expect(screen.getByText('$0.00 tipped')).toBeInTheDocument()
   })
 })

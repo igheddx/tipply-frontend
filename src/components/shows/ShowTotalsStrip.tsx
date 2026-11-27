@@ -26,8 +26,9 @@ export function ShowTotalsStrip({ active, picked = null, refreshMs = 5000 }: Pro
     const load = async () => {
       try {
         const res = await showApi.current()
-        // keep the last numbers on a failed refresh: a blip should not blank the total
-        if (!cancelled && res.data) setCurrent(res.data as ShowSummary)
+        // The API answers { show }: the show itself is inside. Keep the last numbers on a failed refresh: a blip should not blank the total
+        const next = res.data?.show as ShowSummary | null | undefined
+        if (!cancelled && next) setCurrent(next)
       } catch {
         /* the strip simply keeps what it had */
       }
