@@ -15,7 +15,7 @@ class FakeIntersectionObserver { observe() {} unobserve() {} disconnect() {} }
 beforeEach(() => {
   ;(globalThis as any).IntersectionObserver = FakeIntersectionObserver
   localStorage.clear()
-  api.current.mockReset().mockResolvedValue({ data: { id: 's1', name: null, venueName: null, startedAt: new Date().toISOString(), endedAt: new Date().toISOString(), isLive: true, tipCount: 12, gross: 260, waitingGross: 0, fees: 20, youKeep: 240, refundedCount: 0, refundedGross: 0 } })
+  api.current.mockReset().mockResolvedValue({ data: { show: { id: 's1', name: null, venueName: null, startedAt: new Date().toISOString(), endedAt: new Date().toISOString(), isLive: true, tipCount: 12, gross: 260, waitingGross: 0, fees: 20, youKeep: 240, refundedCount: 0, refundedGross: 0 } } })
   api.list.mockReset().mockResolvedValue({ data: { shows: [], total: 0, page: 1, pageSize: 20 } })
   global.fetch = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ songRequests: [], tipsWithoutSong: [] }), text: async () => '' }) as any
 })
